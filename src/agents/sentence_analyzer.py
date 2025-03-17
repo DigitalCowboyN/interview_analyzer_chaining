@@ -63,6 +63,7 @@ class SentenceAnalyzer:
         return results
 
     def analyze_sentences(self, sentences: list) -> Generator[Dict[str, Any], None, None]:
+        pass  # Placeholder implementation
     """Analyze sentences, yielding structured results individually."""
     contexts = context_builder.build_all_contexts(sentences)
 
