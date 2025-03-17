@@ -20,7 +20,7 @@ def test_successful_call(mock_create, agent):
 
 @patch("openai.ChatCompletion.create")
 def test_retry_on_rate_limit(mock_create, agent):
-    mock_response = type("obj", (object,), {"request": "mock_request"})
+    mock_response = type("obj", (object,), {"request": "mock_request", "status_code": 429})
     mock_create.side_effect = [RateLimitError("Rate limit exceeded", response=mock_response, body=None), type("obj", (object,), {"choices": [type("obj", (object,), {"message": type("obj", (object,), {"content": "Recovered response"})})]})]
 
     response = agent.call_model("Test prompt")
