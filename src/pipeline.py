@@ -34,7 +34,7 @@ async def process_file(input_file: Path, output_dir: Path):
     logger.info(f"Finished processing {input_file}, results saved to {output_file}")
 
 
-def run_pipeline(input_dir: Path, output_dir: Path):
+async def run_pipeline(input_dir: Path, output_dir: Path):
     """Run pipeline across all text files in input directory."""
     input_files = list(input_dir.glob("*.txt"))
 
@@ -45,6 +45,6 @@ def run_pipeline(input_dir: Path, output_dir: Path):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for input_file in input_files:
-        process_file(input_file, output_dir)
+        await process_file(input_file, output_dir)  # Add await here
 
     logger.info("Pipeline run complete.")
