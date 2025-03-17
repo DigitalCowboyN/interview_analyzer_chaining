@@ -21,7 +21,7 @@ class SentenceAnalyzer:
 
         # Function type classification (no context)
         function_prompt = self.prompts["sentence_function_type"]["prompt"].format(sentence=sentence)
-        results["function_type"] = await agent.call_model(function_prompt)
+        results["function_type"] = agent.call_model(function_prompt)  # Remove await
 
         # Structure type classification (no context)
         structure_prompt = self.prompts["sentence_structure_type"]["prompt"].format(sentence=sentence)
