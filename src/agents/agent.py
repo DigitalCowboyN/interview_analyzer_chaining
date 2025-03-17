@@ -23,7 +23,7 @@ class OpenAIAgent:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                    response = openai.ChatCompletion.create(
+                response = openai.ChatCompletion.create(
                         model=self.model,
                     messages=[{"role": "user", "content": prompt}], 
                     max_tokens=self.max_tokens,
@@ -32,7 +32,7 @@ class OpenAIAgent:
                     max_tokens=self.max_tokens,
                     temperature=self.temperature,
                 )
-            result = response['choices'][0]['message']['content'].strip()
+                result = response['choices'][0]['message']['content'].strip()
                 logger.info("Successful OpenAI API call.")
                 return result
 
