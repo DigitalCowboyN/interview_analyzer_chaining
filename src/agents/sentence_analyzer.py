@@ -63,18 +63,16 @@ class SentenceAnalyzer:
         return results
 
     def analyze_sentences(self, sentences: list) -> Generator[Dict[str, Any], None, None]:
-        pass  # Placeholder implementation
-    """Analyze sentences, yielding structured results individually."""
-    contexts = context_builder.build_all_contexts(sentences)
+        contexts = context_builder.build_all_contexts(sentences)
 
-    for idx, sentence in enumerate(sentences):
-        result = self.classify_sentence(sentence, contexts[idx])
-        result.update({"sentence_id": idx, "sentence": sentence})
-        logger.debug(f"Completed analysis for sentence ID {idx}")
+        for idx, sentence in enumerate(sentences):
+            result = self.classify_sentence(sentence, contexts[idx])
+            result.update({"sentence_id": idx, "sentence": sentence})
+            logger.debug(f"Completed analysis for sentence ID {idx}")
 
-        # Removed redundant assignments and updates
-        logger.debug(f"Finalized result: {result}")
-        yield result
+            # Removed redundant assignments and updates
+            logger.debug(f"Finalized result: {result}")
+            yield result
 
 
 # Singleton instance for pipeline use
