@@ -37,7 +37,7 @@ def test_retry_on_api_error(mock_create, agent):
 
 @patch("openai.ChatCompletion.create")
 def test_max_retry_exceeded(mock_create, agent):
-    mock_response = type("obj", (object,), {"request": "mock_request"})
+    mock_response = type("obj", (object,), {"request": "mock_request", "status_code": 429})
     mock_create.side_effect = RateLimitError("Rate limit exceeded", response=mock_response, body=None)
 
     with pytest.raises(Exception, match="Max retry attempts exceeded"):
