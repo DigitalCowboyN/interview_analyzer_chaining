@@ -15,7 +15,7 @@ class SentenceAnalyzer:
         prompts_path = config["classification"]["local"]["prompt_files"]["no_context"]
         self.prompts = load_yaml(prompts_path)
 
-    def classify_sentence(self, sentence: str, contexts: Dict[str, str]) -> Dict[str, Any]:
+    async def classify_sentence(self, sentence: str, contexts: Dict[str, str]) -> Dict[str, Any]:
         """Classify a single sentence across all required dimensions."""
         results = {}
 
@@ -66,7 +66,7 @@ class SentenceAnalyzer:
         contexts = context_builder.build_all_contexts(sentences)
 
         for idx, sentence in enumerate(sentences):
-            result = self.classify_sentence(sentence, contexts[idx])
+            result = await self.classify_sentence(sentence, contexts[idx])
             result.update({"sentence_id": idx, "sentence": sentence})
             logger.debug(f"Completed analysis for sentence ID {idx}")
 
