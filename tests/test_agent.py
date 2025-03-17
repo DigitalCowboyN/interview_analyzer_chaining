@@ -12,7 +12,13 @@ def agent():
 
 @patch("openai.ChatCompletion.create")
 def test_successful_call(mock_create, agent):
-    mock_create.return_value = type("obj", (object,), {"choices": [type("obj", (object,), {"message": type("obj", (object,), {"content": "Test response"})})]})
+    mock_create.return_value = {
+        "choices": [{
+            "message": {
+                "content": "Test response"
+            }
+        }]
+    }
 
     response = agent.call_model("Test prompt")
     assert response == "Test response"
@@ -20,8 +26,20 @@ def test_successful_call(mock_create, agent):
 
 @patch("openai.ChatCompletion.create")
 def test_retry_on_rate_limit(mock_create, agent):
-    mock_response = type("obj", (object,), {"request": "mock_request", "status_code": 429})
-    mock_create.side_effect = [RateLimitError("Rate limit exceeded", response=mock_response, body=None), type("obj", (object,), {"choices": [type("obj", (object,), {"message": type("obj", (object,), {"content": "Recovered response"})})]})]
+    mock_response = {
+        "request": "mock_request",
+        "status_code": 429
+    }
+    mock_create.side_effect = [
+        RateLimitError("Rate limit exceeded", response=mock_response, body=None),
+        {
+            "choices": [{
+                "message": {
+                    "content": "Recovered response"
+                }
+            }]
+        }
+    ]
 
     response = agent.call_model("Test prompt")
     assert response == "Recovered response"
@@ -29,7 +47,16 @@ def test_retry_on_rate_limit(mock_create, agent):
 
 @patch("openai.ChatCompletion.create")
 def test_retry_on_api_error(mock_create, agent):
-    mock_create.side_effect = [APIError("API error", request="mock_request", body="mock_body"), type("obj", (object,), {"choices": [type("obj", (object,), {"message": type("obj", (object,), {"content": "Recovered from API error"})})]})]
+    mock_create.side_effect = [
+        APIError("API error", request="mock_request", body="mock_body"),
+        {
+            "choices": [{
+                "message": {
+                    "content": "Recovered from API error"
+                }
+            }]
+        }
+    ]
 
     response = agent.call_model("Test prompt")
     assert response == "Recovered from API error"
