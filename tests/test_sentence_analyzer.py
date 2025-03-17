@@ -1,5 +1,7 @@
 # tests/test_sentence_analyzer.py
 import pytest
+
+pytestmark = pytest.mark.asyncio
 from unittest.mock import patch
 from src.agents.sentence_analyzer import SentenceAnalyzer
 
