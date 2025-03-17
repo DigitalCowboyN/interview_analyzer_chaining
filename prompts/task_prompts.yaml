@@ -1,0 +1,147 @@
+# task_prompts.yaml - Prompts for sentence classification tasks
+
+sentence_function_type:
+  prompt: |
+    Determine the function type of the sentence provided.
+
+    Options:
+      - declarative
+      - interrogative
+      - imperative
+      - exclamatory
+
+    Format: <type> [confidence]
+
+    Sentence: "{sentence}"
+
+sentence_structure_type:
+  prompt: |
+    Classify the structure type of the given sentence.
+
+    Options:
+      - simple
+      - compound
+      - complex
+      - compound-complex
+
+    Format: <type> [confidence]
+
+    Sentence: "{sentence}"
+
+sentence_purpose:
+  prompt: |
+    Given the sentence and its surrounding context, identify the sentence's purpose from the perspective of an outside observer.
+
+    Options:
+      - Statement
+      - Query
+      - Exclamation
+      - Answer
+      - Commentary
+      - Observation
+      - Retraction
+      - Mockery
+      - Objection
+      - Clarification
+      - Conclusion
+      - Confession
+      - Speculation
+      - Recitation
+      - Correction
+      - Explanation
+      - Qualification
+      - Threat
+      - Warning
+      - Advisory
+      - Request
+      - Addendum
+      - Musing
+      - Amendment
+
+    Format: <Purpose> [confidence]
+
+    Sentence: "{sentence}"
+    Context:
+    """
+    {context}
+    """
+
+topic_level_1:
+  prompt: |
+    Classify the topic of the given sentence based on its immediate surrounding context (±2 sentences).
+
+    Options:
+      - goals
+      - tools
+      - processes
+      - experiences
+      - observations
+      - pain points
+      - responsibilities
+      - collaborations
+      - reporting
+      - managing
+      - mentoring
+      - strategy
+      - operations
+      - small talk
+      - niceties
+
+    Format: <topic> [confidence]
+
+    Sentence: "{sentence}"
+    Context:
+    """
+    {context}
+    """
+
+topic_level_3:
+  prompt: |
+    Classify the topic of the sentence considering a broader context (±6 sentences).
+
+    Options:
+      - goals
+      - tools
+      - processes
+      - experiences
+      - observations
+      - pain points
+      - responsibilities
+      - collaborations
+      - reporting
+      - managing
+      - mentoring
+      - strategy
+      - operations
+      - small talk
+      - niceties
+
+    Format: <topic> [confidence]
+
+    Sentence: "{sentence}"
+    Context:
+    """
+    {context}
+    """
+
+topic_overall_keywords:
+  prompt: |
+    Provide up to 6 keywords that best represent the main topics of conversation based on the surrounding 10 sentences.
+
+    Format: keyword1, keyword2, keyword3, ...
+
+    Context:
+    """
+    {context}
+    """
+
+domain_specific_keywords:
+  prompt: |
+    Identify any domain-specific keywords present in the sentence from the provided domain-specific list below. Include up to 6 keywords found.
+
+    Domain-specific list:
+    {domain_keywords}
+
+    Sentence: "{sentence}"
+
+    Format: keyword1, keyword2, keyword3, ... (or "None" if no keywords found)
