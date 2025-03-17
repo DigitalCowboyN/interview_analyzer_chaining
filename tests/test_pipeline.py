@@ -23,13 +23,14 @@ def sample_text_file(tmp_path):
     return test_file
 
 
-def test_process_file(sample_text_file, tmp_path):
+@pytest.mark.asyncio
+async def test_process_file(sample_text_file, tmp_path):
     from src.pipeline import process_file
 
     output_dir = tmp_path / "output"
     output_dir.mkdir()
 
-    process_file(sample_text_file, output_dir)
+    await process_file(sample_text_file, output_dir)  # Use await
 
     output_file = output_dir / "test_file_analysis.json"
     assert output_file.exists()
