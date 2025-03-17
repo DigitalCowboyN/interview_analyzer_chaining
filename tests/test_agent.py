@@ -29,7 +29,7 @@ def test_retry_on_rate_limit(mock_create, agent):
 
 @patch("openai.ChatCompletion.create")
 def test_retry_on_api_error(mock_create, agent):
-    mock_create.side_effect = [APIError("API error", request="mock_request", body=None), type("obj", (object,), {"choices": [type("obj", (object,), {"message": type("obj", (object,), {"content": "Recovered from API error"})})]})]
+    mock_create.side_effect = [APIError("API error", request="mock_request", body="mock_body"), type("obj", (object,), {"choices": [type("obj", (object,), {"message": type("obj", (object,), {"content": "Recovered from API error"})})]})]
 
     response = agent.call_model("Test prompt")
     assert response == "Recovered from API error"
