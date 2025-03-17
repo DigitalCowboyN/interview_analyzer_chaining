@@ -28,7 +28,6 @@ class OpenAIAgent:
                     messages=[{"role": "user", "content": prompt}], 
                     max_tokens=self.max_tokens,
                     temperature=self.temperature,
-                    model=self.model,
                     max_tokens=self.max_tokens,
                     temperature=self.temperature,
                 )
