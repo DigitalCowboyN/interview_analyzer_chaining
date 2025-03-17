@@ -23,8 +23,11 @@ class OpenAIAgent:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                response = openai.ChatCompletion.create(
-                    messages=[{"role": "user", "content": prompt}],
+                    response = openai.ChatCompletion.create(
+                        model=self.model,
+                    messages=[{"role": "user", "content": prompt}], 
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
                     model=self.model,
                     max_tokens=self.max_tokens,
                     temperature=self.temperature,
