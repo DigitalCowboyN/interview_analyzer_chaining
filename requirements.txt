@@ -21,6 +21,7 @@ torchvision==0.17.2
 
 # Development
 pytest==8.3.3
+pytest-asyncio
 black==24.3.0
 flake8==7.0.0
 isort==5.13.2
