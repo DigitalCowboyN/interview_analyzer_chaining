@@ -32,7 +32,7 @@ class OpenAIAgent:
                     max_tokens=self.max_tokens,
                     temperature=self.temperature,
                 )
-                result = response['choices'][0]['message']['content'].strip()
+            result = response['choices'][0]['message']['content'].strip()
                 logger.info("Successful OpenAI API call.")
                 return result
 
