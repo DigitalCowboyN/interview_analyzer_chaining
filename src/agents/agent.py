@@ -23,7 +23,7 @@ class OpenAIAgent:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                response = openai.ChatCompletion.acreate(
+                response = openai.ChatCompletion.create(
                     # Remove the duplicate model argument
                     messages=[{"role": "user", "content": prompt}], 
                     model=self.model,
