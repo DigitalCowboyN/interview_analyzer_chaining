@@ -17,7 +17,7 @@ def segment_text(text: str) -> list:
     return sentences
 
 
-def process_file(input_file: Path, output_dir: Path):
+async def process_file(input_file: Path, output_dir: Path):
     """Process a single transcript file through the analysis pipeline."""
     logger.info(f"Processing file: {input_file}")
 
@@ -25,7 +25,7 @@ def process_file(input_file: Path, output_dir: Path):
     sentences = segment_text(text)
 
     results = []
-    for analysis_result in sentence_analyzer.analyze_sentences(sentences):
+    async for analysis_result in sentence_analyzer.analyze_sentences(sentences):
         results.append(analysis_result)
 
     output_file = output_dir / f"{input_file.stem}_analysis.json"
