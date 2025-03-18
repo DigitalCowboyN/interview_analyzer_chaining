@@ -1,6 +1,8 @@
 # tests/test_pipeline.py
 import pytest
 from pathlib import Path
+import pytest
+import asyncio
 from src.pipeline import segment_text
 
 

@@ -1,6 +1,8 @@
 # tests/test_agent.py
 import pytest
+import pytest
 from unittest.mock import patch
+import asyncio
 from openai import RateLimitError, APIError
 from unittest.mock import MagicMock
 from src.agents.agent import OpenAIAgent

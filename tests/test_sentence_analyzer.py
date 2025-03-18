@@ -2,6 +2,8 @@
 import pytest
 
 pytestmark = pytest.mark.asyncio
+import pytest
+import asyncio
 from unittest.mock import patch
 from src.agents.sentence_analyzer import SentenceAnalyzer
 
