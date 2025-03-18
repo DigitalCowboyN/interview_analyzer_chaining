@@ -13,22 +13,18 @@ def agent():
     return OpenAIAgent()
 
 
-@patch("openai.ChatCompletion.acreate", new_callable=AsyncMock)
+@patch("openai.responses.create", new_callable=AsyncMock)
 @pytest.mark.asyncio
 async def test_successful_call(mock_create, agent):
     mock_create.return_value = {
-        "choices": [{
-            "message": {
-                "content": "Test response"
-            }
-        }]
+        "output_text": "Test response"  # Update to match the new response structure
     }
 
     response = await agent.call_model("Test prompt")  # Use await
     assert response == "Test response"
 
 
-@patch("openai.ChatCompletion.acreate")
+@patch("openai.responses.create")
 async def test_retry_on_rate_limit(mock_create, agent):
     mock_response = MagicMock()
     mock_response.request = MagicMock()
@@ -36,11 +32,7 @@ async def test_retry_on_rate_limit(mock_create, agent):
     mock_create.side_effect = [
         RateLimitError("Rate limit exceeded", response=mock_response, body=None),
         {
-            "choices": [{
-                "message": {
-                    "content": "Recovered response"
-                }
-            }]
+            "output_text": "Recovered response"  # Update to match the new response structure
         }
     ]  # Ensure proper structure for mock return value
 
@@ -53,11 +45,7 @@ async def test_retry_on_api_error(mock_create, agent):
     mock_create.side_effect = [
         APIError("API error", request="mock_request", body="mock_body"),
         {
-            "choices": [{
-                "message": {
-                    "content": "Recovered from API error"
-                }
-            }]
+            "output_text": "Recovered from API error"  # Update to match the new response structure
         }
     ]  # Ensure proper structure for mock return value
 
