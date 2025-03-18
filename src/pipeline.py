@@ -24,7 +24,7 @@ async def process_file(input_file: Path, output_dir: Path):
     text = input_file.read_text(encoding="utf-8")
     sentences = segment_text(text)
 
-    results = []
+    results = []  # Initialize results list
     async for analysis_result in sentence_analyzer.analyze_sentences(sentences):
         results.append(analysis_result)
 
