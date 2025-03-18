@@ -11,7 +11,7 @@ logger = get_logger()
 class OpenAIAgent:
     def __init__(self):
         self.api_key = config["openai"]["api_key"]
-        openai.api_key = self.api_key
+        openai.api_key = self.api_key  # This line remains unchanged
         self.model = config["openai"]["model_name"]
         self.max_tokens = config["openai"]["max_tokens"]
         self.temperature = config["openai"]["temperature"]
@@ -24,9 +24,9 @@ class OpenAIAgent:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                response = await openai.ChatCompletion.acreate(
-                    model="gpt-4-turbo",
-                    input=function_prompt
+                response = await openai.ChatCompletion.acreate(  # This line remains unchanged
+                    model=self.model,  # Use the model from the config
+                    messages=[{"role": "user", "content": function_prompt}]  # Corrected input structure
                 )
                 logger.debug(f"Received response: {response}")
                 return response["choices"][0]["message"]["content"]
