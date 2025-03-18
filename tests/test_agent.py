@@ -21,7 +21,7 @@ def test_successful_call(mock_create, agent):
         }]
     }
 
-    response = agent.call_model("Test prompt")
+    response = await agent.call_model("Test prompt")  # Use await
     assert response == "Test response"
 
 
@@ -41,7 +41,7 @@ def test_retry_on_rate_limit(mock_create, agent):
         }
     ]  # Ensure proper structure for mock return value
 
-    response = agent.call_model("Test prompt")
+    response = await agent.call_model("Test prompt")  # Use await
     assert response == "Recovered response"
 
 
@@ -58,7 +58,7 @@ def test_retry_on_api_error(mock_create, agent):
         }
     ]  # Ensure proper structure for mock return value
 
-    response = agent.call_model("Test prompt")
+    response = await agent.call_model("Test prompt")  # Use await
     assert response == "Recovered from API error"
 
 

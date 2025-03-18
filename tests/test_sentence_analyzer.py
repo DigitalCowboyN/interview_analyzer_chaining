@@ -28,7 +28,7 @@ async def test_classify_sentence(mock_call_model, analyzer, mock_contexts):
     mock_call_model.return_value = "<type> [0.9]"
 
     sentence = "This is a test sentence."
-    result = await analyzer.classify_sentence(sentence, mock_contexts)
+    result = await analyzer.classify_sentence(sentence, mock_contexts)  # Ensure await is used
 
     assert "function_type" in result
     assert result["function_type"] == "<type> [0.9]"
