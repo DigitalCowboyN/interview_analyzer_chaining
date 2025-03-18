@@ -10,11 +10,11 @@ client = OpenAI(api_key=api_key)
 
 try:
     # Test the responses.create method
-    response = client.responses.create(
+    response = await client.responses.create(  # Ensure this is awaited
         model="gpt-4",
         instructions="You are a coding assistant.",
         input="What is the capital of France?"
     )
-    print(response.output_text)
+    print(response.output_text)  # Ensure this is the correct attribute to access
 except Exception as e:
     print(f"An error occurred: {e}")
