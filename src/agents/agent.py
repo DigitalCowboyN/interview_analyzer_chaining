@@ -24,7 +24,11 @@ class OpenAIAgent:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                response = await openai.Responses.create(
+                from openai import OpenAI
+
+                client = OpenAI(api_key=self.api_key)
+
+                response = await client.responses.create(
                     model="gpt-4-turbo",
                     input=function_prompt
                 )
