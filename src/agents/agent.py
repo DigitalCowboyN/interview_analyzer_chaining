@@ -1,5 +1,6 @@
 # src/agents/agent.py
 import openai
+import asyncio
 import time
 from src.config import config
 from src.utils.logger import get_logger
