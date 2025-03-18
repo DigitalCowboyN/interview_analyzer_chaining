@@ -28,10 +28,8 @@ class OpenAIAgent:
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=self.max_tokens,
                     temperature=self.temperature,
-                    n=1,  # Ensure only one response is returned
                 )
-                # Remove duplicate max_tokens and temperature arguments
-                result = response['choices'][0]['message']['content'].strip()
+                result = response['choices'][0]['message']['content']
                 logger.info("Successful OpenAI API call.")
                 return result
 
