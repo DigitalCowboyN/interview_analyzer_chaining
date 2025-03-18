@@ -18,7 +18,7 @@ class OpenAIAgent:
         self.retry_attempts = config.get("openai_api", {}).get("retry", {}).get("max_attempts", 5)
         self.backoff_factor = config.get("openai_api", {}).get("retry", {}).get("backoff_factor", 2)
 
-    async def call_model(self, function_prompt):
+    async def call_model(self, function_prompt: str) -> str:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
