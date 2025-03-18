@@ -62,7 +62,7 @@ class SentenceAnalyzer:
 
         return results
 
-    async def analyze_sentences(self, sentences: list) -> AsyncGenerator[Dict[str, Any], None]:
+    async def analyze_sentences(self, sentences: list) -> List[Dict[str, Any]]:
         contexts = context_builder.build_all_contexts(sentences)
 
         for idx, sentence in enumerate(sentences):
@@ -72,7 +72,9 @@ class SentenceAnalyzer:
 
             # Removed redundant assignments and updates
             logger.debug(f"Finalized result: {result}")
-            yield result
+            results.append(result)
+
+    return results  # Return the list of results
 
 
 # Singleton instance for pipeline use
