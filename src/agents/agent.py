@@ -34,7 +34,7 @@ class OpenAIAgent:
             except openai.RateLimitError as e:
                 wait_time = self.backoff_factor ** attempt
                 logger.warning(f"Rate limit hit. Retrying after {wait_time} seconds...")
-                await asyncio.sleep(wait_time)  # Use asyncio.sleep for async context
+                await asyncio.sleep(wait_time)  # Ensure await is used
                 attempt += 1
 
             except openai.APIError as e:
