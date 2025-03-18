@@ -43,7 +43,7 @@ class SentenceAnalyzer:
         topic_lvl3_prompt = self.prompts["topic_level_3"]["prompt"].format(
             sentence=sentence, context=contexts["broader"]
         )
-        results["topic_level_3"] = agent.call_model(topic_lvl1_prompt)
+        results["topic_level_3"] = agent.call_model(topic_lvl3_prompt)  # Corrected variable
 
         # Overall keywords (overall context)
         overall_keywords_prompt = self.prompts["topic_overall_keywords"]["prompt"].format(

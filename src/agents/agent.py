@@ -25,9 +25,10 @@ class OpenAIAgent:
             try:
                 response = openai.ChatCompletion.create(
                     model=self.model,
-                    messages=[{"role": "user", "content": prompt}], 
+                    messages=[{"role": "user", "content": prompt}],
                     max_tokens=self.max_tokens,
                     temperature=self.temperature,
+                    n=1,  # Ensure only one response is returned
                 )
                 # Remove duplicate max_tokens and temperature arguments
                 result = response['choices'][0]['message']['content'].strip()
