@@ -29,10 +29,6 @@ class OpenAIAgent:
                     n=1
                 )
                 return response["choices"][0]["message"]["content"]
-                    messages=[{"role": "user", "content": function_prompt}],
-                    max_tokens=256,
-                    n=1
-                )
                 return response["choices"][0]["message"]["content"]
 
             except openai.RateLimitError as e:
