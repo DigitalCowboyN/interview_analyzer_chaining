@@ -40,7 +40,7 @@ async def test_retry_on_rate_limit(mock_create, agent):
     assert response == "Recovered response"
 
 
-@patch("openai.ChatCompletion.acreate")
+@patch("openai.responses.create")
 async def test_retry_on_api_error(mock_create, agent):
     mock_create.side_effect = [
         APIError("API error", request="mock_request", body="mock_body"),
