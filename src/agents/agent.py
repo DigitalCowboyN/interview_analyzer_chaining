@@ -18,20 +18,14 @@ class OpenAIAgent:
         self.retry_attempts = config.get("openai_api", {}).get("retry", {}).get("max_attempts", 5)
         self.backoff_factor = config.get("openai_api", {}).get("retry", {}).get("backoff_factor", 2)
 
-    def call_model(self, prompt: str) -> str:
-        """Call the OpenAI API with robust retry logic."""
-        attempt = 0
-        while attempt < self.retry_attempts:
-            try:
-                response = openai.ChatCompletion.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                )
-                result = response['choices'][0]['message']['content']
-                logger.info("Successful OpenAI API call.")
-                return result
+    async def call_model(self, function_prompt):
+        response = await openai.ChatCompletion.acreate(
+            model="gpt-4-turbo",
+            messages=[{"role": "user", "content": function_prompt}],
+            max_tokens=256,
+            n=1
+        )
+        return response["choices"][0]["message"]["content"]
 
             except openai.RateLimitError as e:
                 wait_time = self.backoff_factor ** attempt
