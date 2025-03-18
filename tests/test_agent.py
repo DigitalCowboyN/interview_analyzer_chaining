@@ -16,13 +16,14 @@ def agent():
 @patch("openai.ChatCompletion.acreate", new_callable=AsyncMock)
 @pytest.mark.asyncio
 async def test_successful_call(mock_create, agent):
-    mock_create.return_value = {
+    mock_create.return_value = asyncio.Future()
+    mock_create.return_value.set_result({
         "choices": [{
             "message": {
                 "content": "Test response"
             }
         }]
-    }
+    })
 
     response = await agent.call_model("Test prompt")  # Use await
     assert response == "Test response"
