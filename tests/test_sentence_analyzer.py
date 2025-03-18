@@ -29,7 +29,6 @@ def analyzer():
 async def test_classify_sentence(mock_call_model, analyzer, mock_contexts):
     mock_call_model.return_value = asyncio.Future()
     mock_call_model.return_value.set_result("<type> [0.9]")  # Ensure this is a string
-    mock_call_model.return_value = "<type> [0.9]"  # Ensure this is a string
 
     sentence = "This is a test sentence."
     result = await analyzer.classify_sentence(sentence, mock_contexts)  # Ensure await is used

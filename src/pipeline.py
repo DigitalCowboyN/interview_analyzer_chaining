@@ -26,7 +26,7 @@ async def process_file(input_file: Path, output_dir: Path):
     sentences = segment_text(text)
 
     analyzer = SentenceAnalyzer()
-    results = await asyncio.gather(*[analyzer.analyze_sentences([sentence]) for sentence in sentences])
+    results = await asyncio.gather(*[analyzer.analyze_sentences(sentence) for sentence in sentences])
     # Ensure that results are fully resolved before saving
     # results.append(analysis_result)  # This line is not needed
 
