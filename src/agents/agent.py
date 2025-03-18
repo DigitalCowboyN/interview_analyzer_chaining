@@ -24,10 +24,10 @@ class OpenAIAgent:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                response = await openai.responses.create(  # Change from ChatCompletion to responses
-                    model=self.model,  # Use the model from the config
-                    instructions="You are a coding assistant that talks like a pirate.",  # Add instructions as needed
-                    input=function_prompt  # Change to input parameter
+                response = await openai.responses.create(  # Use responses.create
+                    model=self.model,
+                    instructions="You are a coding assistant that talks like a pirate.",
+                    input=function_prompt
                 )
                 logger.debug(f"Received response: {response}")
                 return response.output_text  # Change to access output_text
