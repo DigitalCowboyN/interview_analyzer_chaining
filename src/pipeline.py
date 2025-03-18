@@ -1,6 +1,7 @@
 # src/pipeline.py
 from pathlib import Path
 from src.utils.helpers import save_json
+import asyncio
 from src.agents.sentence_analyzer import SentenceAnalyzer
 from src.utils.logger import get_logger
 import spacy
@@ -24,7 +25,8 @@ async def process_file(input_file: Path, output_dir: Path):
     text = input_file.read_text(encoding="utf-8")
     sentences = segment_text(text)
 
-    results = await asyncio.gather(*[sentence_analyzer.analyze_sentence(sentence) for sentence in sentences])
+    analyzer = SentenceAnalyzer()
+    results = await asyncio.gather(*[analyzer.analyze_sentence(sentence) for sentence in sentences])
     # results.append(analysis_result)  # This line is not needed
 
     output_file = output_dir / f"{input_file.stem}_analysis.json"
