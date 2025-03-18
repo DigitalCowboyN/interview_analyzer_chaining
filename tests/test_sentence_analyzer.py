@@ -44,7 +44,7 @@ async def test_analyze_sentences(mock_call_model, analyzer):
     mock_call_model.return_value = "<type> [0.9]"
 
     sentences = ["First test sentence.", "Second test sentence."]
-    results = [result async for result in analyzer.analyze_sentences(sentences)]  # Use async for
+    results = await analyzer.analyze_sentences(sentences)  # Await the function directly
 
     assert len(results) == 2
 

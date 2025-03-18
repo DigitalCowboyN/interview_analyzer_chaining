@@ -22,7 +22,7 @@ class OpenAIAgent:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                response = await openai.ChatCompletion.acreate(
+                response = await openai.ChatCompletion.create(  # Update to the new method
                     model="gpt-4-turbo",
                     messages=[{"role": "user", "content": function_prompt}],
                     max_tokens=256,
@@ -33,7 +33,7 @@ class OpenAIAgent:
             except openai.RateLimitError as e:
                 wait_time = self.backoff_factor ** attempt
                 logger.warning(f"Rate limit hit. Retrying after {wait_time} seconds...")
-                time.sleep(wait_time)
+                await asyncio.sleep(wait_time)  # Use asyncio.sleep for async context
                 attempt += 1
 
             except openai.APIError as e:
