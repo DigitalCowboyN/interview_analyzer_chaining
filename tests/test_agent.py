@@ -12,7 +12,7 @@ def agent():
 
 
 @patch("openai.ChatCompletion.create")
-def test_successful_call(mock_create, agent):
+async def test_successful_call(mock_create, agent):
     mock_create.return_value = {
         "choices": [{
             "message": {
@@ -26,7 +26,7 @@ def test_successful_call(mock_create, agent):
 
 
 @patch("openai.ChatCompletion.create")
-def test_retry_on_rate_limit(mock_create, agent):
+async def test_retry_on_rate_limit(mock_create, agent):
     mock_response = MagicMock()
     mock_response.request = MagicMock()
     mock_response.headers = {"x-request-id": "mock_request_id"}
@@ -46,7 +46,7 @@ def test_retry_on_rate_limit(mock_create, agent):
 
 
 @patch("openai.ChatCompletion.create")
-def test_retry_on_api_error(mock_create, agent):
+async def test_retry_on_api_error(mock_create, agent):
     mock_create.side_effect = [
         APIError("API error", request="mock_request", body="mock_body"),
         {
@@ -63,7 +63,7 @@ def test_retry_on_api_error(mock_create, agent):
 
 
 @patch("openai.ChatCompletion.create")
-def test_max_retry_exceeded(mock_create, agent):
+async def test_max_retry_exceeded(mock_create, agent):
     mock_response = MagicMock()
     mock_response.request = MagicMock()
     mock_response.headers = {"x-request-id": "mock_request_id"}
