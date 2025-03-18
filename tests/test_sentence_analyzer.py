@@ -25,7 +25,6 @@ def analyzer():
 
 
 @pytest.mark.asyncio
-@pytest.mark.asyncio
 @patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock)
 async def test_classify_sentence(mock_call_model, analyzer, mock_contexts):
     mock_call_model.return_value = asyncio.Future()
