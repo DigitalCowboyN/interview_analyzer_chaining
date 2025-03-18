@@ -4,7 +4,7 @@ import pytest
 pytestmark = pytest.mark.asyncio
 import pytest
 import asyncio
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from src.agents.sentence_analyzer import SentenceAnalyzer
 
 
@@ -25,7 +25,7 @@ def analyzer():
 
 
 @pytest.mark.asyncio
-@patch("src.agents.agent.OpenAIAgent.call_model")
+@patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock)
 async def test_classify_sentence(mock_call_model, analyzer, mock_contexts):
     mock_call_model.return_value = "<type> [0.9]"  # Ensure this is a string
 
