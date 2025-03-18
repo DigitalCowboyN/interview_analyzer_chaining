@@ -29,7 +29,6 @@ class OpenAIAgent:
                     n=1
                 )
                 return response["choices"][0]["message"]["content"]
-                return response["choices"][0]["message"]["content"]
 
             except openai.RateLimitError as e:
                 wait_time = self.backoff_factor ** attempt

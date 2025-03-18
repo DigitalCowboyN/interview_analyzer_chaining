@@ -30,7 +30,7 @@ async def test_process_file(sample_text_file, tmp_path):
     output_dir = tmp_path / "output"
     output_dir.mkdir()
 
-    await process_file(sample_text_file, output_dir)  # Use await
+    await process_file(sample_text_file, output_dir)  # Ensure this is awaited
 
     output_file = output_dir / "test_file_analysis.json"
     assert output_file.exists()
