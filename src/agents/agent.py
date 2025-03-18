@@ -19,18 +19,16 @@ class OpenAIAgent:
         self.backoff_factor = config.get("openai_api", {}).get("retry", {}).get("backoff_factor", 2)
 
     async def call_model(self, function_prompt):
-        response = await openai.ChatCompletion.acreate(
-            model="gpt-4-turbo",
-            messages=[{"role": "user", "content": function_prompt}],
-            max_tokens=256,
-            n=1
-        )
-        return response["choices"][0]["message"]["content"]
-
         attempt = 0
         while attempt < self.retry_attempts:
             try:
                 response = await openai.ChatCompletion.acreate(
+                    model="gpt-4-turbo",
+                    messages=[{"role": "user", "content": function_prompt}],
+                    max_tokens=256,
+                    n=1
+                )
+                return response["choices"][0]["message"]["content"]
                     model="gpt-4-turbo",
                     messages=[{"role": "user", "content": function_prompt}],
                     max_tokens=256,
@@ -54,7 +52,7 @@ class OpenAIAgent:
                 logger.exception(f"Unexpected error: {e}")
                 raise
 
-        raise Exception("Max retry attempts exceeded.")
+        raise Exception("Max retry attempts exceeded.")        
 
 
 # Singleton instance for use across pipeline

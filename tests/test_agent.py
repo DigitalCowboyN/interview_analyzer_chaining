@@ -11,7 +11,7 @@ def agent():
     return OpenAIAgent()
 
 
-@patch("openai.ChatCompletion.create")
+@patch("openai.ChatCompletion.acreate")
 async def test_successful_call(mock_create, agent):
     mock_create.return_value = {
         "choices": [{
@@ -25,7 +25,7 @@ async def test_successful_call(mock_create, agent):
     assert response == "Test response"
 
 
-@patch("openai.ChatCompletion.create")
+@patch("openai.ChatCompletion.acreate")
 async def test_retry_on_rate_limit(mock_create, agent):
     mock_response = MagicMock()
     mock_response.request = MagicMock()
@@ -45,7 +45,7 @@ async def test_retry_on_rate_limit(mock_create, agent):
     assert response == "Recovered response"
 
 
-@patch("openai.ChatCompletion.create")
+@patch("openai.ChatCompletion.acreate")
 async def test_retry_on_api_error(mock_create, agent):
     mock_create.side_effect = [
         APIError("API error", request="mock_request", body="mock_body"),
@@ -62,7 +62,7 @@ async def test_retry_on_api_error(mock_create, agent):
     assert response == "Recovered from API error"
 
 
-@patch("openai.ChatCompletion.create")
+@patch("openai.ChatCompletion.acreate")
 async def test_max_retry_exceeded(mock_create, agent):
     mock_response = MagicMock()
     mock_response.request = MagicMock()
