@@ -21,7 +21,7 @@ async def test_successful_call(mock_create, agent):
         }]
     }
 
-    response = await agent.call_model("Test prompt")  # Use await
+    response = await agent.call_model("Test prompt")  # Ensure this is awaited
     assert response == "Test response"
 
 
