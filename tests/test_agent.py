@@ -13,8 +13,8 @@ def agent():
     return OpenAIAgent()
 
 
-@pytest.mark.asyncio
 @patch("openai.ChatCompletion.acreate")
+@pytest.mark.asyncio
 async def test_successful_call(mock_create, agent):
     mock_create.return_value = {
         "choices": [{
