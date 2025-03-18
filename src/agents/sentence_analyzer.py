@@ -1,5 +1,5 @@
 # src/agents/sentence_analyzer.py
-from typing import Dict, Any, Generator
+from typing import Dict, Any, Generator, AsyncGenerator
 from src.agents.agent import agent
 from src.agents.context_builder import context_builder
 from src.utils.logger import get_logger
@@ -62,7 +62,7 @@ class SentenceAnalyzer:
 
         return results
 
-    async def analyze_sentences(self, sentences: list) -> Generator[Dict[str, Any], None, None]:
+    async def analyze_sentences(self, sentences: list) -> AsyncGenerator[Dict[str, Any], None]:
         contexts = context_builder.build_all_contexts(sentences)
 
         for idx, sentence in enumerate(sentences):
