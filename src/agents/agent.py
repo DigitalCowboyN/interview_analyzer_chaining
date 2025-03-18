@@ -27,6 +27,17 @@ class OpenAIAgent:
         )
         return response["choices"][0]["message"]["content"]
 
+        attempt = 0
+        while attempt < self.retry_attempts:
+            try:
+                response = await openai.ChatCompletion.acreate(
+                    model="gpt-4-turbo",
+                    messages=[{"role": "user", "content": function_prompt}],
+                    max_tokens=256,
+                    n=1
+                )
+                return response["choices"][0]["message"]["content"]
+
             except openai.RateLimitError as e:
                 wait_time = self.backoff_factor ** attempt
                 logger.warning(f"Rate limit hit. Retrying after {wait_time} seconds...")
