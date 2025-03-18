@@ -1,5 +1,5 @@
 # src/agents/agent.py
-import openai
+import openai.responses  # Ensure this import is added
 import asyncio
 import time
 from src.config import config
@@ -24,12 +24,13 @@ class OpenAIAgent:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                response = await openai.ChatCompletion.acreate(  # This line remains unchanged
+                response = await openai.responses.create(  # Change from ChatCompletion to responses
                     model=self.model,  # Use the model from the config
-                    messages=[{"role": "user", "content": function_prompt}]  # Corrected input structure
+                    instructions="You are a coding assistant that talks like a pirate.",  # Add instructions as needed
+                    input=function_prompt  # Change to input parameter
                 )
                 logger.debug(f"Received response: {response}")
-                return response["choices"][0]["message"]["content"]
+                return response.output_text  # Change to access output_text
 
             except openai.RateLimitError as e:
                 wait_time = self.backoff_factor ** attempt
