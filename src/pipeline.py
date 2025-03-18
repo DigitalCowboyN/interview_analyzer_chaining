@@ -25,7 +25,7 @@ async def process_file(input_file: Path, output_dir: Path):
     sentences = segment_text(text)
 
     results = await asyncio.gather(*[sentence_analyzer.analyze_sentence(sentence) for sentence in sentences])
-        results.append(analysis_result)
+    # results.append(analysis_result)  # Remove this line as it is not needed
 
     output_file = output_dir / f"{input_file.stem}_analysis.json"
     save_json(results, output_file)
