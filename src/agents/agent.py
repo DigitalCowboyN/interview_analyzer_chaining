@@ -24,11 +24,9 @@ class OpenAIAgent:
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                response = await openai.ChatCompletion.acreate(  # Update to the new method
+                response = await openai.Responses.create(
                     model="gpt-4-turbo",
-                    messages=[{"role": "user", "content": function_prompt}],
-                    max_tokens=256,
-                    n=1
+                    input=function_prompt
                 )
                 logger.debug(f"Received response: {response}")
                 return response["choices"][0]["message"]["content"]
