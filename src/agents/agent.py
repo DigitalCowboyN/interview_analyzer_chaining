@@ -20,6 +20,7 @@ class OpenAIAgent:
         self.backoff_factor = config.get("openai_api", {}).get("retry", {}).get("backoff_factor", 2)
 
     async def call_model(self, function_prompt: str) -> str:
+        logger.debug(f"Calling OpenAI API with prompt: {function_prompt}")
         attempt = 0
         while attempt < self.retry_attempts:
             try:
@@ -29,6 +30,7 @@ class OpenAIAgent:
                     max_tokens=256,
                     n=1
                 )
+                logger.debug(f"Received response: {response}")
                 return response["choices"][0]["message"]["content"]
 
             except openai.RateLimitError as e:
