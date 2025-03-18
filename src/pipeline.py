@@ -27,12 +27,9 @@ async def process_file(input_file: Path, output_dir: Path):
 
     analyzer = SentenceAnalyzer()
     results = []
-    results = []
     async for result in analyzer.analyze_sentences(sentences):
         results.append(result)
-        results.append(result)
     # Ensure that results are fully resolved before saving
-    # results.append(analysis_result)  # This line is not needed
 
     output_file = output_dir / f"{input_file.stem}_analysis.json"
     save_json(results, output_file)
