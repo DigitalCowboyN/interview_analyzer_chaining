@@ -16,7 +16,7 @@ async def main():  # Define an async main function
         instructions="You are a coding assistant.",
         input="What is the capital of France?"
     )
-    print(response.output_text)  # Ensure this is the correct attribute to access
+        print(response.output_text)  # Ensure this is the correct attribute to access
     except Exception as e:
         print(f"An error occurred: {e}")
 
