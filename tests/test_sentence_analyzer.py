@@ -25,7 +25,7 @@ def analyzer():
 @pytest.mark.asyncio
 @patch("src.agents.agent.OpenAIAgent.call_model")
 async def test_classify_sentence(mock_call_model, analyzer, mock_contexts):
-    mock_call_model.return_value = await "<type> [0.9]"  # Ensure this is awaited
+    mock_call_model.return_value = "<type> [0.9]"  # Ensure this is a string
 
     sentence = "This is a test sentence."
     result = await analyzer.classify_sentence(sentence, mock_contexts)  # Ensure await is used
