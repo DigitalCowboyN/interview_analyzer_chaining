@@ -1,5 +1,6 @@
 # src/agents/sentence_analyzer.py
-from typing import Dict, Any, Generator, AsyncGenerator
+from typing import Dict, Any, List, AsyncGenerator
+from typing import Generator
 from src.agents.agent import agent
 from src.agents.context_builder import context_builder
 from src.utils.logger import get_logger
@@ -64,6 +65,7 @@ class SentenceAnalyzer:
 
     async def analyze_sentences(self, sentences: list) -> List[Dict[str, Any]]:
         contexts = context_builder.build_all_contexts(sentences)
+        results = []  # Initialize results list
 
         for idx, sentence in enumerate(sentences):
             result = await self.classify_sentence(sentence, contexts[idx])
@@ -74,7 +76,7 @@ class SentenceAnalyzer:
             logger.debug(f"Finalized result: {result}")
             results.append(result)
 
-    return results  # Return the list of results
+        return results  # Return the list of results
 
 
 # Singleton instance for pipeline use
