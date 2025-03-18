@@ -2,6 +2,7 @@
 import pytest
 from unittest.mock import patch
 from openai import RateLimitError, APIError
+from unittest.mock import MagicMock
 from src.agents.agent import OpenAIAgent
 
 
