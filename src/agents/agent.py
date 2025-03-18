@@ -40,7 +40,7 @@ class OpenAIAgent:
             except openai.APIError as e:
                 wait_time = self.backoff_factor ** attempt
                 logger.error(f"OpenAI API error: {e}. Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
+                await asyncio.sleep(wait_time)  # Use asyncio.sleep for async context
                 attempt += 1
 
             except Exception as e:

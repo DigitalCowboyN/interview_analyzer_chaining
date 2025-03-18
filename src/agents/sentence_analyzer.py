@@ -26,38 +26,38 @@ class SentenceAnalyzer:
 
         # Structure type classification (no context)
         structure_prompt = self.prompts["sentence_structure_type"]["prompt"].format(sentence=sentence)
-        results["structure_type"] = agent.call_model(structure_prompt)
+        results["structure_type"] = await agent.call_model(structure_prompt)  # Add await
 
         # Purpose classification (observer context)
         purpose_prompt = self.prompts["sentence_purpose"]["prompt"].format(
             sentence=sentence, context=contexts["observer"]
         )
-        results["purpose"] = agent.call_model(purpose_prompt)
+        results["purpose"] = await agent.call_model(purpose_prompt)  # Add await
 
         # Topic level 1 (immediate context)
         topic_lvl1_prompt = self.prompts["topic_level_1"]["prompt"].format(
             sentence=sentence, context=contexts["immediate"]
         )
-        results["topic_level_1"] = agent.call_model(topic_lvl1_prompt)
+        results["topic_level_1"] = await agent.call_model(topic_lvl1_prompt)  # Add await
 
         # Topic level 3 (broader context)
         topic_lvl3_prompt = self.prompts["topic_level_3"]["prompt"].format(
             sentence=sentence, context=contexts["broader"]
         )
-        results["topic_level_3"] = agent.call_model(topic_lvl3_prompt)  # Corrected variable
+        results["topic_level_3"] = await agent.call_model(topic_lvl3_prompt)  # Add await
 
         # Overall keywords (overall context)
         overall_keywords_prompt = self.prompts["topic_overall_keywords"]["prompt"].format(
             context=contexts["observer"]
         )
-        results["overall_keywords"] = agent.call_model(overall_keywords_prompt)
+        results["overall_keywords"] = await agent.call_model(overall_keywords_prompt)  # Add await
 
         # Domain-specific keywords
         domain_keywords = ", ".join(config.get("domain_keywords", []))
         domain_prompt = self.prompts["domain_specific_keywords"]["prompt"].format(
             sentence=sentence, domain_keywords=domain_keywords
         )
-        results["domain_keywords"] = agent.call_model(domain_prompt)
+        results["domain_keywords"] = await agent.call_model(domain_prompt)  # Add await
 
         logger.info(f"Sentence analyzed: {sentence[:50]}...")
 
