@@ -1,5 +1,5 @@
 # src/agents/agent.py
-# import openai.responses  # Remove this line
+import openai
 import asyncio
 import time
 from src.config import config
