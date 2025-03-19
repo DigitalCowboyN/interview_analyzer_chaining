@@ -34,7 +34,7 @@ async def test_retry_on_rate_limit(mock_create, agent):
     mock_response.headers = {"x-request-id": "mock_request_id"}
     mock_create.side_effect = [
         RateLimitError("Rate limit exceeded", response=mock_response, body=None),
-        AsyncMock(return_value={"output_text": "Recovered response"})  # Ensure it returns an async mock
+        {"output_text": "Recovered response"}  # Ensure it returns a dictionary
     ]  # Ensure proper structure for mock return value
 
     response = await agent.call_model("Test prompt")  # Use await
@@ -45,7 +45,7 @@ async def test_retry_on_rate_limit(mock_create, agent):
 async def test_retry_on_api_error(mock_create, agent):
     mock_create.side_effect = [
         APIError("API error", request="mock_request", body="mock_body"),
-        AsyncMock(return_value={"output_text": "Recovered from API error"})  # Ensure it returns an async mock
+        {"output_text": "Recovered from API error"}  # Ensure it returns a dictionary
     ]  # Ensure proper structure for mock return value
 
     response = await agent.call_model("Test prompt")  # Use await
