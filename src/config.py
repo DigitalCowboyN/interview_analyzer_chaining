@@ -1,8 +1,8 @@
 # src/config.py
 import os
+import re
 import yaml
 from pathlib import Path
-
 
 class Config:
     def __init__(self, config_path: str = "config.yaml"):
@@ -14,7 +14,16 @@ class Config:
             raise FileNotFoundError(f"Config file not found at {self.config_path}")
 
         with open(self.config_path, "r", encoding="utf-8") as file:
-            return yaml.safe_load(file)
+            content = file.read()
+
+        # Expand environment variables of the form ${VAR_NAME}
+        content = re.sub(
+            r"\$\{([^}]+)\}",
+            lambda match: os.environ.get(match.group(1), match.group(0)),  # fallback to placeholder if not found
+            content
+        )
+
+        return yaml.safe_load(content)
 
     def get(self, key, default=None):
         return self.config.get(key, default)

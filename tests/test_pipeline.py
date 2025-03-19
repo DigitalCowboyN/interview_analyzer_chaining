@@ -41,7 +41,7 @@ async def test_process_file(sample_text_file, tmp_path):
     import json
 
     data = json.loads(output_file.read_text())
-    assert isinstance(data, dict)  # Update to match the expected structure
+    assert isinstance(data, list)  # Update to match the expected structure
     assert len(data) == 2  # two sentences
     assert data[0]["sentence"] == "This is a test."
     assert data[0]["function_type"] is not None  # Check for function type
