@@ -40,7 +40,7 @@ class OpenAIAgent:
 
             except openai.APIError as e:
                 wait_time = self.backoff_factor ** attempt
-                logger.error(f"OpenAI API error: {e}. Retrying in {wait_time} seconds...")
+                logger.error(f"OpenAI API error: {e}. Retrying in {wait_time} seconds...")  # Log the error
                 await asyncio.sleep(wait_time)  # Use asyncio.sleep for async context
                 attempt += 1
 
@@ -48,7 +48,7 @@ class OpenAIAgent:
                 logger.exception(f"Unexpected error: {e}")
                 raise
 
-        raise Exception("Max retry attempts exceeded.")        
+        raise Exception("Max retry attempts exceeded.")  # Ensure this is reached when retries are exhausted
 
 
 # Singleton instance for use across pipeline
