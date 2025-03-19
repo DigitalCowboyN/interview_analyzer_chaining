@@ -27,26 +27,26 @@ async def test_successful_call(mock_create, agent):
     assert response == "Test response"
 
 
-@patch("openai.responses.create")
+@patch("openai.responses.create", new_callable=AsyncMock)
 async def test_retry_on_rate_limit(mock_create, agent):
     mock_response = MagicMock()
     mock_response.request = MagicMock()
     mock_response.headers = {"x-request-id": "mock_request_id"}
     mock_create.side_effect = [
         RateLimitError("Rate limit exceeded", response=mock_response, body=None),
-        {"output_text": "Recovered response"}  # Ensure it returns a dictionary
-    ]  # Ensure proper structure for mock return value
+        await recovered_response()  # Use awaitable coroutine
+    ]
 
     response = await agent.call_model("Test prompt")  # Use await
     assert response == "Recovered response"
 
 
-@patch("openai.responses.create")
+@patch("openai.responses.create", new_callable=AsyncMock)
 async def test_retry_on_api_error(mock_create, agent):
     mock_create.side_effect = [
         APIError("API error", request="mock_request", body="mock_body"),
-        {"output_text": "Recovered from API error"}  # Ensure it returns a dictionary
-    ]  # Ensure proper structure for mock return value
+        await recovered_api_error_response()  # Use awaitable coroutine
+    ]
 
     response = await agent.call_model("Test prompt")  # Use await
     assert response == "Recovered from API error"
