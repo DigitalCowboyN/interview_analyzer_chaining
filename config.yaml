@@ -1,7 +1,7 @@
 # config.yaml - Comprehensive configuration for enriched sentence analysis pipeline using OpenAI API
 
 openai:
-  api_key: ${OPENAI_API_KEY}     # Set this securely in your environment
+  api_key: "your_actual_api_key_here"  # Replace with your actual API key
   model_name: "gpt-4-turbo"      # OpenAI model
   max_tokens: 256                # Response length
   temperature: 0.2               # Lower for determinism

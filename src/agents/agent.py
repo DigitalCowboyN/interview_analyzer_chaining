@@ -30,7 +30,7 @@ class OpenAIAgent:
                     input=function_prompt
                 )
                 logger.debug(f"Received response: {response}")
-                return response.output_text  # Change to access output_text
+                return response["output_text"]  # Access output_text using dictionary key
 
             except openai.RateLimitError as e:
                 wait_time = self.backoff_factor ** attempt
