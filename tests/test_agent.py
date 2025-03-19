@@ -1,11 +1,14 @@
 # tests/test_agent.py
-import pytest
+import os
 import pytest
 from unittest.mock import patch, AsyncMock
 import asyncio
 from openai import RateLimitError, APIError
 from unittest.mock import MagicMock
 from src.agents.agent import OpenAIAgent
+
+# Set the environment variable for logging
+os.environ["OPENAI_LOG"] = "debug"
 
 
 @pytest.fixture
