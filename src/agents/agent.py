@@ -11,6 +11,7 @@ logger = get_logger()
 class OpenAIAgent:
     def __init__(self):
         self.api_key = config["openai"]["api_key"]
+        logger.debug(f"Using OpenAI API key: {'*' * len(self.api_key)}")  # Log the key status
         openai.api_key = self.api_key  # This line remains unchanged
         self.model = config["openai"]["model_name"]
         self.max_tokens = config["openai"]["max_tokens"]
