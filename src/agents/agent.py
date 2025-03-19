@@ -11,6 +11,8 @@ logger = get_logger()
 class OpenAIAgent:
     def __init__(self):
         self.api_key = config["openai"]["api_key"]
+        if not self.api_key:
+            raise ValueError("OpenAI API key is not set. Please set the OPENAI_API_KEY environment variable.")
         logger.debug(f"Using OpenAI API key: {'*' * len(self.api_key)}")  # Log the key status
         openai.api_key = self.api_key  # This line remains unchanged
         self.model = config["openai"]["model_name"]
