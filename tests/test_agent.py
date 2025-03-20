@@ -24,6 +24,8 @@ async def test_successful_call(mock_create, agent):
     """
     mock_response = {
         "output": [{
+            "content": [{
+            "content": [{
             "function_type": "declarative",
             "structure_type": "simple sentence",
             "purpose": "to state a fact",

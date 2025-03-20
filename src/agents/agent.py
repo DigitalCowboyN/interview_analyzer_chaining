@@ -42,14 +42,15 @@ class OpenAIAgent:
                 logger.debug(f"Received response: {response}")
                 # The real openai.responses.create() returns a 'Response' object,
                 # which should have an 'output_text' attribute, not be subscriptable.
+                output_message = response.output[0]  # Assuming response.output is a list
                 response_data = {
-                    "function_type": response.output[0]["function_type"],
-                    "structure_type": response.output[0]["structure_type"],
-                    "purpose": response.output[0]["purpose"],
-                    "topic_level_1": response.output[0]["topic_level_1"],
-                    "topic_level_3": response.output[0]["topic_level_3"],
-                    "overall_keywords": response.output[0]["overall_keywords"],
-                    "domain_keywords": response.output[0]["domain_keywords"]
+                    "function_type": output_message.content[0].function_type,
+                    "structure_type": output_message.content[0].structure_type,
+                    "purpose": output_message.content[0].purpose,
+                    "topic_level_1": output_message.content[0].topic_level_1,
+                    "topic_level_3": output_message.content[0].topic_level_3,
+                    "overall_keywords": output_message.content[0].overall_keywords,
+                    "domain_keywords": output_message.content[0].domain_keywords
                 }
                 return AnalysisResult(**response_data)  # Pass the extracted data
 
