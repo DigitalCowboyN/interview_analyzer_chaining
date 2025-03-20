@@ -1,4 +1,5 @@
 # src/agents/sentence_analyzer.py
+import json
 from typing import Dict, Any, List, AsyncGenerator
 from typing import Generator
 from src.agents.agent import agent
