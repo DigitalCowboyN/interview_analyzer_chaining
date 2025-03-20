@@ -28,6 +28,13 @@ async def test_successful_call(mock_create, agent):
 
     response = await agent.call_model("Test prompt")
     assert response == "Test response"
+    assert hasattr(response, 'function_type')
+    assert hasattr(response, 'structure_type')
+    assert hasattr(response, 'purpose')
+    assert hasattr(response, 'topic_level_1')
+    assert hasattr(response, 'topic_level_3')
+    assert hasattr(response, 'overall_keywords')
+    assert hasattr(response, 'domain_keywords')
 
 @pytest.mark.asyncio
 @patch("openai.responses.create")
