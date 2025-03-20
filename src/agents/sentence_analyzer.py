@@ -37,32 +37,42 @@ class SentenceAnalyzer:
         purpose_prompt = self.prompts["sentence_purpose"]["prompt"].format(
             sentence=sentence, context=contexts["observer"]
         )
-        results["purpose"] = await agent.call_model(purpose_prompt)  # Add await
+        response = await agent.call_model(purpose_prompt)  # Add await
+        response_json = json.loads(response.output[0].content[0].text)  # Parse JSON response
+        results["purpose"] = response_json.get("purpose")
 
         # Topic level 1 (immediate context)
         topic_lvl1_prompt = self.prompts["topic_level_1"]["prompt"].format(
             sentence=sentence, context=contexts["immediate"]
         )
-        results["topic_level_1"] = await agent.call_model(topic_lvl1_prompt)  # Add await
+        response = await agent.call_model(topic_lvl1_prompt)  # Add await
+        response_json = json.loads(response.output[0].content[0].text)  # Parse JSON response
+        results["topic_level_1"] = response_json.get("topic_level_1")
 
         # Topic level 3 (broader context)
         topic_lvl3_prompt = self.prompts["topic_level_3"]["prompt"].format(
             sentence=sentence, context=contexts["broader"]
         )
-        results["topic_level_3"] = await agent.call_model(topic_lvl3_prompt)  # Add await
+        response = await agent.call_model(topic_lvl3_prompt)  # Add await
+        response_json = json.loads(response.output[0].content[0].text)  # Parse JSON response
+        results["topic_level_3"] = response_json.get("topic_level_3")
 
         # Overall keywords (overall context)
         overall_keywords_prompt = self.prompts["topic_overall_keywords"]["prompt"].format(
             context=contexts["observer"]
         )
-        results["overall_keywords"] = await agent.call_model(overall_keywords_prompt)  # Add await
+        response = await agent.call_model(overall_keywords_prompt)  # Add await
+        response_json = json.loads(response.output[0].content[0].text)  # Parse JSON response
+        results["overall_keywords"] = response_json.get("overall_keywords")
 
         # Domain-specific keywords
         domain_keywords = ", ".join(config.get("domain_keywords", []))
         domain_prompt = self.prompts["domain_specific_keywords"]["prompt"].format(
             sentence=sentence, domain_keywords=domain_keywords
         )
-        results["domain_keywords"] = await agent.call_model(domain_prompt)  # Add await
+        response = await agent.call_model(domain_prompt)  # Add await
+        response_json = json.loads(response.output[0].content[0].text)  # Parse JSON response
+        results["domain_keywords"] = response_json.get("domain_keywords")
 
         logger.info(f"Sentence analyzed: {sentence[:50]}...")
 
