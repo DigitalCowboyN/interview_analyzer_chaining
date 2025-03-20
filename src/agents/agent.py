@@ -1,6 +1,7 @@
 import openai
 import asyncio
 from src.config import config
+from src.models.analysis_result import AnalysisResult
 from src.utils.logger import get_logger
 
 logger = get_logger()

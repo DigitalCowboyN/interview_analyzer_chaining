@@ -42,7 +42,7 @@ async def test_prompt_attributes(load_prompts):
         
         # Parse the response to extract the function type
         assert response.function_type == "declarative"  # Replace with expected value
-        assert "structure_type" in response_json
+        assert "structure_type" in response
         assert "purpose" in response
         assert "topic_level_1" in response
         assert "topic_level_3" in response
