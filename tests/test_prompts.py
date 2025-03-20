@@ -38,7 +38,13 @@ async def test_prompt_attributes(load_prompts):
         formatted_prompt = prompt["prompt"].format(sentence="This is a test sentence.")
         response = await agent.call_model(formatted_prompt)
         
-        assert "function_type" in response
+        # Parse the response to extract the function type
+        match = re.search(r'Answer: (\w+) \[high confidence\]', response)
+        if match:
+            function_type = match.group(1)
+            assert function_type == "declarative"  # Replace with expected value
+        else:
+            assert False, "Function type not found in response"
         assert "structure_type" in response
         assert "purpose" in response
         assert "topic_level_1" in response

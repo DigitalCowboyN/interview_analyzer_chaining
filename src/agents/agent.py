@@ -28,7 +28,7 @@ class OpenAIAgent:
         def sync_create():
             return openai.responses.create(
                 model=self.model,
-                instructions="You are a coding assistant that talks like a pirate.",
+                instructions="You are a coding assistant. Analyze the provided sentence and return the function type, structure type, purpose, topic level 1, topic level 3, overall keywords, and domain keywords in a structured format.",
                 input=function_prompt
             )
 
