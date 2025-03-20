@@ -20,12 +20,15 @@ async def test_prompt_attributes(load_prompts):
     surrounding_sentences = [
         "This is the first surrounding sentence.",
         "This is the second surrounding sentence.",
-        "This is the third surrounding sentence."
+        "This is the third surrounding sentence.",
+        "This is the fourth surrounding sentence.",
+        "This is the fifth surrounding sentence.",
+        "This is the sixth surrounding sentence."
     ]
 
     # Create contexts based on surrounding sentences
     contexts = {
-        "immediate": " ".join(surrounding_sentences[:1]),  # Immediate context
+        "immediate": " ".join(surrounding_sentences[:2]),  # Immediate context (2 sentences)
         "broader": " ".join(surrounding_sentences),  # Broader context
         "observer": "This is the observer context."  # Observer context
     }
