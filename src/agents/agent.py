@@ -27,7 +27,7 @@ class OpenAIAgent:
 
         # Synchronous method to call the OpenAI API.
         def sync_create():
-            response = openai.responses.create(
+            return openai.responses.create(
                 model=self.model,
                 instructions="You are a coding assistant. Analyze the provided sentence and return the function type, structure type, purpose, topic level 1, topic level 3, overall keywords, and domain keywords in a structured format.",
                 input=function_prompt
@@ -43,13 +43,13 @@ class OpenAIAgent:
                 # The real openai.responses.create() returns a 'Response' object,
                 # which should have an 'output_text' attribute, not be subscriptable.
                 response_data = {
-                    "function_type": response.output[0].function_type,
-                    "structure_type": response.output[0].structure_type,
-                    "purpose": response.output[0].purpose,
-                    "topic_level_1": response.output[0].topic_level_1,
-                    "topic_level_3": response.output[0].topic_level_3,
-                    "overall_keywords": response.output[0].overall_keywords,
-                    "domain_keywords": response.output[0].domain_keywords
+                    "function_type": response.output[0]["function_type"],
+                    "structure_type": response.output[0]["structure_type"],
+                    "purpose": response.output[0]["purpose"],
+                    "topic_level_1": response.output[0]["topic_level_1"],
+                    "topic_level_3": response.output[0]["topic_level_3"],
+                    "overall_keywords": response.output[0]["overall_keywords"],
+                    "domain_keywords": response.output[0]["domain_keywords"]
                 }
                 return AnalysisResult(**response_data)  # Pass the extracted data
 

@@ -22,7 +22,7 @@ async def test_successful_call(mock_create, agent):
     Agent code uses response.output_text, so let's return a mocked object
     that has that attribute.
     """
-    mock_response = {  # Ensure the structure matches AnalysisResult
+    mock_response = {
         "output": [{
             "function_type": "declarative",
             "structure_type": "simple sentence",
