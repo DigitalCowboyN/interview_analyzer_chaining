@@ -24,7 +24,7 @@ class OpenAIAgent:
         logger.debug(f"Calling OpenAI API with prompt: {function_prompt}")
         attempt = 0
 
-        # Synchronous method we want to call in a thread.
+        # Synchronous method to call the OpenAI API.
         def sync_create():
             return openai.responses.create(
                 model=self.model,
@@ -41,7 +41,7 @@ class OpenAIAgent:
                 logger.debug(f"Received response: {response}")
                 # The real openai.responses.create() returns a 'Response' object,
                 # which should have an 'output_text' attribute, not be subscriptable.
-                return response.output_text
+                return AnalysisResult(**response)  # Return structured response
 
             except openai.RateLimitError as e:
                 wait_time = self.backoff_factor ** attempt
