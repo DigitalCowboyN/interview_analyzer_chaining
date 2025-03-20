@@ -22,12 +22,20 @@ async def test_successful_call(mock_create, agent):
     Agent code uses response.output_text, so let's return a mocked object
     that has that attribute.
     """
-    mock_response = MagicMock()
-    mock_response.output_text = "Test response"
+    mock_response = {
+        "output": [{
+            "function_type": "declarative",
+            "structure_type": "simple sentence",
+            "purpose": "to state a fact",
+            "topic_level_1": "testing",
+            "topic_level_3": "evaluation",
+            "overall_keywords": ["test"],
+            "domain_keywords": ["assessment", "evaluation"]
+        }]
+    }
     mock_create.return_value = mock_response
 
     response = await agent.call_model("Test prompt")
-    assert response == "Test response"
     assert hasattr(response, 'function_type')
     assert hasattr(response, 'structure_type')
     assert hasattr(response, 'purpose')
@@ -43,8 +51,17 @@ async def test_retry_on_rate_limit(mock_create, agent):
     First call => RateLimitError,
     Second call => recovers with a mock object that has .output_text
     """
-    mock_response = MagicMock()
-    mock_response.output_text = "Recovered response"
+    mock_response = {
+        "output": [{
+            "function_type": "declarative",
+            "structure_type": "simple sentence",
+            "purpose": "to state a fact",
+            "topic_level_1": "testing",
+            "topic_level_3": "evaluation",
+            "overall_keywords": ["test"],
+            "domain_keywords": ["assessment", "evaluation"]
+        }]
+    }
 
     error_response = RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
 
@@ -54,7 +71,13 @@ async def test_retry_on_rate_limit(mock_create, agent):
     ]
 
     response = await agent.call_model("Test prompt")
-    assert response == "Recovered response"
+    assert hasattr(response, 'function_type')
+    assert hasattr(response, 'structure_type')
+    assert hasattr(response, 'purpose')
+    assert hasattr(response, 'topic_level_1')
+    assert hasattr(response, 'topic_level_3')
+    assert hasattr(response, 'overall_keywords')
+    assert hasattr(response, 'domain_keywords')
 
 @pytest.mark.asyncio
 @patch("openai.responses.create")
@@ -63,8 +86,17 @@ async def test_retry_on_api_error(mock_create, agent):
     First call => APIError,
     Second call => returns a mock object with .output_text
     """
-    mock_response = MagicMock()
-    mock_response.output_text = "Recovered from API error"
+    mock_response = {
+        "output": [{
+            "function_type": "declarative",
+            "structure_type": "simple sentence",
+            "purpose": "to state a fact",
+            "topic_level_1": "testing",
+            "topic_level_3": "evaluation",
+            "overall_keywords": ["test"],
+            "domain_keywords": ["assessment", "evaluation"]
+        }]
+    }
 
     error_response = APIError("API error", request="mock_request", body="mock_body")
 
@@ -74,7 +106,13 @@ async def test_retry_on_api_error(mock_create, agent):
     ]
 
     response = await agent.call_model("Test prompt")
-    assert response == "Recovered from API error"
+    assert hasattr(response, 'function_type')
+    assert hasattr(response, 'structure_type')
+    assert hasattr(response, 'purpose')
+    assert hasattr(response, 'topic_level_1')
+    assert hasattr(response, 'topic_level_3')
+    assert hasattr(response, 'overall_keywords')
+    assert hasattr(response, 'domain_keywords')
 
 @pytest.mark.asyncio
 @patch("openai.responses.create")
