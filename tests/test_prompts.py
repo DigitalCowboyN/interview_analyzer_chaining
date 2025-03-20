@@ -42,14 +42,14 @@ async def test_prompt_attributes(load_prompts):
         
         # Parse the response to extract the function type
         assert response.function_type == "declarative"  # Replace with expected value
-        assert "structure_type" in response
-        assert "purpose" in response
-        assert "topic_level_1" in response
-        assert "topic_level_3" in response
-        assert "overall_keywords" in response
-        assert "domain_keywords" in response
+        assert hasattr(response, 'structure_type')
+        assert hasattr(response, 'purpose')
+        assert hasattr(response, 'topic_level_1')
+        assert hasattr(response, 'topic_level_3')
+        assert hasattr(response, 'overall_keywords')
+        assert hasattr(response, 'domain_keywords')
 
     # Test domain prompts
     for keyword in domain_prompts['domain_keywords']:
         response = await agent.call_model(f"Identify the keyword: {keyword}")
-        assert "domain_keywords" in response
+        assert hasattr(response, 'domain_keywords')
