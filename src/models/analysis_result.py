@@ -1,8 +1,7 @@
 from pydantic import BaseModel
 
 class AnalysisResult(BaseModel):
-    overall_keywords: str  # Ensure this is a string
-    domain_keywords: str    # Ensure this is a string
+    # Remove duplicate fields
     function_type: str
     structure_type: str
     purpose: str

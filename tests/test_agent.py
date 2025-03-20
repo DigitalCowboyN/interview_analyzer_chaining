@@ -23,13 +23,15 @@ async def test_successful_call(mock_create, agent):
     that has that attribute.
     """
     mock_response = {  # Ensure the structure matches AnalysisResult
-        "function_type": "declarative",
-        "structure_type": "simple sentence",
-        "purpose": "to state a fact",
-        "topic_level_1": "testing",
-        "topic_level_3": "evaluation",
-        "overall_keywords": "test",  # Change to string
-        "domain_keywords": "assessment, evaluation"  # Change to string
+        "output": [{
+            "function_type": "declarative",
+            "structure_type": "simple sentence",
+            "purpose": "to state a fact",
+            "topic_level_1": "testing",
+            "topic_level_3": "evaluation",
+            "overall_keywords": "test",
+            "domain_keywords": "assessment, evaluation"
+        }]
     }
     mock_create.return_value = mock_response
 
