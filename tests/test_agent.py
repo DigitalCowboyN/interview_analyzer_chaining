@@ -33,7 +33,7 @@ async def test_successful_call(mock_create, agent):
                 "overall_keywords": "test",
                 "domain_keywords": "assessment, evaluation"
             }]
-            "function_type": "declarative",
+,           "function_type": "declarative",
             "structure_type": "simple sentence",
             "purpose": "to state a fact",
             "topic_level_1": "testing",
