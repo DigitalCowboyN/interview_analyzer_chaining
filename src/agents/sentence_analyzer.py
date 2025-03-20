@@ -22,11 +22,15 @@ class SentenceAnalyzer:
 
         # Function type classification (no context)
         function_prompt = self.prompts["sentence_function_type"]["prompt"].format(sentence=sentence)
-        results["function_type"] = await agent.call_model(function_prompt)  # Ensure await is used
+        response = await agent.call_model(function_prompt)
+        response_json = json.loads(response.output[0].content[0].text)  # Parse JSON response
+        results["function_type"] = response_json.get("function_type")
 
         # Structure type classification (no context)
         structure_prompt = self.prompts["sentence_structure_type"]["prompt"].format(sentence=sentence)
-        results["structure_type"] = await agent.call_model(structure_prompt)  # Add await
+        response = await agent.call_model(structure_prompt)
+        response_json = json.loads(response.output[0].content[0].text)  # Parse JSON response
+        results["structure_type"] = response_json.get("structure_type")
 
         # Purpose classification (observer context)
         purpose_prompt = self.prompts["sentence_purpose"]["prompt"].format(

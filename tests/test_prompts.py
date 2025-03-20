@@ -40,13 +40,10 @@ async def test_prompt_attributes(load_prompts):
         response = await agent.call_model(formatted_prompt)
         
         # Parse the response to extract the function type
-        match = re.search(r'- Function Type: (\w+)', response)
-        if match:
-            function_type = match.group(1)
-            assert function_type == "declarative"  # Replace with expected value
-        else:
-            assert False, "Function type not found in response"
-        assert "structure_type" in response
+        response_json = json.loads(response.output[0].content[0].text)  # Parse JSON response
+        function_type = response_json.get("function_type")
+        assert function_type == "declarative"  # Replace with expected value
+        assert "structure_type" in response_json
         assert "purpose" in response
         assert "topic_level_1" in response
         assert "topic_level_3" in response
