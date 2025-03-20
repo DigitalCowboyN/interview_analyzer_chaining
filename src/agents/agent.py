@@ -42,7 +42,15 @@ class OpenAIAgent:
                 logger.debug(f"Received response: {response}")
                 # The real openai.responses.create() returns a 'Response' object,
                 # which should have an 'output_text' attribute, not be subscriptable.
-                response_data = response.output[0]  # Assuming the first output is what you need
+                response_data = {
+                    "function_type": response["function_type"],
+                    "structure_type": response["structure_type"],
+                    "purpose": response["purpose"],
+                    "topic_level_1": response["topic_level_1"],
+                    "topic_level_3": response["topic_level_3"],
+                    "overall_keywords": response["overall_keywords"],
+                    "domain_keywords": response["domain_keywords"]
+                }
                 return AnalysisResult(**response_data)  # Pass the extracted data
 
             except openai.RateLimitError as e:
