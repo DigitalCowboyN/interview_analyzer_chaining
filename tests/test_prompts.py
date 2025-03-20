@@ -1,3 +1,4 @@
+import re
 import pytest
 import yaml
 from src.agents.agent import OpenAIAgent
