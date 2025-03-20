@@ -15,6 +15,21 @@ async def test_prompt_attributes(load_prompts):
     domain_prompts, task_prompts = load_prompts
     agent = OpenAIAgent()
 
+    # Define a target sentence and surrounding sentences for context
+    target_sentence = "This is a test sentence."
+    surrounding_sentences = [
+        "This is the first surrounding sentence.",
+        "This is the second surrounding sentence.",
+        "This is the third surrounding sentence."
+    ]
+
+    # Create contexts based on surrounding sentences
+    contexts = {
+        "immediate": " ".join(surrounding_sentences[:1]),  # Immediate context
+        "broader": " ".join(surrounding_sentences),  # Broader context
+        "observer": "This is the observer context."  # Observer context
+    }
+
     # Test each task prompt
     for prompt_key, prompt in task_prompts.items():
         formatted_prompt = prompt["prompt"].format(sentence="This is a test sentence.")
