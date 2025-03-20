@@ -44,6 +44,6 @@ async def test_process_file(sample_text_file, tmp_path):
     assert isinstance(data, list)  # Update to match the expected structure
     assert len(data) == 2  # two sentences
     assert data[0]["sentence"] == "This is a test."
-    assert data[0]["function_type"] is not None  # Check for function type
+    assert data[0]["function_type"] == "declarative"  # Check for expected function type
     assert data[1]["sentence"] == "Ensure proper segmentation."
     assert data[1]["function_type"] is not None  # Check for function type
