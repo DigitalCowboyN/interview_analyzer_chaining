@@ -42,7 +42,13 @@ async def test_classify_sentence(mock_call_model, analyzer, mock_contexts):
     result = await analyzer.classify_sentence(sentence, mock_contexts)  # Ensure await is used
 
     assert "function_type" in result
-    assert result["function_type"] == "declarative"  # Update to match the actual return value
+    assert result["function_type"] == "declarative"  # Ensure this matches the expected output
+    assert result["structure_type"] == "simple sentence"
+    assert result["purpose"] == "to state a fact"
+    assert result["topic_level_1"] == "testing"
+    assert result["topic_level_3"] == "evaluation"
+    assert result["overall_keywords"] == "test"
+    assert result["domain_keywords"] == "assessment, evaluation"
 
     assert mock_call_model.call_count == 7  # Seven classifications
 
