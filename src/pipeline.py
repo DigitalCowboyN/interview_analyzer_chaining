@@ -26,7 +26,15 @@ async def process_file(input_file: Path, output_dir: Path):
     sentences = segment_text(text)
 
     analyzer = SentenceAnalyzer()
-    results = await analyzer.analyze_sentences(sentences)  # Await the results directly
+    results = await analyzer.analyze_sentences(sentences)
+    for result in results:
+        assert hasattr(result, 'function_type')
+        assert hasattr(result, 'structure_type')
+        assert hasattr(result, 'purpose')
+        assert hasattr(result, 'topic_level_1')
+        assert hasattr(result, 'topic_level_3')
+        assert hasattr(result, 'overall_keywords')
+        assert hasattr(result, 'domain_keywords')
     # Ensure that results are fully resolved before saving
 
     output_file = output_dir / f"{input_file.stem}_analysis.json"  # Ensure the output file is named correctly

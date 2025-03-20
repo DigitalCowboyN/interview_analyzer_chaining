@@ -25,6 +25,13 @@ class SentenceAnalyzer:
         function_prompt = self.prompts["sentence_function_type"]["prompt"].format(sentence=sentence)
         response = await agent.call_model(function_prompt)
         results["function_type"] = response.function_type
+        assert hasattr(response, 'function_type')
+        assert hasattr(response, 'structure_type')
+        assert hasattr(response, 'purpose')
+        assert hasattr(response, 'topic_level_1')
+        assert hasattr(response, 'topic_level_3')
+        assert hasattr(response, 'overall_keywords')
+        assert hasattr(response, 'domain_keywords')
 
         # Structure type classification (no context)
         structure_prompt = self.prompts["sentence_structure_type"]["prompt"].format(sentence=sentence)
