@@ -34,13 +34,13 @@ async def test_successful_call(mock_create, agent):
     mock_create.return_value = mock_response
 
     response = await agent.call_model("Test prompt")
-    assert hasattr(response, 'function_type')
-    assert hasattr(response, 'structure_type')
-    assert hasattr(response, 'purpose')
-    assert hasattr(response, 'topic_level_1')
-    assert hasattr(response, 'topic_level_3')
-    assert hasattr(response, 'overall_keywords')
-    assert hasattr(response, 'domain_keywords')
+    assert response.function_type == "declarative"
+    assert response.structure_type == "simple sentence"
+    assert response.purpose == "to state a fact"
+    assert response.topic_level_1 == "testing"
+    assert response.topic_level_3 == "evaluation"
+    assert response.overall_keywords == "test"
+    assert response.domain_keywords == "assessment, evaluation"
 
 @pytest.mark.asyncio
 @patch("openai.responses.create")
@@ -56,8 +56,8 @@ async def test_retry_on_rate_limit(mock_create, agent):
             "purpose": "to state a fact",
             "topic_level_1": "testing",
             "topic_level_3": "evaluation",
-            "overall_keywords": ["test"],
-            "domain_keywords": ["assessment", "evaluation"]
+            "overall_keywords": "test",
+            "domain_keywords": "assessment, evaluation"
         }]
     }
 
