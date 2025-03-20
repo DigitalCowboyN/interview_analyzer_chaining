@@ -25,7 +25,14 @@ async def test_successful_call(mock_create, agent):
     mock_response = {
         "output": [{
             "content": [{
-            "content": [{
+                "function_type": "declarative",
+                "structure_type": "simple sentence",
+                "purpose": "to state a fact",
+                "topic_level_1": "testing",
+                "topic_level_3": "evaluation",
+                "overall_keywords": "test",
+                "domain_keywords": "assessment, evaluation"
+            }]
             "function_type": "declarative",
             "structure_type": "simple sentence",
             "purpose": "to state a fact",
