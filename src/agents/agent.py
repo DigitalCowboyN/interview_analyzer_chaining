@@ -42,7 +42,8 @@ class OpenAIAgent:
                 logger.debug(f"Received response: {response}")
                 # The real openai.responses.create() returns a 'Response' object,
                 # which should have an 'output_text' attribute, not be subscriptable.
-                return AnalysisResult(**response)  # Return structured response
+                response_data = response.output[0]  # Assuming the first output is what you need
+                return AnalysisResult(**response_data)  # Pass the extracted data
 
             except openai.RateLimitError as e:
                 wait_time = self.backoff_factor ** attempt
