@@ -30,7 +30,6 @@ async def process_file(input_file: Path, output_dir: Path):
     # Ensure that results are fully resolved before saving
 
     output_file = output_dir / f"{input_file.stem}_analysis.json"  # Ensure the output file is named correctly
-    results = await analyzer.analyze_sentences(sentences)  # Await the results directly
     save_json(results, output_file)
 
     logger.info(f"Finished processing {input_file}, results saved to {output_file}")
