@@ -1,5 +1,6 @@
 # tests/test_sentence_analyzer.py
 import pytest
+from src.models.analysis_result import AnalysisResult
 
 pytestmark = pytest.mark.asyncio
 import pytest
