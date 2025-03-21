@@ -49,7 +49,7 @@ async def test_successful_call(mock_create, agent):
                     "annotations": []
                 }]
             }
-        ]
+        ],
 ,           "function_type": "declarative",
             "structure_type": "simple sentence",
             "purpose": "to state a fact",
