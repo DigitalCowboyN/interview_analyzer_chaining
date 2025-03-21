@@ -59,8 +59,7 @@ async def test_successful_call(mock_create, agent):
             "overall_keywords": "test",
             "domain_keywords": "assessment, evaluation"
         }  # This closing brace is correct
-    }  # This closing brace is the one that needs to be removed
-    }
+
     mock_create.return_value = mock_response
 
     response = await agent.call_model("Test prompt")
