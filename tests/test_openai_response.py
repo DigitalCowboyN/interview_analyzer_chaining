@@ -1,5 +1,6 @@
 import pytest
 from src.agents.agent import OpenAIAgent
+from src.models.analysis_result import AnalysisResult  # Import AnalysisResult
 
 @pytest.mark.asyncio
 async def test_openai_response_structure():
