@@ -81,13 +81,23 @@ async def test_retry_on_rate_limit(mock_create, agent):
     """
     mock_response = {
         "output": [{
-            "function_type": "declarative",
-            "structure_type": "simple sentence",
-            "purpose": "to state a fact",
-            "topic_level_1": "testing",
-            "topic_level_3": "evaluation",
-            "overall_keywords": "test",
-            "domain_keywords": "assessment, evaluation"
+            "type": "message",
+            "id": "msg_123",
+            "status": "completed",
+            "role": "assistant",
+            "content": [{
+                "type": "output_text",
+                "text": {
+                    "function_type": "declarative",
+                    "structure_type": "simple sentence",
+                    "purpose": "to state a fact",
+                    "topic_level_1": "testing",
+                    "topic_level_3": "evaluation",
+                    "overall_keywords": "test",
+                    "domain_keywords": "assessment, evaluation"
+                },
+                "annotations": []
+            }]
         }]
     }
 
