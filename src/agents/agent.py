@@ -43,7 +43,7 @@ class OpenAIAgent:
                 logger.debug(f"Received response: {response}")
                 # The real openai.responses.create() returns a 'Response' object,
                 # which should have an 'output_text' attribute, not be subscriptable.
-                output_message = response["output"][0]["content"][0]["text"]  # Accessing attributes directly
+                output_message = response.output[0].content[0].text  # Accessing attributes directly
                 output_data = json.loads(output_message)  # Parse if it's a JSON string
                 response_data = {
                     "function_type": output_data.get("function_type"),
