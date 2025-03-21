@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import List  # Import List from typing
 
 class AnalysisResult(BaseModel):
     # Ensure the fields match the expected output from the OpenAI API
