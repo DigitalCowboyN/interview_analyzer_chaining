@@ -58,17 +58,17 @@ class OpenAIAgent:
                 # Extract JSON from the output message if it contains it
                 json_start = output_message.find('{')
                 if json_start != -1:
-                    output_data = json.loads(output_message[json_start:])  # Parse the JSON part
+                    output_data = json.loads(output_message)  # Parse the JSON part
                 else:
                     raise ValueError("Response does not contain valid JSON.")
                 response_data = {
-                    "function_type": output_data.get("function_type"),
-                    "structure_type": output_data.get("structure_type"),
-                    "purpose": output_data.get("purpose"),
-                    "topic_level_1": output_data.get("topic_level_1"),
-                    "topic_level_3": output_data.get("topic_level_3"),
-                    "overall_keywords": output_data.get("overall_keywords"),
-                    "domain_keywords": output_data.get("domain_keywords")
+                    "function_type": output_data.function_type,
+                    "structure_type": output_data.structure_type,
+                    "purpose": output_data.purpose,
+                    "topic_level_1": output_data.topic_level_1,
+                    "topic_level_3": output_data.topic_level_3,
+                    "overall_keywords": output_data.overall_keywords,
+                    "domain_keywords": output_data.domain_keywords
                 }
                 return AnalysisResult(**response_data)  # Pass the extracted data
                 response_data = {
