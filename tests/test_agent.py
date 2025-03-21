@@ -62,7 +62,13 @@ async def test_successful_call(mock_create, agent):
     mock_create.return_value = mock_response
 
     response = await agent.call_model("Test prompt")
-    assert response.function_type == "declarative"
+    assert response.function_type == "declarative"  # Ensure this matches the expected output
+    assert hasattr(response, 'structure_type')
+    assert hasattr(response, 'purpose')
+    assert hasattr(response, 'topic_level_1')
+    assert hasattr(response, 'topic_level_3')
+    assert hasattr(response, 'overall_keywords')
+    assert hasattr(response, 'domain_keywords')
     assert response.structure_type == "simple sentence"
     assert response.purpose == "to state a fact"
     assert response.topic_level_1 == "testing"

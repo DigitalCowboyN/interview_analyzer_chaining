@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 class AnalysisResult(BaseModel):
-    # Remove duplicate fields
+    # Ensure the fields match the expected output from the OpenAI API
     function_type: str
     structure_type: str
     purpose: str
