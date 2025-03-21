@@ -35,7 +35,7 @@ async def test_process_file(sample_text_file, tmp_path):
     await process_file(sample_text_file, output_dir)  # Ensure this is awaited
     # Check that the output file is created
 
-    output_file = output_dir / "test_file_analysis.json"
+    output_file = output_dir / f"{sample_text_file.stem}_analysis.json"  # Ensure the output file is named correctly
     assert output_file.exists()
 
     import json
