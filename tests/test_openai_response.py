@@ -12,4 +12,4 @@ async def test_openai_response_structure():
     print(response)  # This will show you the full response object
 
     # Optionally, you can assert that the response is of the expected type
-    assert isinstance(response, dict)  # Assuming the response should be a dictionary-like object
+    assert isinstance(response, AnalysisResult)  # Check for AnalysisResult instance
