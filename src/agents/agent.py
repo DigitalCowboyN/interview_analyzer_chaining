@@ -46,13 +46,31 @@ class OpenAIAgent:
                 output_message = response.output[0].content[0].text  # Accessing attributes directly
                 logger.debug(f"Raw output message: {output_message}")  # Log the raw output message
 
+                # Extract JSON from the output message
+                json_start = output_message.find('{')
+                if json_start != -1:
+                    json_part = output_message[json_start:]  # Extract the JSON part
+                    output_data = json.loads(json_part)  # Parse the JSON part
+                else:
+                    raise ValueError("Response does not contain valid JSON.")
+                logger.debug(f"Raw output message: {output_message}")  # Log the raw output message
+
                 # Extract JSON from the output message if it contains it
                 json_start = output_message.find('{')
                 if json_start != -1:
                     output_data = json.loads(output_message[json_start:])  # Parse the JSON part
                 else:
                     raise ValueError("Response does not contain valid JSON.")
-                output_data = json.loads(output_message)  # Parse if it's a JSON string
+                response_data = {
+                    "function_type": output_data.get("function_type"),
+                    "structure_type": output_data.get("structure_type"),
+                    "purpose": output_data.get("purpose"),
+                    "topic_level_1": output_data.get("topic_level_1"),
+                    "topic_level_3": output_data.get("topic_level_3"),
+                    "overall_keywords": output_data.get("overall_keywords"),
+                    "domain_keywords": output_data.get("domain_keywords")
+                }
+                return AnalysisResult(**response_data)  # Pass the extracted data
                 response_data = {
                     "function_type": output_data.get("function_type"),
                     "structure_type": output_data.get("structure_type"),
