@@ -1,5 +1,6 @@
 # tests/test_agent.py
 import os
+import json
 import pytest
 from unittest.mock import patch, MagicMock
 import asyncio
