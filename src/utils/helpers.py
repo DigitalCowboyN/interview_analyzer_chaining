@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 
 
-def save_json(data, file_path, indent=4):
+def save_json(data, file_path: str, indent: int = 4):
     """Save data as JSON."""
     file_path = Path(file_path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -13,13 +13,13 @@ def save_json(data, file_path, indent=4):
         json.dump(data, f, indent=indent, ensure_ascii=False)
 
 
-def load_json(file_path):
+def load_json(file_path: str) -> dict:
     """Load data from JSON file."""
     with Path(file_path).open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def save_yaml(data, file_path):
+def save_yaml(data: dict, file_path: str):
     """Save data as YAML."""
     file_path = Path(file_path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -27,7 +27,7 @@ def save_yaml(data, file_path):
         yaml.safe_dump(data, f)
 
 
-def load_yaml(file_path):
+def load_yaml(file_path: str) -> dict:
     """Load data from YAML file."""
     with Path(file_path).open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
