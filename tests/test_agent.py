@@ -23,16 +23,34 @@ async def test_successful_call(mock_create, agent):
     that has that attribute.
     """
     mock_response = {
-        "output": [{
-            "content": [{
-                "function_type": "declarative",
-                "structure_type": "simple sentence",
-                "purpose": "to state a fact",
-                "topic_level_1": "testing",
-                "topic_level_3": "evaluation",
-                "overall_keywords": "test",
-                "domain_keywords": "assessment, evaluation"
-            }]
+        "id": "resp_123",
+        "object": "response",
+        "created_at": 1741476777,
+        "status": "completed",
+        "error": None,
+        "output": [
+            {
+                "type": "message",
+                "id": "msg_123",
+                "status": "completed",
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": {
+                            "function_type": "declarative",
+                            "structure_type": "simple sentence",
+                            "purpose": "to state a fact",
+                            "topic_level_1": "testing",
+                            "topic_level_3": "evaluation",
+                            "overall_keywords": "test",
+                            "domain_keywords": "assessment, evaluation"
+                        },
+                        "annotations": []
+                    }
+                ]
+            }
+        ]
 ,           "function_type": "declarative",
             "structure_type": "simple sentence",
             "purpose": "to state a fact",
