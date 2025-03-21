@@ -7,5 +7,5 @@ class AnalysisResult(BaseModel):
     purpose: str
     topic_level_1: str
     topic_level_3: str
-    overall_keywords: str  # Ensure this is a string
-    domain_keywords: str    # Ensure this is a string
+    overall_keywords: List[str]  # Change to List of strings
+    domain_keywords: List[str]    # Change to List of strings
