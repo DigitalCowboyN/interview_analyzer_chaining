@@ -58,7 +58,7 @@ async def test_successful_call(mock_create, agent):
             "topic_level_3": "evaluation",
             "overall_keywords": "test",
             "domain_keywords": "assessment, evaluation"
-        }]
+        }  # Removed the extra closing bracket here
     }
     mock_create.return_value = mock_response
 
