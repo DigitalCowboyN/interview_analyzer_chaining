@@ -1,7 +1,10 @@
 import pytest
 # Ensure to run tests with the correct PYTHONPATH
 # Example: PYTHONPATH=. pytest tests/integration/test_api_calls.py
+import sys
 import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 from src.agents.agent import OpenAIAgent
 
 @pytest.mark.asyncio
