@@ -1,4 +1,6 @@
 import pytest
+# Ensure to run tests with the correct PYTHONPATH
+# Example: PYTHONPATH=. pytest tests/integration/test_api_calls.py
 import os
 from src.agents.agent import OpenAIAgent
 
