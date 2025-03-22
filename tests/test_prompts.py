@@ -14,7 +14,6 @@ def mock_response(content_dict):
     mock_resp = MagicMock()
     mock_output = MagicMock()
     mock_content = MagicMock()
-    # Convert our dictionary to JSON string.
     mock_content.text = json.dumps(content_dict)
     mock_output.content = [mock_content]
     mock_resp.output = [mock_output]
@@ -43,10 +42,11 @@ async def test_prompt_attributes(load_prompts):
     }
     with patch("openai.responses.create", return_value=mock_response(response_content)):
         for prompt_key, prompt in task_prompts.items():
-            # Supply both 'sentence' and 'context' (and any other placeholders required)
+            # Supply all placeholders expected in the prompt
             formatted_prompt = prompt["prompt"].format(
                 sentence="This is a test sentence.",
-                context="Default context"
+                context="Default context",
+                domain_keywords="Default domain keywords"
             )
             response = await agent.call_model(formatted_prompt)
             assert isinstance(response, AnalysisResult)

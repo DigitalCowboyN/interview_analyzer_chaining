@@ -1,6 +1,6 @@
 import openai
 import asyncio
-import json  # Ensure to import json
+import json
 from src.config import config
 from src.models.analysis_result import AnalysisResult
 from src.utils.logger import get_logger
@@ -26,82 +26,44 @@ class OpenAIAgent:
         logger.debug(f"Calling OpenAI API with prompt: {function_prompt}")
         attempt = 0
 
-        # Synchronous method to call the OpenAI API.
         def sync_create():
             return openai.responses.create(
                 model=self.model,
-                instructions="You are a coding assistant. Analyze the provided sentence and return the function type, structure type, purpose, topic level 1, topic level 3, overall keywords, and domain keywords in a structured format.",
+                instructions=(
+                    "You are a coding assistant. Analyze the sentence and return structured JSON "
+                    "with keys: function_type, structure_type, purpose, topic_level_1, topic_level_3, overall_keywords, domain_keywords."
+                ),
                 input=function_prompt
             )
 
         while attempt < self.retry_attempts:
             try:
-                # Run the sync call in an executor so we can await the result.
                 loop = asyncio.get_running_loop()
                 response = await loop.run_in_executor(None, sync_create)
+                output_message = response.output[0].content[0].text.strip()
+                logger.debug(f"Raw output message: {output_message}")
+                output_data = json.loads(output_message)
+                
+                # If overall_keywords and domain_keywords are returned as comma-separated strings, split them:
+                # Uncomment the following two lines if needed:
+                # output_data["overall_keywords"] = [kw.strip() for kw in output_data["overall_keywords"].split(",")]
+                # output_data["domain_keywords"] = [kw.strip() for kw in output_data["domain_keywords"].split(",")]
 
-                logger.debug(f"Received response: {response}")
-                # The real openai.responses.create() returns a 'Response' object,
-                # which should have an 'output_text' attribute, not be subscriptable.
-                output_message = response.output[0].content[0].text  # Accessing attributes directly
-                logger.debug(f"Raw output message: {output_message}")  # Log the raw output message
+                return AnalysisResult(**output_data)
 
-                # Extract JSON from the output message
-                json_start = output_message.find('{')
-                if json_start != -1:
-                    json_part = output_message[json_start:]  # Extract the JSON part
-                    output_data = json.loads(json_part)  # Parse the JSON part
-                else:
-                    raise ValueError("Response does not contain valid JSON.")
-                logger.debug(f"Raw output message: {output_message}")  # Log the raw output message
-
-                # Extract JSON from the output message if it contains it
-                json_start = output_message.find('{')
-                if json_start != -1:
-                    output_data = json.loads(output_message)  # Parse the JSON part
-                else:
-                    raise ValueError("Response does not contain valid JSON.")
-                response_data = {
-                    "function_type": output_data.function_type,
-                    "structure_type": output_data.structure_type,
-                    "purpose": output_data.purpose,
-                    "topic_level_1": output_data.topic_level_1,
-                    "topic_level_3": output_data.topic_level_3,
-                    "overall_keywords": output_data.overall_keywords,
-                    "domain_keywords": output_data.domain_keywords
-                }
-                return AnalysisResult(**response_data)  # Pass the extracted data
-                response_data = {
-                    "function_type": output_data.get("function_type"),
-                    "structure_type": output_data.get("structure_type"),
-                    "purpose": output_data.get("purpose"),
-                    "topic_level_1": output_data.get("topic_level_1"),
-                    "topic_level_3": output_data.get("topic_level_3"),
-                    "overall_keywords": output_data.get("overall_keywords"),
-                    "domain_keywords": output_data.get("domain_keywords")
-                }
-                return AnalysisResult(**response_data)  # Pass the extracted data
-
-            except openai.RateLimitError as e:
+            except (openai.RateLimitError, openai.APIError) as e:
                 wait_time = self.backoff_factor ** attempt
-                logger.warning(
-                    f"Rate limit hit. Retrying after {wait_time} seconds... (Attempt {attempt + 1})"
-                )
+                logger.warning(f"{type(e).__name__} encountered: Retrying after {wait_time}s (Attempt {attempt+1})")
                 await asyncio.sleep(wait_time)
                 attempt += 1
-
-            except openai.APIError as e:
-                wait_time = self.backoff_factor ** attempt
-                logger.error(f"OpenAI API error: {e}. Retrying...")
-                logger.error(f"Error details: {e}")
-                await asyncio.sleep(wait_time)
-                attempt += 1
-
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decoding failed: {e}")
+                raise
             except Exception as e:
                 logger.exception(f"Unexpected error: {e}")
                 raise
 
         raise Exception("Max retry attempts exceeded.")
 
-# Singleton instance (if you need it globally)
+# Singleton instance
 agent = OpenAIAgent()

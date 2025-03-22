@@ -1,184 +1,81 @@
 # tests/test_agent.py
-import os
-import json
 import pytest
+import json
 from unittest.mock import patch, MagicMock
-import asyncio
 from openai import RateLimitError, APIError
 from src.agents.agent import OpenAIAgent
+from src.models.analysis_result import AnalysisResult
 
-# Set the environment variable for logging (optional)
-os.environ["OPENAI_LOG"] = "debug"
+pytestmark = pytest.mark.asyncio
+
+def mock_response(content_dict):
+    mock_resp = MagicMock()
+    mock_output = MagicMock()
+    mock_content = MagicMock()
+    mock_content.text = json.dumps(content_dict)
+    mock_output.content = [mock_content]
+    mock_resp.output = [mock_output]
+    return mock_resp
 
 @pytest.fixture
 def agent():
-    """Pytest fixture to provide an OpenAIAgent instance."""
     return OpenAIAgent()
 
 @pytest.mark.asyncio
 @patch("openai.responses.create")
 async def test_successful_call(mock_create, agent):
-    """
-    Simulates a single successful response from openai.responses.create.
-    Agent code uses response.output_text, so let's return a mocked object
-    that has that attribute.
-    """
-    mock_response = {
-        "id": "resp_123",
-        "object": "response",
-        "created_at": 1741476777,
-        "status": "completed",
-        "error": None,
-        "output": [
-            {
-                "type": "message",
-                "id": "msg_123",
-                "status": "completed",
-                "role": "assistant",
-                "content": [{
-                    "type": "output_text",
-                    "text": json.dumps({
-                        "function_type": "declarative",
-                        "structure_type": "simple sentence",
-                        "purpose": "to state a fact",
-                        "topic_level_1": "testing",
-                        "topic_level_3": "evaluation",
-                        "overall_keywords": "test",
-                        "domain_keywords": "assessment, evaluation"
-                    }),
-                    "annotations": []
-                }]
-            }
-        ],
-,           "function_type": "declarative",
-            "structure_type": "simple sentence",
-            "purpose": "to state a fact",
-            "topic_level_1": "testing",
-            "topic_level_3": "evaluation",
-            "overall_keywords": "test",
-            "domain_keywords": "assessment, evaluation"
-        }  # This closing brace is correct
-
-    mock_create.return_value = mock_response
-
+    response_content = {
+        "function_type": "declarative",
+        "structure_type": "simple sentence",
+        "purpose": "to state a fact",
+        "topic_level_1": "testing",
+        "topic_level_3": "evaluation",
+        "overall_keywords": ["test"],
+        "domain_keywords": ["assessment", "evaluation"]
+    }
+    mock_create.return_value = mock_response(response_content)
     response = await agent.call_model("Test prompt")
-    assert response.function_type == "declarative"  # Ensure this matches the expected output
-    assert hasattr(response, 'structure_type')
-    assert hasattr(response, 'purpose')
-    assert hasattr(response, 'topic_level_1')
-    assert hasattr(response, 'topic_level_3')
-    assert hasattr(response, 'overall_keywords')
-    assert hasattr(response, 'domain_keywords')
-    assert response.structure_type == "simple sentence"
-    assert response.purpose == "to state a fact"
-    assert response.topic_level_1 == "testing"
-    assert response.topic_level_3 == "evaluation"
-    assert response.overall_keywords == "test"
-    assert response.domain_keywords == "assessment, evaluation"
+    assert isinstance(response, AnalysisResult)
+    assert response.function_type == "declarative"
+    assert response.overall_keywords == ["test"]
 
 @pytest.mark.asyncio
 @patch("openai.responses.create")
 async def test_retry_on_rate_limit(mock_create, agent):
-    """
-    First call => RateLimitError,
-    Second call => recovers with a mock object that has .output_text
-    """
-    mock_response = {
-        "output": [{
-            "type": "message",
-            "id": "msg_123",
-            "status": "completed",
-            "role": "assistant",
-            "content": [{
-                "type": "output_text",
-                "text": json.dumps({
-                    "function_type": "declarative",
-                    "structure_type": "simple sentence",
-                    "purpose": "to state a fact",
-                    "topic_level_1": "testing",
-                    "topic_level_3": "evaluation",
-                    "overall_keywords": "test",
-                    "domain_keywords": "assessment, evaluation"
-                }),
-                "annotations": []
-            }]
-        }]
+    response_content = {
+        "function_type": "declarative",
+        "structure_type": "simple sentence",
+        "purpose": "to state a fact",
+        "topic_level_1": "testing",
+        "topic_level_3": "evaluation",
+        "overall_keywords": ["test"],
+        "domain_keywords": ["assessment", "evaluation"]
     }
-
     error_response = RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
-
-    mock_create.side_effect = [
-        error_response,      # Raise on first call
-        mock_response        # Return success on second call
-    ]
-
+    mock_create.side_effect = [error_response, mock_response(response_content)]
     response = await agent.call_model("Test prompt")
-    assert hasattr(response, 'function_type')
-    assert hasattr(response, 'structure_type')
-    assert hasattr(response, 'purpose')
-    assert hasattr(response, 'topic_level_1')
-    assert hasattr(response, 'topic_level_3')
-    assert hasattr(response, 'overall_keywords')
-    assert hasattr(response, 'domain_keywords')
+    assert response.function_type == "declarative"
 
 @pytest.mark.asyncio
 @patch("openai.responses.create")
 async def test_retry_on_api_error(mock_create, agent):
-    """
-    First call => APIError,
-    Second call => returns a mock object with .output_text
-    """
-    mock_response = {
-        "output": [{
-            "type": "message",
-            "id": "msg_123",
-            "status": "completed",
-            "role": "assistant",
-            "content": [{
-                "type": "output_text",
-                "text": json.dumps({
-                    "function_type": "declarative",
-                    "structure_type": "simple sentence",
-                    "purpose": "to state a fact",
-                    "topic_level_1": "testing",
-                    "topic_level_3": "evaluation",
-                    "overall_keywords": "test",
-                    "domain_keywords": "assessment, evaluation"
-                }),
-                "annotations": []
-            }]
-        }]
+    response_content = {
+        "function_type": "declarative",
+        "structure_type": "simple sentence",
+        "purpose": "to state a fact",
+        "topic_level_1": "testing",
+        "topic_level_3": "evaluation",
+        "overall_keywords": ["test"],
+        "domain_keywords": ["assessment", "evaluation"]
     }
-
     error_response = APIError("API error", request="mock_request", body="mock_body")
-
-    mock_create.side_effect = [
-        error_response,      # Raise on first call
-        mock_response        # Return success on second call
-    ]
-
+    mock_create.side_effect = [error_response, mock_response(response_content)]
     response = await agent.call_model("Test prompt")
-    assert hasattr(response, 'function_type')
-    assert hasattr(response, 'structure_type')
-    assert hasattr(response, 'purpose')
-    assert hasattr(response, 'topic_level_1')
-    assert hasattr(response, 'topic_level_3')
-    assert hasattr(response, 'overall_keywords')
-    assert hasattr(response, 'domain_keywords')
+    assert response.purpose == "to state a fact"
 
 @pytest.mark.asyncio
 @patch("openai.responses.create")
 async def test_max_retry_exceeded(mock_create, agent):
-    """
-    Forces repeated RateLimitError so that the agent exhausts its retries
-    and raises "Max retry attempts exceeded".
-    """
-    # Always raise RateLimitError on every call
-    mock_create.side_effect = RateLimitError(
-        "Rate limit exceeded",
-        response=MagicMock(),
-        body=None
-    )
-
+    mock_create.side_effect = RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
     with pytest.raises(Exception, match="Max retry attempts exceeded"):
         await agent.call_model("Test prompt")
