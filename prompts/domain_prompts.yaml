@@ -1,4 +1,59 @@
+# This section lists domain-specific keywords relevant to Agile methodologies and project management.
+# These keywords can be used for classification and analysis in various contexts.
+
 domain_keywords:
+# Agile methodologies and frameworks
+  - Agile
+  - Scrum
+  - Kanban
+  - Backlog
+  - Retrospective
+  - Stand-up
+  - Sprint
+  - Epic
+  - User Story
+  - Roadmap
+  - MVP
+  - CI/CD
+  - DevOps
+  - Cloud
+# Cloud service providers
+  - AWS
+  - Azure
+# Software architecture and deployment
+  - Microservices
+  - Docker
+  - Kubernetes
+# Design and user experience
+  - UX/UI
+  - Persona
+  - Journey Map
+  - Wireframe
+  - Prototype
+  - Figma
+# Performance and measurement
+  - OKR
+  - KPI
+  - Metrics
+  - Analytics
+# Tools and platforms
+  - Salesforce
+  - CRM
+  - ERP
+  - SAP
+  - Jira
+  - Confluence
+  - GitHub
+  - GitLab
+  - Bitbucket
+# AI and machine learning
+  - OpenAI
+  - GPT
+  - LLM
+  - Transformer
+  - Embedding
+  - Vector
+  - Clustering
   - Agile
   - Scrum
   - Kanban
