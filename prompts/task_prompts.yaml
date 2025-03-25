@@ -1,3 +1,5 @@
+# This prompt determines the function type of a given sentence.
+# Options include declarative, interrogative, imperative, and exclamatory.
 sentence_function_type:
   prompt: |
     Determine the function type of the sentence provided.
@@ -12,6 +14,8 @@ sentence_function_type:
 
     Sentence: "{sentence}"
 
+# This prompt classifies the structure type of a given sentence.
+# Options include simple, compound, complex, and compound-complex.
 sentence_structure_type:
   prompt: |
     Classify the structure type of the given sentence.
@@ -26,6 +30,8 @@ sentence_structure_type:
 
     Sentence: "{sentence}"
 
+# This prompt identifies the purpose of a sentence from an outside observer's perspective.
+# Options include Statement, Query, Exclamation, and more.
 sentence_purpose:
   prompt: |
     Given the sentence and its surrounding context, identify the sentence's purpose from the perspective of an outside observer.
@@ -64,6 +70,8 @@ sentence_purpose:
     {context}
     """
 
+# This prompt classifies the topic of a sentence based on its immediate surrounding context (±2 sentences).
+# Options include goals, tools, processes, and more.
 topic_level_1:
   prompt: |
     Classify the topic of the given sentence based on its immediate surrounding context (±2 sentences).
@@ -93,6 +101,8 @@ topic_level_1:
     {context}
     """
 
+# This prompt classifies the topic of a sentence considering a broader context (±6 sentences).
+# Options include goals, tools, processes, and more.
 topic_level_3:
   prompt: |
     Classify the topic of the sentence considering a broader context (±6 sentences).
@@ -122,6 +132,8 @@ topic_level_3:
     {context}
     """
 
+# This prompt provides up to 6 keywords that represent the main topics of conversation based on the surrounding 10 sentences.
+# The context is provided for better accuracy.
 topic_overall_keywords:
   prompt: |
     Provide up to 6 keywords that best represent the main topics of conversation based on the surrounding 10 sentences.
@@ -133,6 +145,8 @@ topic_overall_keywords:
     {context}
     """
 
+# This prompt identifies any domain-specific keywords present in the sentence from a provided list.
+# Include up to 6 keywords found or "None" if no keywords are found.
 domain_specific_keywords:
   prompt: |
     Identify any domain-specific keywords present in the sentence from the provided domain-specific list below. Include up to 6 keywords found.
