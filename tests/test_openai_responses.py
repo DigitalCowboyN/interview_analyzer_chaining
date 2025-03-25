@@ -1,15 +1,15 @@
-"""                                                                                                                                                                                                                               
-test_openai_responses.py                                                                                                                                                                                                          
-                                                                                                                                                                                                                                  
-This module contains unit tests for the OpenAI API responses, specifically testing                                                                                                                                                
-the functionality of the 'responses.create' method in an asynchronous context.                                                                                                                                                    
-The tests ensure that the API can be called correctly and that the response                                                                                                                                                       
-contains the expected attributes.                                                                                                                                                                                                 
-                                                                                                                                                                                                                                  
-Usage Example:                                                                                                                                                                                                                    
-                                                                                                                                                                                                                                  
-1. Run the tests using pytest:                                                                                                                                                                                                    
-   pytest tests/test_openai_responses.py                                                                                                                                                                                          
+"""
+test_openai_api_responses.py
+
+This module contains unit tests for the OpenAI API responses, specifically testing
+the functionality of the 'responses.create' method in an asynchronous context.
+The tests ensure that the API can be called correctly and that the response
+contains the expected attributes.
+
+Usage Example:
+
+1. Run the tests using pytest:
+   pytest tests/test_openai_api_responses.py
 """
 import os
 import pytest
