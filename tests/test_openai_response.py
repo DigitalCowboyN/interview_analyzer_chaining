@@ -1,4 +1,15 @@
-# tests/test_openai_response.py
+"""                                                                                                                                                                                                                               
+test_openai_response.py                                                                                                                                                                                                           
+                                                                                                                                                                                                                                  
+This module contains unit tests for the OpenAIAgent class, specifically testing                                                                                                                                                   
+the structure of the response returned by the OpenAI API. The tests ensure that                                                                                                                                                   
+the response adheres to the expected format and contains the necessary attributes.                                                                                                                                                
+                                                                                                                                                                                                                                  
+Usage Example:                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                  
+1. Run the tests using pytest:                                                                                                                                                                                                    
+   pytest tests/test_openai_response.py                                                                                                                                                                                           
+"""
 import pytest
 import json
 from unittest.mock import patch, MagicMock
@@ -17,6 +28,16 @@ def mock_response(content_dict):
     return mock_resp
 
 async def test_openai_response_structure():
+    """                                                                                                                                                                                                                           
+    Test the structure of the response returned by the OpenAI API.                                                                                                                                                                
+                                                                                                                                                                                                                                  
+    This test verifies that the response from the OpenAIAgent's call_model method                                                                                                                                                 
+    matches the expected structure and contains the correct attributes.                                                                                                                                                           
+                                                                                                                                                                                                                                  
+    Asserts:                                                                                                                                                                                                                      
+        - The response is an instance of AnalysisResult.                                                                                                                                                                          
+        - The topic_level_1 attribute of the response matches the expected value.                                                                                                                                                 
+    """
     agent = OpenAIAgent()
     prompt = "What is the capital of France?"
     response_content = {

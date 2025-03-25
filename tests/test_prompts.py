@@ -1,4 +1,15 @@
-# tests/test_prompts.py
+"""                                                                                                                                                                                                                               
+test_prompts.py                                                                                                                                                                                                                   
+                                                                                                                                                                                                                                  
+This module contains unit tests for the prompt handling functionality in the OpenAIAgent class.                                                                                                                                   
+The tests verify that the prompts loaded from YAML files are correctly formatted and that                                                                                                                                         
+the responses from the OpenAI API contain the expected attributes.                                                                                                                                                                
+                                                                                                                                                                                                                                  
+Usage Example:                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                  
+1. Run the tests using pytest:                                                                                                                                                                                                    
+   pytest tests/test_prompts.py                                                                                                                                                                                                   
+"""
 import pytest
 import yaml
 import json
@@ -9,7 +20,19 @@ from src.models.analysis_result import AnalysisResult
 pytestmark = pytest.mark.asyncio
 
 def mock_response(content_dict):
-    """Return a mock Response object mimicking openai.responses.create."""
+    """                                                                                                                                                                                                                           
+    Return a mock Response object mimicking openai.responses.create.                                                                                                                                                              
+                                                                                                                                                                                                                                  
+    This function creates a mock response object that simulates the structure                                                                                                                                                     
+    of the response returned by the OpenAI API, allowing for controlled testing                                                                                                                                                   
+    of the OpenAIAgent's behavior.                                                                                                                                                                                                
+                                                                                                                                                                                                                                  
+    Parameters:                                                                                                                                                                                                                   
+        content_dict (dict): A dictionary representing the content of the mock response.                                                                                                                                          
+                                                                                                                                                                                                                                  
+    Returns:                                                                                                                                                                                                                      
+        MagicMock: A mock response object with the specified content.                                                                                                                                                             
+    """
     from unittest.mock import MagicMock
     mock_resp = MagicMock()
     mock_output = MagicMock()
@@ -21,6 +44,15 @@ def mock_response(content_dict):
 
 @pytest.fixture
 def load_prompts():
+    """                                                                                                                                                                                                                           
+    Fixture to load prompts from YAML files.                                                                                                                                                                                      
+                                                                                                                                                                                                                                  
+    This fixture reads the domain and task prompts from their respective YAML files                                                                                                                                               
+    and returns them as dictionaries for use in the tests.                                                                                                                                                                        
+                                                                                                                                                                                                                                  
+    Returns:                                                                                                                                                                                                                      
+        tuple: A tuple containing the domain prompts and task prompts as dictionaries.                                                                                                                                            
+    """
     with open("prompts/domain_prompts.yaml") as f:
         domain_prompts = yaml.safe_load(f)
     with open("prompts/task_prompts.yaml") as f:
@@ -28,6 +60,21 @@ def load_prompts():
     return domain_prompts, task_prompts
 
 async def test_prompt_attributes(load_prompts):
+    """                                                                                                                                                                                                                           
+    Test the attributes of the prompts loaded from YAML files.                                                                                                                                                                    
+                                                                                                                                                                                                                                  
+    This test verifies that the prompts are correctly formatted and that the                                                                                                                                                      
+    responses from the OpenAIAgent contain the expected attributes. It checks                                                                                                                                                     
+    both task prompts and domain keywords.                                                                                                                                                                                        
+                                                                                                                                                                                                                                  
+    Parameters:                                                                                                                                                                                                                   
+        load_prompts: A fixture providing the loaded domain and task prompts.                                                                                                                                                     
+                                                                                                                                                                                                                                  
+    Asserts:                                                                                                                                                                                                                      
+        - The response is an instance of AnalysisResult.                                                                                                                                                                          
+        - The function type of the response matches the expected value.                                                                                                                                                           
+        - The domain keywords in the response match the expected values.                                                                                                                                                          
+    """
     domain_prompts, task_prompts = load_prompts
     agent = OpenAIAgent()
 

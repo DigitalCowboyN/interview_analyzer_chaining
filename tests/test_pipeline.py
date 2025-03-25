@@ -1,4 +1,17 @@
-# tests/test_pipeline.py
+"""                                                                                                                                                                                                                               
+test_pipeline.py                                                                                                                                                                                                                  
+                                                                                                                                                                                                                                  
+This module contains unit tests for the functions in the pipeline module,                                                                                                                                                         
+specifically testing the sentence segmentation and file processing functionalities.                                                                                                                                               
+The tests ensure that the segment_text function correctly segments sentences                                                                                                                                                      
+and that the process_file function processes text files and generates the expected                                                                                                                                                
+output.                                                                                                                                                                                                                           
+                                                                                                                                                                                                                                  
+Usage Example:                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                  
+1. Run the tests using pytest:                                                                                                                                                                                                    
+   pytest tests/test_pipeline.py                                                                                                                                                                                                  
+"""
 import pytest
 from pathlib import Path
 from src.pipeline import segment_text, process_file
@@ -19,18 +32,55 @@ def mock_response(content_dict):
     return mock_resp
 
 def test_segment_text():
+    """                                                                                                                                                                                                                           
+    Test the sentence segmentation functionality.                                                                                                                                                                                 
+                                                                                                                                                                                                                                  
+    This test verifies that the segment_text function correctly segments                                                                                                                                                          
+    a given text into individual sentences.                                                                                                                                                                                       
+                                                                                                                                                                                                                                  
+    Asserts:                                                                                                                                                                                                                      
+        - The number of sentences returned matches the expected count.                                                                                                                                                            
+    """
     test_text = "Hello world. How are you today? This pipeline is running well!"
     sentences = segment_text(test_text)
     assert len(sentences) == 3
 
 @pytest.fixture
 def sample_text_file(tmp_path):
+    """                                                                                                                                                                                                                           
+    Fixture to create a temporary text file for testing.                                                                                                                                                                          
+                                                                                                                                                                                                                                  
+    This fixture creates a sample text file with predefined content                                                                                                                                                               
+    and returns the path to the file.                                                                                                                                                                                             
+                                                                                                                                                                                                                                  
+    Parameters:                                                                                                                                                                                                                   
+        tmp_path: The temporary directory provided by pytest.                                                                                                                                                                     
+                                                                                                                                                                                                                                  
+    Returns:                                                                                                                                                                                                                      
+        Path: The path to the created sample text file.                                                                                                                                                                           
+    """
     file_content = "This is a test. Ensure proper segmentation."
     test_file = tmp_path / "test_file.txt"
     test_file.write_text(file_content)
     return test_file
 
 async def test_process_file(sample_text_file, tmp_path):
+    """                                                                                                                                                                                                                           
+    Test the file processing functionality.                                                                                                                                                                                       
+                                                                                                                                                                                                                                  
+    This test verifies that the process_file function processes a given                                                                                                                                                           
+    text file, generates the expected output JSON file, and that the                                                                                                                                                              
+    output contains the correct analysis data.                                                                                                                                                                                    
+                                                                                                                                                                                                                                  
+    Parameters:                                                                                                                                                                                                                   
+        sample_text_file: A fixture providing a sample text file for testing.                                                                                                                                                     
+        tmp_path: The temporary directory provided by pytest.                                                                                                                                                                     
+                                                                                                                                                                                                                                  
+    Asserts:                                                                                                                                                                                                                      
+        - The output file is created.                                                                                                                                                                                             
+        - The output file contains a list of analysis results.                                                                                                                                                                    
+        - The first analysis result matches the expected sentence and function type.                                                                                                                                              
+    """
     from src.pipeline import process_file
     output_dir = tmp_path / "output"
     output_dir.mkdir()

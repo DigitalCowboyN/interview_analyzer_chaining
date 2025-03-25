@@ -1,4 +1,16 @@
-# tests/test_sentence_analyzer.py
+"""                                                                                                                                                                                                                               
+test_sentence_analyzer.py                                                                                                                                                                                                         
+                                                                                                                                                                                                                                  
+This module contains unit tests for the SentenceAnalyzer class, which is responsible for                                                                                                                                          
+analyzing sentences using the OpenAI API. The tests cover the classification of individual                                                                                                                                        
+sentences and the analysis of multiple sentences, ensuring that the results conform to the                                                                                                                                        
+expected structure and values.                                                                                                                                                                                                    
+                                                                                                                                                                                                                                  
+Usage Example:                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                  
+1. Run the tests using pytest:                                                                                                                                                                                                    
+   pytest tests/test_sentence_analyzer.py                                                                                                                                                                                         
+"""
 import pytest
 from unittest.mock import patch, AsyncMock
 from src.agents.sentence_analyzer import SentenceAnalyzer
@@ -108,16 +120,3 @@ async def test_analyze_sentences(mock_call_model, analyzer):
         assert result["sentence_id"] == idx
         assert result["sentence"] == sentences[idx]
         assert result["function_type"] == "declarative"
-"""
-test_sentence_analyzer.py
-
-This module contains unit tests for the SentenceAnalyzer class, which is responsible for
-analyzing sentences using the OpenAI API. The tests cover the classification of individual
-sentences and the analysis of multiple sentences, ensuring that the results conform to the
-expected structure and values.
-
-Usage Example:
-
-1. Run the tests using pytest:
-   pytest tests/test_sentence_analyzer.py
-"""

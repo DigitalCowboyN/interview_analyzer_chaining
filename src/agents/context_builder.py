@@ -1,4 +1,18 @@
-# src/agents/context_builder.py
+"""                                                                                                                                                                                                                                    
+context_builder.py                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                       
+This module defines the ContextBuilder class, which is responsible for creating                                                                                                                                                        
+textual and embedding-based contexts for sentences. It utilizes the SentenceTransformer                                                                                                                                                
+model for generating embeddings and manages context windows based on configuration settings.                                                                                                                                           
+                                                                                                                                                                                                                                       
+Usage Example:                                                                                                                                                                                                                         
+                                                                                                                                                                                                                                       
+1. Import the context builder instance:                                                                                                                                                                                                
+   from src.agents.context_builder import context_builder                                                                                                                                                                              
+                                                                                                                                                                                                                                       
+2. Build contexts for a list of sentences:                                                                                                                                                                                             
+   contexts = context_builder.build_all_contexts(sentences)                                                                                                                                                                            
+"""  
 from typing import List, Dict
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -9,12 +23,35 @@ logger = get_logger()
 
 
 class ContextBuilder:
+    """                                                                                                                                                                                                                                
+    A class to build contexts for sentences.                                                                                                                                                                                           
+                                                                                                                                                                                                                                       
+    This class generates both textual and embedding-based contexts for sentences                                                                                                                                                       
+    based on specified window sizes from the configuration.                                                                                                                                                                            
+                                                                                                                                                                                                                                       
+    Attributes:                                                                                                                                                                                                                        
+        context_windows (dict): The context window sizes for different types of analysis.                                                                                                                                              
+        embedder (SentenceTransformer): The model used for generating sentence embeddings.                                                                                                                                             
+    """
     def __init__(self):
         self.context_windows = config["preprocessing"]["context_windows"]
         self.embedder = SentenceTransformer(config["embedding"]["model_name"])
 
     def build_context(self, sentences: List[str], idx: int, window_size: int) -> str:
-        """Build textual context around a given sentence."""
+        """                                                                                                                                                                                                                            
+        Build textual context around a given sentence.                                                                                                                                                                                 
+                                                                                                                                                                                                                                       
+        Parameters:                                                                                                                                                                                                                    
+            sentences (List[str]): The list of sentences to build context from.                                                                                                                                                        
+            idx (int): The index of the target sentence.                                                                                                                                                                               
+            window_size (int): The number of sentences to include in the context window.                                                                                                                                               
+                                                                                                                                                                                                                                       
+        Returns:                                                                                                                                                                                                                       
+            str: The constructed context as a single string.                                                                                                                                                                           
+                                                                                                                                                                                                                                       
+        Raises:                                                                                                                                                                                                                        
+            IndexError: If the index is out of bounds for the sentences list.                                                                                                                                                          
+        """
         start = max(0, idx - window_size)
         end = min(len(sentences), idx + window_size + 1)
 
@@ -26,7 +63,20 @@ class ContextBuilder:
         return context
 
     def build_embedding_context(self, sentences: List[str], idx: int, window_size: int) -> np.array:
-        """Generate embedding-based context vector."""
+        """                                                                                                                                                                                                                            
+        Generate embedding-based context vector.                                                                                                                                                                                       
+                                                                                                                                                                                                                                       
+        Parameters:                                                                                                                                                                                                                    
+            sentences (List[str]): The list of sentences to build context from.                                                                                                                                                        
+            idx (int): The index of the target sentence.                                                                                                                                                                               
+            window_size (int): The number of sentences to include in the context window.                                                                                                                                               
+                                                                                                                                                                                                                                       
+        Returns:                                                                                                                                                                                                                       
+            np.array: The average embedding vector of the context sentences.                                                                                                                                                           
+                                                                                                                                                                                                                                       
+        Raises:                                                                                                                                                                                                                        
+            ValueError: If no context sentences are available.                                                                                                                                                                         
+        """
         start = max(0, idx - window_size)
         end = min(len(sentences), idx + window_size + 1)
 
@@ -43,7 +93,18 @@ class ContextBuilder:
         return context_embedding
 
     def build_all_contexts(self, sentences: List[str]) -> Dict[int, Dict[str, str]]:
-        """Build all required contexts for each sentence."""
+        """                                                                                                                                                                                                                            
+        Build all required contexts for each sentence.                                                                                                                                                                                 
+                                                                                                                                                                                                                                       
+        Parameters:                                                                                                                                                                                                                    
+            sentences (List[str]): The list of sentences to build contexts for.                                                                                                                                                        
+                                                                                                                                                                                                                                       
+        Returns:                                                                                                                                                                                                                       
+            Dict[int, Dict[str, str]]: A dictionary mapping sentence indices to their contexts.                                                                                                                                        
+                                                                                                                                                                                                                                       
+        Raises:                                                                                                                                                                                                                        
+            ValueError: If the sentences list is empty.                                                                                                                                                                                
+        """
         contexts = {}
         for idx, sentence in enumerate(sentences):
             contexts[idx] = {
