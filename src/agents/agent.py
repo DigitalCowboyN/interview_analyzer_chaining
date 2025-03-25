@@ -23,6 +23,7 @@ from src.utils.logger import get_logger
 logger = get_logger()
 
 class OpenAIAgent:
+    # This class interacts with the OpenAI API and may utilize domain-specific keywords for analysis.
     """
     A class to interact with the OpenAI API for sentence analysis.
 

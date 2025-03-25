@@ -27,6 +27,7 @@ logger = get_logger()
 
 
 class SentenceAnalyzer:
+    # This class analyzes sentences and may classify them using domain-specific keywords.
     """                                                                                                                                                                                                                                
     A class to analyze sentences using the OpenAI API.                                                                                                                                                                                 
                                                                                                                                                                                                                                        

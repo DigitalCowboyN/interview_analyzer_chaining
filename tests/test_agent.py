@@ -39,6 +39,8 @@ def agent():
     return OpenAIAgent()
 
 @pytest.mark.asyncio
+    # This test suite validates the sentence analyzer's functionality, including its use of domain-specific keywords.
+    # This test suite validates the functionality of the agent, including its handling of domain-specific keywords.
 @patch("openai.responses.create")
 async def test_successful_call(mock_create, agent):
     """                                                                                                                                                                                                                           

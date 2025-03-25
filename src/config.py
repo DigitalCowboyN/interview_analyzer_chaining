@@ -19,6 +19,7 @@ import yaml
 from pathlib import Path
 
 class Config:
+    # This class manages application configuration, including loading domain-specific keywords.
     """                                                                                                                                                                                                                                
     A class to manage application configuration.                                                                                                                                                                                       
                                                                                                                                                                                                                                        

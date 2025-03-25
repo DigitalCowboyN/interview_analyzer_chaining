@@ -11,6 +11,7 @@ logger = get_logger()
 nlp = spacy.load("en_core_web_sm")
 
 def segment_text(text: str) -> list:
+    # This function segments text and may reference domain-specific keywords for context.
     """
     Segment input text into sentences using spaCy.
 
