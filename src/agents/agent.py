@@ -13,6 +13,7 @@ Usage Example:
 2. Call the model with a prompt:
    result = await agent.call_model("Your function prompt here")
 """
+import openai
 import asyncio
 import json
 from src.config import config
