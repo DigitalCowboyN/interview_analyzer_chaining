@@ -1,4 +1,18 @@
-import openai
+"""
+agent.py
+
+This module defines the OpenAIAgent class, which interacts with the OpenAI API
+to analyze sentences and return structured JSON results. It manages API key
+configuration, rate limiting, and retry logic for API calls.
+
+Usage Example:
+
+1. Import the agent instance:
+   from src.agents.agent import agent
+
+2. Call the model with a prompt:
+   result = await agent.call_model("Your function prompt here")
+"""
 import asyncio
 import json
 from src.config import config
@@ -8,6 +22,21 @@ from src.utils.logger import get_logger
 logger = get_logger()
 
 class OpenAIAgent:
+    """
+    A class to interact with the OpenAI API for sentence analysis.
+
+    This class is responsible for managing the OpenAI API key, model parameters,
+    and making calls to the OpenAI API to analyze sentences.
+
+    Attributes:
+        api_key (str): The API key for authenticating with OpenAI.
+        model (str): The model name to be used for API calls.
+        max_tokens (int): The maximum number of tokens to generate in the response.
+        temperature (float): The sampling temperature to use for the API call.
+        rate_limit (int): The rate limit for API calls.
+        retry_attempts (int): The maximum number of retry attempts for failed API calls.
+        backoff_factor (int): The factor by which to increase the wait time between retries.
+    """
     def __init__(self):
         self.api_key = config["openai"]["api_key"]
         if not self.api_key:
@@ -23,10 +52,33 @@ class OpenAIAgent:
         self.backoff_factor = config.get("openai_api", {}).get("retry", {}).get("backoff_factor", 2)
 
     async def call_model(self, function_prompt: str) -> AnalysisResult:
+        """
+        Call the OpenAI API with the provided function prompt and return the analysis result.
+
+        Parameters:
+            function_prompt (str): The prompt to send to the OpenAI API for analysis.
+
+        Returns:
+            AnalysisResult: The structured analysis result returned by the OpenAI API.
+
+        Raises:
+            ValueError: If the OpenAI API key is not set.
+            json.JSONDecodeError: If the response from the API cannot be decoded as JSON.
+            Exception: If the maximum number of retry attempts is exceeded.
+        """
         logger.debug(f"Calling OpenAI API with prompt: {function_prompt}")
         attempt = 0
 
         def sync_create():
+            """
+            Synchronously create a response from the OpenAI API.
+
+            This function is run in a thread executor to handle the synchronous nature
+            of the OpenAI API call.
+
+            Returns:
+                The response object from the OpenAI API.
+            """
             return openai.responses.create(
                 model=self.model,
                 instructions=(
@@ -36,6 +88,7 @@ class OpenAIAgent:
                 input=function_prompt
             )
 
+        # Retry logic for handling API call failures
         while attempt < self.retry_attempts:
             try:
                 loop = asyncio.get_running_loop()
@@ -52,6 +105,7 @@ class OpenAIAgent:
                 return AnalysisResult(**output_data)
 
             except (openai.RateLimitError, openai.APIError) as e:
+                # Calculate wait time based on backoff factor
                 wait_time = self.backoff_factor ** attempt
                 logger.warning(f"{type(e).__name__} encountered: Retrying after {wait_time}s (Attempt {attempt+1})")
                 await asyncio.sleep(wait_time)
@@ -63,7 +117,7 @@ class OpenAIAgent:
                 logger.exception(f"Unexpected error: {e}")
                 raise
 
-        raise Exception("Max retry attempts exceeded.")
+        raise Exception("Max retry attempts exceeded. Please check your API settings or try again later.")
 
 # Singleton instance
 agent = OpenAIAgent()
