@@ -11,6 +11,18 @@ logger = get_logger()
 nlp = spacy.load("en_core_web_sm")
 
 def segment_text(text: str) -> list:
+    """
+    Segment input text into sentences using spaCy.
+
+    Parameters:
+        text (str): The input text to be segmented.
+
+    Returns:
+        list: A list of segmented sentences.
+
+    Raises:
+        ValueError: If the input text is empty.
+    """
     """Segment input text into sentences using spaCy."""
     doc = nlp(text)
     sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
@@ -18,6 +30,20 @@ def segment_text(text: str) -> list:
     return sentences
 
 async def process_file(input_file: Path, output_dir: Path):
+    """
+    Process a single text file by segmenting its content into sentences,
+    analyzing those sentences, and saving the results to a JSON file.
+
+    Parameters:
+        input_file (Path): The path to the input text file.
+        output_dir (Path): The directory where the output JSON file will be saved.
+
+    Returns:
+        None
+
+    Raises:
+        FileNotFoundError: If the input file does not exist.
+    """
     logger.info(f"Processing file: {input_file}")
 
     text = input_file.read_text(encoding="utf-8")
@@ -33,6 +59,23 @@ async def process_file(input_file: Path, output_dir: Path):
     logger.info(f"Results saved to {output_file}")
 
 async def run_pipeline(input_dir: Path, output_dir: Path):
+    """
+    Run the pipeline across all text files in the specified input directory.
+
+    This function will process each .txt file found in the input directory,
+    segmenting the text into sentences and analyzing them. The results will
+    be saved in the specified output directory.
+
+    Parameters:
+        input_dir (Path): The directory containing input text files.
+        output_dir (Path): The directory where output JSON files will be saved.
+
+    Returns:
+        None
+
+    Raises:
+        OSError: If the output directory cannot be created.
+    """
     """Run pipeline across all text files in input directory."""
     input_files = list(input_dir.glob("*.txt"))
 
