@@ -1,14 +1,14 @@
-"""                                                                                                                                                                                                                               
-test_openai_response.py                                                                                                                                                                                                           
-                                                                                                                                                                                                                                  
-This module contains unit tests for the OpenAIAgent class, specifically testing                                                                                                                                                   
-the structure of the response returned by the OpenAI API. The tests ensure that                                                                                                                                                   
-the response adheres to the expected format and contains the necessary attributes.                                                                                                                                                
-                                                                                                                                                                                                                                  
-Usage Example:                                                                                                                                                                                                                    
-                                                                                                                                                                                                                                  
-1. Run the tests using pytest:                                                                                                                                                                                                    
-   pytest tests/test_openai_response.py                                                                                                                                                                                           
+"""
+test_openai_agent_response.py
+
+This module contains unit tests for the OpenAIAgent class, specifically testing
+the structure of the response returned by the OpenAI API. The tests ensure that
+the response adheres to the expected format and contains the necessary attributes.
+
+Usage Example:
+
+1. Run the tests using pytest:
+   pytest tests/test_openai_agent_response.py
 """
 import pytest
 import json
