@@ -44,6 +44,11 @@ def test_segment_text():
     test_text = "Hello world. How are you today? This pipeline is running well!"
     sentences = segment_text(test_text)
     assert len(sentences) == 3
+    
+    # Check the content of the sentences
+    assert sentences[0] == "Hello world."
+    assert sentences[1] == "How are you today?"
+    assert sentences[2] == "This pipeline is running well!"
 
 @pytest.fixture
 def sample_text_file(tmp_path):
