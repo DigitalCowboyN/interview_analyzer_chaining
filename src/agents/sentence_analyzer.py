@@ -21,7 +21,6 @@ from src.agents.context_builder import context_builder
 from src.utils.logger import get_logger
 from src.utils.helpers import load_yaml
 from src.config import config
-from typing import Generator
 
 logger = get_logger()
 
