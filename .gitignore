@@ -1,4 +1,5 @@
 .devcontainer/
+.env
 data/
 logs/
 .aider*

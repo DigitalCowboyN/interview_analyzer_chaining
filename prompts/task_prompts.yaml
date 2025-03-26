@@ -10,9 +10,11 @@ sentence_function_type:
       - imperative
       - exclamatory
 
-    Format: <type> [confidence]
+    Format: {{"function_type": "<type>", "confidence": "<confidence>"}}
 
     Sentence: "{sentence}"
+
+    Provide your response explicitly formatted as JSON.
 
 # This prompt classifies the structure type of a given sentence.
 # Options include simple, compound, complex, and compound-complex.
@@ -26,9 +28,11 @@ sentence_structure_type:
       - complex
       - compound-complex
 
-    Format: <type> [confidence]
+    Format: {{"structure_type": "<type>", "confidence": "<confidence>"}}
 
     Sentence: "{sentence}"
+
+    Provide your response explicitly formatted as JSON.
 
 # This prompt identifies the purpose of a sentence from an outside observer's perspective.
 # Options include Statement, Query, Exclamation, and more.
@@ -62,13 +66,15 @@ sentence_purpose:
       - Musing
       - Amendment
 
-    Format: <Purpose> [confidence]
+    Format: {{"purpose": "<Purpose>", "confidence": "<confidence>"}}
 
     Sentence: "{sentence}"
     Context:
     """
     {context}
     """
+
+    Provide your response explicitly formatted as JSON.
 
 # This prompt classifies the topic of a sentence based on its immediate surrounding context (±2 sentences).
 # Options include goals, tools, processes, and more.
@@ -93,13 +99,15 @@ topic_level_1:
       - small talk
       - niceties
 
-    Format: <topic> [confidence]
+    Format: {{"topic_level_1": "<topic>", "confidence": "<confidence>"}}
 
     Sentence: "{sentence}"
     Context:
     """
     {context}
     """
+
+    Provide your response explicitly formatted as JSON.
 
 # This prompt classifies the topic of a sentence considering a broader context (±6 sentences).
 # Options include goals, tools, processes, and more.
@@ -124,7 +132,7 @@ topic_level_3:
       - small talk
       - niceties
 
-    Format: <topic> [confidence]
+    Format: {{"topic_level_3": "<topic>", "confidence": "<confidence>"}}
 
     Sentence: "{sentence}"
     Context:
@@ -132,18 +140,22 @@ topic_level_3:
     {context}
     """
 
+    Provide your response explicitly formatted as JSON.
+
 # This prompt provides up to 6 keywords that represent the main topics of conversation based on the surrounding 10 sentences.
 # The context is provided for better accuracy.
 topic_overall_keywords:
   prompt: |
     Provide up to 6 keywords that best represent the main topics of conversation based on the surrounding 10 sentences.
 
-    Format: keyword1, keyword2, keyword3, ...
+    Format:{{"overall_keywords": ["keyword1", "keyword2", ...]}}
 
     Context:
     """
     {context}
     """
+
+    Provide your response explicitly formatted as JSON.
 
 # This prompt identifies any domain-specific keywords present in the sentence from a provided list.
 # Include up to 6 keywords found or "None" if no keywords are found.
@@ -156,4 +168,9 @@ domain_specific_keywords:
 
     Sentence: "{sentence}"
 
-    Format: keyword1, keyword2, keyword3, ... (or "None" if no keywords found)
+    Explicitly respond in JSON format with the key 'domain_keywords', and ensure the value is an array of strings. If no keywords found, explicitly return an empty array [].
+
+    Example response:
+    {{"domain_keywords": ["keyword1", "keyword2"]}}
+
+    Provide your response explicitly formatted as JSON.

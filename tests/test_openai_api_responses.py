@@ -13,18 +13,17 @@ Usage Example:
 """
 import os
 import pytest
-import asyncio
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 # Make sure your OPENAI_API_KEY is set in the environment
 API_KEY = os.environ.get("OPENAI_API_KEY")
 if not API_KEY:
     raise ValueError("API key is not set. Please set the OPENAI_API_KEY environment variable.")
 
-client = OpenAI(api_key=API_KEY)
+client = AsyncOpenAI(api_key=API_KEY)
 
 @pytest.mark.asyncio
-async def test_responses_create():
+async def test_responses_create_structured_json():
     """                                                                                                                                                                                                                           
     Test the 'responses.create' method of the OpenAI API in an async context.                                                                                                                                                     
                                                                                                                                                                                                                                   
@@ -40,26 +39,25 @@ async def test_responses_create():
         ValueError: If the OPENAI_API_KEY environment variable is not set.                                                                                                                                                        
     """
     try:
-        # Synchronous method to call
-        def sync_create():
-            return client.responses.create(
-                model="gpt-4",
-                instructions="You are a coding assistant.",
-                input="What is the capital of France?"
-            )
+        response = await client.responses.create(
+            model="gpt-4o",
+            instructions="You are a coding assistant. Return JSON with keys: capital, country.",
+            input="What is the capital of France? Respond in JSON.",
+            text={"format": {"type": "json_object"}}
+        )
 
-        # Run sync method inside a thread so we can 'await' the result
-        loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(None, sync_create)
+        assert response.output, "No output in response"
+        first_output = response.output[0]
+        assert first_output.content, "No content in first output item"
+        output_message = first_output.content[0].text.strip()
 
-        # Check that we got a 'response' object with an 'output_text' attribute
-        assert hasattr(response, "output_text"), "Expected a 'response' object with 'output_text'"
-        
-        # Optionally, you can assert something about the answer
-        # For example, that it contains "Paris"
-        # assert "Paris" in response.output_text, "Expected 'Paris' in the output_text"
+        print("\nStructured JSON response:", output_message)
 
-        print("\nTest passed. Model answer was:", response.output_text)
+        # Explicit JSON validation
+        import json
+        parsed_json = json.loads(output_message)
+        assert "capital" in parsed_json, "Expected key 'capital' in JSON response"
+        assert parsed_json["capital"] == "Paris", "Expected 'capital' value to be 'Paris'"
 
     except Exception as e:
         pytest.fail(f"An error occurred: {e}")

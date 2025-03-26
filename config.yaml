@@ -1,10 +1,10 @@
-# config.yaml - Comprehensive configuration for enriched sentence analysis pipeline using OpenAI API
+# config.yaml - Configuration for enriched sentence analysis pipeline using OpenAI API
 
 openai:
-  api_key: ${OPENAI_API_KEY}                # Ensure this is set in your environment (devcontainer.json)
-  model_name: "gpt-4o-mini-2024-07-18"      # OpenAI model
-  max_tokens: 256                           # Response length
-  temperature: 0.2                          # Lower for determinism
+  api_key: ${OPENAI_API_KEY}
+  model_name: "gpt-4o-mini-2024-07-18"
+  max_tokens: 256
+  temperature: 0.2
 
 paths:
   input_dir: "data/input"
@@ -13,11 +13,11 @@ paths:
 
 preprocessing:
   context_windows:
-    structure_analysis: 0        # Sentence type doesn't require context
-    immediate_context: 2         # Immediate neighbors (2 chunks each side)
-    observer_context: 4          # Outside observer context (±2 sentences)
-    broader_context: 6           # Broad context window
-    overall_context: 10          # For thematic summaries
+    structure_analysis: 0
+    immediate_context: 2
+    observer_context: 4
+    broader_context: 6
+    overall_context: 10
 
 embedding:
   model_name: "all-MiniLM-L6-v2"
@@ -28,75 +28,6 @@ clustering:
   hdbscan:
     min_cluster_size: 5
     metric: "euclidean"
-
-classification:
-  sentence_function_types:
-    - declarative
-    - interrogative
-    - imperative
-    - exclamatory
-  sentence_structure_types:
-    - simple
-    - compound
-    - complex
-    - compound-complex
-  purposes:
-    - Statement
-    - Query
-    - Exclamation
-    - Answer
-    - Commentary
-    - Observation
-    - Retraction
-    - Mockery
-    - Objection
-    - Clarification
-    - Conclusion
-    - Confession
-    - Speculation
-    - Recitation
-    - Correction
-    - Explanation
-    - Qualification
-    - Threat
-    - Warning
-    - Advisory
-    - Request
-    - Addendum
-    - Musing
-    - Amendment
-  topics_level_1:
-    - goals
-    - tools
-    - processes
-    - experiences
-    - observations
-    - pain points
-    - responsibilities
-    - collaborations
-    - reporting
-    - managing
-    - mentoring
-    - strategy
-    - operations
-    - small talk
-    - niceties
-  topics_level_3: # same as level 1, allows future customization
-    - goals
-    - tools
-    - processes
-    - experiences
-    - observations
-    - pain points
-    - responsibilities
-    - collaborations
-    - reporting
-    - managing
-    - mentoring
-    - strategy
-    - operations
-    - small talk
-    - niceties
 
 classification:
   local:
@@ -119,7 +50,7 @@ additional:
   visualize_embeddings: true
 
 openai_api:
-  rate_limit: 3000             # Tokens per minute, adapt to your account limits
+  rate_limit: 3000
   retry:
     max_attempts: 5
     backoff_factor: 2

@@ -58,61 +58,62 @@ class SentenceAnalyzer:
         """
         results = {}
 
-        # Function type classification (no context)
+        def safe_extract(response: Dict[str, Any], key: str) -> Any:
+            """Helper to get a value by key, case-insensitive."""
+            key = key.lower()
+            return {k.lower(): v for k, v in response.items()}.get(key, "")
+
+        # Function type
         function_prompt = self.prompts["sentence_function_type"]["prompt"].format(sentence=sentence)
-        response = await agent.call_model(function_prompt)
-        results["function_type"] = response.function_type
-        assert hasattr(response, 'function_type')
-        assert hasattr(response, 'structure_type')
-        assert hasattr(response, 'purpose')
-        assert hasattr(response, 'topic_level_1')
-        assert hasattr(response, 'topic_level_3')
-        assert hasattr(response, 'overall_keywords')
-        assert hasattr(response, 'domain_keywords')
+        function_response = await agent.call_model(function_prompt)
+        results["function_type"] = safe_extract(function_response, "function_type")
 
-        # Structure type classification (no context)
+        # Structure type
         structure_prompt = self.prompts["sentence_structure_type"]["prompt"].format(sentence=sentence)
-        response = await agent.call_model(structure_prompt)
-        results["structure_type"] = response.structure_type
+        structure_response = await agent.call_model(structure_prompt)
+        results["structure_type"] = safe_extract(structure_response, "structure_type")
 
-        # Purpose classification (observer context)
+        # Purpose
         purpose_prompt = self.prompts["sentence_purpose"]["prompt"].format(
             sentence=sentence, context=contexts["observer"]
         )
-        response = await agent.call_model(purpose_prompt)  # Add await
-        results["purpose"] = response.purpose
+        purpose_response = await agent.call_model(purpose_prompt)
+        results["purpose"] = safe_extract(purpose_response, "purpose")
 
-        # Topic level 1 (immediate context)
+        # Topic level 1
         topic_lvl1_prompt = self.prompts["topic_level_1"]["prompt"].format(
             sentence=sentence, context=contexts["immediate"]
         )
-        response = await agent.call_model(topic_lvl1_prompt)  # Add await
-        results["topic_level_1"] = response.topic_level_1
+        topic_lvl1_response = await agent.call_model(topic_lvl1_prompt)
+        results["topic_level_1"] = safe_extract(topic_lvl1_response, "topic_level_1")
 
-        # Topic level 3 (broader context)
+        # Topic level 3
         topic_lvl3_prompt = self.prompts["topic_level_3"]["prompt"].format(
             sentence=sentence, context=contexts["broader"]
         )
-        response = await agent.call_model(topic_lvl3_prompt)  # Add await
-        results["topic_level_3"] = response.topic_level_3
+        topic_lvl3_response = await agent.call_model(topic_lvl3_prompt)
+        results["topic_level_3"] = safe_extract(topic_lvl3_response, "topic_level_3")
 
-        # Overall keywords (overall context)
+        # Overall keywords
         overall_keywords_prompt = self.prompts["topic_overall_keywords"]["prompt"].format(
             context=contexts["observer"]
         )
-        response = await agent.call_model(overall_keywords_prompt)  # Add await
-        results["overall_keywords"] = response.overall_keywords
+        overall_keywords_response = await agent.call_model(overall_keywords_prompt)
+        results["overall_keywords"] = overall_keywords_response.get("overall_keywords", [])
 
         # Domain-specific keywords
-        domain_keywords = ", ".join(config.get("domain_keywords", []))
+        domain_keywords_str = ", ".join(config.get("domain_keywords", []))
         domain_prompt = self.prompts["domain_specific_keywords"]["prompt"].format(
-            sentence=sentence, domain_keywords=domain_keywords
+            sentence=sentence, domain_keywords=domain_keywords_str
         )
-        response = await agent.call_model(domain_prompt)  # Add await
-        results["domain_keywords"] = response.domain_keywords
+        domain_response = await agent.call_model(domain_prompt)
+        domain_keywords = domain_response.get("domain_keywords", [])
+        if isinstance(domain_keywords, str):
+            domain_keywords = [kw.strip() for kw in domain_keywords.split(",") if kw.strip()]
+        results["domain_keywords"] = domain_keywords
 
-        logger.info(f"Sentence analyzed: {sentence[:50]}...")
-
+        results["sentence"] = sentence
+        logger.debug(f"Completed analysis for sentence: {sentence[:50]}...")
         return results
 
     async def analyze_sentences(self, sentences: list) -> List[Dict[str, Any]]:
