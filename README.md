@@ -32,7 +32,7 @@ Interview Analyzer Chaining is a comprehensive pipeline designed to enhance and 
 ## Technology Stack
 
 - **Programming Language:** Python 3.10+
-- **AI Models:** OpenAI GPT-4o-mini, GPT-4o, GPT-4o-turbo Sentence Transformers
+- **AI Models:** OpenAI GPT-4o-mini, GPT-4o, GPT-4o-turbo, Sentence Transformers
 - **NLP Libraries:** spaCy, HDBSCAN
 - **Utilities:** Loguru (logging), PyYAML (configuration), pandas (data handling), matplotlib (visualization)
 - **Containerization:** Docker, VS Code Dev Containers
