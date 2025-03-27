@@ -2,72 +2,79 @@
 
 ## Overview
 
-Interview Analyzer Chaining is a comprehensive pipeline that enhances and contextualizes textual data extracted from transcripts or other conversational inputs. Leveraging OpenAI's GPT models, advanced NLP techniques, and structured context building, it generates richly annotated JSON outputs suitable for downstream analysis, such as persona mining, topic extraction, and sentiment analysis.
+Interview Analyzer Chaining is a comprehensive pipeline designed to enhance and contextualize textual data extracted from transcripts or other conversational inputs. Using OpenAI's GPT models, advanced natural language processing techniques, and structured context building, the pipeline generates richly annotated JSON outputs. These outputs can be used for downstream analysis such as persona mining, topic extraction, sentiment analysis, and thematic clustering.
 
 ## Features
 
-- **Sentence Segmentation**: Accurately splits input text into sentence chunks.
-  
-- **Context Enrichment**: Builds multi-level context windows around sentences for robust analysis.
-  
-- **Classification**: Performs detailed sentence-level classification, including:
-  - Sentence function types (e.g., declarative, interrogative)
-  - Sentence structure types (e.g., simple, compound)
+- **Sentence Segmentation**  
+  Splits input text into individual sentences using spaCy.
+
+- **Context Enrichment**  
+  Constructs multi-level context windows for each sentence (e.g., immediate, observer, broader) and generates both textual and embedding-based contexts using Sentence Transformers.
+
+- **Detailed Classification**  
+  Performs sentence-level classification including:
+  - Sentence function type (e.g., declarative, interrogative)
+  - Sentence structure type (e.g., simple, compound)
   - Sentence purpose identification
-  - Topic classification at multiple context depths
+  - Topic classification at multiple levels (e.g., immediate, broader)
   - Domain-specific keyword extraction
-  
-- **Embedding and Clustering**: Uses embeddings and clustering (HDBSCAN) to group sentences thematically.
-  
-- **Visualization**: Offers embedding visualization for easy inspection of clustering effectiveness.
+
+- **Embedding & Clustering**  
+  Utilizes embeddings (via Sentence Transformers) and clustering (e.g., HDBSCAN) to group sentences thematically.
+
+- **Visualization**  
+  Provides tools for visualizing embeddings to assess clustering performance.
+
+- **Robust Testing & Documentation**  
+  Comprehensive tests ensure each module behaves as expected, with detailed inline documentation to facilitate modifications and extensions.
 
 ## Technology Stack
 
-- **Language & Frameworks**: Python 3.10
-  
-- **AI Models**: OpenAI GPT-4 Turbo, Sentence Transformers
-  
-- **NLP Libraries**: spaCy, HDBSCAN
-  
-- **Utilities**: Loguru (logging), PyYAML (configuration), pandas (data handling), matplotlib (visualization)
-  
-- **Containerization**: Docker, VS Code Dev Container
+- **Programming Language:** Python 3.10+
+- **AI Models:** OpenAI GPT-4 Turbo, Sentence Transformers
+- **NLP Libraries:** spaCy, HDBSCAN
+- **Utilities:** Loguru (logging), PyYAML (configuration), pandas (data handling), matplotlib (visualization)
+- **Containerization:** Docker, VS Code Dev Containers
+- **Testing:** pytest with asyncio support and extensive module coverage
 
 ## Installation
 
-1. Clone the repository:
+1. **Clone the Repository**
    ```bash
    git clone <repository-url>
    cd <repository-directory>
-   ```
 
-2. Install dependencies:
+2. **Install Dependencies**
    ```bash
    pip install -r requirements.txt
-   ```
 
-3. Set up environment variables for OpenAI API key:
+3. **Configure Environmental Variables**
+   Set your OpenAI AIP Key
    ```bash
    export OPENAI_API_KEY='your_api_key_here'
-   ```
 
-4. (Optional) Build and run using Docker:
+4. **(Optional) Using Docker**
+   Set your OpenAI AIP Key
    ```bash
    docker build -t interview-analyzer .
    docker run -p 8000:8000 interview-analyzer
-   ```
+
 
 ## Usage
 
-To analyze a transcript or conversational input, you can use the main script or integrate the provided classes into your application. The `src/main.py` file serves as the entry point for the application. 
+The project is designed to be both a standalone application and a modular library. The main entry point is src/main.py, which orchestrates the entire pipeline. You can also import individual components into your own application.
 
 ### Example Usage
 
 ```python
 from src.agents.sentence_analyzer import sentence_analyzer
 
+# List of sentences extracted from a transcript.
 sentences = ["This is a sample sentence.", "How are you doing today?"]
-results = sentence_analyzer.analyze_sentences(sentences)
+
+# Asynchronously analyze the sentences.
+results = await sentence_analyzer.analyze_sentences(sentences)
 
 for result in results:
     print(result)
@@ -75,11 +82,30 @@ for result in results:
 
 ## Configuration
 
-The configuration for the project is managed through the `config.yaml` file. You can customize various parameters, including OpenAI API settings, context window sizes, and classification options.
+Configuration is managed via the config.yaml file. This file includes settings for:
+- OpenAI API: API key, model name, max tokens, temperature, and retry policies.
+- Context Windows: Sizes for various context types (immediate, observer, broader, etc.).
+- Embedding Model: Model name for generating sentence embeddings.
+- Classification Prompts: YAML files defining classification instructions.
+Adjust these settings to modify the pipeline's behavior. If you update the configuration, be sure to also update any related tests or documentation.
+
+## Testing & Developing
+
+The project comes with a comprehensive test suite covering:
+- Agent API Calls & Retry Logic: Ensuring robust error handling and correct JSON parsing.
+- Pipeline Functions: Testing sentence segmentation, file processing, and the overall pipeline run.
+- Sentence Analysis: Verifying classification across multiple dimensions.
+- Context Building: Confirming textual and embedding-based context generation, including edge cases.
+
+To run the tests, execute:
+```bash
+   pytest
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
+Contributions are welcome! Whether you're fixing a bug, adding a new feature, or improving documentation, please:
+- Open an issue or submit a pull request.
+- Follow the project's code style and ensure tests pass before submitting changes.
 
 ## License
 
