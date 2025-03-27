@@ -42,8 +42,7 @@ Interview Analyzer Chaining is a comprehensive pipeline designed to enhance and 
 
 1. **Clone the Repository**
    ```bash
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone https://github.com/DigitalCowboyN/interview_analyzer_chaining
 
 2. **Install Dependencies**
    ```bash
@@ -100,6 +99,7 @@ The project comes with a comprehensive test suite covering:
 To run the tests, execute:
 ```bash
    pytest
+```
 
 ## Contributing
 
