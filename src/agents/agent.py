@@ -27,10 +27,10 @@ If modifying this file:
 import asyncio
 import json
 from typing import Dict, Any
-from openai import AsyncOpenAI  # External library for asynchronous API calls
+from openai import AsyncOpenAI, APIError
 from src.config import config  # Custom configuration loader; see config.yaml for details
-from src.models.analysis_result import AnalysisResult  # Pydantic model for validated API responses
 from src.utils.logger import get_logger  # Centralized logger for the project
+from src.utils.metrics import metrics_tracker  # Correctly import the global instance
 
 # Get a configured logger for logging debug, warning, and error messages.
 logger = get_logger()
@@ -95,10 +95,13 @@ class OpenAIAgent:
             Exception: If maximum retry attempts are exceeded.
         """
         attempt = 0
-        # Loop to allow for retrying the API call in case of errors.
+        last_exception = None # Store last exception for re-raising
+        output_message = "" # Initialize for use in exception logging
+
         while attempt < self.retry_attempts:
             try:
                 # Make the asynchronous API call.
+                logger.debug(f"Calling OpenAI responses API (Attempt {attempt + 1}/{self.retry_attempts})")
                 response = await self.client.responses.create(
                     model=self.model,
                     instructions=(
@@ -128,26 +131,75 @@ class OpenAIAgent:
                 logger.debug(f"Raw output message: {output_message}")
 
                 if not output_message:
-                    raise ValueError("Received empty response from OpenAI API.")
+                    raise ValueError("Received empty response content from OpenAI API.")
 
                 # Parse the JSON text into a Python dictionary.
-                return json.loads(output_message)
+                parsed_response = json.loads(output_message)
+                
+                # --- Metrics Tracking on Success ---
+                metrics_tracker.increment_api_calls()
+                
+                # Check for usage attribute on the main response object
+                usage = getattr(response, 'usage', None) 
+                
+                # Check if usage exists and has the total_tokens attribute (and it's not None)
+                if usage and hasattr(usage, 'total_tokens') and usage.total_tokens is not None:
+                    total_tokens_used = usage.total_tokens
+                    metrics_tracker.add_tokens(total_tokens_used)
+                    
+                    # Log detailed usage based on provided documentation structure
+                    input_tokens = getattr(usage, 'input_tokens', 'N/A')
+                    output_tokens = getattr(usage, 'output_tokens', 'N/A')
+                    logger.debug(f"API Call Successful. Total Tokens: {total_tokens_used} (Input: {input_tokens}, Output: {output_tokens})")
+                else:
+                    # If usage or total_tokens is not available, we just can't track it
+                    logger.debug("API Call Successful. Token usage data (total_tokens) not available from responses API usage object for this call.")
+                # --- End Metrics Tracking ---
 
-            except (json.JSONDecodeError, ValueError, TypeError) as e:
-                # Log and re-raise any decoding or value-related errors immediately.
-                logger.error(f"Decoding error: {e}")
-                raise
+                return parsed_response
 
-            except Exception as e:
-                # Calculate wait time using exponential backoff based on the current attempt.
-                wait_time = self.backoff_factor ** attempt
-                logger.warning(f"API error ({type(e).__name__}): Retrying after {wait_time}s (Attempt {attempt + 1})")
-                # Wait asynchronously before retrying.
-                await asyncio.sleep(wait_time)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decoding failed for prompt: '{function_prompt[:50]}...'. Response: {output_message}. Error: {e}")
+                metrics_tracker.increment_errors() 
+                # Return empty dict for this error to allow pipeline to continue.
+                return {} 
+
+            except APIError as e:
+                logger.warning(f"OpenAI API error: {e} (Attempt {attempt + 1}/{self.retry_attempts})")
+                last_exception = e
                 attempt += 1
-
-        # If all retry attempts fail, raise an exception.
-        raise Exception("Max retry attempts exceeded.")
+                # *** Restore retry logic ***
+                if attempt < self.retry_attempts:
+                    wait_time = self.backoff_factor ** (attempt - 1) # Corrected backoff index
+                    logger.info(f"Retrying after {wait_time:.2f}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"API error persisted after {self.retry_attempts} attempts: {e}")
+                    metrics_tracker.increment_errors() # Track error *after* retries exhausted
+                    raise last_exception # Re-raise the specific error caught
+            
+            except Exception as e:
+                logger.warning(f"Unexpected error during API call processing (Attempt {attempt + 1}/{self.retry_attempts}): {type(e).__name__}: {e}")
+                last_exception = e
+                attempt += 1
+                # *** Restore retry logic ***
+                if attempt < self.retry_attempts:
+                    wait_time = self.backoff_factor ** (attempt - 1) # Corrected backoff index
+                    logger.info(f"Retrying after {wait_time:.2f}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Unexpected error persisted after {self.retry_attempts} attempts: {e}")
+                    metrics_tracker.increment_errors() # Track error *after* retries exhausted
+                    raise last_exception # Re-raise the specific error caught
+        
+        # Fallback if loop finishes unexpectedly (e.g., retry_attempts <= 0)
+        logger.critical("Reached end of call_model loop unexpectedly. This indicates a logic error or <= 0 retries configured.")
+        metrics_tracker.increment_errors()
+        if last_exception:
+             raise last_exception # Re-raise the last known exception
+        else:
+             # If no exception was caught somehow, raise a generic one
+             raise Exception("call_model failed after retries without specific exception recorded.")
 
 # Create a global instance of OpenAIAgent for ease of use.
 agent = OpenAIAgent()

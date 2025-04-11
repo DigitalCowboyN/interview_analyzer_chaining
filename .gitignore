@@ -9,5 +9,4 @@ repomix-output.xml
 src/__pycache__/
 src/agents/__pycache__/
 src/utils/__pycache__/
-tests/__pycache__ß
-interview_analyzer_chaining/
+tests/__pycache__

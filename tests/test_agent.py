@@ -155,15 +155,20 @@ async def test_retry_on_api_error(agent):
 
 async def test_max_retry_exceeded(agent):
     """
-    Test that the agent raises an exception after exceeding the maximum number of retries.
+    Test that the agent raises the specific APIError after exceeding max retries.
     
-    This test simulates repeated RateLimitErrors so that the retry loop exceeds its limit,
-    and then checks that the correct exception is raised.
+    This test simulates repeated RateLimitErrors, causing the retry loop to exhaust,
+    and checks that the original RateLimitError (a subclass of APIError) is re-raised.
     """
+    error_to_raise = RateLimitError("Rate limit exceeded repeatedly", response=MagicMock(), body=None)
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
-        mock_create.side_effect = RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
-        with pytest.raises(Exception, match="Max retry attempts exceeded"):
-            await agent.call_model("Test prompt")
+        # Simulate the error occurring on every call
+        mock_create.side_effect = error_to_raise
+        # Expect the specific APIError (or subclass) to be raised after retries
+        with pytest.raises(APIError): # Changed from Exception and removed match
+            await agent.call_model("Test prompt for max retries")
+        # Verify it was called the expected number of times (initial + retries)
+        assert mock_create.call_count == agent.retry_attempts
 
 async def test_empty_output(agent):
     """
@@ -196,9 +201,9 @@ async def test_empty_content(agent):
 
 async def test_empty_message(agent):
     """
-    Test that the agent raises a ValueError when the returned text is empty (only whitespace).
+    Test that the agent raises a ValueError when the returned text content is empty.
     
-    This verifies that our code properly handles cases where the API returns no usable text.
+    This verifies handling of cases where the API response structure is valid, but the text field is empty/whitespace.
     """
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_resp = MagicMock()
@@ -208,25 +213,28 @@ async def test_empty_message(agent):
         mock_output.content = [mock_content]
         mock_resp.output = [mock_output]
         mock_create.return_value = mock_resp
-        with pytest.raises(ValueError, match="Received empty response from OpenAI API."):
-            await agent.call_model("Test prompt")
+        # Expect ValueError with the updated message from agent.py
+        with pytest.raises(ValueError, match="Received empty response content from OpenAI API."):
+            await agent.call_model("Test prompt for empty message")
 
 async def test_malformed_json_response(agent):
     """
-    Test that the agent raises a JSONDecodeError when the API response contains invalid JSON.
+    Test that the agent returns an empty dict when the API response contains invalid JSON.
     
-    This ensures that our JSON parsing logic correctly detects and raises errors for malformed data.
+    The agent now catches JSONDecodeError, logs it, increments metrics, and returns {}.
     """
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_resp = MagicMock()
         mock_output = MagicMock()
         mock_content = MagicMock()
-        mock_content.text = "Not a JSON string"
+        mock_content.text = "Not a JSON string" # Invalid JSON
         mock_output.content = [mock_content]
         mock_resp.output = [mock_output]
         mock_create.return_value = mock_resp
-        with pytest.raises(json.JSONDecodeError):
-            await agent.call_model("Test prompt")
+        
+        # Expected behavior: returns {} and logs error, does not raise JSONDecodeError
+        result = await agent.call_model("Test prompt for malformed JSON")
+        assert result == {} 
 
 async def test_retry_log_message(agent, capsys):
     """

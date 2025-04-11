@@ -42,8 +42,8 @@ def log_sink():
         logs.append(message.record["message"])
 
     logger = get_logger()
-    # Add the sink with WARNING level.
-    sink_id = logger.add(sink, level="WARNING")
+    # Add the sink with INFO level to capture retry messages
+    sink_id = logger.add(sink, level="INFO")
     
     yield logs
 

@@ -20,11 +20,22 @@ Modifications:
 import json
 import asyncio
 from typing import Dict, Any, List
+from pydantic import ValidationError
 from src.agents.agent import agent  # Uses the OpenAIAgent instance for API calls.
 from src.agents.context_builder import context_builder  # Builds context for each sentence.
 from src.utils.logger import get_logger  # Centralized logging.
 from src.utils.helpers import load_yaml  # Helper to load YAML configuration.
 from src.config import config  # Project configuration settings.
+from src.utils.metrics import metrics_tracker # Import metrics tracker
+from src.models.llm_responses import (
+    SentenceFunctionResponse,
+    SentenceStructureResponse,
+    SentencePurposeResponse,
+    TopicLevel1Response,
+    TopicLevel3Response,
+    OverallKeywordsResponse,
+    DomainKeywordsResponse,
+)
 
 # Initialize the logger.
 logger = get_logger()
@@ -55,21 +66,20 @@ class SentenceAnalyzer:
 
     async def classify_sentence(self, sentence: str, contexts: Dict[str, str]) -> Dict[str, Any]:
         """
-        Classify a single sentence across all required dimensions using concurrent API calls.
+        Classify a single sentence across all required dimensions using concurrent API calls
+        and validate responses using Pydantic models.
 
-        The method prepares prompts for seven classification dimensions (function type, 
-        structure type, purpose, topic level 1, topic level 3, overall keywords, and 
-        domain-specific keywords). It then executes these API calls concurrently using 
-        asyncio.gather. Finally, it extracts relevant information from each API response 
-        using a helper function and combines them into a single dictionary.
+        The method prepares prompts for seven classification dimensions, executes API calls
+        concurrently using asyncio.gather, validates each response against its corresponding
+        Pydantic model, and combines the results into a single dictionary. If validation fails
+        for a response, a warning is logged, and default values are used.
 
         Parameters:
             sentence (str): The sentence to classify.
-            contexts (Dict[str, str]): A dictionary of context strings (e.g., observer, immediate, broader)
-                                       that provide additional context for classification.
+            contexts (Dict[str, str]): A dictionary of context strings for classification.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the classification results. Expected keys include:
+            Dict[str, Any]: A dictionary containing the classification results. Keys include:
                 - "function_type"
                 - "structure_type"
                 - "purpose"
@@ -80,29 +90,9 @@ class SentenceAnalyzer:
                 - "sentence" (the original sentence)
 
         Raises:
-            AssertionError: If an expected attribute is missing in the API response (this error may be raised 
-                            indirectly through safe_extract if a key is not found).
-            Exception: If any of the underlying API calls fail after retries.
+            Exception: If any of the underlying API calls fail after retries (propagated from asyncio.gather).
         """
         results = {}
-
-        def safe_extract(response: Dict[str, Any], key: str) -> Any:
-            """
-            Helper function to extract a value from a response dictionary in a case-insensitive manner.
-
-            Parameters:
-                response (Dict[str, Any]): The API response dictionary.
-                key (str): The key to extract (case-insensitive).
-
-            Returns:
-                Any: The value associated with the key, or an empty string if the key is not found.
-            """
-            if not isinstance(response, dict): # Add check if response is a dict
-                logger.error(f"Expected dict but got {type(response)} for key '{key}': {response}")
-                return ""
-            key = key.lower()
-            # Convert all keys to lowercase to perform a case-insensitive lookup.
-            return {k.lower(): v for k, v in response.items()}.get(key, "")
 
         # --- Prepare Prompts ---
         function_prompt = self.prompts["sentence_function_type"]["prompt"].format(sentence=sentence)
@@ -136,16 +126,12 @@ class SentenceAnalyzer:
         ]
 
         try:
-            # Gather results from all concurrent API calls
             api_responses = await asyncio.gather(*tasks)
         except Exception as e:
             logger.error(f"Error during concurrent API calls for sentence '{sentence[:50]}...': {e}")
-            # Depending on desired behavior, you might return partial results,
-            # a specific error structure, or re-raise the exception.
-            # For now, let's re-raise to signal failure.
             raise
 
-        # Unpack responses (assuming gather preserves order)
+        # Unpack responses
         (
             function_response,
             structure_response,
@@ -156,30 +142,73 @@ class SentenceAnalyzer:
             domain_response,
         ) = api_responses
 
-        # --- Process Results ---
-        results["function_type"] = safe_extract(function_response, "function_type")
-        results["structure_type"] = safe_extract(structure_response, "structure_type")
-        results["purpose"] = safe_extract(purpose_response, "purpose")
-        results["topic_level_1"] = safe_extract(topic_lvl1_response, "topic_level_1")
-        results["topic_level_3"] = safe_extract(topic_lvl3_response, "topic_level_3")
-        
-        # Handle keyword extraction (checking response type before .get)
-        if isinstance(overall_keywords_response, dict):
-             results["overall_keywords"] = overall_keywords_response.get("overall_keywords", [])
-        else:
-            logger.error(f"Expected dict for overall_keywords, got {type(overall_keywords_response)}: {overall_keywords_response}")
-            results["overall_keywords"] = []
+        # --- Process Results with Pydantic Validation ---
 
-        if isinstance(domain_response, dict):
-            domain_keywords = domain_response.get("domain_keywords", [])
-            # If domain_keywords is returned as a string, split it into a list.
-            if isinstance(domain_keywords, str):
-                domain_keywords = [kw.strip() for kw in domain_keywords.split(",") if kw.strip()]
-            results["domain_keywords"] = domain_keywords
-        else:
-            logger.error(f"Expected dict for domain_keywords, got {type(domain_response)}: {domain_response}")
-            results["domain_keywords"] = []
-            
+        # Function Type
+        try:
+            parsed = SentenceFunctionResponse(**function_response)
+            results["function_type"] = parsed.function_type
+        except ValidationError as e:
+            logger.warning(f"Validation failed for Function Type response: {e}. Response: {function_response}")
+            metrics_tracker.increment_errors() # Track validation error
+            results["function_type"] = "" # Default value
+
+        # Structure Type
+        try:
+            parsed = SentenceStructureResponse(**structure_response)
+            results["structure_type"] = parsed.structure_type
+        except ValidationError as e:
+            logger.warning(f"Validation failed for Structure Type response: {e}. Response: {structure_response}")
+            metrics_tracker.increment_errors() # Track validation error
+            results["structure_type"] = "" # Default value
+
+        # Purpose
+        try:
+            parsed = SentencePurposeResponse(**purpose_response)
+            results["purpose"] = parsed.purpose
+        except ValidationError as e:
+            logger.warning(f"Validation failed for Purpose response: {e}. Response: {purpose_response}")
+            metrics_tracker.increment_errors() # Track validation error
+            results["purpose"] = "" # Default value
+
+        # Topic Level 1
+        try:
+            parsed = TopicLevel1Response(**topic_lvl1_response)
+            results["topic_level_1"] = parsed.topic_level_1
+        except ValidationError as e:
+            logger.warning(f"Validation failed for Topic Level 1 response: {e}. Response: {topic_lvl1_response}")
+            metrics_tracker.increment_errors() # Track validation error
+            results["topic_level_1"] = "" # Default value
+
+        # Topic Level 3
+        try:
+            parsed = TopicLevel3Response(**topic_lvl3_response)
+            results["topic_level_3"] = parsed.topic_level_3
+        except ValidationError as e:
+            logger.warning(f"Validation failed for Topic Level 3 response: {e}. Response: {topic_lvl3_response}")
+            metrics_tracker.increment_errors() # Track validation error
+            results["topic_level_3"] = "" # Default value
+
+        # Overall Keywords
+        try:
+            parsed = OverallKeywordsResponse(**overall_keywords_response)
+            results["overall_keywords"] = parsed.overall_keywords
+        except ValidationError as e:
+            logger.warning(f"Validation failed for Overall Keywords response: {e}. Response: {overall_keywords_response}")
+            metrics_tracker.increment_errors() # Track validation error
+            results["overall_keywords"] = [] # Default value
+
+        # Domain Keywords
+        try:
+            parsed = DomainKeywordsResponse(**domain_response)
+            # Handle case where LLM might return a string instead of a list (though model expects list)
+            # Pydantic handles basic type coercion but explicit check might be safer if needed
+            results["domain_keywords"] = parsed.domain_keywords
+        except ValidationError as e:
+            logger.warning(f"Validation failed for Domain Keywords response: {e}. Response: {domain_response}")
+            metrics_tracker.increment_errors() # Track validation error
+            results["domain_keywords"] = [] # Default value
+
         # Add the original sentence to the results.
         results["sentence"] = sentence
         logger.debug(f"Completed analysis for sentence: {sentence[:50]}...")
@@ -214,7 +243,6 @@ class SentenceAnalyzer:
             # Augment the result with the sentence ID and the original sentence.
             result.update({"sentence_id": idx, "sentence": sentence})
             logger.debug(f"Completed analysis for sentence ID {idx}")
-            logger.debug(f"Finalized result: {result}")
             results.append(result)
 
         return results
