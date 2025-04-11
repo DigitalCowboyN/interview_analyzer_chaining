@@ -6,6 +6,13 @@ openai:
   max_tokens: 256
   temperature: 0.2
 
+google: 
+  api_key: ${GEMINI_API_KEY}
+  model_name: gemini-2.0-flash
+  location: "us-central1"
+  region: "us-central1"
+  zone: "us-central1-a"
+
 paths:
   input_dir: "data/input"
   output_dir: "data/output"

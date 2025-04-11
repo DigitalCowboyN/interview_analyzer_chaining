@@ -1,5 +1,6 @@
 # Core
 openai
+google-genai
 sentence-transformers==2.6.1
 spacy==3.7.4
 hdbscan==0.8.33
