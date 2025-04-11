@@ -18,6 +18,7 @@ Modifications:
 """
 
 import json
+import asyncio
 from typing import Dict, Any, List
 from src.agents.agent import agent  # Uses the OpenAIAgent instance for API calls.
 from src.agents.context_builder import context_builder  # Builds context for each sentence.
@@ -54,12 +55,13 @@ class SentenceAnalyzer:
 
     async def classify_sentence(self, sentence: str, contexts: Dict[str, str]) -> Dict[str, Any]:
         """
-        Classify a single sentence across all required dimensions.
+        Classify a single sentence across all required dimensions using concurrent API calls.
 
-        The method prepares and sends seven separate API calls—each for a specific classification 
-        dimension (function type, structure type, purpose, topic level 1, topic level 3, overall 
-        keywords, and domain-specific keywords). It then extracts the relevant information from each 
-        API response using a helper function, combining them into a single dictionary.
+        The method prepares prompts for seven classification dimensions (function type, 
+        structure type, purpose, topic level 1, topic level 3, overall keywords, and 
+        domain-specific keywords). It then executes these API calls concurrently using 
+        asyncio.gather. Finally, it extracts relevant information from each API response 
+        using a helper function and combines them into a single dictionary.
 
         Parameters:
             sentence (str): The sentence to classify.
@@ -80,6 +82,7 @@ class SentenceAnalyzer:
         Raises:
             AssertionError: If an expected attribute is missing in the API response (this error may be raised 
                             indirectly through safe_extract if a key is not found).
+            Exception: If any of the underlying API calls fail after retries.
         """
         results = {}
 
@@ -94,67 +97,89 @@ class SentenceAnalyzer:
             Returns:
                 Any: The value associated with the key, or an empty string if the key is not found.
             """
+            if not isinstance(response, dict): # Add check if response is a dict
+                logger.error(f"Expected dict but got {type(response)} for key '{key}': {response}")
+                return ""
             key = key.lower()
             # Convert all keys to lowercase to perform a case-insensitive lookup.
             return {k.lower(): v for k, v in response.items()}.get(key, "")
 
-        # --- Begin Classification API Calls ---
-        
-        # 1. Function type classification.
+        # --- Prepare Prompts ---
         function_prompt = self.prompts["sentence_function_type"]["prompt"].format(sentence=sentence)
-        function_response = await agent.call_model(function_prompt)
-        results["function_type"] = safe_extract(function_response, "function_type")
-
-        # 2. Structure type classification.
         structure_prompt = self.prompts["sentence_structure_type"]["prompt"].format(sentence=sentence)
-        structure_response = await agent.call_model(structure_prompt)
-        results["structure_type"] = safe_extract(structure_response, "structure_type")
-
-        # 3. Purpose classification.
-        # Uses observer-level context for purpose.
         purpose_prompt = self.prompts["sentence_purpose"]["prompt"].format(
             sentence=sentence, context=contexts["observer"]
         )
-        purpose_response = await agent.call_model(purpose_prompt)
-        results["purpose"] = safe_extract(purpose_response, "purpose")
-
-        # 4. Topic level 1 classification.
-        # Uses immediate context.
         topic_lvl1_prompt = self.prompts["topic_level_1"]["prompt"].format(
             sentence=sentence, context=contexts["immediate"]
         )
-        topic_lvl1_response = await agent.call_model(topic_lvl1_prompt)
-        results["topic_level_1"] = safe_extract(topic_lvl1_response, "topic_level_1")
-
-        # 5. Topic level 3 classification.
-        # Uses broader context.
         topic_lvl3_prompt = self.prompts["topic_level_3"]["prompt"].format(
             sentence=sentence, context=contexts["broader"]
         )
-        topic_lvl3_response = await agent.call_model(topic_lvl3_prompt)
-        results["topic_level_3"] = safe_extract(topic_lvl3_response, "topic_level_3")
-
-        # 6. Overall keywords extraction.
-        # This prompt typically doesn't require the sentence, only context.
         overall_keywords_prompt = self.prompts["topic_overall_keywords"]["prompt"].format(
             context=contexts["observer"]
         )
-        overall_keywords_response = await agent.call_model(overall_keywords_prompt)
-        results["overall_keywords"] = overall_keywords_response.get("overall_keywords", [])
-
-        # 7. Domain-specific keywords extraction.
-        # The prompt is formatted with a comma-separated string of domain keywords from the config.
         domain_keywords_str = ", ".join(config.get("domain_keywords", []))
         domain_prompt = self.prompts["domain_specific_keywords"]["prompt"].format(
             sentence=sentence, domain_keywords=domain_keywords_str
         )
-        domain_response = await agent.call_model(domain_prompt)
-        domain_keywords = domain_response.get("domain_keywords", [])
-        # If domain_keywords is returned as a string, split it into a list.
-        if isinstance(domain_keywords, str):
-            domain_keywords = [kw.strip() for kw in domain_keywords.split(",") if kw.strip()]
-        results["domain_keywords"] = domain_keywords
 
+        # --- Execute API Calls Concurrently ---
+        tasks = [
+            agent.call_model(function_prompt),
+            agent.call_model(structure_prompt),
+            agent.call_model(purpose_prompt),
+            agent.call_model(topic_lvl1_prompt),
+            agent.call_model(topic_lvl3_prompt),
+            agent.call_model(overall_keywords_prompt),
+            agent.call_model(domain_prompt),
+        ]
+
+        try:
+            # Gather results from all concurrent API calls
+            api_responses = await asyncio.gather(*tasks)
+        except Exception as e:
+            logger.error(f"Error during concurrent API calls for sentence '{sentence[:50]}...': {e}")
+            # Depending on desired behavior, you might return partial results,
+            # a specific error structure, or re-raise the exception.
+            # For now, let's re-raise to signal failure.
+            raise
+
+        # Unpack responses (assuming gather preserves order)
+        (
+            function_response,
+            structure_response,
+            purpose_response,
+            topic_lvl1_response,
+            topic_lvl3_response,
+            overall_keywords_response,
+            domain_response,
+        ) = api_responses
+
+        # --- Process Results ---
+        results["function_type"] = safe_extract(function_response, "function_type")
+        results["structure_type"] = safe_extract(structure_response, "structure_type")
+        results["purpose"] = safe_extract(purpose_response, "purpose")
+        results["topic_level_1"] = safe_extract(topic_lvl1_response, "topic_level_1")
+        results["topic_level_3"] = safe_extract(topic_lvl3_response, "topic_level_3")
+        
+        # Handle keyword extraction (checking response type before .get)
+        if isinstance(overall_keywords_response, dict):
+             results["overall_keywords"] = overall_keywords_response.get("overall_keywords", [])
+        else:
+            logger.error(f"Expected dict for overall_keywords, got {type(overall_keywords_response)}: {overall_keywords_response}")
+            results["overall_keywords"] = []
+
+        if isinstance(domain_response, dict):
+            domain_keywords = domain_response.get("domain_keywords", [])
+            # If domain_keywords is returned as a string, split it into a list.
+            if isinstance(domain_keywords, str):
+                domain_keywords = [kw.strip() for kw in domain_keywords.split(",") if kw.strip()]
+            results["domain_keywords"] = domain_keywords
+        else:
+            logger.error(f"Expected dict for domain_keywords, got {type(domain_response)}: {domain_response}")
+            results["domain_keywords"] = []
+            
         # Add the original sentence to the results.
         results["sentence"] = sentence
         logger.debug(f"Completed analysis for sentence: {sentence[:50]}...")

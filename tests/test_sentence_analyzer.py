@@ -50,29 +50,32 @@ def analyzer():
 @patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock)
 async def test_classify_sentence(mock_call_model, analyzer, mock_contexts):
     """
-    Test the classification of a single sentence.
+    Test the classification of a single sentence using concurrent calls.
     
     This test verifies that the classify_sentence method correctly processes a given sentence,
-    calls the OpenAI API the expected number of times, and returns the expected results.
+    calls the OpenAI API concurrently for the 7 dimensions, and returns the expected combined results.
+    It uses side_effect to provide distinct responses for each call.
     
     Asserts:
         - The classification results contain the expected keys and values.
         - The OpenAI API (call_model) is called exactly seven times.
     """
-    # Return a plain dict instead of an AnalysisResult.
-    fake_response = {
-        "function_type": "declarative",
-        "structure_type": "simple sentence",
-        "purpose": "informational",
-        "topic_level_1": "testing",
-        "topic_level_3": "evaluation",
-        "overall_keywords": ["test"],
-        "domain_keywords": ["assessment", "evaluation"]
-    }
-    mock_call_model.return_value = fake_response
+    # Define individual mock responses for each classification call
+    side_effect_responses = [
+        {"function_type": "declarative"},                            # 1. Function
+        {"structure_type": "simple sentence"},                      # 2. Structure
+        {"purpose": "informational"},                             # 3. Purpose
+        {"topic_level_1": "testing"},                             # 4. Topic L1
+        {"topic_level_3": "evaluation"},                            # 5. Topic L3
+        {"overall_keywords": ["test"]},                         # 6. Overall Keywords
+        {"domain_keywords": ["assessment", "evaluation"]}         # 7. Domain Keywords
+    ]
+    mock_call_model.side_effect = side_effect_responses
 
     sentence = "This is a test sentence."
     result = await analyzer.classify_sentence(sentence, mock_contexts)
+    
+    # Check that values from the corresponding side_effect responses were extracted
     assert result["function_type"] == "declarative"
     assert result["structure_type"] == "simple sentence"
     assert result["purpose"] == "informational"
@@ -80,7 +83,8 @@ async def test_classify_sentence(mock_call_model, analyzer, mock_contexts):
     assert result["topic_level_3"] == "evaluation"
     assert result["overall_keywords"] == ["test"]
     assert result["domain_keywords"] == ["assessment", "evaluation"]
-    # Expecting 7 calls for each classification dimension.
+    
+    # Total call count should equal 7, matching the number of tasks gathered.
     assert mock_call_model.call_count == 7
 
 @patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock)
@@ -88,26 +92,36 @@ async def test_classify_sentence_with_domain_keywords_string(mock_call_model, an
     """
     Test classify_sentence when the API returns domain_keywords as a comma-separated string.
     
-    This test ensures that if domain_keywords is returned as a string, it gets split into a list.
+    This test ensures that if domain_keywords is returned as a string from the corresponding
+    API call, it gets split correctly into a list. It uses side_effect to position the 
+    specific response correctly.
     
     Asserts:
         - The domain_keywords field in the result is a list of stripped keywords.
+        - The OpenAI API (call_model) is called exactly seven times.
+
     """
-    fake_result = {
-        "function_type": "declarative",
-        "structure_type": "simple sentence",
-        "purpose": "informational",
-        "topic_level_1": "testing",
-        "topic_level_3": "evaluation",
-        "overall_keywords": ["test"],
-        "domain_keywords": "assessment, evaluation, extra"
-    }
-    mock_call_model.return_value = fake_result
+    # Define side effects - only the 7th response matters for this specific check
+    side_effect_responses = [
+        {"function_type": "declarative"},         # 1
+        {"structure_type": "simple sentence"},   # 2
+        {"purpose": "informational"},          # 3
+        {"topic_level_1": "testing"},          # 4
+        {"topic_level_3": "evaluation"},         # 5
+        {"overall_keywords": ["test"]},      # 6
+        {"domain_keywords": "assessment, evaluation, extra"} # 7 - String format
+    ]
+    mock_call_model.side_effect = side_effect_responses
 
     sentence = "Test sentence for domain keywords."
     result = await analyzer.classify_sentence(sentence, mock_contexts)
+    
+    # Check that the string was correctly parsed into a list
     assert isinstance(result["domain_keywords"], list)
     assert result["domain_keywords"] == ["assessment", "evaluation", "extra"]
+    
+    # Ensure all 7 calls were made
+    assert mock_call_model.call_count == 7
 
 @patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock)
 async def test_classify_sentence_side_effect(mock_call_model, analyzer, mock_contexts):
