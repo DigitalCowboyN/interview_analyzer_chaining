@@ -3,100 +3,186 @@ test_context_builder.py
 
 This module contains unit tests for the ContextBuilder class, which is responsible for
 building both textual and embedding-based contexts for sentences. The tests cover:
-    - Building a context string from a list of sentences.
-    - Generating an embedding context vector with the correct dimension.
-    - Building contexts for all sentences and ensuring the returned structure is correct.
-    - Edge cases such as no available context sentences and an empty input list.
+    - Building a context string with newline separators and a marked target sentence.
+    - Generating an embedding context vector (excluding the target).
+    - Building contexts for all sentences and verifying the structure.
+    - Edge cases: context at start/end of list, zero window size, empty input list.
 
 Usage:
     Run the tests using pytest:
         pytest tests/test_context_builder.py
 
 Modifications:
-    - If the context window configuration changes, update the tests accordingly.
-    - If the set of context keys changes, update the assertions in test_build_all_contexts.
+    - If the context window configuration changes, update relevant tests if needed.
+    - If the target marker format changes, update test_build_context assertions.
 """
 
 import pytest
 import numpy as np
 from src.agents.context_builder import ContextBuilder
+from src.config import config # To access configured embedding dimension
 
 @pytest.fixture
 def sentences():
+    # Sample sentences for testing
     return [
-        "First sentence.",
-        "Second sentence about testing.",
-        "Third sentence provides context.",
-        "Fourth sentence enhances detail.",
-        "Fifth and final sentence."
+        "Sentence 0.", # idx 0
+        "Sentence 1.", # idx 1
+        "Sentence 2 is the target.", # idx 2
+        "Sentence 3.", # idx 3
+        "Sentence 4."  # idx 4
     ]
 
-def test_build_context(sentences):
-    """
-    Test the construction of immediate context around a given sentence.
+@pytest.fixture
+def builder():
+    # Fixture to provide a ContextBuilder instance
+    return ContextBuilder()
 
-    Verifies that build_context correctly constructs a context string that includes
-    the specified number of surrounding sentences, excluding the target sentence.
-    
-    Expected behavior: For index 2 with window_size=1, it should combine sentence 1 and 3.
+def test_build_context_basic(builder, sentences):
     """
-    builder = ContextBuilder()
+    Test build_context with a window size of 1 around a middle sentence.
+    """
     context = builder.build_context(sentences, idx=2, window_size=1)
-    expected = "Second sentence about testing. Fourth sentence enhances detail."
+    # Use triple quotes for correct multiline string with actual newlines
+    expected = """Sentence 1.
+>>> TARGET: Sentence 2 is the target. <<<
+Sentence 3."""
     assert context == expected
 
-def test_build_embedding_context(sentences):
+def test_build_context_start(builder, sentences):
     """
-    Test the generation of embedding-based context for a given sentence.
+    Test build_context for the first sentence (index 0).
+    """
+    context = builder.build_context(sentences, idx=0, window_size=1)
+    # Use triple quotes
+    expected = """>>> TARGET: Sentence 0. <<<
+Sentence 1."""
+    assert context == expected
 
-    Verifies that build_embedding_context returns an embedding vector with the correct dimension
-    and that the vector is non-zero when context sentences are available.
+def test_build_context_end(builder, sentences):
     """
-    builder = ContextBuilder()
+    Test build_context for the last sentence (index 4).
+    """
+    context = builder.build_context(sentences, idx=4, window_size=1)
+    # Use triple quotes
+    expected = """Sentence 3.
+>>> TARGET: Sentence 4. <<<"""
+    assert context == expected
+
+def test_build_context_zero_window(builder, sentences):
+    """
+    Test build_context with window_size=0. Should only return the marked target.
+    """
+    context = builder.build_context(sentences, idx=2, window_size=0)
+    expected = ">>> TARGET: Sentence 2 is the target. <<<"
+    assert context == expected
+
+def test_build_context_large_window(builder, sentences):
+    """
+    Test build_context with a window size larger than the list boundaries.
+    """
+    context = builder.build_context(sentences, idx=2, window_size=10)
+    # Use triple quotes
+    expected = """Sentence 0.
+Sentence 1.
+>>> TARGET: Sentence 2 is the target. <<<
+Sentence 3.
+Sentence 4."""
+    assert context == expected
+    
+def test_build_context_invalid_idx(builder, sentences):
+    """Test build_context with an invalid index."""
+    assert builder.build_context(sentences, idx=-1, window_size=1) == ""
+    assert builder.build_context(sentences, idx=len(sentences), window_size=1) == ""
+
+def test_build_context_empty_list(builder):
+    """Test build_context with an empty sentences list."""
+    assert builder.build_context([], idx=0, window_size=1) == ""
+
+# --- Embedding Context Tests ---
+
+def test_build_embedding_context_basic(builder, sentences):
+    """
+    Test embedding context generation, ensuring target is excluded.
+    Window size 1 around idx 2 -> uses sentences 1 and 3 for embedding.
+    """
     embedding_context = builder.build_embedding_context(sentences, idx=2, window_size=1)
     expected_dim = builder.embedder.get_sentence_embedding_dimension()
-    assert embedding_context.shape[0] == expected_dim
-    # Ensure the vector is not all zeros (indicating that context was computed)
+    assert isinstance(embedding_context, np.ndarray)
+    assert embedding_context.shape == (expected_dim,)
+    # Check it's not zero vector (assuming sents 1 & 3 have non-zero avg embedding)
     assert np.any(embedding_context != 0)
 
-def test_build_embedding_context_empty(sentences):
+def test_build_embedding_context_zero_window(builder, sentences):
     """
-    Test build_embedding_context when no context sentences are available.
-
-    For instance, if there is only one sentence or window_size=0, then no context is available,
-    and the function should return a zero vector.
+    Test embedding context with window_size=0. No surrounding sentences, expect zero vector.
     """
-    builder = ContextBuilder()
-    # Use window_size 0 so that for any idx, the context list is empty.
-    zero_vector = builder.build_embedding_context(sentences, idx=2, window_size=0)
+    embedding_context = builder.build_embedding_context(sentences, idx=2, window_size=0)
     expected_dim = builder.embedder.get_sentence_embedding_dimension()
-    assert zero_vector.shape[0] == expected_dim
-    # The returned vector should be all zeros.
-    assert np.all(zero_vector == 0)
+    assert isinstance(embedding_context, np.ndarray)
+    assert embedding_context.shape == (expected_dim,)
+    assert np.all(embedding_context == 0) # Should be zero vector
 
-def test_build_all_contexts(sentences):
+def test_build_embedding_context_start(builder, sentences):
     """
-    Test the construction of contexts for all sentences.
+    Test embedding context at start. window=1, idx=0 -> uses sentence 1 only.
+    """
+    embedding_context = builder.build_embedding_context(sentences, idx=0, window_size=1)
+    expected_dim = builder.embedder.get_sentence_embedding_dimension()
+    assert isinstance(embedding_context, np.ndarray)
+    assert embedding_context.shape == (expected_dim,)
+    assert np.any(embedding_context != 0) 
 
-    Verifies that build_all_contexts returns a dictionary mapping each sentence index to its
-    corresponding context, and that each context dictionary contains the expected keys.
-    
-    Expected keys: "structure", "immediate", "observer", "broader", "overall".
+def test_build_embedding_context_end(builder, sentences):
     """
-    builder = ContextBuilder()
+    Test embedding context at end. window=1, idx=4 -> uses sentence 3 only.
+    """
+    embedding_context = builder.build_embedding_context(sentences, idx=4, window_size=1)
+    expected_dim = builder.embedder.get_sentence_embedding_dimension()
+    assert isinstance(embedding_context, np.ndarray)
+    assert embedding_context.shape == (expected_dim,)
+    assert np.any(embedding_context != 0)
+
+def test_build_embedding_context_empty_list(builder):
+    """Test embedding context with empty list."""
+    embedding_context = builder.build_embedding_context([], idx=0, window_size=1)
+    expected_dim = builder.embedder.get_sentence_embedding_dimension()
+    assert np.all(embedding_context == 0)
+    assert embedding_context.shape == (expected_dim,)
+
+def test_build_embedding_context_invalid_idx(builder, sentences):
+    """Test embedding context with invalid index."""
+    embedding_context = builder.build_embedding_context(sentences, idx=-1, window_size=1)
+    expected_dim = builder.embedder.get_sentence_embedding_dimension()
+    assert np.all(embedding_context == 0)
+    assert embedding_context.shape == (expected_dim,)
+
+# --- build_all_contexts Tests ---
+
+def test_build_all_contexts_structure(builder, sentences):
+    """
+    Test the structure returned by build_all_contexts.
+    Checks number of entries and keys for each entry.
+    """
     contexts = builder.build_all_contexts(sentences)
     assert len(contexts) == len(sentences)
-    for idx, ctx in contexts.items():
-        for key in ["structure", "immediate", "observer", "broader", "overall"]:
-            assert key in ctx, f"Context missing key: {key}"
-            assert isinstance(ctx[key], str)
+    expected_keys = list(config["preprocessing"]["context_windows"].keys())
+    
+    for idx in range(len(sentences)):
+        assert idx in contexts
+        assert isinstance(contexts[idx], dict)
+        # Check all expected keys are present and in the same order (Python 3.7+ dicts preserve order)
+        assert list(contexts[idx].keys()) == expected_keys 
+        for key in expected_keys:
+             assert isinstance(contexts[idx][key], str)
+             # Check that the target sentence is marked within each context string
+             # Ensure sentence text exists before checking substring
+             if sentences[idx]: 
+                 assert f">>> TARGET: {sentences[idx]} <<<" in contexts[idx][key]
 
-def test_build_all_contexts_empty():
+def test_build_all_contexts_empty_list(builder):
     """
-    Test build_all_contexts with an empty list of sentences.
-
-    Verifies that if an empty list is provided, build_all_contexts returns an empty dictionary.
+    Test build_all_contexts with an empty list. Expect empty dictionary.
     """
-    builder = ContextBuilder()
     contexts = builder.build_all_contexts([])
     assert contexts == {}

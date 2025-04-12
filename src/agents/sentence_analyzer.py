@@ -98,16 +98,16 @@ class SentenceAnalyzer:
         function_prompt = self.prompts["sentence_function_type"]["prompt"].format(sentence=sentence)
         structure_prompt = self.prompts["sentence_structure_type"]["prompt"].format(sentence=sentence)
         purpose_prompt = self.prompts["sentence_purpose"]["prompt"].format(
-            sentence=sentence, context=contexts["observer"]
+            sentence=sentence, context=contexts["observer_context"]
         )
         topic_lvl1_prompt = self.prompts["topic_level_1"]["prompt"].format(
-            sentence=sentence, context=contexts["immediate"]
+            sentence=sentence, context=contexts["immediate_context"]
         )
         topic_lvl3_prompt = self.prompts["topic_level_3"]["prompt"].format(
-            sentence=sentence, context=contexts["broader"]
+            sentence=sentence, context=contexts["broader_context"]
         )
         overall_keywords_prompt = self.prompts["topic_overall_keywords"]["prompt"].format(
-            context=contexts["observer"]
+            context=contexts["observer_context"]
         )
         domain_keywords_str = ", ".join(config.get("domain_keywords", []))
         domain_prompt = self.prompts["domain_specific_keywords"]["prompt"].format(
