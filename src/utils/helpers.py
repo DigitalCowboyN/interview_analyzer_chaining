@@ -3,6 +3,7 @@ import json
 import yaml
 import pandas as pd
 from pathlib import Path
+from typing import Dict, Any
 
 
 def save_json(data, file_path: str, indent: int = 4):
@@ -17,6 +18,27 @@ def load_json(file_path: str) -> dict:
     """Load data from JSON file."""
     with Path(file_path).open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def append_json_line(data: Dict[str, Any], file_path: Path):
+    """
+    Append a dictionary as a JSON line to a file.
+
+    Ensures the directory exists and appends the JSON string followed by a newline.
+
+    Parameters:
+        data (Dict[str, Any]): The dictionary data to append.
+        file_path (Path): The path to the file.
+    """
+    # Ensure the output directory exists
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Convert the dictionary to a JSON string
+    json_string = json.dumps(data, ensure_ascii=False)
+    
+    # Append the JSON string followed by a newline
+    with file_path.open("a", encoding="utf-8") as f:
+        f.write(json_string + "\n")
 
 
 def save_yaml(data: dict, file_path: str):

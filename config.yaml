@@ -16,7 +16,10 @@ google:
 paths:
   input_dir: "data/input"
   output_dir: "data/output"
+  map_dir: "data/maps"
   logs_dir: "logs"
+  map_suffix: "_map.jsonl"
+  analysis_suffix: "_analysis.jsonl"
 
 preprocessing:
   context_windows:
@@ -35,6 +38,9 @@ clustering:
   hdbscan:
     min_cluster_size: 5
     metric: "euclidean"
+
+pipeline:
+  num_analysis_workers: 10
 
 classification:
   local:

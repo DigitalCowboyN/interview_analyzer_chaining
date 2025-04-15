@@ -105,3 +105,8 @@ class Config:
 
 # Singleton instance for global configuration access
 config = Config()
+
+# --- Add validation or specific accessors for new config keys if needed ---
+# Example (optional validation):
+# if config.get("pipeline", {}).get("num_analysis_workers", 1) < 0:
+#     raise ValueError("num_analysis_workers cannot be negative")

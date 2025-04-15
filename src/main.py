@@ -40,6 +40,20 @@ def main():
     # Parse the command-line arguments
     args = parser.parse_args()
 
+    # --- Get map directory from config --- 
+    # Ensure map_dir key exists in config["paths"]
+    map_dir_path = Path(config["paths"].get("map_dir", "data/maps")) 
+    # Add an argument for map_dir if you want it to be command-line configurable
+    # parser.add_argument(
+    #     "--map_dir",
+    #     type=Path,
+    #     default=map_dir_path,
+    #     help="Path to the directory for saving map files",
+    # )
+    # args = parser.parse_args() # Re-parse if adding new arg
+    # map_dir_to_use = args.map_dir
+    map_dir_to_use = map_dir_path # Using config value for now
+
     # Reset and start metrics tracking
     metrics_tracker.reset()
     metrics_tracker.start_pipeline_timer()
@@ -47,7 +61,13 @@ def main():
     # Log the start of the pipeline execution 
     logger.info("Starting the Enriched Sentence Analysis Pipeline")
     try:
-        asyncio.run(run_pipeline(args.input_dir, args.output_dir))
+        # Pass the necessary arguments to run_pipeline
+        asyncio.run(run_pipeline(
+            input_dir=args.input_dir, 
+            output_dir=args.output_dir, 
+            map_dir=map_dir_to_use, # Pass map directory
+            config=config # Pass the loaded config object
+        ))
         logger.info("Pipeline execution completed.")
     except Exception as e:
         logger.critical(f"Pipeline execution failed: {e}", exc_info=True)
