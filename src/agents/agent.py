@@ -1,27 +1,33 @@
 """
 agent.py
 
-This module defines the OpenAIAgent class, which is responsible for interacting with
-OpenAI's Responses API. The agent sends a prompt (a text input) to the API and expects
-a strictly formatted JSON response. The JSON is then parsed into a Python dictionary.
+Defines the OpenAIAgent class for interacting with OpenAI's API, specifically
+configured for structured JSON responses. Handles API calls, response parsing,
+error handling with retries, and metrics tracking.
+
+This module provides a singleton instance `agent` for convenient use throughout
+the application.
+
+Key Functionality:
+    - Asynchronous API calls using `openai` library and `asyncio`.
+    - Configurable retry logic with exponential backoff for transient errors.
+    - Strict JSON output enforcement via API parameters.
+    - Parsing of JSON responses into Python dictionaries.
+    - Integration with centralized configuration (`src/config.py`) for API key, model,
+      and retry settings.
+    - Integration with centralized logging (`src.utils.logger`) and metrics
+      (`src.utils.metrics`).
 
 Usage:
     from src.agents.agent import agent
-    result = await agent.call_model("Analyze this sentence...")
-
-Key points:
-    - Uses asynchronous execution with asyncio.
-    - Incorporates retry logic with exponential backoff to handle transient API errors.
-    - Logs detailed debug and error messages for traceability.
-    - Expects configuration values (like API key, model name, tokens, etc.) from src/config.py.
-    - Relies on a specific output format as defined by the OpenAI Responses API.
     
-If modifying this file:
-    - Changing configuration keys: Update config.yaml and adjust key names accordingly.
-    - Modifying retry logic: Be aware that altering the retry_attempts or backoff_factor
-      may affect the agent's behavior when facing API errors.
-    - Adjusting the expected JSON response: If the API output structure changes,
-      update the parsing logic and any related tests.
+    async def main():
+        try:
+            result = await agent.call_model("Prompt instructing JSON output.")
+            print(result)
+        except Exception as e:
+            print(f"API call failed: {e}")
+
 """
 
 import asyncio
@@ -37,27 +43,22 @@ logger = get_logger()
 
 class OpenAIAgent:
     """
-    OpenAIAgent class wraps around OpenAI's Responses API to process and analyze text.
-    
-    It sends a prompt to the API, expects a strict JSON response, and parses it.
-    If errors occur (like API rate limits or malformed responses), it retries the request
-    using an exponential backoff strategy.
+    Manages interactions with the OpenAI API for text analysis tasks.
+
+    Encapsulates API call logic, including prompt formatting for JSON output,
+    response handling, error retries, and metrics tracking (API calls, token usage).
+    Uses configuration settings loaded via `src.config`.
     """
     
     def __init__(self):
         """
-        Initializes the OpenAIAgent instance with necessary configuration values.
-        
-        Required configuration values (from config.yaml):
-            - openai.api_key: Your OpenAI API key.
-            - openai.model_name: The model to be used (e.g., "gpt-4o").
-            - openai.max_tokens: Maximum number of tokens in the API response.
-            - openai.temperature: Temperature setting for response randomness.
-            - openai_api.retry.max_attempts: Maximum number of retry attempts.
-            - openai_api.retry.backoff_factor: Factor used to calculate delay between retries.
-            
+        Initializes the asynchronous OpenAI client and loads configuration.
+
+        Reads API key, model name, token limits, temperature, and retry settings
+        from the globally loaded configuration (`src.config.config`).
+
         Raises:
-            ValueError: If the OpenAI API key is not set.
+            ValueError: If the `openai.api_key` is not found in the configuration.
         """
         api_key = config["openai"]["api_key"]
         if not api_key:
@@ -75,24 +76,25 @@ class OpenAIAgent:
 
     async def call_model(self, function_prompt: str) -> Dict[str, Any]:
         """
-        Calls the OpenAI API with the provided prompt and returns the structured JSON response.
-        
-        The method:
-            - Sends a prompt with strict JSON instructions.
-            - Waits for the API response.
-            - Parses the JSON from the response.
-            - Implements retry logic if errors occur.
-        
-        Parameters:
-            function_prompt (str): The text prompt to be analyzed by the API.
-        
+        Asynchronously calls the configured OpenAI model with a prompt.
+
+        Sends the prompt, requests a JSON object response, handles potential API errors
+        with configured retries, parses the JSON content, and tracks metrics.
+
+        Args:
+            function_prompt (str): The prompt string to send to the OpenAI model.
+                                   This prompt should instruct the model to return JSON.
+
         Returns:
-            Dict[str, Any]: The parsed JSON response from the API.
-        
+            Dict[str, Any]: The parsed JSON response from the model as a dictionary.
+                            Returns an empty dictionary if JSON decoding fails, allowing
+                            the pipeline to continue processing other items.
+
         Raises:
-            ValueError: If the API response is missing expected data.
-            json.JSONDecodeError: If the response text is not valid JSON.
-            Exception: If maximum retry attempts are exceeded.
+            openai.APIError: If an API error occurs and persists after all retry attempts.
+            ValueError: If the API response structure is unexpected (e.g., missing content).
+            Exception: For other unexpected errors during the process or if retries are
+                       exhausted for non-APIError exceptions.
         """
         attempt = 0
         last_exception = None # Store last exception for re-raising
@@ -201,5 +203,5 @@ class OpenAIAgent:
              # If no exception was caught somehow, raise a generic one
              raise Exception("call_model failed after retries without specific exception recorded.")
 
-# Create a global instance of OpenAIAgent for ease of use.
+# Create a global singleton instance of OpenAIAgent for application-wide use.
 agent = OpenAIAgent()

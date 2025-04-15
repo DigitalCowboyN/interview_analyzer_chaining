@@ -162,7 +162,7 @@ async def test_analyze_sentences(mock_classify, analyzer, mock_contexts):
     # Mock context_builder as it's called by analyze_sentences
     with patch("src.agents.sentence_analyzer.context_builder.build_all_contexts") as mock_build_contexts:
         # Return mock contexts for the number of sentences - Use injected fixture value
-        mock_build_contexts.return_value = [mock_contexts] * len(sentences) 
+        mock_build_contexts.return_value = {idx: mock_contexts for idx in range(len(sentences))} 
         
         results = await analyzer.analyze_sentences(sentences)
 
@@ -186,10 +186,12 @@ async def test_analyze_sentences_empty(analyzer):
     
     Asserts:
         - The returned result is an empty list.
+        - A ValueError is raised.
     """
-    # Mock context_builder as it's called by analyze_sentences
+    # Mock context_builder as it's called by analyze_sentences, though it won't be reached
     with patch("src.agents.sentence_analyzer.context_builder.build_all_contexts") as mock_build_contexts:
-        mock_build_contexts.return_value = [] # Return empty list for empty input
-        results = await analyzer.analyze_sentences([])
-        assert results == []
-        mock_build_contexts.assert_called_once_with([]) # Ensure it was called
+        # Check that analyze_sentences raises ValueError for an empty list
+        with pytest.raises(ValueError):
+            await analyzer.analyze_sentences([])
+        # Assert that build_all_contexts was not called because the error is raised first
+        mock_build_contexts.assert_not_called() 

@@ -51,23 +51,15 @@ def segment_text(text: str) -> List[str]:
     """
     Segment input text into sentences using spaCy.
     
-    This function uses the spaCy NLP library to split the provided text into sentences.
-    It filters out any empty sentences after stripping whitespace.
+    Uses the spaCy NLP library ('en_core_web_sm') to split the provided text into sentences,
+    filtering out any empty strings after stripping whitespace.
     
-    Parameters:
+    Args:
         text (str): The input text to be segmented.
         
     Returns:
-        list: A list of sentences as strings. For example, if the text contains three
-              sentences, the function returns a list with three elements.
-              
-    Raises:
-        ValueError: If desired behavior changes (e.g., you want to raise an error for empty input).
-                   Currently, if the input is empty, an empty list is returned.
-                   
-    Usage:
-        sentences = segment_text("Hello world. How are you?")
-        # sentences => ["Hello world.", "How are you?"]
+        List[str]: A list of sentences extracted from the text.
+                   Returns an empty list if the input text is empty or contains no sentences.
     """
     # Process the text using the spaCy model.
     doc = nlp(text)
@@ -105,6 +97,13 @@ async def create_conversation_map(input_file: Path, map_dir: Path, map_suffix: s
     text = input_file.read_text(encoding="utf-8")
     sentences = segment_text(text)
     num_sentences = len(sentences)
+    
+    # Check for empty sentences list early
+    if num_sentences == 0:
+        logger.warning(f"Input file {input_file} contains no sentences after segmentation. Map file will be empty.")
+        # Create an empty map file
+        map_file.touch()
+        return 0, [] # Return 0 sentences and empty list
 
     with map_file.open("w", encoding="utf-8") as f:
         for idx, sentence_text in enumerate(sentences):
@@ -121,7 +120,21 @@ async def create_conversation_map(input_file: Path, map_dir: Path, map_suffix: s
 
 async def _load_tasks(map_file: Path, contexts: List[Dict[str, str]], task_queue: asyncio.Queue):
     """
-    Coroutine to read the map file and load analysis tasks onto the task queue.
+    Coroutine to read a map file and load analysis tasks onto the task queue.
+
+    Parses each JSON line from the map file, retrieves the corresponding pre-built
+    context, and enqueues a tuple representing the task.
+
+    Args:
+        map_file (Path): Path to the conversation map file (.jsonl).
+        contexts (List[Dict[str, str]]): A list where the index corresponds to sentence_id
+                                         and the value is the dictionary of contexts for that sentence.
+        task_queue (asyncio.Queue): The queue to put task tuples onto.
+                                    Task tuple format: (sentence_id, sequence_order, sentence, context)
+
+    Raises:
+        FileNotFoundError: If the map_file cannot be found.
+        Exception: For JSON parsing errors or other unexpected issues during file reading.
     """
     logger.debug(f"Starting task loader for map file: {map_file}")
     try:
@@ -164,7 +177,20 @@ async def _analysis_worker(
     results_queue: asyncio.Queue
 ):
     """
-    Coroutine that consumes tasks from task_queue, analyzes sentences, and puts results on results_queue.
+    Async worker that consumes sentence analysis tasks from a queue, performs analysis,
+    and puts results onto another queue.
+
+    Runs in a loop, fetching tasks. Exits when it receives a `None` sentinel value.
+
+    Args:
+        worker_id (int): Identifier for the worker (for logging).
+        analyzer (SentenceAnalyzer): An instance of the sentence analyzer.
+        task_queue (asyncio.Queue): Queue to get task tuples from.
+                                    Expected tuple: (sentence_id, sequence_order, sentence, context).
+                                    Receives `None` to signal termination.
+        results_queue (asyncio.Queue): Queue to put successful analysis results (dict) onto.
+                                       Receives `None` from the main orchestrator when all workers
+                                       should terminate (passed to the writer).
     """
     logger.info(f"Analysis worker {worker_id} started.")
     while True:
@@ -211,7 +237,14 @@ async def _analysis_worker(
 
 async def _result_writer(output_file: Path, results_queue: asyncio.Queue):
     """
-    Coroutine that consumes results from results_queue and writes them to the output file.
+    Async worker that consumes analysis results from a queue and writes them to a JSON Lines file.
+
+    Runs in a loop, fetching results. Exits when it receives a `None` sentinel value.
+
+    Args:
+        output_file (Path): Path to the output .jsonl file.
+        results_queue (asyncio.Queue): Queue to get analysis result dictionaries from.
+                                       Receives `None` to signal termination.
     """
     logger.info(f"Result writer started for: {output_file}")
     results_written = 0
@@ -246,15 +279,34 @@ async def _result_writer(output_file: Path, results_queue: asyncio.Queue):
 
 async def process_file(input_file: Path, output_dir: Path, map_dir: Path, config: Dict[str, Any]):
     """
-    Process a single text file using the concurrent queue-based pipeline.
-    
-    1. Creates a conversation map file.
-    2. Builds sentence contexts.
-    3. Sets up task and result queues.
-    4. Starts loader, worker, and writer coroutines.
-    5. Waits for completion and handles errors.
+    Orchestrates the concurrent processing pipeline for a single input text file.
+
+    Steps:
+    1. Creates a conversation map file containing sentence IDs and text.
+    2. Builds all necessary textual contexts for each sentence using ContextBuilder.
+    3. Initializes asyncio Queues for tasks and results.
+    4. Creates and starts the task loader coroutine.
+    5. Creates and starts multiple analysis worker coroutines.
+    6. Creates and starts the result writer coroutine.
+    7. Waits for the task queue to be fully processed.
+    8. Sends termination sentinels (None) to workers and the writer.
+    9. Waits for all coroutines to complete.
+    10. Logs success or failure for the file processing.
+
+    Args:
+        input_file (Path): Path to the input text file.
+        output_dir (Path): Directory to save the final analysis results JSONL file.
+        map_dir (Path): Directory to save the intermediate conversation map JSONL file.
+        config (Dict[str, Any]): The application configuration dictionary, expected to contain
+                                 keys like 'pipeline', 'context_map', etc.
+
+    Raises:
+        FileNotFoundError: If the input file cannot be found by `create_conversation_map`.
+        Exception: Propagates exceptions from `create_conversation_map`, `_load_tasks`,
+                   or potentially critical errors during queue/coroutine management.
     """
-    logger.info(f"Processing file: {input_file} with concurrent pipeline.")
+    logger.info(f"Processing file: {input_file}")
+    # Revert config access to original method
     map_suffix = config["paths"].get("map_suffix", "_map.jsonl")
     analysis_suffix = config["paths"].get("analysis_suffix", "_analysis.jsonl")
     num_workers = config["pipeline"].get("num_analysis_workers", 10)
@@ -385,8 +437,25 @@ async def process_file(input_file: Path, output_dir: Path, map_dir: Path, config
 
 async def run_pipeline(input_dir: Path, output_dir: Path, map_dir: Path, config: Dict[str, Any]):
     """
-    Run the concurrent pipeline across all text files in the input directory.
+    Runs the analysis pipeline for all .txt files in the specified input directory.
+
+    Iterates through input files, calls `process_file` for each, and tracks overall metrics.
+
+    Args:
+        input_dir (Path): Directory containing input .txt files.
+        output_dir (Path): Root directory for output analysis results (.jsonl files).
+        map_dir (Path): Root directory for intermediate conversation map files (.jsonl files).
+        config (Dict[str, Any]): The application configuration dictionary.
+
+    Returns:
+        None
+
+    Raises:
+        FileNotFoundError: If the input_dir does not exist.
     """
+    # Start global pipeline timer
+    metrics_tracker.start_pipeline_timer()
+
     logger.info(f"Starting pipeline run. Input: {input_dir}, Output: {output_dir}, Map: {map_dir}")
     input_files = list(input_dir.glob("*.txt"))
 

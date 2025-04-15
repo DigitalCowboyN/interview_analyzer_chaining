@@ -24,32 +24,44 @@ class Config:
     """
     Manages application configuration, loading settings from a YAML file.
 
-    This class loads configuration settings from a specified YAML file,
-    expands environment variables explicitly, and provides dictionary-like access.
+    Loads configuration settings from a specified YAML file, expands environment 
+    variables explicitly (format: ${ENV_VAR_NAME}), and provides dictionary-like 
+    access. This class is typically used as a singleton via the `config` instance 
+    defined at the module level.
 
     Attributes:
         config_path (Path): Path to the configuration YAML file.
-        config (dict): Loaded configuration settings.
+        config (dict): The loaded and processed configuration settings.
 
-    Parameters:
-        config_path (str): Relative path to the configuration file (default: "config.yaml").
+    Args:
+        config_path (str): Relative path to the configuration file from the project root.
+                           Defaults to "config.yaml".
     """
 
     def __init__(self, config_path: str = "config.yaml"):
+        """
+        Initializes the Config instance by setting the path and loading the config.
+
+        Args:
+            config_path (str): Relative path to the configuration file. 
+                               Defaults to "config.yaml".
+        """
         self.config_path = Path(__file__).parent.parent / config_path
         self.config = self.load_config()
 
     def load_config(self) -> dict:
         """
-        Loads and returns configuration from the YAML file after explicitly expanding environment variables.
+        Loads configuration from the YAML file and expands environment variables.
 
-        Environment variables in the YAML file should be formatted as ${ENV_VAR_NAME}.
+        Environment variables in the YAML file should be formatted as ${VAR_NAME}.
+        Variables not found in the environment retain their ${VAR_NAME} format.
 
         Returns:
-            dict: Parsed configuration settings.
+            dict: The parsed and processed configuration settings.
 
         Raises:
-            FileNotFoundError: If the configuration file does not exist.
+            FileNotFoundError: If the configuration file specified by `config_path` does not exist.
+            yaml.YAMLError: If the file content is not valid YAML.
         """
         if not self.config_path.exists():
             raise FileNotFoundError(f"Config file not found: {self.config_path}")
@@ -67,40 +79,42 @@ class Config:
 
     def get(self, key, default=None):
         """
-        Retrieves a configuration value by key.
+        Retrieves a configuration value by key, returning a default if not found.
 
-        Parameters:
-            key (str): Key of the configuration setting.
-            default (optional): Default value if key is not found.
+        Args:
+            key (str): The dot-separated key or simple key of the configuration setting 
+                     (e.g., 'openai.api_key' or 'some_top_level_key').
+            default (optional): The value to return if the key is not found. Defaults to None.
 
         Returns:
             Any: The configuration value or the provided default.
         """
+        # Simple implementation for top-level keys; can be extended for nested keys if needed
         return self.config.get(key, default)
 
     def __getitem__(self, key):
         """
-        Enables dictionary-style access to configuration.
+        Enables dictionary-style access (e.g., `config['openai']`).
 
-        Parameters:
-            key (str): Key of the configuration setting.
+        Args:
+            key (str): The top-level key of the configuration setting.
 
         Returns:
             Any: The configuration value associated with the given key.
 
         Raises:
-            KeyError: If the key does not exist.
+            KeyError: If the key does not exist in the configuration.
         """
         return self.config[key]
 
     def __repr__(self):
         """
-        Provides a string representation of the Config instance.
+        Provides a developer-friendly string representation of the Config instance.
 
         Returns:
-            str: Representation including the config file path.
+            str: Representation including the config file path (e.g., "Config(path/to/config.yaml)").
         """
-        return f"Config({self.config_path})"
+        return f"Config(path={self.config_path})" # Added path= for clarity
 
 
 # Singleton instance for global configuration access

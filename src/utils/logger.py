@@ -1,3 +1,23 @@
+"""
+logger.py
+
+Configures the application-wide logger using the Loguru library.
+
+Sets up two logging sinks:
+1.  File Sink: Writes logs in structured JSON format to a file specified in
+    the configuration (`config["paths"]["logs_dir"]/pipeline.log`).
+    - Level: INFO
+    - Rotation: 10 MB
+    - Retention: 10 days
+    - Compression: zip
+    - Format: Includes timestamp, level, module, function, line number, message.
+2.  Stdout Sink: Prints logs to standard output in a human-readable, colored format.
+    - Level: DEBUG
+    - Format: Includes time, level, message.
+
+The `get_logger()` function provides access to the configured logger instance.
+"""
+
 # src/utils/logger.py
 from loguru import logger
 import os

@@ -1,27 +1,25 @@
 """
 context_builder.py
 
-This module defines the ContextBuilder class, which is responsible for creating
-textual and embedding-based contexts for sentences. It leverages the SentenceTransformer
-model to generate sentence embeddings and uses configuration settings to determine how many
-sentences to include in each context window. The textual context includes the target
-sentence marked within its surrounding window.
+Defines the ContextBuilder class, responsible for creating textual contexts
+for sentences based on surrounding sentences within a configurable window size.
 
-Usage Example:
+Contexts are generated for different analysis purposes (e.g., immediate, broader)
+as defined in the project configuration. The target sentence within each context
+string is marked.
+
+Usage:
     from src.agents.context_builder import context_builder
-    contexts = context_builder.build_all_contexts(sentences)
+    
+    sentences = ["Sentence one.", "Sentence two.", "Sentence three."]
+    # Get contexts for all sentences based on config settings
+    all_contexts = context_builder.build_all_contexts(sentences)
+    # Example: Access context for sentence at index 1 for 'immediate' analysis
+    immediate_context_for_sentence_1 = all_contexts[1]["immediate"]
 
-Modifications:
-    - To adjust the size of context windows, update the "preprocessing.context_windows"
-      settings in the configuration file.
-    - If a different embedding model is required, modify the "embedding.model_name" in config.
-    - Changes in how context is constructed (e.g., different marking logic) should be reflected
-      in the build_context method.
 """
 
 from typing import List, Dict
-import numpy as np
-from sentence_transformers import SentenceTransformer
 from src.config import config  # Project configuration settings.
 from src.utils.logger import get_logger  # Centralized logger for the project.
 
@@ -31,17 +29,19 @@ logger = get_logger()
 
 class ContextBuilder:
     """
-    A class to build both textual and embedding-based contexts for sentences.
+    Builds textual context strings for sentences based on configuration.
 
-    Textual context includes the target sentence marked within its surrounding window,
-    joined by newlines. Embedding-based context represents the average embedding of
-    the surrounding sentences *excluding* the target.
+    Generates different context strings for each sentence by extracting a window
+    of surrounding sentences. The size of the window is configurable per context
+    type (e.g., 'immediate', 'observer') in `config.yaml`.
+    The target sentence is marked within the resulting context string.
 
     Attributes:
-        context_windows (dict): Dictionary containing the context window sizes for different analysis types.
-        embedder (SentenceTransformer): The model used for generating sentence embeddings.
+        context_windows (dict): Dictionary mapping context type keys (str) to
+                                window sizes (int), loaded from configuration.
     """
     def __init__(self):
+        """Initializes ContextBuilder by loading context window sizes from config."""
         # Load context window sizes from configuration.
         self.context_windows = config["preprocessing"]["context_windows"]
         # Initialize the SentenceTransformer model using the configured model name.
@@ -51,20 +51,21 @@ class ContextBuilder:
 
     def build_context(self, sentences: List[str], idx: int, window_size: int) -> str:
         """
-        Build textual context around a given sentence, marking the target sentence.
+        Builds a textual context string for a sentence at a specific index.
 
-        Extracts a window of sentences, includes the target sentence marked with
-        '>>> TARGET: ... <<<', and joins all sentences in the window with newlines.
+        Extracts sentences within the defined window (`idx - window_size` to
+        `idx + window_size`), marks the target sentence at `idx`, and joins the
+        extracted sentences with newline characters.
 
-        Parameters:
-            sentences (List[str]): The list of sentences to build context from.
-            idx (int): The index of the target sentence within the list.
-            window_size (int): Number of sentences before/after target to potentially include.
+        Args:
+            sentences (List[str]): The full list of sentences.
+            idx (int): The index of the target sentence in the list.
+            window_size (int): The number of sentences to include before and after
+                               the target sentence.
 
         Returns:
-            str: The constructed context string with newlines and marked target.
-                 Returns an empty string if the input sentences list is empty or idx is invalid,
-                 though primary validation should occur upstream.
+            str: The generated textual context string. Returns an empty string if
+                 the input `sentences` list is empty or `idx` is out of bounds.
         """
         if not sentences or idx < 0 or idx >= len(sentences):
             logger.warning(f"Attempted to build context with invalid input: len(sentences)={len(sentences)}, idx={idx}")
@@ -131,20 +132,21 @@ class ContextBuilder:
 
     def build_all_contexts(self, sentences: List[str]) -> Dict[int, Dict[str, str]]:
         """
-        Build all required textual contexts for each sentence.
+        Builds all configured textual contexts for every sentence in a list.
 
-        Iterates over all sentences, building a set of contexts for each based on
-        different analysis types defined in the config. Each context string now
-        includes the target sentence marked within its window and uses newlines.
+        Iterates through each sentence and, for each context type defined in
+        `self.context_windows` (loaded from config), calls `build_context`
+        to generate the appropriate context string.
 
-        Parameters:
-            sentences (List[str]): The list of sentences to build contexts for.
+        Args:
+            sentences (List[str]): The list of sentences for which to build contexts.
 
         Returns:
-            Dict[int, Dict[str, str]]: A dictionary where each key is a sentence index and each value
-                                       is a dictionary containing context strings for keys like:
-                                       "structure", "immediate", "observer", "broader", "overall".
-                                       Returns empty dict if input sentences list is empty.
+            Dict[int, Dict[str, str]]: A dictionary where keys are sentence indices (int)
+                and values are dictionaries. Each inner dictionary maps context type
+                keys (str, e.g., "immediate", "observer") to their corresponding
+                generated context strings (str).
+                Returns an empty dictionary if the input `sentences` list is empty.
         """
         if not sentences:
             logger.warning("build_all_contexts called with empty sentences list.")
@@ -165,5 +167,5 @@ class ContextBuilder:
         return contexts
 
 
-# Singleton instance for pipeline-wide use.
+# Create a singleton instance for application-wide use.
 context_builder = ContextBuilder()

@@ -20,8 +20,22 @@ def main():
     """
     Main function to execute the Enriched Sentence Analysis Pipeline.
 
-    Sets up argument parsing, resets and starts metrics tracking, runs the pipeline,
-    stops metrics tracking, and logs a summary of the execution metrics.
+    Parses command-line arguments for input/output directories (using defaults
+    from configuration if not provided). Resets and manages metrics tracking
+    (start/stop timer). Initiates the asynchronous `run_pipeline` function.
+    Logs a final summary of execution metrics upon completion or failure.
+
+    Command-line arguments override configuration defaults.
+
+    Args:
+        None (arguments are parsed from `sys.argv` via `argparse`).
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If argument parsing fails.
+        Exception: If `run_pipeline` encounters a critical, unhandled error.
     """
     # Create an argument parser to handle command-line arguments 
     parser = argparse.ArgumentParser(description="Enriched Sentence Analysis Pipeline")
