@@ -1,15 +1,20 @@
 """
 test_openai_api_responses.py
 
-This module contains unit tests for the OpenAI API responses, specifically testing
-the functionality of the 'responses.create' method in an asynchronous context.
-The tests verify that the API can be called correctly and that the response
-contains the expected attributes when properly formatted, and that errors are raised
-when the response is malformed.
+Contains tests focused on the OpenAI API's `responses.create` endpoint,
+particularly its handling of structured JSON responses.
+
+Includes:
+- An integration test (`test_responses_create_structured_json`) that makes a live
+  API call (requires `OPENAI_API_KEY`) to verify successful structured JSON retrieval.
+- A unit test (`test_responses_create_malformed_json`) that mocks the API response
+  to ensure correct error handling for malformed JSON.
 
 Usage Example:
     Run the tests using pytest:
-        pytest tests/test_openai_api_responses.py
+        pytest tests/integration/test_openai_api_responses.py
+
+Note: Running the integration test requires a valid OPENAI_API_KEY environment variable.
 """
 
 import os
@@ -27,13 +32,17 @@ client = AsyncOpenAI(api_key=API_KEY)
 
 def mock_response(content_dict):
     """
-    Return a mock Response object mimicking openai.responses.create.
+    Helper function to create a mock Response object mimicking `openai.responses.create`.
 
-    Parameters:
-        content_dict (dict): A dictionary representing the mock content.
+    Constructs a `MagicMock` object with the nested structure expected from the
+    OpenAI client's response (response -> output -> content -> text).
+
+    Args:
+        content_dict (dict): A dictionary to be JSON-serialized and set as the
+                             `text` attribute of the innermost mock content.
 
     Returns:
-        MagicMock: A mock response object with the expected nested structure.
+        MagicMock: A mock response object suitable for patching `client.responses.create`.
     """
     mock_resp = MagicMock()
     mock_output = MagicMock()
@@ -46,17 +55,23 @@ def mock_response(content_dict):
 @pytest.mark.asyncio
 async def test_responses_create_structured_json():
     """
-    Test the 'responses.create' method of the OpenAI API in an async context.
+    Integration test verifying a live call to `client.responses.create` for structured JSON.
 
-    This integration test verifies that the API call can be made and that the structured
-    JSON response contains the expected attributes.
+    Requires a valid `OPENAI_API_KEY` environment variable.
 
-    Instead of asserting an exact value for "capital", this test verifies:
-      - The response object has non-empty output.
-      - The output JSON can be parsed.
-      - The parsed JSON includes a "capital" key with a non-empty value.
-    
-    If any error occurs, the test fails.
+    Sends a prompt requesting a JSON response and asserts that:
+    - The response object contains output.
+    - The output contains content.
+    - The content text is valid JSON.
+    - The parsed JSON contains the expected keys (e.g., "capital") with non-empty string values.
+
+    Args:
+        None
+
+    Raises:
+        pytest.fail: If any exception occurs during the API call or assertions.
+                     (Indicates failure like API errors, network issues, invalid response structure, or failed assertions).
+        ValueError: If the OPENAI_API_KEY environment variable is not set.
     """
     try:
         response = await client.responses.create(
@@ -84,10 +99,17 @@ async def test_responses_create_structured_json():
 @pytest.mark.asyncio
 async def test_responses_create_malformed_json():
     """
-    Test the behavior of the API call when the response contains malformed JSON.
+    Unit test verifying error handling for malformed JSON responses.
 
-    This test patches the client's responses.create method to return a response with
-    invalid JSON content, verifying that json.loads raises a JSONDecodeError.
+    Patches `client.responses.create` to return a mock response containing
+    text that is not valid JSON. Asserts that attempting to parse this text
+    using `json.loads` correctly raises a `json.JSONDecodeError`.
+
+    Args:
+        None
+
+    Raises:
+        AssertionError: If `json.JSONDecodeError` is not raised when expected.
     """
     malformed_text = "This is not valid JSON"
     # Create a mock response with malformed JSON text.

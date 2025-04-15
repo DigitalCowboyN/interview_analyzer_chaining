@@ -1,20 +1,22 @@
 """
 test_context_builder.py
 
-This module contains unit tests for the ContextBuilder class, which is responsible for
-building both textual and embedding-based contexts for sentences. The tests cover:
-    - Building a context string with newline separators and a marked target sentence.
-    - Generating an embedding context vector (excluding the target).
-    - Building contexts for all sentences and verifying the structure.
-    - Edge cases: context at start/end of list, zero window size, empty input list.
+This module contains unit tests for the `ContextBuilder` class from 
+`src.agents.context_builder.py`, focusing on its textual context generation capabilities.
+
+The tests cover:
+    - Building textual context strings around a target sentence with varying window sizes.
+    - Correct handling of sentence boundaries (start/end of the list).
+    - Correct formatting, including newline separators and target sentence markers.
+    - Building contexts for all sentences and verifying the output structure.
+    - Edge cases like zero window size and empty input lists.
+
+Note: Tests related to `build_embedding_context` are currently commented out,
+      mirroring the status of the corresponding method in the source code.
 
 Usage:
     Run the tests using pytest:
         pytest tests/test_context_builder.py
-
-Modifications:
-    - If the context window configuration changes, update relevant tests if needed.
-    - If the target marker format changes, update test_build_context assertions.
 """
 
 import pytest
@@ -24,6 +26,12 @@ from src.config import config # To access configured embedding dimension
 
 @pytest.fixture
 def sentences():
+    """
+    Pytest fixture providing a sample list of sentences for testing.
+
+    Returns:
+        List[str]: A list of sample sentences.
+    """
     # Sample sentences for testing
     return [
         "Sentence 0.", # idx 0
@@ -35,12 +43,25 @@ def sentences():
 
 @pytest.fixture
 def builder():
+    """
+    Pytest fixture providing a `ContextBuilder` instance for testing.
+
+    Returns:
+        ContextBuilder: A new instance of the context builder.
+    """
     # Fixture to provide a ContextBuilder instance
     return ContextBuilder()
 
 def test_build_context_basic(builder, sentences):
     """
-    Test build_context with a window size of 1 around a middle sentence.
+    Test `build_context` with a window size of 1 around a middle sentence.
+
+    Verifies that the correct preceding and succeeding sentences are included,
+    separated by newlines, and the target sentence is correctly marked.
+
+    Args:
+        builder: Fixture providing a `ContextBuilder` instance.
+        sentences: Fixture providing the sample list of sentences.
     """
     context = builder.build_context(sentences, idx=2, window_size=1)
     # Use triple quotes for correct multiline string with actual newlines
@@ -51,7 +72,14 @@ Sentence 3."""
 
 def test_build_context_start(builder, sentences):
     """
-    Test build_context for the first sentence (index 0).
+    Test `build_context` correctly handles the first sentence (index 0).
+
+    Verifies that only the target sentence and the succeeding sentence (within the window)
+    are included, with the target correctly marked.
+
+    Args:
+        builder: Fixture providing a `ContextBuilder` instance.
+        sentences: Fixture providing the sample list of sentences.
     """
     context = builder.build_context(sentences, idx=0, window_size=1)
     # Use triple quotes
@@ -61,7 +89,14 @@ Sentence 1."""
 
 def test_build_context_end(builder, sentences):
     """
-    Test build_context for the last sentence (index 4).
+    Test `build_context` correctly handles the last sentence.
+
+    Verifies that only the target sentence and the preceding sentence (within the window)
+    are included, with the target correctly marked.
+
+    Args:
+        builder: Fixture providing a `ContextBuilder` instance.
+        sentences: Fixture providing the sample list of sentences.
     """
     context = builder.build_context(sentences, idx=4, window_size=1)
     # Use triple quotes
@@ -71,7 +106,13 @@ def test_build_context_end(builder, sentences):
 
 def test_build_context_zero_window(builder, sentences):
     """
-    Test build_context with window_size=0. Should only return the marked target.
+    Test `build_context` with window_size=0.
+
+    Verifies that only the marked target sentence is returned when the window size is zero.
+
+    Args:
+        builder: Fixture providing a `ContextBuilder` instance.
+        sentences: Fixture providing the sample list of sentences.
     """
     context = builder.build_context(sentences, idx=2, window_size=0)
     expected = ">>> TARGET: Sentence 2 is the target. <<<"
@@ -79,7 +120,14 @@ def test_build_context_zero_window(builder, sentences):
 
 def test_build_context_large_window(builder, sentences):
     """
-    Test build_context with a window size larger than the list boundaries.
+    Test `build_context` with a window size larger than list boundaries.
+
+    Verifies that the context includes all available sentences up to the list start/end
+    when the window size exceeds the number of available preceding/succeeding sentences.
+
+    Args:
+        builder: Fixture providing a `ContextBuilder` instance.
+        sentences: Fixture providing the sample list of sentences.
     """
     context = builder.build_context(sentences, idx=2, window_size=10)
     # Use triple quotes
@@ -91,12 +139,26 @@ Sentence 4."""
     assert context == expected
     
 def test_build_context_invalid_idx(builder, sentences):
-    """Test build_context with an invalid index."""
+    """
+    Test `build_context` returns an empty string for invalid indices.
+
+    Verifies that providing an index less than 0 or greater than/equal to the list length
+    results in an empty string return value.
+
+    Args:
+        builder: Fixture providing a `ContextBuilder` instance.
+        sentences: Fixture providing the sample list of sentences.
+    """
     assert builder.build_context(sentences, idx=-1, window_size=1) == ""
     assert builder.build_context(sentences, idx=len(sentences), window_size=1) == ""
 
 def test_build_context_empty_list(builder):
-    """Test build_context with an empty sentences list."""
+    """
+    Test `build_context` returns an empty string when given an empty list.
+
+    Args:
+        builder: Fixture providing a `ContextBuilder` instance.
+    """
     assert builder.build_context([], idx=0, window_size=1) == ""
 
 # --- Embedding Context Tests --- (Commented out as build_embedding_context is commented out)
@@ -174,8 +236,16 @@ def test_build_context_empty_list(builder):
 
 def test_build_all_contexts_structure(builder, sentences):
     """
-    Test the structure returned by build_all_contexts.
-    Checks number of entries and keys for each entry.
+    Test the structure and content returned by `build_all_contexts`.
+
+    Verifies that:
+    - The outer dictionary has keys corresponding to each sentence index.
+    - Each inner dictionary contains keys for all configured context window types.
+    - Each context string value is a string and contains the correct target marker.
+
+    Args:
+        builder: Fixture providing a `ContextBuilder` instance.
+        sentences: Fixture providing the sample list of sentences.
     """
     contexts = builder.build_all_contexts(sentences)
     assert len(contexts) == len(sentences)
@@ -195,7 +265,10 @@ def test_build_all_contexts_structure(builder, sentences):
 
 def test_build_all_contexts_empty_list(builder):
     """
-    Test build_all_contexts with an empty list. Expect empty dictionary.
+    Test `build_all_contexts` returns an empty dictionary for an empty input list.
+
+    Args:
+        builder: Fixture providing a `ContextBuilder` instance.
     """
     contexts = builder.build_all_contexts([])
     assert contexts == {}

@@ -1,7 +1,19 @@
 """
 tests/integration/test_pipeline_integration.py
 
-End-to-end tests for the main processing pipeline.
+Contains end-to-end integration tests for the main processing pipeline defined
+in `src.pipeline.run_pipeline`.
+
+These tests verify the overall pipeline flow, including:
+- Processing of text files from an input directory.
+- Creation of intermediate map files.
+- Creation of final analysis output files.
+- Handling of successful runs, partial failures (mocked API errors), and empty files.
+- Correct aggregation of results.
+
+External dependencies, specifically the OpenAI API calls made via
+`src.agents.agent.OpenAIAgent.call_model`, are mocked to ensure tests are
+repeatable and do not rely on external services.
 """
 
 import pytest
@@ -18,7 +30,19 @@ from src.config import config # Use the actual config
 
 @pytest.fixture(scope="function") # Use function scope for isolation
 def integration_dirs(tmp_path_factory):
-    """Creates temporary input, output, and map directories for integration tests."""
+    """
+    Pytest fixture to create temporary input, output, and map directories.
+
+    Uses pytest's `tmp_path_factory` to create session-scoped temporary
+    directories, ensuring test isolation.
+
+    Args:
+        tmp_path_factory: Pytest fixture for creating temporary directories.
+
+    Returns:
+        tuple[Path, Path, Path]: A tuple containing the paths to the created
+                                 input, output, and map directories.
+    """
     base_dir = tmp_path_factory.mktemp("pipeline_integration")
     input_dir = base_dir / "input"
     output_dir = base_dir / "output"
@@ -30,7 +54,20 @@ def integration_dirs(tmp_path_factory):
 
 @pytest.fixture(scope="function")
 def setup_input_files(integration_dirs):
-    """Creates sample input files in the temporary input directory."""
+    """
+    Pytest fixture to create sample input files in the temporary input directory.
+
+    Sets up different scenarios (e.g., a file with content, an empty file)
+    for testing various pipeline behaviors.
+
+    Args:
+        integration_dirs (tuple): The tuple returned by the `integration_dirs` fixture,
+                                containing paths to input, output, and map directories.
+
+    Returns:
+        dict[str, Path]: A dictionary mapping logical file names (e.g., "file1", "empty")
+                         to their actual Path objects in the temporary input directory.
+    """
     input_dir, _, _ = integration_dirs
     
     # File with content
@@ -48,6 +85,18 @@ def setup_input_files(integration_dirs):
 
 # --- Helper to load JSON Lines file ---
 def load_jsonl(file_path: Path) -> list:
+    """
+    Load data from a JSON Lines (.jsonl) file.
+
+    Reads a file line by line, parsing each valid line as a JSON object.
+
+    Args:
+        file_path (Path): The path to the .jsonl file.
+
+    Returns:
+        list: A list of dictionaries, where each dictionary is loaded from a line
+              in the file. Returns an empty list if the file does not exist or is empty.
+    """
     if not file_path.exists():
         return []
     lines = []
@@ -59,6 +108,21 @@ def load_jsonl(file_path: Path) -> list:
 
 # --- Mock Analysis Data ---
 def generate_mock_analysis(sentence_id, sequence_order, sentence):
+    """
+    Generate a simple, consistent mock analysis result dictionary.
+
+    Used in tests to provide predictable return values when mocking the actual
+    sentence analysis process.
+
+    Args:
+        sentence_id (int): The ID of the sentence.
+        sequence_order (int): The original sequence order of the sentence.
+        sentence (str): The text of the sentence.
+
+    Returns:
+        dict: A dictionary representing a mock analysis result, including the input
+              IDs/text and placeholder values for analysis fields.
+    """
     # Simple mock analysis result
     return {
         "sentence_id": sentence_id,
@@ -78,7 +142,17 @@ def generate_mock_analysis(sentence_id, sequence_order, sentence):
 @pytest.mark.asyncio
 @pytest.mark.integration # Optional marker
 async def test_pipeline_integration_success(integration_dirs, setup_input_files):
-    """Test the full pipeline successfully processing a file."""
+    """
+    Test the full pipeline successfully processing a file with content.
+
+    Verifies that `run_pipeline` correctly processes a sample text file, creates
+    the expected map and analysis files with the correct content, and that the
+    mocked API call function was invoked.
+
+    Args:
+        integration_dirs: Fixture providing temporary directories.
+        setup_input_files: Fixture providing sample input files.
+    """
     input_dir, output_dir, map_dir = integration_dirs
     input_files = setup_input_files
     target_file = input_files["file1"]
@@ -145,7 +219,19 @@ async def test_pipeline_integration_success(integration_dirs, setup_input_files)
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_pipeline_integration_partial_failure(integration_dirs, setup_input_files):
-    """Test pipeline run where one sentence analysis fails."""
+    """
+    Test the pipeline handling a failure during the analysis of one sentence.
+
+    Mocks the API call to raise an exception for one of the sentences in the input file.
+    Verifies that:
+    - The map file is still created correctly for all sentences.
+    - The analysis file contains results only for the successfully processed sentences.
+    - An error message is logged for the failed sentence analysis.
+
+    Args:
+        integration_dirs: Fixture providing temporary directories.
+        setup_input_files: Fixture providing sample input files.
+    """
     input_dir, output_dir, map_dir = integration_dirs
     input_files = setup_input_files
     target_file = input_files["file1"]
@@ -197,7 +283,17 @@ async def test_pipeline_integration_partial_failure(integration_dirs, setup_inpu
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_pipeline_integration_empty_file(integration_dirs, setup_input_files):
-    """Test the pipeline successfully processing an empty file."""
+    """
+    Test the pipeline correctly handling an empty input file.
+
+    Verifies that `run_pipeline` processes an empty .txt file without errors,
+    creates empty (but existing) map and analysis files, and logs an appropriate
+    warning message.
+
+    Args:
+        integration_dirs: Fixture providing temporary directories.
+        setup_input_files: Fixture providing sample input files.
+    """
     input_dir, output_dir, map_dir = integration_dirs
     input_files = setup_input_files
     target_file = input_files["empty"]

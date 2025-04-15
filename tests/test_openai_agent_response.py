@@ -1,9 +1,15 @@
 """
 test_openai_agent_response.py
 
-This module contains unit tests for the OpenAIAgent class, specifically testing
-the structure of the response returned by the OpenAI API. The tests ensure that
-the response adheres to the expected format and contains the necessary attributes.
+This module contains basic unit tests for the `OpenAIAgent.call_model` method,
+specifically verifying the structure and basic content of the dictionary returned
+when processing a mocked successful API response.
+
+These tests utilize mocking (`unittest.mock.patch`) to simulate responses
+from the `agent.client.responses.create` method.
+
+Note: More comprehensive tests for `OpenAIAgent`, including error handling and
+      retry logic, can be found in `tests/test_agent.py`.
 
 Usage Example:
     Run the tests using pytest:
@@ -19,17 +25,19 @@ pytestmark = pytest.mark.asyncio
 
 def mock_response(content_dict):
     """
-    Return a mock Response object mimicking openai.responses.create.
+    Helper function to create a mock Response object mimicking `openai.responses.create`.
 
     This function creates a mock response object that simulates the structure
     of the response returned by the OpenAI API, allowing for controlled testing
     of the OpenAIAgent's behavior.
 
-    Parameters:
-        content_dict (dict): A dictionary representing the content of the mock response.
+    Args:
+        content_dict (dict): A dictionary representing the content of the mock response,
+                             which will be JSON-serialized.
 
     Returns:
-        MagicMock: A mock response object with the specified content.
+        MagicMock: A mock response object with the specified content, suitable for patching
+                   `client.responses.create`.
     """
     mock_resp = MagicMock()
     mock_output = MagicMock()
@@ -41,14 +49,21 @@ def mock_response(content_dict):
 
 async def test_openai_response_structure():
     """
-    Test the structure of the response returned by the OpenAIAgent's call_model method.
+    Test `call_model` returns a dict with expected keys from a mocked response.
 
-    This test verifies that the response (a dictionary) contains the expected attributes,
-    such as "topic_level_1", and that its value matches the expected test value.
+    Mocks `agent.client.responses.create` to return a predefined successful
+    response. Calls `agent.call_model` and verifies that the result is a dictionary
+    containing at least one expected key (`topic_level_1`) with the correct value.
 
-    Asserts:
-        - The response is a dictionary.
-        - The "topic_level_1" attribute in the response matches the expected value.
+    Args:
+        None (implicitly uses `OpenAIAgent` initialized within the test).
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the response is not a dict or the expected key/value
+                      is missing or incorrect.
     """
     agent = OpenAIAgent()
     prompt = "What is the capital of France?"

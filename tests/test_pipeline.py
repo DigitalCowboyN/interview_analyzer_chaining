@@ -39,15 +39,19 @@ from src.pipeline import segment_text, run_pipeline, create_conversation_map, pr
 
 def test_segment_text():
     """
-    Test the sentence segmentation functionality.
+    Test `segment_text` basic sentence segmentation.
     
-    This test verifies that the segment_text function correctly segments a given text 
-    into individual sentences using spaCy. It checks both the number of sentences and 
-    the content of each sentence.
-    
-    Asserts:
-        - The returned list has the expected number of sentences.
-        - Each sentence in the list matches the expected text.
+    Verifies that `segment_text` correctly splits a sample text into sentences
+    using the default spaCy model.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the number of sentences or their content is incorrect.
     """
     test_text = "Hello world. How are you today? This pipeline is running well!"
     sentences = segment_text(test_text)
@@ -58,13 +62,18 @@ def test_segment_text():
 
 def test_segment_text_empty():
     """
-    Test the segmentation of an empty string.
+    Test `segment_text` with an empty input string.
     
-    This test checks that segment_text returns an empty list when given an empty string.
-    Depending on desired behavior, this could be modified to raise a ValueError instead.
-    
-    Asserts:
-        - An empty list is returned for empty input.
+    Verifies that `segment_text` returns an empty list when the input is empty.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the result is not an empty list.
     """
     sentences = segment_text("")
     assert sentences == []
@@ -72,13 +81,15 @@ def test_segment_text_empty():
 @pytest.fixture
 def sample_text_file(tmp_path):
     """
-    Fixture to create a temporary sample text file.
+    Pytest fixture to create a temporary sample text file for testing.
     
-    This fixture writes a small text with two sentences to a temporary file and returns 
-    the file path. This file is used for testing the process_file function.
+    Writes a simple two-sentence text to a file within the pytest temporary directory.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
     
     Returns:
-        Path: The path to the created sample text file.
+        Path: The path object pointing to the created sample text file.
     """
     file_content = "First sentence. Second sentence."
     test_file = tmp_path / "test_input.txt"
@@ -88,10 +99,12 @@ def sample_text_file(tmp_path):
 @pytest.fixture
 def mock_config():
     """
-    Fixture to provide mock configuration values.
+    Pytest fixture providing a mock configuration dictionary for tests.
     
+    Includes necessary path and pipeline settings used by the functions under test.
+
     Returns:
-        dict: Mock configuration values.
+        dict: A dictionary containing mock configuration values.
     """
     return {
         "paths": {
@@ -109,14 +122,22 @@ def mock_config():
 @pytest.mark.asyncio
 async def test_create_conversation_map(tmp_path, mock_config):
     """
-    Test creating a conversation map file.
+    Test `create_conversation_map` successful execution.
     
-    This test verifies that the create_conversation_map function correctly creates a map file
-    listing sentences with sequence order.
-    
-    Asserts:
-        - The map file is created.
-        - The map file contains the correct sentences.
+    Verifies that the function correctly reads an input file, segments it (mocked),
+    creates the specified map directory and file, writes the correct JSON Lines data
+    to the map file, and returns the correct sentence count and list.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If file/directory creation fails, content is incorrect,
+                      or return values are wrong.
     """
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -153,13 +174,21 @@ async def test_create_conversation_map(tmp_path, mock_config):
 @pytest.mark.asyncio
 async def test_create_conversation_map_empty_file(tmp_path, mock_config):
     """
-    Test create_conversation_map with an empty input file.
+    Test `create_conversation_map` with an empty input file.
     
-    This test verifies that the create_conversation_map function correctly handles an empty input file.
+    Verifies that the function handles an empty input file gracefully by creating
+    an empty map file and returning a sentence count of 0 and an empty list.
     
-    Asserts:
-        - The map file is created.
-        - The map file is empty.
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the map file is not created, not empty, or if return
+                      values are incorrect.
     """
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -185,6 +214,19 @@ async def test_create_conversation_map_empty_file(tmp_path, mock_config):
 
 # Mock Analysis Result Structure (add sentence_id, sequence_order)
 def create_mock_analysis(sentence_id, sequence_order, sentence_text):
+    """
+    Helper function to generate a consistent mock analysis result dictionary.
+
+    Used within pipeline tests to simulate the output of `SentenceAnalyzer`.
+
+    Args:
+        sentence_id (int): The ID of the sentence.
+        sequence_order (int): The sequence order of the sentence.
+        sentence_text (str): The text content of the sentence.
+
+    Returns:
+        dict: A dictionary containing mock analysis fields.
+    """
     return {
         "sentence_id": sentence_id,
         "sequence_order": sequence_order,
@@ -197,7 +239,30 @@ def create_mock_analysis(sentence_id, sequence_order, sentence_text):
 @pytest.mark.asyncio
 async def test_process_file_success(sample_text_file, tmp_path, mock_config):
     """ 
-    Test successful processing, including verifying correct context passing.
+    Test `process_file` successful execution with mocked dependencies.
+
+    Verifies the main success path of `process_file`, ensuring:
+    - Map creation is called correctly.
+    - Contexts are built for the sentences.
+    - Tasks are loaded based on the map.
+    - Sentence analysis (mocked) is performed for each sentence with correct context.
+    - Results are written to the output file.
+    - Queues are managed, and workers/writer are shut down correctly.
+
+    Uses extensive mocking for `create_conversation_map`, `SentenceAnalyzer`,
+    `context_builder`, `_load_tasks`, and `append_json_line`.
+
+    Args:
+        sample_text_file: Fixture providing a path to a sample input file.
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If mocks are not called as expected, output file content
+                      is incorrect, or context passing is wrong.
     """ 
     from src.pipeline import process_file
 
@@ -297,9 +362,29 @@ async def test_process_file_success(sample_text_file, tmp_path, mock_config):
 
 @pytest.mark.asyncio
 async def test_process_file_analyzer_error(sample_text_file, tmp_path, mock_config):
-    """ Test process_file when SentenceAnalyzer raises an error for one sentence. """
-    from src.pipeline import process_file # Assuming import
+    """
+    Test `process_file` handling an error during sentence analysis.
 
+    Mocks `SentenceAnalyzer.classify_sentence` to raise an exception for one sentence.
+    Verifies that:
+    - The pipeline continues processing other sentences.
+    - The error is logged (via mocked logger).
+    - The final output file contains results only for successfully analyzed sentences.
+    - Metrics tracker correctly counts the error.
+
+    Args:
+        sample_text_file: Fixture providing a path to a sample input file.
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the output file contains the failed result, the error
+                      is not logged, or metrics are not updated.
+    """
+    from src.pipeline import process_file
     output_dir = tmp_path / mock_config["paths"]["output_dir"]
     map_dir = tmp_path / mock_config["paths"]["map_dir"]
     expected_analysis_file = output_dir / f"{sample_text_file.stem}{mock_config['paths']['analysis_suffix']}"
@@ -358,9 +443,28 @@ async def test_process_file_analyzer_error(sample_text_file, tmp_path, mock_conf
 
 @pytest.mark.asyncio
 async def test_process_file_writer_error(sample_text_file, tmp_path, mock_config):
-    """ Test process_file when append_json_line fails during writing. """
-    from src.pipeline import process_file # Assuming import
+    """
+    Test `process_file` handling an error during result writing.
 
+    Mocks `append_json_line` to raise an exception when writing one of the results.
+    Verifies that:
+    - The pipeline attempts to write all results.
+    - The error during writing is logged (via mocked logger).
+    - Metrics tracker correctly counts the error.
+    - The output file may contain results written before the error occurred.
+
+    Args:
+        sample_text_file: Fixture providing a path to a sample input file.
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the write error is not logged or metrics not updated.
+    """
+    from src.pipeline import process_file
     output_dir = tmp_path / mock_config["paths"]["output_dir"]
     map_dir = tmp_path / mock_config["paths"]["map_dir"]
 
@@ -415,9 +519,29 @@ async def test_process_file_writer_error(sample_text_file, tmp_path, mock_config
 
 @pytest.mark.asyncio
 async def test_process_file_map_read_error(sample_text_file, tmp_path, mock_config):
-    """ Test process_file when reading the map file fails in the loader. """
-    from src.pipeline import process_file # Assuming import
+    """
+    Test `process_file` handling an error during map file reading/task loading.
 
+    Mocks `_load_tasks` (or simulates an error during map file access within it)
+    to raise an exception (e.g., FileNotFoundError or JSONDecodeError).
+    Verifies that:
+    - The error during task loading is logged.
+    - Metrics tracker correctly counts the error.
+    - The pipeline stops processing for this file, and no analysis results are written.
+
+    Args:
+        sample_text_file: Fixture providing a path to a sample input file.
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the loading error is not logged, metrics not updated, or if
+                      analysis results are unexpectedly written.
+    """
+    from src.pipeline import process_file
     output_dir = tmp_path / mock_config["paths"]["output_dir"]
     map_dir = tmp_path / mock_config["paths"]["map_dir"]
     
@@ -470,15 +594,36 @@ async def test_process_file_map_read_error(sample_text_file, tmp_path, mock_conf
 
 @pytest.mark.asyncio
 async def test_process_file_zero_workers(sample_text_file, tmp_path, mock_config):
-    """ Test process_file when configured with zero workers. """
-    from src.pipeline import process_file # Assuming import
+    """
+    Test `process_file` handling configuration with zero analysis workers.
+
+    Modifies the mock config to set `num_analysis_workers` to 0.
+    Verifies that:
+    - An error is logged indicating zero workers is invalid.
+    - Metrics tracker counts the error.
+    - No analysis is attempted, and the output file remains empty.
+    - `create_conversation_map` might still be called initially.
+
+    Args:
+        sample_text_file: Fixture providing a path to a sample input file.
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration (modified in test).
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the zero worker error is not logged, metrics not updated,
+                      or if analysis/writing is unexpectedly performed.
+    """
+    from src.pipeline import process_file
+    output_dir = tmp_path / mock_config["paths"]["output_dir"]
 
     # Create a deep copy of the config for this test to avoid side effects
     test_specific_config = copy.deepcopy(mock_config)
     # Override worker count in the copied config
     test_specific_config["pipeline"]["num_analysis_workers"] = 0
 
-    output_dir = tmp_path / test_specific_config["paths"]["output_dir"]
     map_dir = tmp_path / test_specific_config["paths"]["map_dir"]
     
     mock_sentences_list = ["First sentence.", "Second sentence."]
@@ -519,12 +664,23 @@ async def test_process_file_zero_workers(sample_text_file, tmp_path, mock_config
 @pytest.mark.asyncio
 async def test_run_pipeline_no_files(tmp_path, mock_config):
     """
-    Test run_pipeline with no input files (should behave similarly).
-    
-    This test verifies that the run_pipeline function correctly handles the case where there are no input files.
-    
-    Asserts:
-        - A warning is logged indicating no input files were found.
+    Test `run_pipeline` when the input directory contains no .txt files.
+
+    Sets up an empty input directory and calls `run_pipeline`.
+    Verifies that:
+    - A warning is logged about no files being found.
+    - No processing functions (like `process_file`) are called.
+    - The output/map directories might be created but remain empty.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the warning is not logged or if processing is attempted.
     """
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -543,12 +699,23 @@ async def test_run_pipeline_no_files(tmp_path, mock_config):
 @pytest.mark.asyncio
 async def test_run_pipeline_multiple_files(tmp_path, mock_config):
     """
-    Test run_pipeline processes multiple files using the refactored process_file.
-    
-    This test verifies that the run_pipeline function correctly processes multiple files using the refactored process_file.
-    
-    Asserts:
-        - process_file is called the expected number of times (once for each text file).
+    Test `run_pipeline` processing multiple files successfully.
+
+    Sets up an input directory with multiple .txt files (including one empty).
+    Mocks `process_file` to track calls.
+    Verifies that:
+    - `process_file` is called once for each .txt file found.
+    - The overall pipeline metrics (timer) are managed.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If `process_file` is not called the correct number of times.
     """
     input_dir = tmp_path / "input"
     input_dir.mkdir()

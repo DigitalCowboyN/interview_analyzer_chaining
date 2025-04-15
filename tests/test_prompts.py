@@ -22,17 +22,19 @@ pytestmark = pytest.mark.asyncio
 
 def mock_response(content_dict):
     """
-    Return a mock Response object mimicking openai.responses.create.
+    Helper function to create a mock Response object mimicking `openai.responses.create`.
 
     This function creates a mock response object that simulates the structure
     of the response returned by the OpenAI API, allowing for controlled testing
     of the OpenAIAgent's behavior.
 
-    Parameters:
-        content_dict (dict): A dictionary representing the content of the mock response.
+    Args:
+        content_dict (dict): A dictionary representing the content of the mock response,
+                             which will be JSON-serialized.
 
     Returns:
-        MagicMock: A mock response object with the specified content.
+        MagicMock: A mock response object with the specified content, suitable for patching
+                   `client.responses.create`.
     """
     from unittest.mock import MagicMock
     mock_resp = MagicMock()
@@ -46,13 +48,17 @@ def mock_response(content_dict):
 @pytest.fixture
 def load_prompts():
     """
-    Fixture to load prompts from YAML files.
+    Pytest fixture to load prompts from standard YAML file locations.
 
-    This fixture reads the domain and task prompts from their respective YAML files
-    and returns them as dictionaries for use in the tests.
+    Reads `prompts/domain_prompts.yaml` and `prompts/task_prompts.yaml`.
 
     Returns:
-        tuple: A tuple containing the domain prompts and task prompts as dictionaries.
+        tuple[dict, dict]: A tuple containing the loaded domain prompts dictionary
+                           and the loaded task prompts dictionary.
+
+    Raises:
+        FileNotFoundError: If either prompt YAML file cannot be found.
+        yaml.YAMLError: If the content of either file is not valid YAML.
     """
     with open("prompts/domain_prompts.yaml") as f:
         domain_prompts = yaml.safe_load(f)
@@ -63,19 +69,28 @@ def load_prompts():
 @patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock)
 async def test_prompt_attributes(mock_call_model, load_prompts):
     """
-    Test the attributes of the prompts loaded from YAML files.
+    Test formatting and basic usage structure of loaded YAML prompts.
 
-    This test verifies that the task prompts are correctly formatted and that when
-    formatted with dummy values, the agent's call_model (simulated here) returns a response
-    with the expected key. Similarly, it tests that for each domain-specific keyword from the
-    domain prompts, the agent returns the expected domain_keywords.
+    Iterates through task prompts loaded by the `load_prompts` fixture,
+    formats each with dummy data, and mocks `agent.call_model` to return a simple
+    dictionary containing the expected output key for that prompt.
+    Asserts that the mocked call returns the expected dictionary structure.
+    Also performs a similar check for domain keywords.
 
-    Parameters:
-        load_prompts: A fixture providing the loaded domain and task prompts.
+    Note: This test verifies prompt loading and formatting, not LLM comprehension.
 
-    Asserts:
-        - For each task prompt, when formatted with dummy values, the fake response contains the expected key/value.
-        - For each domain keyword, a prompt can be sent and the response returns that keyword.
+    Args:
+        mock_call_model: Mock object for `agent.call_model`.
+        load_prompts: Fixture providing the loaded domain and task prompts.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the mocked `call_model` response does not contain the
+                      expected key or value for any tested prompt.
+        KeyError: If prompt keys in the YAML don't match expected keys in the test.
+        TypeError: If prompt formatting fails due to incorrect placeholders.
     """
     domain_prompts, task_prompts = load_prompts
     agent = OpenAIAgent()

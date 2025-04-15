@@ -1,3 +1,15 @@
+"""
+test_logging.py
+
+This module contains tests focused on verifying the logging output generated
+by other parts of the application, specifically the retry mechanism within
+the `OpenAIAgent`.
+
+It utilizes a custom Loguru sink fixture (`log_sink`) to capture log records
+during test execution and assert that expected messages (e.g., retry warnings)
+are logged under specific conditions (e.g., simulated API errors).
+"""
+
 # tests/utils/test_logging.py
 
 import pytest
@@ -11,7 +23,17 @@ pytestmark = pytest.mark.asyncio
 
 def mock_response(content_dict):
     """
-    Return a mock Response object mimicking openai.responses.create.
+    Helper function to create a mock Response object mimicking `openai.responses.create`.
+
+    Constructs a `MagicMock` object with the nested structure expected from the
+    OpenAI client's response (response -> output -> content -> text).
+
+    Args:
+        content_dict (dict): A dictionary to be JSON-serialized and set as the
+                             `text` attribute of the innermost mock content.
+
+    Returns:
+        MagicMock: A mock response object suitable for patching `client.responses.create`.
     """
     mock_resp = MagicMock()
     mock_output = MagicMock()
@@ -52,14 +74,21 @@ def log_sink():
 
 async def test_retry_log_message(agent, log_sink):
     """
-    Test that the retry logic logs a warning message when an API error occurs.
+    Test that the agent's retry logic logs a specific message upon API error.
 
-    This test simulates a RateLimitError on the first API call, followed by a successful response.
-    It uses a custom Loguru sink to capture log messages and asserts that one of the messages
-    contains the substring "Retrying after".
-    
-    Asserts:
-        - At least one captured log message contains "Retrying after".
+    Mocks the underlying API call (`client.responses.create`) to first raise a
+    `RateLimitError` and then return a successful mock response. Uses the `log_sink`
+    fixture to capture log output during the `agent.call_model` execution.
+
+    Asserts that at least one of the captured log messages contains the expected
+    "Retrying after" substring, confirming the retry mechanism logged correctly.
+
+    Args:
+        agent: Fixture providing an `OpenAIAgent` instance.
+        log_sink: Fixture providing a list to capture log messages.
+
+    Raises:
+        AssertionError: If the expected retry log message is not found.
     """
     response_content = {
         "function_type": "declarative",

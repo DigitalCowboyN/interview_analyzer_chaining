@@ -1,9 +1,12 @@
 """
 test_api_calls.py
 
-This module contains integration tests for the OpenAIAgent class, specifically testing
-the API call functionality. The tests ensure that the response from the OpenAI API (simulated
-via a mock) adheres to the expected structure and contains the necessary attributes.
+This module contains unit tests for the `OpenAIAgent.call_model` method,
+focusing on its ability to process and parse responses from the OpenAI API client.
+
+These tests utilize mocking (`unittest.mock.patch`) to simulate responses
+from the `agent.client.responses.create` method, thereby isolating the
+`call_model` logic without making actual external API calls.
 
 Usage Example:
     Run the tests using pytest:
@@ -18,7 +21,19 @@ from src.agents.agent import OpenAIAgent
 pytestmark = pytest.mark.asyncio
 
 def mock_response(content_dict):
-    """Return a mock Response object mimicking openai.responses.create."""
+    """
+    Helper function to create a mock Response object mimicking `openai.responses.create`.
+
+    Constructs a `MagicMock` object with the nested structure expected from the
+    OpenAI client's response (response -> output -> content -> text).
+
+    Args:
+        content_dict (dict): A dictionary to be JSON-serialized and set as the
+                             `text` attribute of the innermost mock content.
+
+    Returns:
+        MagicMock: A mock response object suitable for patching `client.responses.create`.
+    """
     mock_resp = MagicMock()
     mock_output = MagicMock()
     mock_content = MagicMock()
@@ -28,6 +43,24 @@ def mock_response(content_dict):
     return mock_resp
 
 async def test_openai_integration():
+    """
+    Unit test for `OpenAIAgent.call_model` handling a successful mocked response.
+
+    Instantiates `OpenAIAgent`, patches the underlying `client.responses.create`
+    method to return a predefined mock response, and calls `agent.call_model`.
+
+    Asserts that the dictionary returned by `call_model` contains the expected
+    structure and values extracted from the mocked response content.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the response dictionary does not match the expected content.
+    """
     agent = OpenAIAgent()
     response_content = {
         "function_type": "declarative",
