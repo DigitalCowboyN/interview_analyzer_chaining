@@ -99,63 +99,76 @@ def test_build_context_empty_list(builder):
     """Test build_context with an empty sentences list."""
     assert builder.build_context([], idx=0, window_size=1) == ""
 
-# --- Embedding Context Tests ---
-
-def test_build_embedding_context_basic(builder, sentences):
-    """
-    Test embedding context generation, ensuring target is excluded.
-    Window size 1 around idx 2 -> uses sentences 1 and 3 for embedding.
-    """
-    embedding_context = builder.build_embedding_context(sentences, idx=2, window_size=1)
-    expected_dim = builder.embedder.get_sentence_embedding_dimension()
-    assert isinstance(embedding_context, np.ndarray)
-    assert embedding_context.shape == (expected_dim,)
-    # Check it's not zero vector (assuming sents 1 & 3 have non-zero avg embedding)
-    assert np.any(embedding_context != 0)
-
-def test_build_embedding_context_zero_window(builder, sentences):
-    """
-    Test embedding context with window_size=0. No surrounding sentences, expect zero vector.
-    """
-    embedding_context = builder.build_embedding_context(sentences, idx=2, window_size=0)
-    expected_dim = builder.embedder.get_sentence_embedding_dimension()
-    assert isinstance(embedding_context, np.ndarray)
-    assert embedding_context.shape == (expected_dim,)
-    assert np.all(embedding_context == 0) # Should be zero vector
-
-def test_build_embedding_context_start(builder, sentences):
-    """
-    Test embedding context at start. window=1, idx=0 -> uses sentence 1 only.
-    """
-    embedding_context = builder.build_embedding_context(sentences, idx=0, window_size=1)
-    expected_dim = builder.embedder.get_sentence_embedding_dimension()
-    assert isinstance(embedding_context, np.ndarray)
-    assert embedding_context.shape == (expected_dim,)
-    assert np.any(embedding_context != 0) 
-
-def test_build_embedding_context_end(builder, sentences):
-    """
-    Test embedding context at end. window=1, idx=4 -> uses sentence 3 only.
-    """
-    embedding_context = builder.build_embedding_context(sentences, idx=4, window_size=1)
-    expected_dim = builder.embedder.get_sentence_embedding_dimension()
-    assert isinstance(embedding_context, np.ndarray)
-    assert embedding_context.shape == (expected_dim,)
-    assert np.any(embedding_context != 0)
-
-def test_build_embedding_context_empty_list(builder):
-    """Test embedding context with empty list."""
-    embedding_context = builder.build_embedding_context([], idx=0, window_size=1)
-    expected_dim = builder.embedder.get_sentence_embedding_dimension()
-    assert np.all(embedding_context == 0)
-    assert embedding_context.shape == (expected_dim,)
-
-def test_build_embedding_context_invalid_idx(builder, sentences):
-    """Test embedding context with invalid index."""
-    embedding_context = builder.build_embedding_context(sentences, idx=-1, window_size=1)
-    expected_dim = builder.embedder.get_sentence_embedding_dimension()
-    assert np.all(embedding_context == 0)
-    assert embedding_context.shape == (expected_dim,)
+# --- Embedding Context Tests --- (Commented out as build_embedding_context is commented out)
+# def test_build_embedding_context_basic(builder, sentences):
+#     """
+#     Test embedding context generation, ensuring target is excluded.
+#     Window size 1 around idx 2 -> uses sentences 1 and 3 for embedding.
+#     """
+#     # Temporarily un-comment the embedder init in ContextBuilder for this test if needed,
+#     # or mock the embedder object if testing ContextBuilder logic independently
+#     if not hasattr(builder, 'embedder'):
+#         pytest.skip("Skipping embedding test as embedder is commented out in ContextBuilder")
+#     embedding_context = builder.build_embedding_context(sentences, idx=2, window_size=1)
+#     expected_dim = builder.embedder.get_sentence_embedding_dimension()
+#     assert isinstance(embedding_context, np.ndarray)
+#     assert embedding_context.shape == (expected_dim,)
+#     # Check it's not zero vector (assuming sents 1 & 3 have non-zero avg embedding)
+#     assert np.any(embedding_context != 0)
+#
+# def test_build_embedding_context_zero_window(builder, sentences):
+#     """
+#     Test embedding context with window_size=0. No surrounding sentences, expect zero vector.
+#     """
+#     if not hasattr(builder, 'embedder'):
+#          pytest.skip("Skipping embedding test as embedder is commented out in ContextBuilder")
+#     embedding_context = builder.build_embedding_context(sentences, idx=2, window_size=0)
+#     expected_dim = builder.embedder.get_sentence_embedding_dimension()
+#     assert isinstance(embedding_context, np.ndarray)
+#     assert embedding_context.shape == (expected_dim,)
+#     assert np.all(embedding_context == 0) # Should be zero vector
+#
+# def test_build_embedding_context_start(builder, sentences):
+#     """
+#     Test embedding context at start. window=1, idx=0 -> uses sentence 1 only.
+#     """
+#     if not hasattr(builder, 'embedder'):
+#          pytest.skip("Skipping embedding test as embedder is commented out in ContextBuilder")
+#     embedding_context = builder.build_embedding_context(sentences, idx=0, window_size=1)
+#     expected_dim = builder.embedder.get_sentence_embedding_dimension()
+#     assert isinstance(embedding_context, np.ndarray)
+#     assert embedding_context.shape == (expected_dim,)
+#     assert np.any(embedding_context != 0) 
+#
+# def test_build_embedding_context_end(builder, sentences):
+#     """
+#     Test embedding context at end. window=1, idx=4 -> uses sentence 3 only.
+#     """
+#     if not hasattr(builder, 'embedder'):
+#          pytest.skip("Skipping embedding test as embedder is commented out in ContextBuilder")
+#     embedding_context = builder.build_embedding_context(sentences, idx=4, window_size=1)
+#     expected_dim = builder.embedder.get_sentence_embedding_dimension()
+#     assert isinstance(embedding_context, np.ndarray)
+#     assert embedding_context.shape == (expected_dim,)
+#     assert np.any(embedding_context != 0)
+#
+# def test_build_embedding_context_empty_list(builder):
+#     """Test embedding context with empty list."""
+#     if not hasattr(builder, 'embedder'):
+#          pytest.skip("Skipping embedding test as embedder is commented out in ContextBuilder")
+#     embedding_context = builder.build_embedding_context([], idx=0, window_size=1)
+#     expected_dim = builder.embedder.get_sentence_embedding_dimension()
+#     assert np.all(embedding_context == 0)
+#     assert embedding_context.shape == (expected_dim,)
+#
+# def test_build_embedding_context_invalid_idx(builder, sentences):
+#     """Test embedding context with invalid index."""
+#     if not hasattr(builder, 'embedder'):
+#          pytest.skip("Skipping embedding test as embedder is commented out in ContextBuilder")
+#     embedding_context = builder.build_embedding_context(sentences, idx=-1, window_size=1)
+#     expected_dim = builder.embedder.get_sentence_embedding_dimension()
+#     assert np.all(embedding_context == 0)
+#     assert embedding_context.shape == (expected_dim,)
 
 # --- build_all_contexts Tests ---
 

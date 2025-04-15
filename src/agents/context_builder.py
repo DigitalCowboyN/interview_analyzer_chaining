@@ -45,8 +45,9 @@ class ContextBuilder:
         # Load context window sizes from configuration.
         self.context_windows = config["preprocessing"]["context_windows"]
         # Initialize the SentenceTransformer model using the configured model name.
-        self.embedder = SentenceTransformer(config["embedding"]["model_name"])
-        logger.info(f"ContextBuilder initialized with embedding model: {config['embedding']['model_name']}")
+        # self.embedder = SentenceTransformer(config["embedding"]["model_name"]) # Commented out unused embedder
+        # logger.info(f"ContextBuilder initialized with embedding model: {config['embedding']['model_name']}") # Commented out related log
+        logger.info("ContextBuilder initialized.") # Adjusted log message
 
     def build_context(self, sentences: List[str], idx: int, window_size: int) -> str:
         """
@@ -87,45 +88,46 @@ class ContextBuilder:
         logger.debug(f"Built context for sentence {idx} with marked target.")
         return context
 
-    def build_embedding_context(self, sentences: List[str], idx: int, window_size: int) -> np.array:
-        """
-        Generate an embedding-based context vector (excluding the target sentence).
-
-        Computes the average embedding vector of the context sentences surrounding the target.
-        Returns a zero vector if no context sentences are available.
-
-        Parameters:
-            sentences (List[str]): The list of sentences to build context from.
-            idx (int): The index of the target sentence (used to exclude it).
-            window_size (int): The number of sentences to include in the context window.
-
-        Returns:
-            np.array: The average embedding vector of the surrounding context sentences.
-        """
-        if not sentences or idx < 0 or idx >= len(sentences):
-            logger.warning(f"Attempted to build embedding context with invalid input: len(sentences)={len(sentences)}, idx={idx}. Returning zero vector.")
-            return np.zeros(self.embedder.get_sentence_embedding_dimension())
-
-        start = max(0, idx - window_size)
-        end = min(len(sentences), idx + window_size + 1)
-
-        # Explicitly exclude the target sentence for embedding calculation
-        context_sentences_for_embedding = [sent for i, sent in enumerate(sentences[start:end]) if i + start != idx]
-        
-        if not context_sentences_for_embedding:
-            logger.debug(f"No surrounding context sentences available for embedding (sentence {idx}), returning zero vector.")
-            # Note: Previously warning, changed to debug as zero window size is valid use case
-            return np.zeros(self.embedder.get_sentence_embedding_dimension())
-
-        try:
-            embeddings = self.embedder.encode(context_sentences_for_embedding, convert_to_numpy=True)
-            context_embedding = np.mean(embeddings, axis=0)
-            logger.debug(f"Generated embedding context (excluding target) for sentence {idx}.")
-            return context_embedding
-        except Exception as e:
-            logger.error(f"Error generating embedding context for sentence {idx}: {e}", exc_info=True)
-            # Return zero vector on encoding/mean calculation error
-            return np.zeros(self.embedder.get_sentence_embedding_dimension())
+    # Commented out unused embedding context method
+    # def build_embedding_context(self, sentences: List[str], idx: int, window_size: int) -> np.array:
+    #     """
+    #     Generate an embedding-based context vector (excluding the target sentence).
+    #
+    #     Computes the average embedding vector of the context sentences surrounding the target.
+    #     Returns a zero vector if no context sentences are available.
+    #
+    #     Parameters:
+    #         sentences (List[str]): The list of sentences to build context from.
+    #         idx (int): The index of the target sentence (used to exclude it).
+    #         window_size (int): The number of sentences to include in the context window.
+    #
+    #     Returns:
+    #         np.array: The average embedding vector of the surrounding context sentences.
+    #     """
+    #     if not sentences or idx < 0 or idx >= len(sentences):
+    #         logger.warning(f"Attempted to build embedding context with invalid input: len(sentences)={len(sentences)}, idx={idx}. Returning zero vector.")
+    #         return np.zeros(self.embedder.get_sentence_embedding_dimension())
+    #
+    #     start = max(0, idx - window_size)
+    #     end = min(len(sentences), idx + window_size + 1)
+    #
+    #     # Explicitly exclude the target sentence for embedding calculation
+    #     context_sentences_for_embedding = [sent for i, sent in enumerate(sentences[start:end]) if i + start != idx]
+    #     
+    #     if not context_sentences_for_embedding:
+    #         logger.debug(f"No surrounding context sentences available for embedding (sentence {idx}), returning zero vector.")
+    #         # Note: Previously warning, changed to debug as zero window size is valid use case
+    #         return np.zeros(self.embedder.get_sentence_embedding_dimension())
+    #
+    #     try:
+    #         embeddings = self.embedder.encode(context_sentences_for_embedding, convert_to_numpy=True)
+    #         context_embedding = np.mean(embeddings, axis=0)
+    #         logger.debug(f"Generated embedding context (excluding target) for sentence {idx}.")
+    #         return context_embedding
+    #     except Exception as e:
+    #         logger.error(f"Error generating embedding context for sentence {idx}: {e}", exc_info=True)
+    #         # Return zero vector on encoding/mean calculation error
+    #         return np.zeros(self.embedder.get_sentence_embedding_dimension())
 
     def build_all_contexts(self, sentences: List[str]) -> Dict[int, Dict[str, str]]:
         """
