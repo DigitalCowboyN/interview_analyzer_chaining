@@ -162,22 +162,23 @@ async def test_pipeline_integration_success(integration_dirs, setup_input_files)
     async def mock_api_call(*args, **kwargs):
         # Find the sentence in the prompt (this is fragile, depends on prompt structure)
         prompt_str = args[0]
-        sentence = "Unknown Sentence"
-        if "Sentence one." in prompt_str:
-             sentence = "Sentence one."
-        elif "Sentence two?" in prompt_str: # Based on actual segmentation of test1.txt
-             sentence = "Sentence two?"
-        elif "first sentence." in prompt_str: # Handle segmentation variations
-             sentence = "This is the first sentence."
-        elif "Followed by the second." in prompt_str:
-             sentence = "Followed by the second."
+        sentence = "Unknown Sentence" # Default
         
-        # Simulate successful analysis based on which sentence it is (crude mapping)
-        # A more robust mock might inspect kwargs or prompt structure better
-        if "first" in sentence.lower():
-            return generate_mock_analysis(0, 0, sentence)
+        # Expected sentences from "This is the first sentence. Followed by the second."
+        first_expected = "This is the first sentence."
+        second_expected = "Followed by the second."
+
+        if first_expected in prompt_str: 
+             sentence = first_expected
+             return generate_mock_analysis(0, 0, sentence) # sentence_id 0
+        elif second_expected in prompt_str:
+             sentence = second_expected
+             return generate_mock_analysis(1, 1, sentence) # sentence_id 1
         else:
-            return generate_mock_analysis(1, 1, sentence)
+             # This case should ideally not be hit for the main analysis calls in this test
+             # It might be hit if other calls are made (e.g., keywords), handle gracefully
+             print(f"WARNING: Mock API call received unexpected prompt fragment: {prompt_str[:100]}...")
+             return {"mock_fallback_unexpected": []} 
 
     # Adjust patch target based on where the actual external API call is made
     # Assuming it's in src.agents.agent.OpenAIAgent.call_model
@@ -185,6 +186,10 @@ async def test_pipeline_integration_success(integration_dirs, setup_input_files)
         
         # Run the pipeline (using the real config, which includes paths/suffixes)
         await run_pipeline(input_dir, output_dir, map_dir, config)
+
+        # --- Debugging ---
+        print(f"\nDEBUG (Success Test): Mock call_model count: {mock_call_model.call_count}")
+        # print(f"DEBUG (Success Test): Mock call_model args: {mock_call_model.call_args_list}") # Can be verbose
 
         # Assertions
         map_file = map_dir / f"{target_stem}{config['paths']['map_suffix']}"
@@ -200,6 +205,9 @@ async def test_pipeline_integration_success(integration_dirs, setup_input_files)
         # Check analysis file
         assert analysis_file.exists(), "Analysis file was not created"
         analysis_data = load_jsonl(analysis_file)
+        # --- Debugging ---
+        print(f"DEBUG (Success Test): Analysis data loaded: {analysis_data}")
+        # --- End Debugging ---
         assert len(analysis_data) == 2, "Incorrect number of analysis results written"
 
         # Check content of analysis results (order might vary)
@@ -240,45 +248,69 @@ async def test_pipeline_integration_partial_failure(integration_dirs, setup_inpu
     # Mock the API call to fail for the second sentence
     async def mock_api_call_fail_second(*args, **kwargs):
         prompt_str = args[0]
-        sentence = "Unknown Sentence"
-        if "first sentence." in prompt_str:
-             sentence = "This is the first sentence."
-             return generate_mock_analysis(0, 0, sentence)
-        elif "Followed by the second." in prompt_str:
+        
+        # Expected sentences
+        first_expected = "This is the first sentence."
+        second_expected = "Followed by the second."
+
+        if first_expected in prompt_str:
+             sentence = first_expected
+             return generate_mock_analysis(0, 0, sentence) # Success for first
+        elif second_expected in prompt_str:
              # Raise an exception for the second sentence analysis call
-             # Note: This mocks the API call level. If classify_sentence catches this,
-             # the test might need adjustment or mock higher up.
              raise ValueError("Mock API Error for second sentence")
         else:
-            # Fallback for other potential calls (e.g., keyword extraction)
-            return {"mock_fallback": []} 
+            # Fallback for other potential calls
+            print(f"WARNING: Mock API call (fail second) received unexpected prompt fragment: {prompt_str[:100]}...")
+            return {"mock_fallback_unexpected": []} 
 
-    # Use parentheses for multi-line with statement
-    with (patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock, side_effect=mock_api_call_fail_second),
-          patch("src.pipeline.logger") as mock_pipeline_logger): # Mock logger to check error logs
-        
-        await run_pipeline(input_dir, output_dir, map_dir, config)
+    # Use nested with statements for correct mock variable scope
+    with patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock, side_effect=mock_api_call_fail_second) as mock_call_model:
+        with patch("src.pipeline.logger") as mock_pipeline_logger: # Mock logger to check error logs
+            
+            await run_pipeline(input_dir, output_dir, map_dir, config)
 
-        # Assertions
-        map_file = map_dir / f"{target_stem}{config['paths']['map_suffix']}"
-        analysis_file = output_dir / f"{target_stem}{config['paths']['analysis_suffix']}"
+            # --- Debugging ---
+            print(f"\nDEBUG (Partial Fail Test): Mock call_model count: {mock_call_model.call_count}")
+            # print(f"DEBUG (Partial Fail Test): Mock call_model args: {mock_call_model.call_args_list}") # Can be verbose
 
-        # Check map file (should still be complete)
-        assert map_file.exists(), "Map file was not created"
-        map_data = load_jsonl(map_file)
-        assert len(map_data) == 2
+            # Assertions
+            map_file = map_dir / f"{target_stem}{config['paths']['map_suffix']}"
+            analysis_file = output_dir / f"{target_stem}{config['paths']['analysis_suffix']}"
 
-        # Check analysis file (should only contain the first sentence)
-        assert analysis_file.exists(), "Analysis file was not created"
-        analysis_data = load_jsonl(analysis_file)
-        assert len(analysis_data) == 1, "Expected only one successful analysis result"
-        assert analysis_data[0]["sentence_id"] == 0
-        assert analysis_data[0]["sentence"] == "This is the first sentence."
-        
-        # Check that the error was logged (by the worker)
-        error_logged = any("failed analyzing sentence_id 1" in call.args[0] 
-                           for call in mock_pipeline_logger.error.call_args_list)
-        assert error_logged, "Worker error for sentence 1 was not logged"
+            # Check map file (should still be complete)
+            assert map_file.exists(), "Map file was not created"
+            map_data = load_jsonl(map_file)
+            assert len(map_data) == 2
+
+            # Check analysis file (should contain entries for BOTH sentences, one success, one error)
+            assert analysis_file.exists(), "Analysis file was not created"
+            analysis_data = load_jsonl(analysis_file)
+            # --- Debugging ---
+            print(f"DEBUG (Partial Fail Test): Analysis data loaded: {analysis_data}")
+            # --- End Debugging ---
+            assert len(analysis_data) == 2, "Expected analysis file to contain entries for all input sentences"
+
+            # Filter for successful results (those *not* marked as errors)
+            successful_results = [res for res in analysis_data if not res.get("error")]
+            assert len(successful_results) == 1, "Expected exactly one successful analysis result"
+            
+            # Verify the content of the successful result
+            assert successful_results[0]["sentence_id"] == 0
+            assert successful_results[0]["sentence"] == "This is the first sentence."
+            
+            # Optionally, verify the content of the error result
+            error_results = [res for res in analysis_data if res.get("error")]
+            assert len(error_results) == 1, "Expected exactly one error result"
+            assert error_results[0]["sentence_id"] == 1
+            assert error_results[0]["sentence"] == "Followed by the second."
+            assert error_results[0]["error_type"] == "ValueError" # Check error type from mock
+            assert "Mock API Error" in error_results[0]["error_message"] # Check error message
+            
+            # Check that the error was logged (by the worker)
+            error_logged = any("failed analyzing sentence_id 1" in call.args[0] 
+                               for call in mock_pipeline_logger.error.call_args_list)
+            assert error_logged, "Worker error for sentence 1 was not logged"
 
 @pytest.mark.asyncio
 @pytest.mark.integration

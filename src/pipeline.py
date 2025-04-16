@@ -41,7 +41,7 @@ from src.agents.context_builder import context_builder
 from src.utils.metrics import metrics_tracker
 import spacy
 import json
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Set, Optional
 
 # Initialize the logger and load the spaCy model.
 logger = get_logger()
@@ -181,6 +181,10 @@ async def _analysis_worker(
     and puts results onto another queue.
 
     Runs in a loop, fetching tasks. Exits when it receives a `None` sentinel value.
+    If analysis via `analyzer.classify_sentence` succeeds, the result dictionary
+    (augmented with IDs) is put onto `results_queue`.
+    If analysis fails, an error dictionary containing identifying information and
+    error details is put onto `results_queue` instead.
 
     Args:
         worker_id (int): Identifier for the worker (for logging).
@@ -188,9 +192,10 @@ async def _analysis_worker(
         task_queue (asyncio.Queue): Queue to get task tuples from.
                                     Expected tuple: (sentence_id, sequence_order, sentence, context).
                                     Receives `None` to signal termination.
-        results_queue (asyncio.Queue): Queue to put successful analysis results (dict) onto.
-                                       Receives `None` from the main orchestrator when all workers
-                                       should terminate (passed to the writer).
+        results_queue (asyncio.Queue): Queue to put successful analysis results (dict) or
+                                       error dictionaries onto.
+                                       Error dict structure: {"sentence_id": int, "sequence_order": int,
+                                       "sentence": str, "error": True, "error_type": str, "error_message": str}
     """
     logger.info(f"Analysis worker {worker_id} started.")
     while True:
@@ -216,11 +221,21 @@ async def _analysis_worker(
                 
                 await results_queue.put(analysis_result)
                 logger.debug(f"Worker {worker_id} completed sentence_id: {sentence_id}")
-                metrics_tracker.increment_success() # Assuming classify_sentence doesn't throw
                 
             except Exception as e:
-                logger.error(f"Worker {worker_id} failed analyzing sentence_id {sentence_id}: {e}", exc_info=False) # Keep log concise
+                # Include exception type in the log message
+                logger.error(f"Worker {worker_id} failed analyzing sentence_id {sentence_id}: {type(e).__name__}: {e}", exc_info=False) # Keep log concise but add type
                 metrics_tracker.increment_errors()
+                # Create and queue an error result instead of dropping
+                error_result = {
+                    "sentence_id": sentence_id,
+                    "sequence_order": sequence_order,
+                    "sentence": sentence,
+                    "error": True,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e)
+                }
+                await results_queue.put(error_result)
                 # Do not put anything on results_queue for failed analysis
             finally:
                  # Signal task completion regardless of success or failure
@@ -275,6 +290,106 @@ async def _result_writer(output_file: Path, results_queue: asyncio.Queue):
             logger.critical(f"Critical error in writer for {output_file}: {e}", exc_info=True)
             break # Exit loop on critical error
     logger.info(f"Result writer finished for: {output_file}. Total results written: {results_written}")
+
+
+def verify_output_completeness(map_path: Path, analysis_path: Path) -> Dict[str, Any]:
+    """
+    Compares a map file and an analysis file to verify processing completeness.
+
+    Reads sentence IDs from both the map file (expected) and the analysis file (actual)
+    and calculates metrics on how many are missing from the analysis output.
+    Handles file not found errors and JSON parsing errors gracefully by logging and
+    continuing where possible.
+
+    Args:
+        map_path (Path): Path to the conversation map file (.jsonl).
+        analysis_path (Path): Path to the analysis results file (.jsonl).
+
+    Returns:
+        Dict[str, Any]: A dictionary containing completeness metrics:
+            - total_expected (int): Number of unique sentence IDs found in the map file.
+            - total_actual (int): Number of unique sentence IDs found in the analysis file.
+            - total_missing (int): Count of expected IDs not found in the actual IDs.
+            - missing_ids (List[int]): Sorted list of sentence IDs missing from analysis.
+            - error (Optional[str]): Description of critical error encountered (e.g., file not found),
+                                     otherwise None.
+    """
+    expected_ids: Set[int] = set()
+    actual_ids: Set[int] = set()
+    error_msg: Optional[str] = None
+
+    # Process Map File
+    try:
+        with map_path.open("r", encoding="utf-8") as f:
+            for i, line in enumerate(f):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if "sentence_id" in entry:
+                        expected_ids.add(entry["sentence_id"])
+                    else:
+                        logger.warning(f"Missing 'sentence_id' in map file {map_path}, line {i+1}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse line in map file {map_path}, line {i+1}: {e}. Line: '{line[:100]}...'")
+    except FileNotFoundError:
+        logger.warning(f"Map file not found: {map_path}")
+        error_msg = f"Map file not found: {map_path.name}"
+        # Cannot determine expected, so return zero/empty
+        return {
+            "total_expected": 0, "total_actual": 0, "total_missing": 0,
+            "missing_ids": [], "error": error_msg
+        }
+    except Exception as e:
+        logger.error(f"Unexpected error reading map file {map_path}: {e}", exc_info=True)
+        error_msg = f"Error reading map file: {type(e).__name__}"
+        # Treat as if expected is unknown
+        return {
+            "total_expected": 0, "total_actual": 0, "total_missing": 0,
+            "missing_ids": [], "error": error_msg
+        }
+
+    # Process Analysis File
+    try:
+        with analysis_path.open("r", encoding="utf-8") as f:
+            for i, line in enumerate(f):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    # Also check for error flag to potentially exclude failed analysis if needed
+                    # For completeness check, we count any entry with a sentence_id
+                    if "sentence_id" in entry:
+                        actual_ids.add(entry["sentence_id"])
+                    else:
+                         logger.warning(f"Missing 'sentence_id' in analysis file {analysis_path}, line {i+1}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse line in analysis file {analysis_path}, line {i+1}: {e}. Line: '{line[:100]}...'")
+    except FileNotFoundError:
+        logger.warning(f"Analysis file not found: {analysis_path}")
+        # We know the expected count, but actual is zero
+        error_msg = f"Analysis file not found: {analysis_path.name}"
+        # Proceed with calculation based on expected_ids found from map
+    except Exception as e:
+         logger.error(f"Unexpected error reading analysis file {analysis_path}: {e}", exc_info=True)
+         error_msg = f"Error reading analysis file: {type(e).__name__}"
+         # Treat as if actual is unknown or potentially incomplete
+
+    # Calculate differences
+    missing_ids_set = expected_ids - actual_ids
+    total_expected = len(expected_ids)
+    total_actual = len(actual_ids)
+    total_missing = len(missing_ids_set)
+
+    return {
+        "total_expected": total_expected,
+        "total_actual": total_actual,
+        "total_missing": total_missing,
+        "missing_ids": sorted(list(missing_ids_set)),
+        "error": error_msg # Include error message if a file was not found/read
+    }
 
 
 async def process_file(input_file: Path, output_dir: Path, map_dir: Path, config: Dict[str, Any]):
@@ -382,18 +497,24 @@ async def process_file(input_file: Path, output_dir: Path, map_dir: Path, config
             logger.info(f"Loader finished for {input_file.stem}. Waiting for workers ({num_sentences} tasks)... ")
             
             await task_queue.join()
-            logger.info(f"All tasks processed by workers for {input_file.stem}. Signaling workers and writer to stop.")
+            logger.info(f"All tasks processed by workers for {input_file.stem}. Signaling workers to stop.")
             
-            # Signal worker completion
+            # Signal worker completion FIRST
             for _ in range(num_workers):
                 await task_queue.put(None)
-                
-            # Signal writer completion
+            
+            # Wait for all results placed on the queue to be processed by the writer
+            logger.info(f"Waiting for result writer to process {results_queue.qsize()} items...")
+            await results_queue.join()
+            logger.info(f"Result writer finished processing queue items for {input_file.stem}.")
+
+            # NOW Signal writer completion
             await results_queue.put(None) 
             
-            # Wait for writer first (as it depends on results queue)
-            await writer_task # Wait for writer to finish processing results and the sentinel
-            logger.info(f"Writer finished for {input_file.stem}.")
+            # Wait for the writer task to finish (it will consume the None sentinel)
+            logger.debug(f"Waiting for writer task to complete for {input_file.stem}...")
+            await writer_task 
+            logger.info(f"Writer task completed for {input_file.stem}.")
 
             # Wait for workers to finish processing sentinels
             logger.debug(f"Gathering worker tasks for {input_file.stem}...")
@@ -455,17 +576,29 @@ async def run_pipeline(input_dir: Path, output_dir: Path, map_dir: Path, config:
     """
     # Start global pipeline timer
     metrics_tracker.start_pipeline_timer()
+    processed_file_paths = [] # Keep track of (map_path, analysis_path) tuples
 
     logger.info(f"Starting pipeline run. Input: {input_dir}, Output: {output_dir}, Map: {map_dir}")
+    if not input_dir.is_dir():
+        raise FileNotFoundError(f"Input directory not found: {input_dir}")
+        
     input_files = list(input_dir.glob("*.txt"))
 
     if not input_files:
         logger.warning(f"No input files found in {input_dir}")
+        # Still stop timer and log basic metrics even if no files processed
+        metrics_tracker.stop_pipeline_timer()
+        summary = metrics_tracker.get_summary()
+        logger.info(f"Pipeline Execution Summary: {json.dumps(summary, indent=2)}")
         return
 
-    # Ensure base output/map directories exist (process_file handles specifics)
+    # Ensure base output/map directories exist (process_file handles specifics within)
     output_dir.mkdir(parents=True, exist_ok=True)
     map_dir.mkdir(parents=True, exist_ok=True)
+
+    # Get suffixes from config once
+    map_suffix = config["paths"].get("map_suffix", "_map.jsonl")
+    analysis_suffix = config["paths"].get("analysis_suffix", "_analysis.jsonl")
 
     # Process each input file using the refactored process_file
     # Consider running process_file calls concurrently too if needed
@@ -473,8 +606,173 @@ async def run_pipeline(input_dir: Path, output_dir: Path, map_dir: Path, config:
     for input_file in input_files:
         try:
             await process_file(input_file, output_dir, map_dir, config)
+            # If process_file completes without critical error, store paths for verification
+            map_path = map_dir / f"{input_file.stem}{map_suffix}"
+            analysis_path = output_dir / f"{input_file.stem}{analysis_suffix}"
+            processed_file_paths.append((map_path, analysis_path))
         except Exception as e:
+            # Log critical errors from process_file itself if they propagate
             logger.critical(f"Unhandled exception during processing of {input_file} in run_pipeline: {e}", exc_info=True)
-            metrics_tracker.increment_errors()
+            metrics_tracker.increment_errors() # Count file-level processing errors
+
+    # --- Verification Step ---
+    total_files_processed = len(processed_file_paths)
+    total_expected_overall = 0
+    total_actual_overall = 0
+    total_missing_overall = 0
+    files_with_missing = 0
+    files_with_errors = 0 # Files where verification check itself failed
+
+    logger.info("--- Starting Output Verification --- ")
+    for map_path, analysis_path in processed_file_paths:
+        logger.info(f"Verifying output for: {analysis_path.name}")
+        completeness_result = verify_output_completeness(map_path, analysis_path)
+        
+        total_expected_overall += completeness_result["total_expected"]
+        total_actual_overall += completeness_result["total_actual"]
+        total_missing_overall += completeness_result["total_missing"]
+        
+        if completeness_result["total_missing"] > 0:
+            files_with_missing += 1
+            logger.warning(f"Verification for {analysis_path.name}: MISSING {completeness_result['total_missing']} sentences. IDs: {completeness_result['missing_ids']}")
+        elif completeness_result["error"]:
+             files_with_errors += 1
+             logger.error(f"Verification for {analysis_path.name}: FAILED ({completeness_result['error']})")
+        else:
+             logger.info(f"Verification for {analysis_path.name}: OK ({completeness_result['total_actual']}/{completeness_result['total_expected']})")
+             
+    logger.info("--- Output Verification Complete --- ")
+
+    # Stop timer and log metrics summary including verification
+    metrics_tracker.stop_pipeline_timer()
+    summary = metrics_tracker.get_summary()
+    # Add verification summary to the log output
+    verification_summary = (
+        f"Verification Summary: Checked {total_files_processed} files. "
+        f"Total Expected Sentences: {total_expected_overall}, "
+        f"Total Actual Entries: {total_actual_overall}, "
+        f"Total Missing Sentences: {total_missing_overall} across {files_with_missing} files. "
+        f"Verification Errors: {files_with_errors} files."
+    )
+    logger.info(f"Pipeline Execution Summary: {json.dumps(summary, indent=2)}")
+    log_level = logger.warning if total_missing_overall > 0 or files_with_errors > 0 else logger.info
+    log_level(verification_summary)
 
     logger.info("Pipeline run complete.")
+
+
+async def analyze_specific_sentences(input_file_path: Path, sentence_ids: List[int], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Analyzes a specific subset of sentences from an input file.
+
+    Reads the input file, segments it, builds context, and then concurrently
+    analyzes only the sentences corresponding to the provided `sentence_ids`
+    using the `SentenceAnalyzer`.
+
+    This function is useful for reprocessing specific sentences, such as retrying
+    failures or applying updated analysis logic to a subset.
+
+    Args:
+        input_file_path (Path): Path to the original input text file.
+        sentence_ids (List[int]): A list of integer sentence IDs (0-based index)
+                                  to be analyzed.
+        config (Dict[str, Any]): The application configuration dictionary (currently unused
+                                 in this function but passed for potential future use).
+
+    Returns:
+        List[Dict[str, Any]]: A list containing the analysis result dictionaries for
+                              the requested sentences. Each dictionary will either be
+                              a successful analysis result or an error dictionary
+                              (containing 'error': True, 'error_type', 'error_message').
+                              Returns an empty list if `sentence_ids` is empty or
+                              if the input file is empty/invalid.
+
+    Raises:
+        FileNotFoundError: If `input_file_path` does not exist.
+        Exception: Can propagate exceptions from file reading, context building,
+                   or sentence analysis if not caught by the internal wrapper.
+    """
+    logger.info(f"Starting specific analysis for {len(sentence_ids)} sentences from {input_file_path}")
+    if not sentence_ids:
+        logger.warning("Received empty list of sentence IDs. No analysis to perform.")
+        return []
+
+    if not input_file_path.exists():
+        raise FileNotFoundError(f"Input file not found: {input_file_path}")
+
+    try:
+        text = input_file_path.read_text(encoding="utf-8")
+        all_sentences = segment_text(text)
+        if not all_sentences:
+             logger.warning(f"Input file {input_file_path} yielded no sentences. Cannot analyze specific IDs.")
+             return []
+        
+        num_total_sentences = len(all_sentences)
+        
+        # Validate requested sentence IDs
+        valid_ids_to_process: List[int] = []
+        for idx in sentence_ids:
+            if 0 <= idx < num_total_sentences:
+                 valid_ids_to_process.append(idx)
+            else:
+                 logger.warning(f"Invalid sentence_id requested: {idx}. Total sentences: {num_total_sentences}. Skipping.")
+        
+        if not valid_ids_to_process:
+            logger.warning("No valid sentence IDs remain after filtering. No analysis to perform.")
+            return []
+            
+        logger.debug(f"Building contexts for all {num_total_sentences} sentences to analyze {len(valid_ids_to_process)} specific ones.")
+        all_contexts = context_builder.build_all_contexts(all_sentences)
+        analyzer = SentenceAnalyzer()
+
+        # --- Define internal wrapper for concurrent execution --- 
+        async def _wrapper_analyze(idx: int):
+            sentence = all_sentences[idx]
+            context = all_contexts.get(idx) # Get context for this specific ID
+            
+            if context is None:
+                # Should not happen if build_all_contexts is correct, but handle defensively
+                logger.error(f"Internal error: Context missing for sentence_id {idx} during specific analysis.")
+                return {
+                    "sentence_id": idx,
+                    "sequence_order": idx, # Assume sequence_order == sentence_id here
+                    "sentence": sentence,
+                    "error": True,
+                    "error_type": "ContextMissingError",
+                    "error_message": "Failed to retrieve context during analysis."
+                }
+
+            try:
+                analysis_result = await analyzer.classify_sentence(sentence, context)
+                # Augment result with IDs (sequence_order might be ambiguous here, use id)
+                analysis_result["sentence_id"] = idx
+                analysis_result["sequence_order"] = idx # Assuming sequence order matches ID
+                analysis_result["sentence"] = sentence # Ensure original sentence is included
+                return analysis_result
+            except Exception as e:
+                 logger.error(f"Analysis failed for specific sentence_id {idx}: {type(e).__name__}: {e}", exc_info=False)
+                 # Return the standard error dictionary
+                 return {
+                    "sentence_id": idx,
+                    "sequence_order": idx,
+                    "sentence": sentence,
+                    "error": True,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e)
+                 }
+        # --- End internal wrapper --- 
+
+        # Create tasks only for the valid requested IDs
+        tasks = [asyncio.create_task(_wrapper_analyze(idx)) for idx in valid_ids_to_process]
+        
+        logger.info(f"Running analysis for {len(tasks)} specific sentences concurrently...")
+        results = await asyncio.gather(*tasks)
+        logger.info(f"Completed analysis for {len(results)} specific sentences.")
+        
+        return results # Return the list of results (success or error dicts)
+
+    except Exception as e:
+        logger.critical(f"Unexpected error during analyze_specific_sentences for {input_file_path}: {e}", exc_info=True)
+        # Re-raise or return empty list? Returning empty list might hide critical errors.
+        # Let's re-raise for now to make upstream aware.
+        raise

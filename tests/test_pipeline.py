@@ -30,9 +30,10 @@ import asyncio
 import copy # Import copy module
 from pathlib import Path
 from unittest.mock import patch, AsyncMock, MagicMock, call, ANY # Import ANY for flexible mocking
+from typing import List, Dict
 
 # Assume these will be the new/refactored imports from src.pipeline
-from src.pipeline import segment_text, run_pipeline, create_conversation_map, process_file 
+from src.pipeline import segment_text, run_pipeline, create_conversation_map, process_file, verify_output_completeness, analyze_specific_sentences
 # We will likely need to import the specific functions/classes we test directly if they are exposed
 # For now, we'll patch them within tests assuming they are part of the pipeline module's internal structure
 # or imported there.
@@ -369,7 +370,8 @@ async def test_process_file_analyzer_error(sample_text_file, tmp_path, mock_conf
     Verifies that:
     - The pipeline continues processing other sentences.
     - The error is logged (via mocked logger).
-    - The final output file contains results only for successfully analyzed sentences.
+    - The final output file contains entries for *both* the successfully analyzed
+      sentence and the failed one (marked with an error flag).
     - Metrics tracker correctly counts the error.
 
     Args:
@@ -381,8 +383,8 @@ async def test_process_file_analyzer_error(sample_text_file, tmp_path, mock_conf
         None
 
     Raises:
-        AssertionError: If the output file contains the failed result, the error
-                      is not logged, or metrics are not updated.
+        AssertionError: If the output file does not contain both success and error
+                      results, the error is not logged, or metrics are not updated.
     """
     from src.pipeline import process_file
     output_dir = tmp_path / mock_config["paths"]["output_dir"]
@@ -391,13 +393,14 @@ async def test_process_file_analyzer_error(sample_text_file, tmp_path, mock_conf
 
     # Mock SentenceAnalyzer to fail on the second sentence
     mock_analyzer_instance = MagicMock()
+    fail_msg = "Mock analysis failed!"
     async def mock_classify_side_effect_error(sentence, context):
         if "Second" in sentence:
-            raise ValueError("Mock analysis failed!")
+            raise ValueError(fail_msg)
         else:
             # For the successful case, return the dict directly
-            return create_mock_analysis(0, 0, sentence) 
-            
+            return create_mock_analysis(0, 0, sentence)
+
     mock_analyzer_instance.classify_sentence = AsyncMock(side_effect=mock_classify_side_effect_error)
 
     # Define mock loader side effect (same as above)
@@ -408,12 +411,12 @@ async def test_process_file_analyzer_error(sample_text_file, tmp_path, mock_conf
             await task_queue.put(task_item)
 
     mock_sentences_list = ["First sentence.", "Second sentence."] # Needed for side effect scope
-    with (patch("src.pipeline.create_conversation_map", new_callable=AsyncMock, return_value=(2, mock_sentences_list)), 
-          patch("src.pipeline.SentenceAnalyzer", return_value=mock_analyzer_instance), 
-          patch("src.pipeline.context_builder") as mock_patched_context_builder, 
-          patch("src.pipeline._load_tasks", side_effect=mock_load_tasks_side_effect) as mock_load_tasks, 
-          patch("src.pipeline.append_json_line") as mock_append_json, 
-          patch("src.pipeline.logger") as mock_logger, 
+    with (patch("src.pipeline.create_conversation_map", new_callable=AsyncMock, return_value=(2, mock_sentences_list)),
+          patch("src.pipeline.SentenceAnalyzer", return_value=mock_analyzer_instance),
+          patch("src.pipeline.context_builder") as mock_patched_context_builder,
+          patch("src.pipeline._load_tasks", side_effect=mock_load_tasks_side_effect) as mock_load_tasks,
+          patch("src.pipeline.append_json_line") as mock_append_json,
+          patch("src.pipeline.logger") as mock_logger,
           patch("src.pipeline.metrics_tracker") as mock_metrics): # Removed patch for asyncio.Queue
 
         # Configure the mock context builder instance returned by the patch
@@ -424,22 +427,44 @@ async def test_process_file_analyzer_error(sample_text_file, tmp_path, mock_conf
         # Asserts
         # 1. Analyzer called twice (attempted for both sentences)
         assert mock_analyzer_instance.classify_sentence.await_count == 2
+
+        # 2. append_json_line called TWICE (once for success, once for error)
+        assert mock_append_json.call_count == 2
         
-        # 2. append_json_line called only ONCE (for the successful sentence)
-        mock_append_json.assert_called_once() 
-        call_arg_data = mock_append_json.call_args[0][0]
-        assert call_arg_data["sentence"] == "First sentence."
-        assert call_arg_data["sentence_id"] == 0
-        mock_append_json.assert_called_with(ANY, expected_analysis_file)
+        # 3. Check the content written
+        call_args_list = [call[0][0] for call in mock_append_json.call_args_list] # Get the 'data' arg from each call
+        
+        # Find the successful result (sentence_id 0)
+        success_result = next((res for res in call_args_list if res.get("sentence_id") == 0), None)
+        assert success_result is not None
+        assert success_result.get("error") is not True # Ensure error flag is not set
+        assert success_result.get("sentence") == "First sentence."
+        assert success_result.get("function_type") == "mock_declarative" # Check analysis field
 
-        # 3. Error logged
+        # Find the error result (sentence_id 1)
+        error_result = next((res for res in call_args_list if res.get("sentence_id") == 1), None)
+        assert error_result is not None
+        assert error_result.get("error") is True
+        assert error_result.get("sentence") == "Second sentence."
+        assert error_result.get("error_type") == "ValueError"
+        assert error_result.get("error_message") == fail_msg
+        # Check that analysis fields are NOT present in error result
+        assert "function_type" not in error_result 
+        
+        # Check the file path argument for append_json_line
+        # (assert_called_with checks the *last* call, use call_args_list for all)
+        assert all(call[0][1] == expected_analysis_file for call in mock_append_json.call_args_list)
+
+        # 4. Error logged by worker
         mock_logger.error.assert_called_once()
-        assert "Mock analysis failed!" in mock_logger.error.call_args[0][0] # Check log message content
-
-        # 4. Metrics updated for error
+        # Check log message content for the specific error and sentence id
+        error_log_call = mock_logger.error.call_args
+        log_message = error_log_call[0][0]
+        assert "failed analyzing sentence_id 1" in log_message # Check sentence ID part
+        assert f"ValueError: {fail_msg}" in log_message # Check error type and message part
+        
+        # 5. Metrics updated for error
         mock_metrics.increment_errors.assert_called_once()
-        # Check success metric called once if implemented
-        # mock_metrics.increment_success.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_process_file_writer_error(sample_text_file, tmp_path, mock_config):
@@ -670,6 +695,7 @@ async def test_run_pipeline_no_files(tmp_path, mock_config):
     Verifies that:
     - A warning is logged about no files being found.
     - No processing functions (like `process_file`) are called.
+    - `verify_output_completeness` is not called.
     - The output/map directories might be created but remain empty.
 
     Args:
@@ -687,14 +713,16 @@ async def test_run_pipeline_no_files(tmp_path, mock_config):
     output_dir = tmp_path / mock_config["paths"]["output_dir"]
     map_dir = tmp_path / mock_config["paths"]["map_dir"]
 
-    # Patch logger and process_file (which shouldn't be called)
+    # Patch logger, process_file, and verify_output_completeness
     with (patch("src.pipeline.logger") as mock_logger,
-          patch("src.pipeline.process_file", new_callable=AsyncMock) as mock_process_file):
+          patch("src.pipeline.process_file", new_callable=AsyncMock) as mock_process_file,
+          patch("src.pipeline.verify_output_completeness") as mock_verify):
         
-        await run_pipeline(input_dir, output_dir, map_dir, mock_config) # Pass map_dir and config
+        await run_pipeline(input_dir, output_dir, map_dir, mock_config) 
         
         mock_logger.warning.assert_called_with(f"No input files found in {input_dir}")
         mock_process_file.assert_not_awaited() # process_file should not be called
+        mock_verify.assert_not_called() # verify should not be called
 
 @pytest.mark.asyncio
 async def test_run_pipeline_multiple_files(tmp_path, mock_config):
@@ -702,9 +730,11 @@ async def test_run_pipeline_multiple_files(tmp_path, mock_config):
     Test `run_pipeline` processing multiple files successfully.
 
     Sets up an input directory with multiple .txt files (including one empty).
-    Mocks `process_file` to track calls.
+    Mocks `process_file` and `verify_output_completeness`.
     Verifies that:
     - `process_file` is called once for each .txt file found.
+    - `verify_output_completeness` is called for each processed file.
+    - The final summary log includes completeness metrics.
     - The overall pipeline metrics (timer) are managed.
 
     Args:
@@ -715,7 +745,8 @@ async def test_run_pipeline_multiple_files(tmp_path, mock_config):
         None
 
     Raises:
-        AssertionError: If `process_file` is not called the correct number of times.
+        AssertionError: If mocks are not called the correct number of times or the
+                      summary log is missing.
     """
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -730,17 +761,461 @@ async def test_run_pipeline_multiple_files(tmp_path, mock_config):
     file2.write_text("File two.")
     file3.write_text("Markdown file.")
 
-    # Patch process_file
-    with patch("src.pipeline.process_file", new_callable=AsyncMock) as mock_process_file:
+    # Patch process_file and verify_output_completeness
+    # Mock verify to return success
+    mock_verify_return = {"total_expected": 1, "total_actual": 1, "total_missing": 0, "missing_ids": [], "error": None}
+    with (patch("src.pipeline.process_file", new_callable=AsyncMock) as mock_process_file,
+          patch("src.pipeline.verify_output_completeness", return_value=mock_verify_return) as mock_verify,
+          patch("src.pipeline.logger") as mock_logger):
         
         await run_pipeline(input_dir, output_dir, map_dir, mock_config) # Pass map_dir and config
         
         # Assert process_file called twice (once for each .txt file)
         assert mock_process_file.await_count == 2
         
-        # Check calls more specifically
-        calls = [
+        # Check calls more specifically for process_file
+        process_calls = [
             call(file1, output_dir, map_dir, mock_config),
             call(file2, output_dir, map_dir, mock_config)
         ]
-        mock_process_file.assert_has_awaits(calls, any_order=True) # Order might vary
+        mock_process_file.assert_has_awaits(process_calls, any_order=True) # Order might vary
+
+        # Assert verify_output_completeness called twice
+        assert mock_verify.call_count == 2
+        map1_path = map_dir / f"{file1.stem}{mock_config['paths']['map_suffix']}"
+        analysis1_path = output_dir / f"{file1.stem}{mock_config['paths']['analysis_suffix']}"
+        map2_path = map_dir / f"{file2.stem}{mock_config['paths']['map_suffix']}"
+        analysis2_path = output_dir / f"{file2.stem}{mock_config['paths']['analysis_suffix']}"
+        verify_calls = [
+            call(map1_path, analysis1_path),
+            call(map2_path, analysis2_path)
+        ]
+        mock_verify.assert_has_calls(verify_calls, any_order=True)
+
+        # Check that the completeness summary was logged correctly
+        summary_log_found = False
+        verification_log_found = False
+        for log_call in mock_logger.info.call_args_list:
+            log_msg = log_call[0][0]
+            if "Pipeline Execution Summary:" in log_msg:
+                summary_log_found = True
+            if "Verification Summary:" in log_msg:
+                verification_log_found = True
+                assert "Checked 2 files" in log_msg
+                assert "Total Expected Sentences: 2" in log_msg # 1 expected per file from mock
+                assert "Total Actual Entries: 2" in log_msg    # 1 actual per file from mock
+                assert "Total Missing Sentences: 0" in log_msg # 0 missing per file from mock
+                assert "Verification Errors: 0" in log_msg
+                
+        assert summary_log_found, "Metrics summary log message not found"
+        assert verification_log_found, "Verification summary log message not found"
+
+@pytest.mark.asyncio
+async def test_run_pipeline_with_missing(tmp_path, mock_config):
+    """
+    Test `run_pipeline` reporting missing sentences in the summary log.
+
+    Mocks `verify_output_completeness` to return data indicating missing sentences
+    for one of the processed files.
+    Verifies that the final summary log message correctly reflects the aggregated
+    count of missing sentences and files with missing entries.
+
+    Args:
+        tmp_path: Pytest fixture providing a temporary directory path.
+        mock_config: Fixture providing mock configuration.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the summary log does not report the missing sentences correctly.
+    """
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    output_dir = tmp_path / mock_config["paths"]["output_dir"]
+    map_dir = tmp_path / mock_config["paths"]["map_dir"]
+    
+    file1 = input_dir / "file1.txt"
+    file2 = input_dir / "file2.txt"
+    file1.write_text("File one.")
+    file2.write_text("File two.")
+
+    # Mock verify results: file1 OK, file2 has 1 missing
+    mock_verify_results = [
+        {"total_expected": 2, "total_actual": 2, "total_missing": 0, "missing_ids": [], "error": None}, # file1
+        {"total_expected": 3, "total_actual": 2, "total_missing": 1, "missing_ids": [1], "error": None}  # file2
+    ]
+
+    with (patch("src.pipeline.process_file", new_callable=AsyncMock) as mock_process_file,
+          patch("src.pipeline.verify_output_completeness", side_effect=mock_verify_results) as mock_verify,
+          patch("src.pipeline.logger") as mock_logger):
+        
+        await run_pipeline(input_dir, output_dir, map_dir, mock_config)
+        
+        # Assert process_file called twice
+        assert mock_process_file.await_count == 2
+        # Assert verify called twice
+        assert mock_verify.call_count == 2
+
+        # Check the final summary log message for aggregated missing counts
+        verification_log_found = False
+        for log_call in mock_logger.warning.call_args_list: # Missing sentences trigger WARNING level
+             log_msg = log_call[0][0]
+             if "Verification Summary:" in log_msg:
+                verification_log_found = True
+                assert "Checked 2 files" in log_msg
+                assert "Total Expected Sentences: 5" in log_msg # 2 + 3
+                assert "Total Actual Entries: 4" in log_msg    # 2 + 2
+                assert "Total Missing Sentences: 1" in log_msg # 0 + 1
+                assert "across 1 files" in log_msg # Only file2 had missing
+                assert "Verification Errors: 0" in log_msg
+                break 
+        
+        assert verification_log_found, "Verification summary log message (warning level) not found or incorrect"
+
+# --- Tests for verify_output_completeness ---
+
+# Helper to create dummy JSONL files
+def create_jsonl_file(path: Path, data: List[Dict]):
+    """Creates a JSONL file with the given data."""
+    with path.open("w", encoding="utf-8") as f:
+        for item in data:
+            f.write(json.dumps(item) + '\n')
+
+def test_verify_completeness_success(tmp_path):
+    """
+    Test verify_output_completeness when analysis matches map perfectly.
+    """
+    map_file = tmp_path / "map.jsonl"
+    analysis_file = tmp_path / "analysis.jsonl"
+    map_data = [
+        {"sentence_id": 0, "sentence": "s0"},
+        {"sentence_id": 1, "sentence": "s1"},
+        {"sentence_id": 2, "sentence": "s2"}
+    ]
+    analysis_data = [
+        {"sentence_id": 0, "analysis": "a0"},
+        {"sentence_id": 1, "analysis": "a1"},
+        {"sentence_id": 2, "analysis": "a2"}
+    ]
+    create_jsonl_file(map_file, map_data)
+    create_jsonl_file(analysis_file, analysis_data)
+
+    result = verify_output_completeness(map_file, analysis_file)
+
+    assert result["total_expected"] == 3
+    assert result["total_actual"] == 3
+    assert result["total_missing"] == 0
+    assert result["missing_ids"] == []
+
+def test_verify_completeness_missing_items(tmp_path):
+    """
+    Test verify_output_completeness when analysis file is missing entries.
+    """
+    map_file = tmp_path / "map.jsonl"
+    analysis_file = tmp_path / "analysis.jsonl"
+    map_data = [
+        {"sentence_id": 0, "sentence": "s0"},
+        {"sentence_id": 1, "sentence": "s1"},
+        {"sentence_id": 2, "sentence": "s2"},
+        {"sentence_id": 3, "sentence": "s3"}
+    ]
+    analysis_data = [
+        {"sentence_id": 0, "analysis": "a0"},
+        # Missing ID 1
+        {"sentence_id": 2, "analysis": "a2"},
+        # Missing ID 3
+    ]
+    create_jsonl_file(map_file, map_data)
+    create_jsonl_file(analysis_file, analysis_data)
+
+    result = verify_output_completeness(map_file, analysis_file)
+
+    assert result["total_expected"] == 4
+    assert result["total_actual"] == 2
+    assert result["total_missing"] == 2
+    assert result["missing_ids"] == [1, 3] # Should be sorted
+
+def test_verify_completeness_empty_analysis(tmp_path):
+    """
+    Test verify_output_completeness when analysis file exists but is empty.
+    """
+    map_file = tmp_path / "map.jsonl"
+    analysis_file = tmp_path / "analysis.jsonl"
+    map_data = [
+        {"sentence_id": 0, "sentence": "s0"},
+        {"sentence_id": 1, "sentence": "s1"}
+    ]
+    create_jsonl_file(map_file, map_data)
+    analysis_file.touch() # Create empty file
+
+    result = verify_output_completeness(map_file, analysis_file)
+
+    assert result["total_expected"] == 2
+    assert result["total_actual"] == 0
+    assert result["total_missing"] == 2
+    assert result["missing_ids"] == [0, 1]
+
+def test_verify_completeness_map_not_found(tmp_path):
+    """
+    Test verify_output_completeness when map file does not exist.
+    """
+    map_file = tmp_path / "non_existent_map.jsonl"
+    analysis_file = tmp_path / "analysis.jsonl"
+    analysis_file.touch()
+
+    # Mock logger to check warning
+    with patch("src.pipeline.logger") as mock_logger:
+        result = verify_output_completeness(map_file, analysis_file)
+
+    assert result["total_expected"] == 0
+    assert result["total_actual"] == 0 # Should ideally be 0 if map fails
+    assert result["total_missing"] == 0
+    assert result["missing_ids"] == []
+    assert result.get("error") is not None # Check for error indicator
+    mock_logger.warning.assert_called_once()
+    assert f"Map file not found: {map_file}" in mock_logger.warning.call_args[0][0]
+
+def test_verify_completeness_analysis_not_found(tmp_path):
+    """
+    Test verify_output_completeness when analysis file does not exist.
+    """
+    map_file = tmp_path / "map.jsonl"
+    analysis_file = tmp_path / "non_existent_analysis.jsonl"
+    map_data = [
+        {"sentence_id": 0, "sentence": "s0"},
+        {"sentence_id": 1, "sentence": "s1"}
+    ]
+    create_jsonl_file(map_file, map_data)
+
+    # Mock logger to check warning
+    with patch("src.pipeline.logger") as mock_logger:
+        result = verify_output_completeness(map_file, analysis_file)
+
+    assert result["total_expected"] == 2
+    assert result["total_actual"] == 0 # Actual count is 0
+    assert result["total_missing"] == 2 # Missing count reflects expected
+    assert result["missing_ids"] == [0, 1]
+    assert result.get("error") is not None # Check for error indicator
+    mock_logger.warning.assert_called_once()
+    assert f"Analysis file not found: {analysis_file}" in mock_logger.warning.call_args[0][0]
+
+def test_verify_completeness_malformed_map(tmp_path):
+    """
+    Test verify_output_completeness with a malformed line in the map file.
+    """
+    map_file = tmp_path / "map.jsonl"
+    analysis_file = tmp_path / "analysis.jsonl"
+    analysis_data = [ {"sentence_id": 0, "analysis": "a0"} ]
+    create_jsonl_file(analysis_file, analysis_data)
+    # Create map file with bad JSON
+    with map_file.open("w", encoding="utf-8") as f:
+        f.write(json.dumps({"sentence_id": 0, "sentence": "s0"}) + '\n')
+        f.write("this is not json\n")
+        f.write(json.dumps({"sentence_id": 2, "sentence": "s2"}) + '\n')
+        
+    # Mock logger to check error
+    with patch("src.pipeline.logger") as mock_logger:
+        result = verify_output_completeness(map_file, analysis_file)
+
+    assert result["total_expected"] == 2 # Only IDs 0 and 2 should be expected
+    assert result["total_actual"] == 1
+    assert result["total_missing"] == 1
+    assert result["missing_ids"] == [2]
+    mock_logger.error.assert_called_once()
+    assert "Failed to parse line in map file" in mock_logger.error.call_args[0][0]
+
+def test_verify_completeness_malformed_analysis(tmp_path):
+    """
+    Test verify_output_completeness with a malformed line in the analysis file.
+
+    Verifies that the function logs an error for the invalid line but continues
+    processing subsequent valid lines, correctly identifying all valid sentence IDs.
+    """
+    map_file = tmp_path / "map.jsonl"
+    analysis_file = tmp_path / "analysis.jsonl"
+    map_data = [ {"sentence_id": 0, "sentence": "s0"}, {"sentence_id": 1, "sentence": "s1"} ]
+    create_jsonl_file(map_file, map_data)
+    # Create analysis file with bad JSON in the middle
+    with analysis_file.open("w", encoding="utf-8") as f:
+        f.write(json.dumps({"sentence_id": 0, "analysis": "a0"}) + '\n')
+        f.write("this is not json\n")
+        f.write(json.dumps({"sentence_id": 1, "analysis": "a1"}) + '\n')
+
+    # Mock logger to check error
+    with patch("src.pipeline.logger") as mock_logger:
+        result = verify_output_completeness(map_file, analysis_file)
+
+    assert result["total_expected"] == 2 
+    assert result["total_actual"] == 2 # Both ID 0 and ID 1 should be found
+    assert result["total_missing"] == 0 # No IDs should be missing
+    assert result["missing_ids"] == [] # List of missing IDs should be empty
+    mock_logger.error.assert_called_once()
+    assert "Failed to parse line in analysis file" in mock_logger.error.call_args[0][0]
+
+@pytest.mark.asyncio
+async def test_analyze_specific_sentences_success(tmp_path, mock_config):
+    """
+    Test `analyze_specific_sentences` successfully analyzing a subset.
+    """
+    from src.pipeline import analyze_specific_sentences # Import the new function
+    
+    input_file = tmp_path / "input.txt"
+    input_file.write_text("Sentence 0. Sentence 1 is target. Sentence 2 is also target. Sentence 3.")
+    sentence_ids_to_analyze = [1, 2] # Analyze only the middle two
+    
+    # Mock dependencies
+    mock_analyzer_instance = MagicMock()
+    # Store calls to verify context/sentence passing if needed
+    classify_calls = [] 
+    async def mock_classify(sentence, context):
+        # Determine sentence_id based on text for simplicity in mock
+        sentence_id = 1 if " 1 " in sentence else (2 if " 2 " in sentence else -1)
+        result = create_mock_analysis(sentence_id, sentence_id, sentence)
+        classify_calls.append({'sentence': sentence, 'context': context, 'result': result})
+        return result
+    mock_analyzer_instance.classify_sentence = AsyncMock(side_effect=mock_classify)
+    
+    mock_context_builder_instance = MagicMock()
+    # Mock context builder to return plausible dicts for each sentence index
+    mock_context_builder_instance.build_all_contexts.return_value = {
+        0: {"ctx": "c0"}, 1: {"ctx": "c1"}, 2: {"ctx": "c2"}, 3: {"ctx": "c3"}
+    }
+    
+    with (patch("src.pipeline.segment_text", return_value=["Sentence 0.", "Sentence 1 is target.", "Sentence 2 is also target.", "Sentence 3."]),
+          patch("src.pipeline.context_builder", mock_context_builder_instance),
+          patch("src.pipeline.SentenceAnalyzer", return_value=mock_analyzer_instance),
+          patch("src.pipeline.logger")):
+              
+        results = await analyze_specific_sentences(input_file, sentence_ids_to_analyze, mock_config)
+
+    # Assertions
+    assert len(results) == 2 # Should only get results for IDs 1 and 2
+    # Check content (order might vary due to gather)
+    results_by_id = {res["sentence_id"]: res for res in results}
+    assert 1 in results_by_id
+    assert 2 in results_by_id
+    assert results_by_id[1]["sentence"] == "Sentence 1 is target."
+    assert results_by_id[1].get("error") is not True
+    assert results_by_id[2]["sentence"] == "Sentence 2 is also target."
+    assert results_by_id[2].get("error") is not True
+    assert mock_analyzer_instance.classify_sentence.await_count == 2
+    # Check context passing (optional but good)
+    call1_context = next(call['context'] for call in classify_calls if call['sentence'] == "Sentence 1 is target.")
+    call2_context = next(call['context'] for call in classify_calls if call['sentence'] == "Sentence 2 is also target.")
+    assert call1_context == {"ctx": "c1"}
+    assert call2_context == {"ctx": "c2"}
+
+@pytest.mark.asyncio
+async def test_analyze_specific_sentences_with_error(tmp_path, mock_config):
+    """
+    Test `analyze_specific_sentences` when one analysis fails.
+    """
+    from src.pipeline import analyze_specific_sentences
+    
+    input_file = tmp_path / "input.txt"
+    input_file.write_text("Sentence 0. Sentence 1 fails. Sentence 2 works.")
+    sentence_ids_to_analyze = [1, 2]
+    fail_msg = "Analysis failed for sentence 1"
+
+    # Mock dependencies
+    mock_analyzer_instance = MagicMock()
+    async def mock_classify_error(sentence, context):
+        if " 1 " in sentence:
+            raise ValueError(fail_msg)
+        else:
+            return create_mock_analysis(2, 2, sentence)
+    mock_analyzer_instance.classify_sentence = AsyncMock(side_effect=mock_classify_error)
+    
+    mock_context_builder_instance = MagicMock()
+    mock_context_builder_instance.build_all_contexts.return_value = {
+        0: {"ctx": "c0"}, 1: {"ctx": "c1"}, 2: {"ctx": "c2"}
+    }
+    
+    with (patch("src.pipeline.segment_text", return_value=["Sentence 0.", "Sentence 1 fails.", "Sentence 2 works."]),
+          patch("src.pipeline.context_builder", mock_context_builder_instance),
+          patch("src.pipeline.SentenceAnalyzer", return_value=mock_analyzer_instance),
+          patch("src.pipeline.logger")):
+              
+        results = await analyze_specific_sentences(input_file, sentence_ids_to_analyze, mock_config)
+
+    # Assertions
+    assert len(results) == 2
+    results_by_id = {res["sentence_id"]: res for res in results}
+    assert 1 in results_by_id
+    assert 2 in results_by_id
+    
+    # Check error result for ID 1
+    assert results_by_id[1].get("error") is True
+    assert results_by_id[1]["sentence"] == "Sentence 1 fails."
+    assert results_by_id[1]["error_type"] == "ValueError"
+    assert results_by_id[1]["error_message"] == fail_msg
+
+    # Check success result for ID 2
+    assert results_by_id[2].get("error") is not True
+    assert results_by_id[2]["sentence"] == "Sentence 2 works."
+    assert mock_analyzer_instance.classify_sentence.await_count == 2
+
+@pytest.mark.asyncio
+async def test_analyze_specific_sentences_invalid_id(tmp_path, mock_config):
+    """
+    Test `analyze_specific_sentences` handling invalid sentence IDs.
+    """
+    from src.pipeline import analyze_specific_sentences
+    
+    input_file = tmp_path / "input.txt"
+    input_file.write_text("Sentence 0. Sentence 1.") # Only 2 sentences (IDs 0, 1)
+    sentence_ids_to_analyze = [0, 2] # ID 2 is out of bounds
+    
+    # Mock dependencies (analyzer won't be called for invalid ID)
+    mock_analyzer_instance = MagicMock()
+    async def mock_classify(sentence, context): 
+         return create_mock_analysis(0, 0, sentence) # Only called for ID 0
+    mock_analyzer_instance.classify_sentence = AsyncMock(side_effect=mock_classify)
+    
+    mock_context_builder_instance = MagicMock()
+    mock_context_builder_instance.build_all_contexts.return_value = {0: {"ctx": "c0"}, 1: {"ctx": "c1"}}
+    
+    with (patch("src.pipeline.segment_text", return_value=["Sentence 0.", "Sentence 1."]),
+          patch("src.pipeline.context_builder", mock_context_builder_instance),
+          patch("src.pipeline.SentenceAnalyzer", return_value=mock_analyzer_instance),
+          patch("src.pipeline.logger") as mock_logger):
+              
+        results = await analyze_specific_sentences(input_file, sentence_ids_to_analyze, mock_config)
+
+    # Assertions
+    assert len(results) == 1 # Only the result for ID 0 should be returned
+    assert results[0]["sentence_id"] == 0
+    assert results[0].get("error") is not True
+    mock_analyzer_instance.classify_sentence.assert_awaited_once() # Only called for ID 0
+    # Check warning log for invalid ID
+    mock_logger.warning.assert_called_once()
+    assert "Invalid sentence_id requested: 2" in mock_logger.warning.call_args[0][0]
+
+@pytest.mark.asyncio
+async def test_analyze_specific_sentences_empty_list(tmp_path, mock_config):
+    """
+    Test `analyze_specific_sentences` with an empty list of IDs.
+    """
+    from src.pipeline import analyze_specific_sentences
+    
+    input_file = tmp_path / "input.txt"
+    input_file.write_text("Sentence 0. Sentence 1.") 
+    sentence_ids_to_analyze = [] # Empty list
+    
+    # Mock dependencies (should not be called)
+    mock_analyzer_instance = MagicMock()
+    mock_analyzer_instance.classify_sentence = AsyncMock()
+    mock_context_builder_instance = MagicMock()
+    mock_context_builder_instance.build_all_contexts.return_value = {0: {}, 1: {}}
+
+    with (patch("src.pipeline.segment_text", return_value=["Sentence 0.", "Sentence 1."]),
+          patch("src.pipeline.context_builder", mock_context_builder_instance),
+          patch("src.pipeline.SentenceAnalyzer", return_value=mock_analyzer_instance),
+          patch("src.pipeline.logger")):
+              
+        results = await analyze_specific_sentences(input_file, sentence_ids_to_analyze, mock_config)
+
+    # Assertions
+    assert results == [] # Expect empty list back
+    mock_analyzer_instance.classify_sentence.assert_not_awaited() # Analyzer should not be called
