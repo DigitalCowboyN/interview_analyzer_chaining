@@ -13,8 +13,24 @@ from src.pipeline import run_pipeline
 from src.config import config
 from src.utils.logger import get_logger
 from src.utils.metrics import metrics_tracker # Import metrics tracker
+from fastapi import FastAPI
+# --- Add router imports --- 
+from src.api.routers import files, analysis # Import the new router
+# -------------------------
 
 logger = get_logger()
+
+app = FastAPI(title="Interview Analyzer API", version="0.1.0")
+
+# --- Include the routers ---
+app.include_router(files.router)
+app.include_router(analysis.router) # Add the analysis router
+# ------------------------------
+
+@app.get("/", tags=["Health Check"])
+async def read_root():
+    """Basic health check endpoint."""
+    return {"status": "ok"}
 
 def main():
     """
@@ -51,12 +67,19 @@ def main():
         default=Path(config["paths"]["output_dir"]),
         help="Path to the directory for saving output analysis JSON files",
     )
+    # Add an argument for map_dir
+    parser.add_argument(
+        "--map_dir",
+        type=Path,
+        default=Path(config["paths"].get("map_dir", "data/maps")), # Use get with default
+        help="Path to the directory for saving intermediate map files (.jsonl)",
+    )
     # Parse the command-line arguments
     args = parser.parse_args()
 
-    # --- Get map directory from config --- 
+    # --- Use map_dir from args --- 
     # Ensure map_dir key exists in config["paths"]
-    map_dir_path = Path(config["paths"].get("map_dir", "data/maps")) 
+    # map_dir_path = Path(config["paths"].get("map_dir", "data/maps")) 
     # Add an argument for map_dir if you want it to be command-line configurable
     # parser.add_argument(
     #     "--map_dir",
@@ -66,7 +89,8 @@ def main():
     # )
     # args = parser.parse_args() # Re-parse if adding new arg
     # map_dir_to_use = args.map_dir
-    map_dir_to_use = map_dir_path # Using config value for now
+    # map_dir_to_use = map_dir_path # Using config value for now
+    map_dir_to_use = args.map_dir # Use the parsed argument
 
     # Reset and start metrics tracking
     metrics_tracker.reset()

@@ -19,9 +19,6 @@ matplotlib==3.8.3
 
 # Embeddings & NLP
 transformers==4.39.3
-torch==2.2.2
-torchaudio==2.2.2
-torchvision==0.17.2
 
 # Development
 pytest==8.3.3
@@ -33,4 +30,12 @@ isort==5.13.2
 # spaCy model
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
 # Additional dependencies for enhanced functionality
-pydantic==1.10.9  # Ensure Pydantic is included for data validation
+pydantic  # Ensure Pydantic is included for data validation
+
+# FastAPI
+fastapi
+uvicorn
+
+# Task Queue Manager
+celery
+redis

@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
     curl \
+    redis-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip

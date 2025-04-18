@@ -55,12 +55,13 @@ class Config:
 
         Environment variables in the YAML file should be formatted as ${VAR_NAME}.
         Variables not found in the environment retain their ${VAR_NAME} format.
+        Also specifically looks for CELERY_BROKER_URL and CELERY_RESULT_BACKEND_URL
+        in the environment first.
 
         Returns:
             dict: The parsed and processed configuration settings.
-
         Raises:
-            FileNotFoundError: If the configuration file specified by `config_path` does not exist.
+            FileNotFoundError: If the configuration file does not exist.
             yaml.YAMLError: If the file content is not valid YAML.
         """
         if not self.config_path.exists():
@@ -75,7 +76,28 @@ class Config:
             content
         )
 
-        return yaml.safe_load(content)
+        loaded_config = yaml.safe_load(content)
+
+        # --- Add Celery URL loading from environment --- 
+        # Ensure 'celery' key exists
+        if 'celery' not in loaded_config:
+            loaded_config['celery'] = {}
+            
+        # Override broker/backend URL from environment if set
+        broker_url = os.environ.get("CELERY_BROKER_URL")
+        if broker_url:
+            loaded_config['celery']['broker_url'] = broker_url
+        elif 'broker_url' not in loaded_config['celery']: # Set a default if not in env or yaml
+             loaded_config['celery']['broker_url'] = "redis://redis:6379/0"
+             
+        backend_url = os.environ.get("CELERY_RESULT_BACKEND_URL")
+        if backend_url:
+            loaded_config['celery']['result_backend'] = backend_url
+        elif 'result_backend' not in loaded_config['celery']: # Set a default
+             loaded_config['celery']['result_backend'] = "redis://redis:6379/1"
+        # ---------------------------------------------
+
+        return loaded_config
 
     def get(self, key, default=None):
         """
@@ -124,3 +146,8 @@ config = Config()
 # Example (optional validation):
 # if config.get("pipeline", {}).get("num_analysis_workers", 1) < 0:
 #     raise ValueError("num_analysis_workers cannot be negative")
+
+# Make Celery config easily accessible (optional)
+# celery_config = config.get('celery', {})
+# CELERY_BROKER_URL = celery_config.get('broker_url')
+# CELERY_RESULT_BACKEND = celery_config.get('result_backend')

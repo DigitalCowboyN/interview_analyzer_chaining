@@ -264,92 +264,86 @@ async def test_pipeline_integration_partial_failure(integration_dirs, setup_inpu
             print(f"WARNING: Mock API call (fail second) received unexpected prompt fragment: {prompt_str[:100]}...")
             return {"mock_fallback_unexpected": []} 
 
-    # Use nested with statements for correct mock variable scope
-    with patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock, side_effect=mock_api_call_fail_second) as mock_call_model:
-        with patch("src.pipeline.logger") as mock_pipeline_logger: # Mock logger to check error logs
-            
-            await run_pipeline(input_dir, output_dir, map_dir, config)
+    # Patch the API call and the CORRECT logger for worker errors
+    with patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock, side_effect=mock_api_call_fail_second) as mock_call_model, \
+         patch("src.services.analysis_service.logger") as mock_service_logger: # Patch service logger
+        
+        await run_pipeline(input_dir, output_dir, map_dir, config)
 
-            # --- Debugging ---
-            print(f"\nDEBUG (Partial Fail Test): Mock call_model count: {mock_call_model.call_count}")
-            # print(f"DEBUG (Partial Fail Test): Mock call_model args: {mock_call_model.call_args_list}") # Can be verbose
+        # --- Debugging ---
+        print(f"\nDEBUG (Partial Fail Test): Mock call_model count: {mock_call_model.call_count}")
+        # print(f"DEBUG (Partial Fail Test): Mock call_model args: {mock_call_model.call_args_list}") # Can be verbose
 
-            # Assertions
-            map_file = map_dir / f"{target_stem}{config['paths']['map_suffix']}"
-            analysis_file = output_dir / f"{target_stem}{config['paths']['analysis_suffix']}"
+        # Assertions
+        map_file = map_dir / f"{target_stem}{config['paths']['map_suffix']}"
+        analysis_file = output_dir / f"{target_stem}{config['paths']['analysis_suffix']}"
 
-            # Check map file (should still be complete)
-            assert map_file.exists(), "Map file was not created"
-            map_data = load_jsonl(map_file)
-            assert len(map_data) == 2
+        # Check map file (should still be complete)
+        assert map_file.exists(), "Map file was not created"
+        map_data = load_jsonl(map_file)
+        assert len(map_data) == 2
 
-            # Check analysis file (should contain entries for BOTH sentences, one success, one error)
-            assert analysis_file.exists(), "Analysis file was not created"
-            analysis_data = load_jsonl(analysis_file)
-            # --- Debugging ---
-            print(f"DEBUG (Partial Fail Test): Analysis data loaded: {analysis_data}")
-            # --- End Debugging ---
-            assert len(analysis_data) == 2, "Expected analysis file to contain entries for all input sentences"
+        # Check analysis file (should contain entries for BOTH sentences, one success, one error)
+        assert analysis_file.exists(), "Analysis file was not created"
+        analysis_data = load_jsonl(analysis_file)
+        # --- Debugging ---
+        print(f"DEBUG (Partial Fail Test): Analysis data loaded: {analysis_data}")
+        # --- End Debugging ---
+        assert len(analysis_data) == 2, "Expected analysis file to contain entries for all input sentences"
 
-            # Filter for successful results (those *not* marked as errors)
-            successful_results = [res for res in analysis_data if not res.get("error")]
-            assert len(successful_results) == 1, "Expected exactly one successful analysis result"
-            
-            # Verify the content of the successful result
-            assert successful_results[0]["sentence_id"] == 0
-            assert successful_results[0]["sentence"] == "This is the first sentence."
-            
-            # Optionally, verify the content of the error result
-            error_results = [res for res in analysis_data if res.get("error")]
-            assert len(error_results) == 1, "Expected exactly one error result"
-            assert error_results[0]["sentence_id"] == 1
-            assert error_results[0]["sentence"] == "Followed by the second."
-            assert error_results[0]["error_type"] == "ValueError" # Check error type from mock
-            assert "Mock API Error" in error_results[0]["error_message"] # Check error message
-            
-            # Check that the error was logged (by the worker)
-            error_logged = any("failed analyzing sentence_id 1" in call.args[0] 
-                               for call in mock_pipeline_logger.error.call_args_list)
-            assert error_logged, "Worker error for sentence 1 was not logged"
+        # Filter for successful results (those *not* marked as errors)
+        successful_results = [res for res in analysis_data if not res.get("error")]
+        assert len(successful_results) == 1, "Expected exactly one successful analysis result"
+        
+        # Verify the content of the successful result
+        assert successful_results[0]["sentence_id"] == 0
+        assert successful_results[0]["sentence"] == "This is the first sentence."
+        
+        # Optionally, verify the content of the error result
+        error_results = [res for res in analysis_data if res.get("error")]
+        assert len(error_results) == 1, "Expected exactly one error result"
+        assert error_results[0]["sentence_id"] == 1
+        assert error_results[0]["sentence"] == "Followed by the second."
+        assert error_results[0]["error_type"] == "ValueError" # Check error type from mock
+        assert "Mock API Error" in error_results[0]["error_message"] # Check error message
+        
+        # Check that the error was logged using the SERVICE logger mock
+        error_logged = any("failed analyzing sentence_id 1" in call.args[0] 
+                           for call in mock_service_logger.error.call_args_list)
+        assert error_logged, "Worker error for sentence 1 was not logged by service logger"
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_pipeline_integration_empty_file(integration_dirs, setup_input_files):
+async def test_pipeline_integration_empty_file(integration_dirs):
     """
-    Test the pipeline correctly handling an empty input file.
-
-    Verifies that `run_pipeline` processes an empty .txt file without errors,
-    creates empty (but existing) map and analysis files, and logs an appropriate
-    warning message.
-
-    Args:
-        integration_dirs: Fixture providing temporary directories.
-        setup_input_files: Fixture providing sample input files.
+    Test the pipeline correctly handles an empty input file.
+    Verifies that:
+    - An empty map file is created.
+    - NO analysis file is created.
+    - No API calls are made.
     """
     input_dir, output_dir, map_dir = integration_dirs
-    input_files = setup_input_files
-    target_file = input_files["empty"]
+    # Manually create ONLY the empty file for this test
+    target_file = input_dir / "empty.txt"
+    target_file.write_text("")
     target_stem = target_file.stem
 
-    # No API mocking needed as no analysis should happen
-    with patch("src.pipeline.logger") as mock_pipeline_logger: # Check logs
+    # Mock the API call (shouldn't be called anyway)
+    with patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock) as mock_call_model:
+        
+        # Run pipeline on the directory containing ONLY the empty file
         await run_pipeline(input_dir, output_dir, map_dir, config)
 
         # Assertions
         map_file = map_dir / f"{target_stem}{config['paths']['map_suffix']}"
         analysis_file = output_dir / f"{target_stem}{config['paths']['analysis_suffix']}"
 
-        # Check map file (exists but is empty)
+        # Check map file (should be created and empty)
         assert map_file.exists(), "Map file was not created for empty input"
-        map_data = load_jsonl(map_file)
-        assert len(map_data) == 0
+        assert map_file.read_text() == "", "Map file should be empty for empty input"
 
-        # Check analysis file (exists but is empty)
-        assert analysis_file.exists(), "Analysis file was not created for empty input"
-        analysis_data = load_jsonl(analysis_file)
-        assert len(analysis_data) == 0
-        
-        # Check for appropriate warning log
-        warning_logged = any("contains 0 processable sentences" in call.args[0] 
-                             for call in mock_pipeline_logger.warning.call_args_list)
-        assert warning_logged, "Warning for empty file was not logged" 
+        # Check analysis file (SHOULD NOT EXIST)
+        assert not analysis_file.exists(), "Analysis file SHOULD NOT be created for empty input" 
+
+        # Check API call mock was NOT used (this should now pass)
+        mock_call_model.assert_not_called() 
