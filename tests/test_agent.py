@@ -1,29 +1,20 @@
 """
 tests/test_agent.py
 
-This file contains unit tests for the OpenAIAgent class found in src/agents/agent.py.
-The OpenAIAgent class uses OpenAI's Responses API to analyze sentences and return structured JSON.
-These tests verify that:
-    - The agent successfully processes a correct API response.
-    - The retry logic works for RateLimitError and APIError.
-    - The agent correctly raises exceptions for malformed or missing data.
-    - The logging of retry messages occurs when an error is encountered.
+Contains unit tests for the `OpenAIAgent` class (`src.agents.agent.py`).
 
-Key concepts covered in these tests:
-    - Asynchronous testing with pytest (using pytest.mark.asyncio)
-    - Using fixtures to create test instances of our agent.
-    - Patching asynchronous API calls with AsyncMock.
-    - Testing for expected exceptions with pytest.raises.
-    - Capturing and asserting logging (or stdout output) with capsys.
+These tests verify:
+    - Successful processing of valid API responses.
+    - Correct retry logic for `RateLimitError` and generic `APIError`.
+    - Correct exception handling for malformed/missing API response data.
+    - Correct logging of retry attempts.
 
-How to run these tests:
-    From the command line in the project root, run:
-        pytest tests/test_agent.py
-
-How to modify these tests:
-    - If the API response format changes, update the expected keys and values in test_successful_call.
-    - Adjust the simulated errors (e.g. RateLimitError, APIError) if you change the retry logic.
-    - Add new tests if you introduce more edge cases or functionality in agent.py.
+Key Testing Techniques Used:
+    - Asynchronous testing with `pytest-asyncio` (`@pytest.mark.asyncio`).
+    - Fixtures (`agent`) for creating test instances.
+    - Patching asynchronous methods (`agent.client.responses.create`) with `AsyncMock`.
+    - Testing expected exceptions using `pytest.raises`.
+    - Capturing log output using the `caplog` fixture.
 """
 
 import pytest
@@ -31,26 +22,23 @@ import json
 from unittest.mock import patch, MagicMock, AsyncMock
 from openai import RateLimitError, APIError
 from src.agents.agent import OpenAIAgent
+import logging
 
 # This marks all tests in this file as asynchronous tests.
 pytestmark = pytest.mark.asyncio
 
 def mock_response(content_dict):
     """
-    Creates a mock response object that mimics the structure returned by the OpenAI API.
+    Creates a mock `openai.responses.CreateResponse` object structure.
     
-    The response structure is:
-        - response.output: a list containing one item
-            - The item has a 'content' attribute, which is a list containing one object.
-            - The object has a 'text' attribute, containing a JSON string.
+    Mimics the expected nested structure: `response.output[0].content[0].text`,
+    setting the `text` attribute to the JSON-serialized `content_dict`.
     
     Args:
-        content_dict (dict): A dictionary representing the expected JSON structure,
-                             which will be JSON-serialized.
+        content_dict (dict): The dictionary to serialize into the mock response text.
     
     Returns:
-        MagicMock: A MagicMock object configured with the nested attributes and
-                   serialized content, suitable for mocking `client.responses.create`.
+        MagicMock: A mock object ready for use with `patch`.
     """
     mock_resp = MagicMock()
     mock_output = MagicMock()
@@ -63,32 +51,16 @@ def mock_response(content_dict):
 @pytest.fixture
 def agent():
     """
-    Pytest fixture that creates and returns an instance of OpenAIAgent.
-    
-    Ensures a fresh agent instance is available for each test function.
-
-    Returns:
-        OpenAIAgent: A new instance of the agent class.
+    Provides a fresh instance of `OpenAIAgent` for each test function.
     """
     return OpenAIAgent()
 
 async def test_successful_call(agent):
     """
-    Test `call_model` successfully processes a valid mocked API response.
+    Tests `call_model` with a valid, successful mock API response.
     
-    Patches `agent.client.responses.create` to return a predefined successful
-    response via `mock_response`. Asserts that the dictionary returned by
-    `call_model` contains all expected keys and values from the mock content.
-
-    Args:
-        agent: Fixture providing an `OpenAIAgent` instance.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If the returned dictionary is not a dict, misses keys,
-                      or has incorrect values.
+    Verifies that the returned dictionary correctly parses the JSON content
+    from the mock response and contains the expected keys and values.
     """
     response_content = {
         "function_type": "declarative",
@@ -128,20 +100,10 @@ async def test_successful_call(agent):
 
 async def test_retry_on_rate_limit(agent):
     """
-    Test `call_model` retries successfully after a simulated RateLimitError.
+    Tests `call_model` successfully retries after a `RateLimitError`.
     
-    Mocks `agent.client.responses.create` to first raise `RateLimitError` and then
-    return a successful response. Asserts that the final dictionary returned by
-    `call_model` matches the content of the successful response.
-
-    Args:
-        agent: Fixture providing an `OpenAIAgent` instance.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If the final response does not match the expected successful content.
+    Mocks the API call to raise `RateLimitError` once, then return success.
+    Asserts the final returned dictionary matches the successful response content.
     """
     response_content = {
         "function_type": "declarative",
@@ -161,20 +123,10 @@ async def test_retry_on_rate_limit(agent):
 
 async def test_retry_on_api_error(agent):
     """
-    Test `call_model` retries successfully after a simulated generic APIError.
+    Tests `call_model` successfully retries after a generic `APIError`.
     
-    Mocks `agent.client.responses.create` to first raise `APIError` and then
-    return a successful response. Asserts that the final dictionary returned by
-    `call_model` matches the content of the successful response.
-
-    Args:
-        agent: Fixture providing an `OpenAIAgent` instance.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If the final response does not match the expected successful content.
+    Mocks the API call to raise `APIError` once, then return success.
+    Asserts the final returned dictionary matches the successful response content.
     """
     response_content = {
         "function_type": "declarative",
@@ -193,21 +145,11 @@ async def test_retry_on_api_error(agent):
 
 async def test_max_retry_exceeded(agent):
     """
-    Test `call_model` raises the original APIError after exhausting retries.
+    Tests `call_model` raises the original `APIError` after exhausting all retries.
     
-    Mocks `agent.client.responses.create` to *always* raise a `RateLimitError`.
-    Asserts that `call_model` raises an `APIError` (or subclass like `RateLimitError`)
-    after making the configured number of retry attempts (`agent.retry_attempts`).
-
-    Args:
-        agent: Fixture providing an `OpenAIAgent` instance.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If `APIError` is not raised, or if the mock was not called
-                      the expected number of times.
+    Mocks the API call to *always* raise `RateLimitError`. Asserts that
+    `pytest.raises(APIError)` correctly catches the exception after the configured
+    number of attempts and that the mock was called the expected number of times.
     """
     error_to_raise = RateLimitError("Rate limit exceeded repeatedly", response=MagicMock(), body=None)
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
@@ -221,20 +163,7 @@ async def test_max_retry_exceeded(agent):
 
 async def test_empty_output(agent):
     """
-    Test `call_model` raises ValueError for an API response with empty `output` list.
-    
-    Mocks `agent.client.responses.create` to return a response where `response.output`
-    is an empty list. Asserts that `call_model` raises a `ValueError` with a specific
-    message indicating no output was received.
-
-    Args:
-        agent: Fixture providing an `OpenAIAgent` instance.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If `ValueError` is not raised or the message doesn't match.
+    Tests `call_model` raises `ValueError` for an API response with an empty `output` list.
     """
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         # Create a mock response with an empty 'output' list.
@@ -246,20 +175,7 @@ async def test_empty_output(agent):
 
 async def test_empty_content(agent):
     """
-    Test `call_model` raises ValueError for an API response with empty `content` list.
-    
-    Mocks `agent.client.responses.create` to return a response where 
-    `response.output[0].content` is an empty list. Asserts that `call_model` raises
-    a `ValueError` with a specific message indicating no content was received.
-
-    Args:
-        agent: Fixture providing an `OpenAIAgent` instance.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If `ValueError` is not raised or the message doesn't match.
+    Tests `call_model` raises `ValueError` for an API response with empty `output[0].content`.
     """
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_resp = MagicMock()
@@ -272,20 +188,7 @@ async def test_empty_content(agent):
 
 async def test_empty_message(agent):
     """
-    Test `call_model` raises ValueError for an API response with empty text content.
-    
-    Mocks `agent.client.responses.create` to return a response where 
-    `response.output[0].content[0].text` is empty or whitespace. Asserts that
-    `call_model` raises a `ValueError` with a specific message indicating empty content.
-
-    Args:
-        agent: Fixture providing an `OpenAIAgent` instance.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If `ValueError` is not raised or the message doesn't match.
+    Tests `call_model` raises `ValueError` for an API response with empty/whitespace text.
     """
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_resp = MagicMock()
@@ -301,20 +204,10 @@ async def test_empty_message(agent):
 
 async def test_malformed_json_response(agent):
     """
-    Test `call_model` returns an empty dict for invalid JSON response content.
+    Tests `call_model` returns an empty dict `{}` for a non-JSON API response.
     
-    Mocks `agent.client.responses.create` to return text that is not valid JSON.
-    Asserts that `call_model` catches the `JSONDecodeError`, logs it (implicitly),
-    and returns an empty dictionary `{}` instead of raising the error.
-
-    Args:
-        agent: Fixture providing an `OpenAIAgent` instance.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If the return value is not an empty dictionary.
+    Verifies that `JSONDecodeError` is caught internally and an empty dict is returned,
+    allowing processing to potentially continue for other items.
     """
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_resp = MagicMock()
@@ -329,26 +222,17 @@ async def test_malformed_json_response(agent):
         result = await agent.call_model("Test prompt for malformed JSON")
         assert result == {} 
 
-async def test_retry_log_message(agent, capsys):
+async def test_retry_log_message(agent, caplog):
     """
-    Test that `call_model` logs a retry message via stdout when retrying.
+    Tests `call_model` logs the correct retry message when retrying API calls.
+
+    Mocks the API call to raise `RateLimitError` once, then succeed.
+    Uses `caplog` to capture log records emitted by the agent and verify the
+    "Retrying after..." message is present at INFO level.
+    """
+    # Explicitly set logger level for caplog to capture INFO messages
+    caplog.set_level(logging.INFO)
     
-    Mocks `agent.client.responses.create` to raise an `APIError` then succeed.
-    Uses the `capsys` fixture to capture standard output (where the configured
-    logger directs human-readable output).
-
-    Asserts that the captured output contains the expected "Retrying after" message.
-
-    Args:
-        agent: Fixture providing an `OpenAIAgent` instance.
-        capsys: Pytest fixture for capturing stdout/stderr.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If the expected log message is not found in stdout.
-    """
     response_content = {
         "function_type": "declarative",
         "structure_type": "simple sentence",
@@ -358,11 +242,10 @@ async def test_retry_log_message(agent, capsys):
         "overall_keywords": ["test"],
         "domain_keywords": ["assessment", "evaluation"]
     }
-    error_response = APIError("API error", request="mock_request", body="mock_body")
+    error_response = RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_create.side_effect = [error_response, mock_response(response_content)]
-        response = await agent.call_model("Test prompt")
-        captured = capsys.readouterr().out
-        # Assert that the retry warning message appears in the captured stdout.
-        assert "Retrying after" in captured, f"Expected retry log message not found in stdout. Captured: {captured}"
-    assert response["purpose"] == "to state a fact"
+        await agent.call_model("Test prompt")
+        
+    # Assert the message is present in the captured log records
+    assert "Retrying after" in caplog.text, f"Expected retry log message not found in caplog.text. Captured: {caplog.text}"

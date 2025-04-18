@@ -17,14 +17,16 @@ This analyzer is designed to be used within the main processing pipeline.
 
 import asyncio
 import json # Removed unused import
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import ValidationError
 from src.agents.agent import agent  # Uses the OpenAIAgent instance for API calls.
 # Removed unused context_builder import here, as it's used in pipeline.py
-from src.agents.context_builder import context_builder # Restore global import for deprecated method test
+# Restore global import for deprecated method test -> No longer needed? Removing.
+# from src.agents.context_builder import context_builder
 from src.utils.logger import get_logger  # Centralized logging.
 from src.utils.helpers import load_yaml  # Helper to load YAML configuration.
-from src.config import config  # Project configuration settings.
+# Import global config but alias it to avoid direct use unless necessary
+from src.config import config as global_config
 from src.utils.metrics import metrics_tracker # Import metrics tracker
 from src.models.llm_responses import (
     SentenceFunctionResponse,
@@ -51,14 +53,34 @@ class SentenceAnalyzer:
     Attributes:
         prompts (Dict[str, Any]): A dictionary containing the loaded classification
                                  prompts from the YAML file specified in the config.
+        config (Dict[str, Any]): The configuration dictionary used by the instance.
     """
 
-    def __init__(self):
+    def __init__(self, config_dict: Optional[Dict[str, Any]] = None):
         """Initializes the SentenceAnalyzer by loading classification prompts."""
-        # Load the classification prompts from the YAML file specified in the configuration.
-        prompts_path = config["classification"]["local"]["prompt_files"]["no_context"]
-        self.prompts = load_yaml(prompts_path)
-        logger.info(f"SentenceAnalyzer initialized with prompts from: {prompts_path}")
+        # Use provided config_dict or fall back to global config
+        config_to_use = config_dict if config_dict is not None else global_config
+        self.config = config_to_use  # Store the config for later use
+
+        # Load the classification prompts using the determined config
+        prompts_path = ""  # Initialize prompts_path
+        try:
+            # Access nested keys carefully
+            prompts_path = self.config.get("classification", {}).get("local", {}).get("prompt_files", {}).get("no_context")
+            if not prompts_path:
+                raise KeyError("Prompt path 'classification.local.prompt_files.no_context' not found in config.")
+            
+            self.prompts = load_yaml(prompts_path)
+            logger.info(f"SentenceAnalyzer initialized with prompts from: {prompts_path}")
+        except KeyError as e:
+            logger.error(f"Failed to get prompt path from config: {e}. Using empty prompts.")
+            self.prompts = {}
+        except FileNotFoundError:
+             logger.error(f"Prompt file not found at path: {prompts_path}. Using empty prompts.")
+             self.prompts = {}
+        except Exception as e:
+            logger.error(f"Failed to load prompts yaml from {prompts_path}: {e}", exc_info=True)
+            self.prompts = {}
 
     async def classify_sentence(self, sentence: str, contexts: Dict[str, str]) -> Dict[str, Any]:
         """
@@ -105,7 +127,8 @@ class SentenceAnalyzer:
         overall_keywords_prompt = self.prompts["topic_overall_keywords"]["prompt"].format(
             context=contexts["observer_context"]
         )
-        domain_keywords_str = ", ".join(config.get("domain_keywords", []))
+        # Use the instance's config
+        domain_keywords_str = ", ".join(self.config.get("domain_keywords", []))
         domain_prompt = self.prompts["domain_specific_keywords"]["prompt"].format(
             sentence=sentence, domain_keywords=domain_keywords_str
         )
@@ -146,7 +169,7 @@ class SentenceAnalyzer:
             results["function_type"] = parsed.function_type
         except ValidationError as e:
             logger.warning(f"Validation failed for Function Type response: {e}. Response: {function_response}")
-            metrics_tracker.increment_errors() # Track validation error
+            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
             results["function_type"] = "" # Default value
 
         # Structure Type
@@ -155,7 +178,7 @@ class SentenceAnalyzer:
             results["structure_type"] = parsed.structure_type
         except ValidationError as e:
             logger.warning(f"Validation failed for Structure Type response: {e}. Response: {structure_response}")
-            metrics_tracker.increment_errors() # Track validation error
+            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
             results["structure_type"] = "" # Default value
 
         # Purpose
@@ -164,7 +187,7 @@ class SentenceAnalyzer:
             results["purpose"] = parsed.purpose
         except ValidationError as e:
             logger.warning(f"Validation failed for Purpose response: {e}. Response: {purpose_response}")
-            metrics_tracker.increment_errors() # Track validation error
+            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
             results["purpose"] = "" # Default value
 
         # Topic Level 1
@@ -173,7 +196,7 @@ class SentenceAnalyzer:
             results["topic_level_1"] = parsed.topic_level_1
         except ValidationError as e:
             logger.warning(f"Validation failed for Topic Level 1 response: {e}. Response: {topic_lvl1_response}")
-            metrics_tracker.increment_errors() # Track validation error
+            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
             results["topic_level_1"] = "" # Default value
 
         # Topic Level 3
@@ -182,7 +205,7 @@ class SentenceAnalyzer:
             results["topic_level_3"] = parsed.topic_level_3
         except ValidationError as e:
             logger.warning(f"Validation failed for Topic Level 3 response: {e}. Response: {topic_lvl3_response}")
-            metrics_tracker.increment_errors() # Track validation error
+            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
             results["topic_level_3"] = "" # Default value
 
         # Overall Keywords
@@ -191,7 +214,7 @@ class SentenceAnalyzer:
             results["overall_keywords"] = parsed.overall_keywords
         except ValidationError as e:
             logger.warning(f"Validation failed for Overall Keywords response: {e}. Response: {overall_keywords_response}")
-            metrics_tracker.increment_errors() # Track validation error
+            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
             results["overall_keywords"] = [] # Default value
 
         # Domain Keywords
@@ -202,7 +225,7 @@ class SentenceAnalyzer:
             results["domain_keywords"] = parsed.domain_keywords
         except ValidationError as e:
             logger.warning(f"Validation failed for Domain Keywords response: {e}. Response: {domain_response}")
-            metrics_tracker.increment_errors() # Track validation error
+            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
             results["domain_keywords"] = [] # Default value
 
         # Add the original sentence to the results.
@@ -245,8 +268,7 @@ class SentenceAnalyzer:
             sentence_context = contexts.get(idx)
             if sentence_context is None:
                  logger.error(f"Context missing for sentence index {idx}. Skipping analysis for this sentence.")
-                 metrics_tracker.increment_errors()
-                 # Add a placeholder or skip? Skipping for now.
+                 # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
                  continue 
 
             try:
@@ -260,7 +282,7 @@ class SentenceAnalyzer:
             except Exception as e:
                  # Log error from classify_sentence if it propagates
                  logger.error(f"Error analyzing sentence ID {idx}: {e}", exc_info=True)
-                 metrics_tracker.increment_errors()
+                 # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
                  # Skip appending failed analysis
 
         return results

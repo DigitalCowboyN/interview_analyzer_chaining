@@ -1,60 +1,124 @@
 """
 logger.py
 
-Configures the application-wide logger using the Loguru library.
+Configures the application-wide logger using Python's standard `logging` module.
 
-Sets up two logging sinks:
-1.  File Sink: Writes logs in structured JSON format to a file specified in
-    the configuration (`config["paths"]["logs_dir"]/pipeline.log`).
-    - Level: INFO
-    - Rotation: 10 MB
-    - Retention: 10 days
-    - Compression: zip
-    - Format: Includes timestamp, level, module, function, line number, message.
-2.  Stdout Sink: Prints logs to standard output in a human-readable, colored format.
-    - Level: DEBUG
-    - Format: Includes time, level, message.
+This module sets up a single logger instance named 'pipeline' (accessible via
+`get_logger`) configured with two handlers upon first access:
 
-The `get_logger()` function provides access to the configured logger instance.
+1.  File Handler:
+    - Writes logs to a file specified in the configuration
+      (`config["paths"]["logs_dir"]/pipeline.log`, defaults to `./logs/pipeline.log`).
+    - Level: `INFO` and above.
+    - Format: Detailed (Timestamp, Level, LoggerName:FuncName:LineNo, Message).
+    - Handles potential config errors or OS errors during setup.
+
+2.  Stream Handler (stdout):
+    - Prints logs to standard output (`sys.stdout`).
+    - Level: `DEBUG` and above.
+    - Format: Simpler (Time, Level, Message).
+    - Uses basicConfig as a fallback if stream handler setup fails.
+
+The configuration is performed only once by the internal `_setup_logger` function.
+Subsequent calls to `get_logger` return the same configured logger instance.
 """
 
-# src/utils/logger.py
-from loguru import logger
-import os
+import logging
+import sys
+import os # Keep os import
 from pathlib import Path
 from src.config import config
 
-# Ensure log directory exists
-log_dir = Path(config["paths"]["logs_dir"])
-log_dir.mkdir(parents=True, exist_ok=True)
+# --- Configuration Constants ---
+_logger_instance = None
+_DEFAULT_LOG_DIR = "./logs"
+_DEFAULT_LOG_FILENAME = "pipeline.log"
+_APP_LOGGER_NAME = "pipeline"
 
-log_file_path = log_dir / "pipeline.log"
-
-logger.remove()  # Remove default handlers to configure custom ones
-
-# Add structured JSON logging to file
-logger.add(
-    log_file_path,
-    format="{time:YYYY-MM-DD at HH:mm:ss} | {level:<8} | {name}:{function}:{line} - {message}",
-    rotation="10 MB",
-    retention="10 days",
-    compression="zip",
-    level="INFO",
-    serialize=True  # This outputs the log as a JSON string
-)
-
-# Optional: Add logging to stdout with different verbosity in human-readable format.
-logger.add(
-    lambda msg: print(msg, end=""),
-    format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | <cyan>{message}</cyan>",
-    level="DEBUG",
-)
-
-def get_logger():
+def _setup_logger() -> logging.Logger:
     """
-    Returns the configured logger instance.
+    Internal function to configure and return the singleton logger instance.
 
-    The logger outputs logs to a file in structured JSON format for easier integration
-    with log management systems, and also prints human-readable logs to stdout.
+    This function is called by `get_logger` and should not be called directly.
+    It performs the setup only once.
+
+    - Retrieves/creates the logger instance for `_APP_LOGGER_NAME`.
+    - Sets the logger's base level to DEBUG.
+    - Clears existing handlers to prevent duplication if called again.
+    - Creates, configures (level, formatter), and adds a StreamHandler for console output.
+    - Creates, configures (level, formatter), and adds a FileHandler using paths
+      from the global `config` object, with error handling for path/OS issues.
+
+    Returns:
+        logging.Logger: The configured singleton logger instance.
     """
-    return logger
+    global _logger_instance
+    if _logger_instance:
+        return _logger_instance
+
+    logger = logging.getLogger(_APP_LOGGER_NAME)
+    logger.setLevel(logging.DEBUG) # Set root level to lowest handler level
+
+    # Prevent adding handlers multiple times
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
+    # --- Formatter Definitions ---
+    file_formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
+    )
+    console_formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(message)s",
+        datefmt="%H:%M:%S"
+    )
+
+    # --- Stream Handler (Console) ---
+    try:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.DEBUG) # Log DEBUG and above to console
+        console_handler.setFormatter(console_formatter)
+        logger.addHandler(console_handler)
+    except Exception as e:
+        # Fallback basic logging if stream handler fails
+        logging.basicConfig(level=logging.WARNING) # Use basicConfig on the root logger
+        logging.error(f"Failed to configure console logging: {e}", exc_info=True)
+        # Continue to try setting up file handler
+
+    # --- File Handler ---
+    try:
+        log_dir_path_str = config.get("paths", {}).get("logs_dir", _DEFAULT_LOG_DIR)
+        log_dir = Path(log_dir_path_str)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file_path = log_dir / _DEFAULT_LOG_FILENAME
+
+        file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+        file_handler.setLevel(logging.INFO) # Log INFO and above to file
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
+
+    except KeyError as e:
+        # Log error using the already configured console handler (or basicConfig)
+        logger.error(f"Log directory path key missing in config: {e}. File logging disabled.")
+    except OSError as e:
+        logger.error(f"Failed to create log directory or file at '{log_dir_path_str}': {e}. File logging disabled.")
+    except Exception as e:
+        logger.error(f"Unexpected error configuring file logging: {e}", exc_info=True)
+
+    _logger_instance = logger
+    return _logger_instance
+
+def get_logger() -> logging.Logger:
+    """
+    Public function to retrieve the application's configured logger instance.
+
+    Calls the internal `_setup_logger` function to perform the one-time
+    configuration on the first call. Subsequent calls return the existing
+    singleton logger instance.
+
+    Returns:
+        logging.Logger: The application's configured logger instance.
+    """
+    return _setup_logger()
+
+# Initialize logger on import (optional, ensures setup happens early)
+# get_logger()

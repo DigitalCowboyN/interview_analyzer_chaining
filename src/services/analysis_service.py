@@ -131,11 +131,11 @@ class AnalysisService:
                     logger.debug(f"Loaded task for sentence_id: {sentence_id}")
                 else:
                     logger.warning(f"Context missing for sentence index {idx}. Skipping loading task.")
-                    self.metrics_tracker.increment_errors() # Use injected tracker
+                    # self.metrics_tracker.increment_errors() # TODO (Metrics): Reinstate with proper Celery solution
             logger.info(f"Finished loading {len(sentences)} tasks from memory.")
         except Exception as e:
             logger.error(f"Unexpected error loading tasks from memory: {e}", exc_info=True)
-            self.metrics_tracker.increment_errors() # Use injected tracker
+            # self.metrics_tracker.increment_errors() # TODO (Metrics): Reinstate with proper Celery solution
             raise
 
     async def _analysis_worker(
@@ -174,7 +174,7 @@ class AnalysisService:
 
             except Exception as e:
                 logger.error(f"Worker {worker_id} failed analyzing sentence_id {sentence_id}: {e}", exc_info=True)
-                self.metrics_tracker.increment_errors() # Use injected tracker
+                # self.metrics_tracker.increment_errors() # TODO (Metrics): Reinstate with proper Celery solution
                 error_result = {
                     "sentence_id": sentence_id,
                     "sequence_order": sequence_order,

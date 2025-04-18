@@ -19,7 +19,7 @@ Usage:
 
 """
 
-from typing import List, Dict
+from typing import List, Dict, Any, Optional
 from src.config import config  # Project configuration settings.
 from src.utils.logger import get_logger  # Centralized logger for the project.
 
@@ -40,14 +40,25 @@ class ContextBuilder:
         context_windows (dict): Dictionary mapping context type keys (str) to
                                 window sizes (int), loaded from configuration.
     """
-    def __init__(self):
+    def __init__(self, config_dict: Optional[Dict[str, Any]] = None):
         """Initializes ContextBuilder by loading context window sizes from config."""
-        # Load context window sizes from configuration.
-        self.context_windows = config["preprocessing"]["context_windows"]
-        # Initialize the SentenceTransformer model using the configured model name.
-        # self.embedder = SentenceTransformer(config["embedding"]["model_name"]) # Commented out unused embedder
-        # logger.info(f"ContextBuilder initialized with embedding model: {config['embedding']['model_name']}") # Commented out related log
-        logger.info("ContextBuilder initialized.") # Adjusted log message
+        # Use provided config_dict or fall back to global config
+        from src.config import config as global_config # Import locally
+        config_to_use = config_dict or global_config
+        
+        try:
+            # Read context windows from the determined config
+            self.context_windows = config_to_use["preprocessing"]["context_windows"]
+            logger.info(f"ContextBuilder initialized with windows: {self.context_windows}")
+            self.config = config_to_use # Store for potential future use
+        except KeyError as e:
+            logger.error(f"Config key missing for context_windows: {e}. Using default empty windows.")
+            self.context_windows = {}
+            self.config = config_to_use # Still store config
+        except Exception as e:
+            logger.error(f"Failed to initialize ContextBuilder config: {e}", exc_info=True)
+            self.context_windows = {}
+            self.config = config_to_use # Still store config
 
     def build_context(self, sentences: List[str], idx: int, window_size: int) -> str:
         """
@@ -165,6 +176,27 @@ class ContextBuilder:
             
         logger.info(f"Built all textual contexts for {len(sentences)} sentences.")
         return contexts
+
+    def build_sentence_context(self, sentences: List[str], index: int) -> Dict[str, str]:
+        """
+        Builds context for a specific sentence index using configured windows.
+
+        Args:
+            sentences (List[str]): The full list of sentences.
+            index (int): The index of the target sentence.
+
+        Returns:
+            Dict[str, str]: A dictionary where keys are window names (e.g., 'immediate')
+                           and values are the context strings for that window.
+        """
+        sentence_contexts = {}
+        for window_name, window_size in self.context_windows.items():
+            start_index = max(0, index - window_size)
+            end_index = min(len(sentences), index + window_size + 1)
+            # Exclude the sentence itself if necessary (policy decision, current includes it)
+            context_list = sentences[start_index:end_index]
+            sentence_contexts[window_name] = " ".join(context_list)
+        return sentence_contexts
 
 
 # Create a singleton instance for application-wide use.
