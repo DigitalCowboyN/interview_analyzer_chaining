@@ -8,9 +8,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from pathlib import Path
 from typing import List, Dict, Any
 import json # Needed for loading json lines
+import pydantic
 
 from src.config import config # Assuming config is accessible
-from src.api.schemas import FileListResponse, FileContentResponse # Import the response schema
+from src.api.schemas import FileListResponse, FileContentResponse, AnalysisResult # Import the response schema and new models
 from src.utils.logger import get_logger
 
 router = APIRouter(
@@ -49,69 +50,180 @@ def get_analysis_suffix() -> str:
 
 # --- Updated Endpoints --- 
 
-@router.get("/", response_model=FileListResponse)
-async def list_analysis_files(output_dir: Path = Depends(get_output_dir),
-                              analysis_suffix: str = Depends(get_analysis_suffix)):
-    """Lists available analysis result files (.jsonl) in the output directory."""
+@router.get(
+    "/", 
+    response_model=FileListResponse,
+    summary="List Available Analysis Files"
+)
+async def list_analysis_files():
+    """
+    Retrieves a list of completed analysis filenames.
+    
+    Scans the configured output directory for files ending with the analysis suffix.
+    Returns an empty list if the directory doesn't exist or no files are found.
+    Raises HTTPException 500 on internal server errors during listing.
+    """
     try:
-        # Dependencies injected
-        logger.info(f"Scanning for analysis files in: {output_dir} with suffix: {analysis_suffix}")
-
+        output_dir_str = config.get("paths", {}).get("output_dir", "./data/output")
+        analysis_suffix = config.get("paths", {}).get("analysis_suffix", "_analysis.jsonl")
+        output_dir = Path(output_dir_str)
+        
         if not output_dir.is_dir():
             logger.warning(f"Output directory not found: {output_dir}")
+            # Return empty list if dir doesn't exist
             return FileListResponse(filenames=[]) 
-
+            
+        # Use glob to find files ending with the suffix
         analysis_files = [f.name for f in output_dir.glob(f"*{analysis_suffix}") if f.is_file()]
         
-        logger.info(f"Found {len(analysis_files)} analysis files.")
         return FileListResponse(filenames=sorted(analysis_files))
         
-    except Exception as e: # Simplified catch block as config errors handled in deps
+    except Exception as e:
         logger.error(f"Error listing analysis files: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        # Return an internal server error response
+        raise HTTPException(status_code=500, detail="Internal server error listing analysis files.")
 
-@router.get("/{filename}", response_model=FileContentResponse)
-async def get_analysis_file_content(filename: str, 
-                                  output_dir: Path = Depends(get_output_dir),
-                                  analysis_suffix: str = Depends(get_analysis_suffix)):
-    """Retrieves the content of a specific analysis result file (.jsonl)."""
+@router.get(
+    "/{filename}", 
+    response_model=FileContentResponse,
+    summary="Get Analysis File Content"
+)
+async def get_analysis_file_content(filename: str):
+    """
+    Retrieves the content of a specific analysis file.
+
+    Reads the specified .jsonl file from the output directory, parses each line
+    as JSON, and returns the results. Malformed JSON lines are skipped and logged.
+
+    Args:
+        filename (str): The name of the analysis file (e.g., "interview1_analysis.jsonl").
+
+    Returns:
+        FileContentResponse: The content of the file including filename and results.
+
+    Raises:
+        HTTPException(404): If the specified file does not exist.
+        HTTPException(500): If there's an OS error reading the file or another internal error.
+    """
     try:
-        # Dependencies injected
-
-        # Basic validation: check suffix
-        if not filename.endswith(analysis_suffix):
-            logger.warning(f"Requested filename '{filename}' does not have expected suffix '{analysis_suffix}'.")
-            raise HTTPException(status_code=400, detail="Invalid filename suffix.")
-
-        # Use the injected output_dir object
+        output_dir_str = config.get("paths", {}).get("output_dir", "./data/output")
+        output_dir = Path(output_dir_str)
         file_path = output_dir / filename
-        logger.info(f"Attempting to read file: {file_path}")
 
         if not file_path.is_file():
-            logger.warning(f"Requested file not found: {file_path}")
-            raise HTTPException(status_code=404, detail="File not found.")
+            logger.warning(f"Requested analysis file not found: {file_path}")
+            raise HTTPException(status_code=404, detail=f"Analysis file not found: {filename}")
 
-        content = []
+        results = []
         try:
-            # Use the derived file_path object (which originated from the injected mock)
             with file_path.open('r', encoding='utf-8') as f:
                 for line in f:
-                    try:
-                        content.append(json.loads(line.strip()))
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON line in {filename}: {line.strip()}")
-            logger.info(f"Successfully read {len(content)} lines from {filename}.")
-            return FileContentResponse(content=content)
-        except IOError as e:
-            logger.error(f"Error reading file {file_path}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Error reading file.")
+                    line = line.strip()
+                    if line:
+                        try:
+                            # Parse JSON line into a dictionary
+                            data = json.loads(line)
+                            # Validate with Pydantic model (optional but good practice)
+                            # analysis_item = AnalysisResult(**data) 
+                            # results.append(analysis_item)
+                            results.append(data) # For now, just append the dict
+                        except json.JSONDecodeError:
+                            logger.warning(f"Skipping malformed JSON line in {filename}: {line[:100]}...")
+                            # Decide whether to skip or raise 500 - skipping for now
+                        except Exception as pydantic_err: # Catch potential Pydantic validation error
+                            logger.warning(f"Skipping line due to validation/data error in {filename}: {pydantic_err}. Line: {line[:100]}...")
+                            # results.append({"error": "validation failed", "line": line}) # Option to include errors
+        except OSError as e:
+            logger.error(f"Error reading analysis file {filename}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Error reading file: {filename}")
 
-    except HTTPException: # Re-raise HTTP exceptions directly
-        raise
-    except IOError as e: # Specific handling for file read errors
-            logger.error(f"Error reading file {file_path}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Error reading file.")
+        # Return the results wrapped in the response model
+        return FileContentResponse(filename=filename, results=results)
+
+    except HTTPException as http_exc:
+        raise http_exc # Re-raise specific HTTP exceptions (like 404)
     except Exception as e:
-        # Catch other potential errors
-        logger.error(f"Error retrieving file content for {filename}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error") 
+        logger.error(f"Unexpected error retrieving content for file {filename}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error retrieving file content.")
+
+@router.get(
+    "/{filename}/sentences/{sentence_id}", 
+    response_model=AnalysisResult,
+    summary="Get Specific Sentence Analysis"
+)
+async def get_specific_sentence_analysis(filename: str, sentence_id: int):
+    """
+    Retrieves the analysis result for a specific sentence within a file.
+
+    Reads the specified .jsonl analysis file line by line, searching for the
+    entry matching the given `sentence_id`. Skips malformed lines.
+
+    Args:
+        filename (str): The name of the analysis file.
+        sentence_id (int): The ID of the sentence to retrieve.
+
+    Returns:
+        AnalysisResult: The analysis data for the specified sentence.
+
+    Raises:
+        HTTPException(404): If the file is not found, or the sentence_id is not found 
+                            within the file (after skipping malformed lines).
+        HTTPException(500): If there's an OS error reading the file, a validation error 
+                            for the target sentence's data, or another internal error.
+    """
+    logger.debug(f"Request received for sentence {sentence_id} in file {filename}")
+    try:
+        output_dir_str = config.get("paths", {}).get("output_dir", "./data/output")
+        output_dir = Path(output_dir_str)
+        file_path = output_dir / filename
+
+        if not file_path.is_file():
+            logger.warning(f"Analysis file not found for specific sentence request: {file_path}")
+            raise HTTPException(status_code=404, detail=f"Analysis file not found: {filename}")
+
+        found_result = None
+        try:
+            with file_path.open('r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        # Check if 'sentence_id' exists and matches the requested ID
+                        if data.get("sentence_id") == sentence_id:
+                            logger.info(f"Found sentence {sentence_id} in {filename} at line {line_num + 1}")
+                            # Validate data against the response model
+                            try:
+                                found_result = AnalysisResult(**data)
+                                break # Exit loop once found
+                            except pydantic.ValidationError as validation_err:
+                                logger.error(f"Data validation failed for sentence {sentence_id} in {filename}: {validation_err}. Data: {data}")
+                                # Raise 500 as this indicates bad data was written for the specific requested sentence
+                                raise HTTPException(status_code=500, detail=f"Data validation error for sentence {sentence_id}")
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping malformed JSON line {line_num + 1} in {filename} while searching for sentence {sentence_id}")
+                        continue # Keep searching
+                    # Catch the specific HTTPException from validation and re-raise it
+                    except HTTPException as http_exc:
+                        raise http_exc
+                    # Catch other unexpected errors during line processing (excluding JSONDecodeError and ValidationError handled above)
+                    except Exception as inner_e:
+                         logger.warning(f"Skipping line {line_num + 1} in {filename} due to unexpected error processing line data (excluding JSON/Validation): {inner_e}. Line: {line[:100]}...")
+                         continue # Keep searching
+
+        except OSError as e:
+            logger.error(f"Error reading analysis file {filename} while searching for sentence {sentence_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Error reading file: {filename}")
+
+        if found_result:
+            return found_result
+        else:
+            logger.warning(f"Sentence ID {sentence_id} not found in file {filename}")
+            raise HTTPException(status_code=404, detail=f"Sentence ID {sentence_id} not found in file {filename}")
+
+    except HTTPException as http_exc:
+        raise http_exc # Re-raise specific HTTP exceptions
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving sentence {sentence_id} for file {filename}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error retrieving sentence analysis.") 

@@ -5,127 +5,168 @@ Tests for the API endpoints defined in src/api/routers/analysis.py.
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
+from fastapi import status, BackgroundTasks
 from pathlib import Path
-import unittest.mock
 
-# Import the FastAPI app and dependencies to override
-from src.main import app
-# Import all dependency functions used
-from src.api.routers.analysis import get_input_dir, get_output_dir, get_map_dir, get_config_dep
-# Remove import of original config object if no longer needed elsewhere
-# from src.config import config as app_config
+# Import the FastAPI app to create a TestClient
+from src.main import app 
+# Import schemas used in requests/responses
+from src.api.schemas import AnalysisTriggerRequest, AnalysisTriggerResponse
 
 client = TestClient(app)
 
-# --- Mock Configuration --- (Can potentially be shared with test_files_api)
+# Mock config data (similar to test_files_api.py)
 MOCK_INPUT_DIR = "/mock/input/dir"
-MOCK_OUTPUT_DIR = "/mock/output/dir"
-MOCK_MAP_DIR = "/mock/map/dir"
 MOCK_CONFIG = {
     "paths": {
         "input_dir": MOCK_INPUT_DIR,
-        "output_dir": MOCK_OUTPUT_DIR,
-        "map_dir": MOCK_MAP_DIR,
-        "analysis_suffix": "_analysis.jsonl" # Needed by other parts potentially
+        # Add other paths if needed by run_pipeline or its callees
+        "output_dir": "/mock/output/dir", 
+        "map_dir": "/mock/map/dir",
+        "analysis_suffix": "_analysis.jsonl"
     }
 }
 
-# --- Global Dependency Overrides ---
-# Remove override for the original config object
-# if get_mock_config in app.dependency_overrides:
-#     app.dependency_overrides.pop(get_mock_config) # Adjust if key was app_config
-# Override the new config dependency function
-app.dependency_overrides[get_config_dep] = lambda: MOCK_CONFIG
+VALID_INPUT_FILENAME = "interview_transcript.txt"
+NON_EXISTENT_FILENAME = "ghost.txt"
+INVALID_FILENAME_FORMAT = "../sneaky_file.txt"
 
-# --- Test Data ---
-VALID_INPUT_FILENAME = "test_transcript.txt"
-NON_EXISTENT_INPUT_FILENAME = "non_existent_transcript.txt"
-
-# --- Tests ---
+# Test functions will go here
 
 def test_trigger_analysis_success():
-    """Test POST /analyze/ successfully triggers analysis for an existing file."""
-    mock_input_dir_obj = MagicMock(spec=Path)
-    mock_output_dir_obj = MagicMock(spec=Path)
-    mock_map_dir_obj = MagicMock(spec=Path)
-    mock_input_file_path_obj = MagicMock(spec=Path)
-
-    # Configure mocks
-    mock_input_dir_obj.__truediv__.return_value = mock_input_file_path_obj
-    mock_input_file_path_obj.is_file.return_value = True # File exists
-
-    # Override path dependencies
-    app.dependency_overrides[get_input_dir] = lambda: mock_input_dir_obj
-    app.dependency_overrides[get_output_dir] = lambda: mock_output_dir_obj
-    app.dependency_overrides[get_map_dir] = lambda: mock_map_dir_obj
-
-    # Patch the .delay() method of the Celery task
-    # Target where the task is imported and called from (the router)
-    with patch("src.tasks.run_pipeline_for_file.delay") as mock_task_delay:
-        # Mock the return value of .delay() to simulate a task ID if needed
-        mock_task_delay.return_value = MagicMock(id="mock_task_123")
+    """Test POST /analysis/ successfully schedules analysis."""
+    # Patch config, Path, run_pipeline (which is now called by BackgroundTasks)
+    # AND BackgroundTasks itself to check add_task
+    with patch.dict("src.config.config.config", MOCK_CONFIG, clear=True), \
+         patch("src.api.routers.analysis.Path") as MockPath, \
+         patch("src.pipeline.run_pipeline") as mock_run_pipeline, \
+         patch("fastapi.BackgroundTasks.add_task") as mock_add_task: # Patch add_task
         
+        # Configure Path mocks
+        mock_input_dir_obj = MagicMock(spec=Path)
+        mock_input_file_path_obj = MagicMock(spec=Path)
+        MockPath.return_value = mock_input_dir_obj
+        mock_input_dir_obj.__truediv__.return_value = mock_input_file_path_obj
+        mock_input_file_path_obj.is_file.return_value = True
+
+        # --- Act --- 
         response = client.post(
-            "/analyze/", 
+            "/analysis/",
             json={"input_filename": VALID_INPUT_FILENAME}
         )
 
-    assert response.status_code == 202
-    assert response.json() == {
-        "message": "Analysis task accepted and queued.", # Verify updated message
-        "input_filename": VALID_INPUT_FILENAME
-        # Optionally check for task_id if API returns it
-    }
+        # --- Assert --- 
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert response.json() == {
+            "message": "Analysis task accepted and scheduled to run in background.",
+            "input_filename": VALID_INPUT_FILENAME
+        }
+        
+        # Check Path calls
+        MockPath.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_input_dir_obj.__truediv__.assert_called_once_with(VALID_INPUT_FILENAME)
+        mock_input_file_path_obj.is_file.assert_called_once()
+        
+        # Check that BackgroundTasks.add_task was called correctly
+        # Note: run_pipeline mock is checked implicitly via add_task args
+        mock_add_task.assert_called_once_with(
+            mock_run_pipeline, # Check the function itself was passed
+            input_dir=MOCK_INPUT_DIR, 
+            specific_file=VALID_INPUT_FILENAME
+        )
+        # Ensure the pipeline itself wasn't awaited directly
+        mock_run_pipeline.assert_not_awaited()
+        mock_run_pipeline.assert_not_called() # add_task holds the ref, doesn't call it here
 
-    # Assertions for mocks
-    mock_input_dir_obj.__truediv__.assert_called_once_with(VALID_INPUT_FILENAME)
-    mock_input_file_path_obj.is_file.assert_called_once()
+def test_trigger_analysis_invalid_filename():
+    """Test POST /analysis/ with invalid filename format (400)."""
+    # Only patch config internal dict
+    with patch.dict("src.config.config.config", MOCK_CONFIG, clear=True):
+        response = client.post(
+            "/analysis/",
+            json={"input_filename": INVALID_FILENAME_FORMAT}
+        )
     
-    # Check that the task's .delay() method was called correctly
-    mock_task_delay.assert_called_once_with(
-        input_file_path_str=str(mock_input_dir_obj / VALID_INPUT_FILENAME), # Construct expected str path
-        output_dir_str=str(mock_output_dir_obj),
-        map_dir_str=str(mock_map_dir_obj),
-        config_dict=MOCK_CONFIG # Check injected config was passed
-    )
-
-    # Clean up overrides
-    app.dependency_overrides.pop(get_input_dir)
-    app.dependency_overrides.pop(get_output_dir)
-    app.dependency_overrides.pop(get_map_dir)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Invalid input filename format" in response.json()["detail"]
 
 def test_trigger_analysis_file_not_found():
-    """Test POST /analyze/ returns 404 if the input file does not exist."""
-    mock_input_dir_obj = MagicMock()
-    mock_input_file_path_obj = MagicMock()
-    # Add mocks for other path dependencies, even if not used by main logic
-    mock_output_dir_obj = MagicMock()
-    mock_map_dir_obj = MagicMock()
+    """Test POST /analysis/ when input file does not exist (404)."""
+    # Patch config, Path, run_pipeline (not called), and add_task (not called)
+    with patch.dict("src.config.config.config", MOCK_CONFIG, clear=True), \
+         patch("src.api.routers.analysis.Path") as MockPath, \
+         patch("src.pipeline.run_pipeline") as mock_run_pipeline, \
+         patch("fastapi.BackgroundTasks.add_task") as mock_add_task:
+        
+        # Configure Path mocks for file not found
+        mock_input_dir_obj = MagicMock(spec=Path)
+        mock_input_file_path_obj = MagicMock(spec=Path)
+        MockPath.return_value = mock_input_dir_obj
+        mock_input_dir_obj.__truediv__.return_value = mock_input_file_path_obj
+        mock_input_file_path_obj.is_file.return_value = False
 
-    # Configure mocks for the input path check
-    mock_input_dir_obj.__truediv__.return_value = mock_input_file_path_obj
-    mock_input_file_path_obj.is_file.return_value = False # File does NOT exist
-
-    # Override *all* path dependencies declared by the endpoint
-    app.dependency_overrides[get_input_dir] = lambda: mock_input_dir_obj
-    app.dependency_overrides[get_output_dir] = lambda: mock_output_dir_obj
-    app.dependency_overrides[get_map_dir] = lambda: mock_map_dir_obj
-
-    # Patch the .delay() method
-    with patch("src.tasks.run_pipeline_for_file.delay") as mock_task_delay:
         response = client.post(
-            "/analyze/",
-            json={"input_filename": NON_EXISTENT_INPUT_FILENAME}
+            "/analysis/",
+            json={"input_filename": NON_EXISTENT_FILENAME}
         )
 
-    # Assertions (remain the same)
-    assert response.status_code == 404
-    assert "Input file not found" in response.json()["detail"]
-    mock_input_dir_obj.__truediv__.assert_called_once_with(NON_EXISTENT_INPUT_FILENAME)
-    mock_input_file_path_obj.is_file.assert_called_once()
-    mock_task_delay.assert_not_called() # Ensure task wasn't sent
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "Input file not found" in response.json()["detail"]
+        
+        # Check Path calls
+        MockPath.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_input_dir_obj.__truediv__.assert_called_once_with(NON_EXISTENT_FILENAME)
+        mock_input_file_path_obj.is_file.assert_called_once()
+        
+        # Ensure add_task and run_pipeline were NOT called
+        mock_run_pipeline.assert_not_called()
+        mock_add_task.assert_not_called()
 
-    # Clean up *all* overrides added in this test
-    app.dependency_overrides.pop(get_input_dir)
-    app.dependency_overrides.pop(get_output_dir)
-    app.dependency_overrides.pop(get_map_dir) 
+def test_trigger_analysis_pipeline_error_still_accepts():
+    """Test POST /analysis/ still returns 202 even if background task would fail."""
+    # Test that the API call itself succeeds (202) even if run_pipeline would error.
+    # The error happens in the background, not affecting the initial response.
+    pipeline_error_message = "Something broke in the pipeline!"
+    # Patch config, Path, run_pipeline (to configure side_effect for add_task) and add_task
+    with patch.dict("src.config.config.config", MOCK_CONFIG, clear=True), \
+         patch("src.api.routers.analysis.Path") as MockPath, \
+         patch("src.pipeline.run_pipeline") as mock_run_pipeline, \
+         patch("fastapi.BackgroundTasks.add_task") as mock_add_task:
+        
+        # Configure Path mocks for file exists
+        mock_input_dir_obj = MagicMock(spec=Path)
+        mock_input_file_path_obj = MagicMock(spec=Path)
+        MockPath.return_value = mock_input_dir_obj
+        mock_input_dir_obj.__truediv__.return_value = mock_input_file_path_obj
+        mock_input_file_path_obj.is_file.return_value = True
+        
+        # Configure run_pipeline side effect (won't be called directly)
+        # This error would happen when the background task runner executes it.
+        mock_run_pipeline.side_effect = Exception(pipeline_error_message)
+
+        response = client.post(
+            "/analysis/",
+            json={"input_filename": VALID_INPUT_FILENAME}
+        )
+
+        # API should still accept the request
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert response.json() == {
+            "message": "Analysis task accepted and scheduled to run in background.",
+            "input_filename": VALID_INPUT_FILENAME
+        }
+
+        # Check Path calls were made
+        MockPath.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_input_dir_obj.__truediv__.assert_called_once_with(VALID_INPUT_FILENAME)
+        mock_input_file_path_obj.is_file.assert_called_once()
+        
+        # Check add_task was called correctly, even though run_pipeline would fail later
+        mock_add_task.assert_called_once_with(
+            mock_run_pipeline, # The function that *would* raise error
+            input_dir=MOCK_INPUT_DIR, 
+            specific_file=VALID_INPUT_FILENAME
+        )
+        # Ensure run_pipeline wasn't called or awaited directly by the endpoint
+        mock_run_pipeline.assert_not_awaited()
+        mock_run_pipeline.assert_not_called() 

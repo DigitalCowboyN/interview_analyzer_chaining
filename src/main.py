@@ -15,16 +15,21 @@ from src.utils.logger import get_logger
 from src.utils.metrics import metrics_tracker # Import metrics tracker
 from fastapi import FastAPI
 # --- Add router imports --- 
-from src.api.routers import files, analysis # Import the new router
+from src.api.routers import files as files_router
+from src.api.routers import analysis as analysis_router
 # -------------------------
 
 logger = get_logger()
 
-app = FastAPI(title="Interview Analyzer API", version="0.1.0")
+app = FastAPI(
+    title="Interview Analyzer API",
+    description="API for analyzing interview transcripts.",
+    version="0.1.0"
+)
 
 # --- Include the routers ---
-app.include_router(files.router)
-app.include_router(analysis.router) # Add the analysis router
+app.include_router(files_router.router)
+app.include_router(analysis_router.router) # Add the analysis router
 # ------------------------------
 
 @app.get("/", tags=["Health Check"])

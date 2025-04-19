@@ -5,13 +5,14 @@ Provides a simple centralized tracker for key performance and cost metrics.
 """
 
 from time import time
+from typing import Dict, Any
 
 class MetricsTracker:
     """
     A simple singleton-like class (by convention) to track key operational metrics.
 
     Provides methods to increment counters for API calls, token usage, and errors,
-    and to time the overall pipeline execution. A summary of metrics can be retrieved.
+    and to time the overall pipeline execution. Also allows setting arbitrary custom metrics.
     A global instance `metrics_tracker` is provided for convenience.
 
     Attributes:
@@ -20,6 +21,7 @@ class MetricsTracker:
         pipeline_start_time (float | None): Timestamp when the pipeline started.
         pipeline_end_time (float | None): Timestamp when the pipeline ended.
         errors (int): Count of errors encountered during processing.
+        custom_metrics (Dict[str, Dict[str, Any]]): Storage for arbitrary metrics categorized by scope.
     """
     def __init__(self):
         """Initializes the MetricsTracker by resetting all counters."""
@@ -32,6 +34,8 @@ class MetricsTracker:
         self.pipeline_start_time: float | None = None
         self.pipeline_end_time: float | None = None
         self.errors: int = 0 # Basic error tracking
+        self.custom_metrics: Dict[str, Dict[str, Any]] = {} # Initialize custom metrics storage
+        self.file_timers: Dict[str, float] = {} # Track start times for individual files
 
     def increment_api_calls(self, count: int = 1):
         """
@@ -62,36 +66,91 @@ class MetricsTracker:
         """Records the end time of the pipeline using `time.time()`."""
         self.pipeline_end_time = time()
 
-    def increment_errors(self, count: int = 1):
-         """
-         Increments the count of errors encountered.
+    def increment_errors(self, category: str = "global", count: int = 1):
+        """
+        Increments the count of errors encountered, optionally by category.
 
-         Args:
+        Args:
+            category (str): The category or scope of the error (e.g., 'pipeline', 'file_name'). Defaults to 'global'.
             count (int): The number of errors to add. Defaults to 1.
-         """
-         self.errors += count
+        """
+        self.errors += count # Keep global count for simplicity in summary? Or make it category based?
+        # Optionally track errors per category
+        # self.set_metric(category, "errors", self.custom_metrics.get(category, {}).get("errors", 0) + count)
+
+    # --- Add start/stop file timer ---
+    def start_file_timer(self, filename: str):
+        """Records the start time for processing a specific file."""
+        self.file_timers[filename] = time()
+
+    def stop_file_timer(self, filename: str):
+        """Calculates and stores the elapsed time for a processed file."""
+        if filename in self.file_timers:
+            elapsed = time() - self.file_timers[filename]
+            self.set_metric(filename, "processing_time_seconds", round(elapsed, 2))
+            # Remove from active timers once stopped
+            # del self.file_timers[filename] # Keep it? Or clear? Keep for now.
+        else:
+            # Log a warning?
+            pass
+
+    # --- Add set_metric method ---
+    def set_metric(self, category: str, key: str, value: Any):
+        """
+        Sets or updates a custom metric within a specific category.
+
+        Args:
+            category (str): The category for the metric (e.g., 'pipeline', filename).
+            key (str): The name of the metric (e.g., 'files_processed', 'verification_errors').
+            value (Any): The value of the metric.
+        """
+        if category not in self.custom_metrics:
+            self.custom_metrics[category] = {}
+        self.custom_metrics[category][key] = value
+
+    # --- Add increment_metric method (optional helper) ---
+    def increment_metric(self, category: str, key: str, increment_by: int = 1):
+        """
+        Increments a numeric custom metric within a specific category.
+
+        Args:
+            category (str): The category for the metric.
+            key (str): The name of the metric.
+            increment_by (int): The value to add to the metric. Defaults to 1.
+        """
+        current_value = self.custom_metrics.get(category, {}).get(key, 0)
+        if isinstance(current_value, (int, float)):
+            self.set_metric(category, key, current_value + increment_by)
+        else:
+            # Log warning: trying to increment non-numeric metric
+            self.set_metric(category, key, increment_by) # Overwrite if not numeric?
+
+    # --- Add increment_results_processed (specific helper needed in pipeline) ---
+    def increment_results_processed(self, filename: str, count: int = 1):
+        """Helper to increment results processed count for a file."""
+        self.increment_metric(filename, "results_processed", count)
 
     def get_summary(self) -> dict:
         """
-        Returns a dictionary summarizing the tracked metrics.
+        Returns a dictionary summarizing the tracked metrics, including custom ones.
 
         Calculates the pipeline duration if start and end times are available.
 
         Returns:
-            dict: A dictionary containing keys like 'total_api_calls',
-                  'total_tokens_used', 'total_errors', and 
-                  'pipeline_duration_seconds'.
+            dict: A dictionary containing standard metrics and custom metrics.
         """
         duration = None
         if self.pipeline_start_time and self.pipeline_end_time:
             duration = self.pipeline_end_time - self.pipeline_start_time
-        
-        return {
+
+        summary = {
             "total_api_calls": self.api_calls,
             "total_tokens_used": self.total_tokens,
-            "total_errors": self.errors,
-            "pipeline_duration_seconds": duration
+            "total_errors": self.errors, # Overall error count
+            "pipeline_duration_seconds": duration,
+            "custom_metrics": self.custom_metrics # Include all custom metrics
         }
+        return summary
 
 # Global instance
 metrics_tracker = MetricsTracker() 

@@ -4,110 +4,109 @@ src/api/routers/analysis.py
 API router for triggering and managing analysis tasks.
 """
 
-from fastapi import APIRouter, HTTPException, Depends # Removed BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, status
+from typing import Dict, Any
 from pathlib import Path
+import uuid # Import uuid
 
-from src.api.schemas import AnalysisRequest, AnalysisResponse
-# Removed direct config import as it's injected
-# from src.config import config 
+# Import necessary schemas
+from src.api.schemas import AnalysisTriggerRequest, AnalysisTriggerResponse 
+
+# Import the core pipeline function (adjust path if necessary)
+# from src.pipeline import run_pipeline 
+
+# Import logger
 from src.utils.logger import get_logger
-# Import the Celery task
-from src.tasks import run_pipeline_for_file 
-# Keep dependency function imports from *other* files
-from src.api.routers.files import get_output_dir 
-# Remove the incorrect relative import for locally defined functions
-# from . import get_input_dir, get_map_dir, get_config_dep 
 
 router = APIRouter(
-    prefix="/analyze",
+    prefix="/analysis",
     tags=["Analysis"]
 )
 
 logger = get_logger()
 
-# --- Dependency Functions (similar to files.py, adapt if needed) ---
-def get_input_dir() -> Path:
-    """Dependency function to get the input directory Path object from config."""
-    from src.config import config # Import locally
-    try:
-        return Path(config['paths']['input_dir'])
-    except KeyError as e:
-        logger.critical(f"Config missing 'paths.input_dir': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Server configuration error for input path.")
+# Endpoint implementation will go here
 
-# Reuse get_output_dir from files router (or define here if preferred)
-# Add get_map_dir dependency
-def get_map_dir() -> Path:
-    """Dependency function to get the map directory Path object from config."""
-    from src.config import config # Import locally
-    try:
-        # Use .get for the optional map_dir key
-        map_dir_str = config['paths'].get("map_dir", "data/maps") 
-        return Path(map_dir_str)
-    except KeyError as e:
-        # This would only happen if 'paths' itself is missing
-        logger.critical(f"Config missing 'paths' key: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Server configuration error for paths.")
-    except Exception as e:
-        logger.critical(f"Error creating map_dir Path: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Server configuration error for map path.")
-
-# Add config dependency function
-def get_config_dep() -> dict:
-    """Dependency function to return the underlying config dictionary."""
-    from src.config import config # Import locally
-    if config is None or not hasattr(config, 'config'):
-        logger.critical("Global config object or its data not loaded!")
-        raise HTTPException(status_code=500, detail="Server configuration not loaded.")
-    # Return the actual dictionary attribute, not the Config object
-    return config.config
-
-@router.post("/", response_model=AnalysisResponse, status_code=202)
+@router.post(
+    "/", 
+    response_model=AnalysisTriggerResponse, 
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Trigger Analysis Pipeline"
+)
 async def trigger_analysis(
-    analysis_request: AnalysisRequest,
-    # background_tasks: BackgroundTasks, # Removed
-    input_dir: Path = Depends(get_input_dir),
-    output_dir: Path = Depends(get_output_dir),
-    map_dir: Path = Depends(get_map_dir),
-    config_dep: dict = Depends(get_config_dep) 
+    request: AnalysisTriggerRequest,
+    background_tasks: BackgroundTasks # Inject BackgroundTasks
 ):
-    """Triggers the analysis pipeline task for a specified input file via Celery."""
-    input_filename = analysis_request.input_filename
-    # Construct the full path for validation
-    # NOTE: input_dir here is the *directory* from the dependency
-    input_file_path = input_dir / input_filename
-    
-    logger.info(f"Received analysis request for: {input_filename}")
+    """
+    Triggers the analysis pipeline for a specific input file to run in the background.
 
-    # --- Validation (Input file exists) --- 
-    if not input_file_path.is_file():
-        logger.warning(f"Requested input file not found: {input_file_path}")
-        raise HTTPException(status_code=404, detail=f"Input file not found: {input_filename}")
+    - Validates the input filename format.
+    - Checks if the specified file exists in the configured input directory.
+    - Schedules the `run_pipeline` function using background tasks.
 
-    # --- Trigger Celery Task --- 
-    logger.info(f"Sending analysis task for {input_file_path} to Celery queue.")
-    
-    # Convert Path objects to strings for Celery task arguments
-    input_file_path_str = str(input_file_path)
-    output_dir_str = str(output_dir)
-    map_dir_str = str(map_dir)
-    
-    # Call .delay() on the task to send it to the queue
+    Returns an immediate `202 Accepted` response indicating the task has been scheduled.
+    Errors during the background task execution itself are logged but do not affect this response.
+
+    Args:
+        request (AnalysisTriggerRequest): Request body containing the `input_filename`.
+        background_tasks (BackgroundTasks): FastAPI mechanism for running background tasks.
+
+    Returns:
+        AnalysisTriggerResponse: Confirmation message and the input filename.
+
+    Raises:
+        HTTPException(400): If the `input_filename` has an invalid format (e.g., contains `/` or `..`).
+        HTTPException(404): If the specified `input_filename` is not found in the input directory.
+        HTTPException(500): If there is an unexpected internal server error during request validation or task scheduling.
+    """
+    task_id = str(uuid.uuid4()) # Generate unique task ID
+    logger.info(f"[Task {task_id}] Received analysis trigger request for: {request.input_filename}")
     try:
-        task = run_pipeline_for_file.delay(
-            input_file_path_str=input_file_path_str, 
-            output_dir_str=output_dir_str,
-            map_dir_str=map_dir_str,
-            config_dict=config_dep 
-        )
-        logger.info(f"Task {task.id} sent to queue for file {input_filename}")
-    except Exception as e:
-        logger.error(f"Failed to send task to Celery queue: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to schedule analysis task.")
+        # Import locally to avoid potential circular dependencies at module level
+        from src.pipeline import run_pipeline 
+        from src.config import config
 
-    # --- Return Response --- 
-    return AnalysisResponse(
-        message="Analysis task accepted and queued.", # Updated message
-        input_filename=input_filename
-        # task_id=task.id # Optionally return task id
-    ) 
+        input_dir_str = config.get("paths", {}).get("input_dir", "./data/input")
+        input_dir = Path(input_dir_str)
+        input_file_path = input_dir / request.input_filename
+
+        # --- Validation ---
+        # Basic filename check (prevent path traversal)
+        if "/" in request.input_filename or ".." in request.input_filename:
+             logger.warning(f"[Task {task_id}] Invalid characters in requested input filename: {request.input_filename}")
+             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid input filename format.")
+
+        # Check if input file exists (run_pipeline might also do this, but good to check early)
+        if not input_file_path.is_file():
+            logger.warning(f"[Task {task_id}] Requested input file for analysis not found: {input_file_path}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Input file not found: {request.input_filename}")
+
+        # --- Schedule Pipeline in Background --- 
+        logger.info(f"[Task {task_id}] Scheduling background analysis task for {input_file_path}...")
+        background_tasks.add_task(
+            run_pipeline, 
+            task_id=task_id, # Pass the task_id
+            input_dir=input_dir_str, # Pass arguments needed by run_pipeline
+            specific_file=request.input_filename,
+            # Pass other necessary args if run_pipeline's signature changes
+            # output_dir=config.get("paths",{}).get("output_dir"), 
+            # map_dir=config.get("paths",{}).get("map_dir"),
+            # config=config.config # Pass the actual config dict if needed
+        )
+
+        return AnalysisTriggerResponse(
+            message="Analysis task accepted and scheduled to run in background.",
+            input_filename=request.input_filename,
+            task_id=task_id # Include task_id in response
+        )
+
+    except FileNotFoundError as fnf_error:
+        # Catch specific error if run_pipeline raises it for the input file
+        logger.warning(f"[Task {task_id}] Analysis failed: Input file not found during pipeline execution: {fnf_error}")
+        # The file existence check above should prevent this, but handle defensively.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Input file not found during analysis: {request.input_filename}")
+    except HTTPException as http_exc:
+        raise http_exc # Re-raise specific HTTP exceptions
+    except Exception as e:
+        logger.error(f"[Task {task_id}] Error triggering analysis for {request.input_filename}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error during analysis trigger.") 
