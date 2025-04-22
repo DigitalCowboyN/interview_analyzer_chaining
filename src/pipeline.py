@@ -135,20 +135,23 @@ async def _result_writer(
         metrics_tracker (MetricsTracker): Instance used to track errors during writing.
     """
     prefix = _log_prefix(task_id)
-    logger.info(f"{prefix}Result writer started for: {output_file}")
+    logger.debug(f"{prefix}Result writer starting for: {output_file}")
     results_written = 0
     while True:
         try:
+            logger.debug(f"{prefix}Writer waiting for item...")
             result = await results_queue.get()
+            logger.debug(f"{prefix}Writer received item: {type(result)}")
             if result is None: # Sentinel value indicates completion
                 logger.info(f"{prefix}Writer received sentinel. Exiting.")
                 results_queue.task_done() # Mark sentinel as processed
                 break
 
             try:
+                logger.debug(f"{prefix}Writer attempting to append result ID: {result.get('sentence_id', 'N/A')}")
                 append_json_line(result, output_file)
                 results_written += 1
-                logger.debug(f"{prefix}Writer appended result for sentence_id: {result.get('sentence_id', 'N/A')}")
+                logger.debug(f"{prefix}Writer successfully appended result ID: {result.get('sentence_id', 'N/A')}")
                 # Optionally track write success metric
                 # metrics_tracker.increment_write_success()
             except Exception as e:
@@ -165,7 +168,7 @@ async def _result_writer(
         except Exception as e:
             logger.critical(f"{prefix}Critical error in writer for {output_file}: {e}", exc_info=True)
             break # Exit loop on critical error
-    logger.info(f"{prefix}Result writer finished for: {output_file}. Total results written: {results_written}")
+    logger.debug(f"{prefix}Result writer loop finished for: {output_file}. Total written: {results_written}")
 
 def verify_output_completeness(map_path: Path, analysis_path: Path) -> Dict[str, Any]:
     """
@@ -379,7 +382,8 @@ async def process_file(
         
         # Assuming analyze_sentences returns a list of result dicts
         logger.info(f"{prefix}Starting sentence analysis for {input_file.name} using AnalysisService...")
-        analysis_results = await analysis_service.analyze_sentences(sentences, contexts)
+        # Pass task_id to the analysis service method
+        analysis_results = await analysis_service.analyze_sentences(sentences, contexts, task_id=task_id)
         logger.info(f"{prefix}AnalysisService completed analysis for {input_file.name}. Found {len(analysis_results)} results.")
         
         # --- Step 4: Write results using the writer task --- 
@@ -389,8 +393,11 @@ async def process_file(
             metrics_tracker.increment_results_processed(input_file.name)
 
         # Signal writer completion
-        await results_queue.put(None) 
-        await writer_task # Wait for writer to finish processing queue
+        await results_queue.put(None)
+        # Wait for the queue to be fully processed
+        await results_queue.join()
+        await writer_task # Wait for writer task coroutine to finish
+        await asyncio.sleep(0.01) # Small sleep (keep for now, maybe remove later)
         logger.info(f"{prefix}Result writing complete for {input_file.name}.")
         metrics_tracker.set_metric(input_file.name, "results_written", len(analysis_results)) # Track written count
 
@@ -734,7 +741,10 @@ async def analyze_specific_sentences(
     logger.info(f"{prefix}Analyzing {len(target_sentences)} specific sentences...")
     try:
         # Pass only the target sentences and their corresponding contexts
-        analysis_results = await analysis_service.analyze_sentences(target_sentences, target_contexts)
+        # Pass task_id as well
+        analysis_results = await analysis_service.analyze_sentences(
+            target_sentences, target_contexts, task_id=task_id
+        )
     except Exception as e:
          logger.error(f"{prefix}Error during specific sentence analysis: {e}", exc_info=True)
          raise

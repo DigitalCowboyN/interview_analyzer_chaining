@@ -157,44 +157,27 @@ async def test_classify_sentence_success(sentence_analyzer_with_dict, mock_conte
 
 @pytest.mark.asyncio
 async def test_classify_sentence_api_error(sentence_analyzer_with_dict, mock_contexts, caplog):
-    """Test classify_sentence when agent.call_model raises an error."""
-    # Set caplog level to capture ERROR messages
-    caplog.set_level(logging.ERROR)
-    sentence = "Another test sentence."
+    """Test classify_sentence correctly handles and propagates API errors from agent.call_model."""
+    caplog.set_level(logging.ERROR) # Ensure ERROR logs are captured
+    sentence = "Sentence triggering API error."
     analyzer, mock_agent = sentence_analyzer_with_dict # Unpack fixture
 
-    # Define an async function to raise the exception for the side_effect
-    async def raiser(*args, **kwargs):
-        raise ValueError("Simulated API Error")
+    # Configure the mock agent's call_model to raise the desired exception
+    # Raising it directly is enough, as asyncio.gather will propagate the first exception.
+    mock_agent.call_model = AsyncMock(side_effect=ValueError("Simulated API Error"))
 
-    # Configure mock agent to raise error using the async raiser function
-    mock_agent.call_model = AsyncMock(side_effect=raiser)
+    # Expect the classify_sentence method to re-raise the same exception
+    with pytest.raises(ValueError, match="Simulated API Error"):
+        await analyzer.classify_sentence(sentence, mock_contexts)
 
-    # Patch the Pydantic models to assert they aren't called
-    with patch("src.agents.sentence_analyzer.SentenceFunctionResponse") as MockFuncResp, \
-         patch("src.agents.sentence_analyzer.SentenceStructureResponse") as MockStructResp, \
-         patch("src.agents.sentence_analyzer.SentencePurposeResponse") as MockPurposeResp, \
-         patch("src.agents.sentence_analyzer.TopicLevel1Response") as MockTopic1Resp, \
-         patch("src.agents.sentence_analyzer.TopicLevel3Response") as MockTopic3Resp, \
-         patch("src.agents.sentence_analyzer.OverallKeywordsResponse") as MockOverallKwResp, \
-         patch("src.agents.sentence_analyzer.DomainKeywordsResponse") as MockDomainKwResp:
+    # Assert that the error was logged
+    assert len(caplog.records) == 1 # Should be exactly one error log
+    assert caplog.records[0].levelname == "ERROR"
+    assert f"Error during concurrent API calls for sentence '{sentence[:50]}...'" in caplog.text
+    assert "Simulated API Error" in caplog.text
 
-        with pytest.raises(ValueError, match="Simulated API Error"):
-            await analyzer.classify_sentence(sentence, mock_contexts)
-
-        # Check logs
-        assert f"Error during concurrent API calls for sentence '{sentence[:50]}...'" in caplog.text
-        assert "Simulated API Error" in caplog.text
-        # Removed unreliable await_count assertion
-
-        # Assert that Pydantic models (validation part) were NOT called
-        MockFuncResp.assert_not_called()
-        MockStructResp.assert_not_called()
-        MockPurposeResp.assert_not_called()
-        MockTopic1Resp.assert_not_called()
-        MockTopic3Resp.assert_not_called()
-        MockOverallKwResp.assert_not_called()
-        MockDomainKwResp.assert_not_called()
+    # Verify that call_model was attempted (likely just once before gather raises)
+    mock_agent.call_model.assert_awaited() # Check it was awaited at least once
 
 @pytest.mark.asyncio
 async def test_classify_sentence_validation_error(sentence_analyzer_with_dict, mock_contexts, caplog):

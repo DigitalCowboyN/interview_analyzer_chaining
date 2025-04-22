@@ -233,59 +233,63 @@ class SentenceAnalyzer:
         logger.debug(f"Completed analysis for sentence: {sentence[:50]}...")
         return results
 
-    async def analyze_sentences(self, sentences: list) -> List[Dict[str, Any]]:
-        """
-        DEPRECATED: This method is no longer used by the main pipeline.
-        The pipeline now processes sentences individually using `classify_sentence`.
-
-        Analyzes a list of sentences sequentially, building contexts internally.
-        Prefer using the main pipeline (`src.pipeline.process_file`) which handles
-        context building and concurrent analysis more efficiently.
-
-        Args:
-            sentences (List[str]): A list of sentences to analyze.
-
-        Returns:
-            List[Dict[str, Any]]: A list of dictionaries, each containing the
-                classification results for a sentence, augmented with "sentence_id"
-                and the original "sentence".
-
-        Raises:
-            ValueError: If the sentences list is empty.
-        """
-        # Build contexts for all sentences. The context builder returns a dictionary for each sentence.
-        # Note: This internal context building is less efficient than the pipeline's approach.
-        logger.warning("analyze_sentences is deprecated and less efficient; use the main pipeline.")
-        if not sentences:
-             raise ValueError("Input sentence list cannot be empty.")
-
-        contexts = context_builder.build_all_contexts(sentences)
-        results = []  # List to accumulate analysis results.
-
-        # Process each sentence with its corresponding context.
-        for idx, sentence in enumerate(sentences):
-            # Need to handle potential KeyError if context building failed, though unlikely
-            sentence_context = contexts.get(idx)
-            if sentence_context is None:
-                 logger.error(f"Context missing for sentence index {idx}. Skipping analysis for this sentence.")
-                 # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
-                 continue 
-
-            try:
-                 result = await self.classify_sentence(sentence, sentence_context)
-                 # Augment the result with the sentence ID and the original sentence.
-                 # Ensure keys from classify_sentence are present before updating
-                 result.update({"sentence_id": idx, "sentence": sentence}) # sentence is already in result
-                 result["sentence_id"] = idx # Just add id
-                 logger.debug(f"Completed analysis for sentence ID {idx}")
-                 results.append(result)
-            except Exception as e:
-                 # Log error from classify_sentence if it propagates
-                 logger.error(f"Error analyzing sentence ID {idx}: {e}", exc_info=True)
-                 # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
-                 # Skip appending failed analysis
-
-        return results
+    # --- Deprecated Method --- 
+    # async def analyze_sentences(self, sentences: list) -> List[Dict[str, Any]]:
+    #     """
+    #     DEPRECATED: Analyzes a list of sentences, building contexts internally.
+    # 
+    #     This method is inefficient as it rebuilds context for each call.
+    #     Use the pipeline orchestrator (`run_pipeline` or `process_file`) which injects
+    #     an `AnalysisService` that manages context building and analysis more effectively.
+    # 
+    #     Args:
+    #         sentences (list): A list of sentence strings to analyze.
+    # 
+    #     Returns:
+    #         List[Dict[str, Any]]: A list of dictionaries, where each contains the 
+    #             classification results for a sentence, augmented with "sentence_id"
+    #             and the original "sentence".
+    # 
+    #     Raises:
+    #         ValueError: If the sentences list is empty.
+    #     """
+    #     # Build contexts for all sentences. The context builder returns a dictionary for each sentence.
+    #     # Note: This internal context building is less efficient than the pipeline's approach.
+    #     logger.warning("analyze_sentences is deprecated and less efficient; use the main pipeline.")
+    #     if not sentences:
+    #          raise ValueError("Input sentence list cannot be empty.")
+    # 
+    #     # !!! INCORRECT USAGE - Causes NameError: context_builder not defined !!!
+    #     # contexts = context_builder.build_all_contexts(sentences) 
+    #     contexts = {} # Placeholder if we were to keep the method structure
+    #     logger.error("analyze_sentences method is deprecated and contains non-functional context building logic.")
+    # 
+    #     results = []  # List to accumulate analysis results.
+    # 
+    #     # Process each sentence with its corresponding context.
+    #     for idx, sentence in enumerate(sentences):
+    #         # Need to handle potential KeyError if context building failed, though unlikely
+    #         sentence_context = contexts.get(idx)
+    #         if sentence_context is None:
+    #              logger.error(f"Context missing for sentence index {idx}. Skipping analysis for this sentence.")
+    #              # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
+    #              continue 
+    # 
+    #         try:
+    #              result = await self.classify_sentence(sentence, sentence_context)
+    #              # Augment the result with the sentence ID and the original sentence.
+    #              # Ensure keys from classify_sentence are present before updating
+    #              result.update({"sentence_id": idx, "sentence": sentence}) # sentence is already in result
+    #              result["sentence_id"] = idx # Just add id
+    #              logger.debug(f"Completed analysis for sentence ID {idx}")
+    #              results.append(result)
+    #         except Exception as e:
+    #              # Log error from classify_sentence if it propagates
+    #              logger.error(f"Error analyzing sentence ID {idx}: {e}", exc_info=True)
+    #              # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
+    #              # Skip appending failed analysis
+    # 
+    #     return results
 
 
 # Note: This module does not export a singleton instance by default.

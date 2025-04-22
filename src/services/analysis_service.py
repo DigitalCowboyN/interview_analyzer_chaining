@@ -1,7 +1,7 @@
 # src/services/analysis_service.py
 import asyncio
 import json
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from pathlib import Path # Added for potential future use if map reading moves here
 
 from src.utils.logger import get_logger
@@ -54,9 +54,15 @@ class AnalysisService:
             logger.error(f"Failed to build contexts: {e}", exc_info=True)
             raise
 
-    async def analyze_sentences(self, sentences: List[str], contexts: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    async def analyze_sentences(
+        self, 
+        sentences: List[str], 
+        contexts: List[Dict[str, str]], 
+        task_id: Optional[str] = None # Keep task_id parameter
+    ) -> List[Dict[str, Any]]:
         """Analyzes a list of sentences with their corresponding contexts using concurrent workers."""
-        logger.debug(f"Analyzing {len(sentences)} sentences.")
+        # Remove prefix usage
+        logger.debug(f"Analyzing {len(sentences)} sentences.") # Revert to original log
         if not sentences:
             logger.warning("analyze_sentences called with no sentences. Returning empty list.")
             return []
