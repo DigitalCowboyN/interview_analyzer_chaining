@@ -41,6 +41,8 @@ import time
 # Import agent classes needed for instantiation
 from src.agents.context_builder import ContextBuilder
 from src.agents.sentence_analyzer import SentenceAnalyzer
+# Import the new path helper
+from src.utils.path_helpers import generate_pipeline_paths, PipelinePaths
 
 logger = get_logger()
 
@@ -323,10 +325,29 @@ async def process_file(
     #     metrics_tracker=metrics_tracker 
     # )
 
-    # Derive output and map filenames
-    analysis_suffix = config.get("paths", {}).get("analysis_suffix", "_analysis.jsonl")
-    map_suffix = config.get("paths", {}).get("map_suffix", "_map.jsonl")
-    output_file = output_dir / f"{input_file.stem}{analysis_suffix}"
+    # Derive output and map filenames using the utility
+    try:
+        map_suffix = config.get("paths", {}).get("map_suffix", "_map.jsonl")
+        analysis_suffix = config.get("paths", {}).get("analysis_suffix", "_analysis.jsonl")
+        # Generate paths using the helper
+        pipeline_paths = generate_pipeline_paths(
+            input_file=input_file, 
+            map_dir=map_dir, 
+            output_dir=output_dir, 
+            map_suffix=map_suffix, 
+            analysis_suffix=analysis_suffix, 
+            task_id=task_id
+        )
+    except ValueError as e: # Handle potential error from path generation
+        logger.error(f"{prefix}Failed to generate pipeline paths for {input_file.name}: {e}")
+        metrics_tracker.increment_errors(input_file.name)
+        metrics_tracker.stop_file_timer(input_file.name)
+        raise
+
+    # Ensure output/map directories exist (create_map also does map_dir)
+    # analysis_suffix = config.get("paths", {}).get("analysis_suffix", "_analysis.jsonl")
+    # map_suffix = config.get("paths", {}).get("map_suffix", "_map.jsonl")
+    # output_file = output_dir / f"{input_file.stem}{analysis_suffix}"
     # map_file_path = map_dir / f"{input_file.stem}{map_suffix}" # Map path handled by create_map
 
     # Ensure output/map directories exist (create_map also does map_dir)
@@ -372,7 +393,8 @@ async def process_file(
     # --- Step 3: Analyze Sentences & Write Results --- 
     results_queue = asyncio.Queue()
     # Pass metrics_tracker and task_id to writer
-    writer_task = asyncio.create_task(_result_writer(output_file, results_queue, metrics_tracker, task_id))
+    # Use the generated path for the output file
+    writer_task = asyncio.create_task(_result_writer(pipeline_paths.analysis_file, results_queue, metrics_tracker, task_id))
 
     try:
         # Use AnalysisService to perform analysis, putting results on queue
@@ -585,9 +607,25 @@ async def run_pipeline(
     logger.info(f"{prefix}Starting output verification...")
     verification_results = []
     for file_path in files_to_process:
-        map_path = map_dir_path / f"{file_path.stem}{map_suffix}"
-        analysis_path = output_dir_path / f"{file_path.stem}{analysis_suffix}"
-        verification_result = verify_output_completeness(map_path, analysis_path)
+        # Use helper function to get paths for verification
+        try:
+            paths = generate_pipeline_paths(
+                input_file=file_path, 
+                map_dir=map_dir_path, 
+                output_dir=output_dir_path, 
+                map_suffix=map_suffix, 
+                analysis_suffix=analysis_suffix, 
+                task_id=task_id
+            )
+        except ValueError as e:
+            logger.error(f"{prefix}Skipping verification for {file_path.name}, cannot generate paths: {e}")
+            verification_results.append({
+                 "total_expected": 0, "total_actual": 0, "total_missing": 0,
+                 "missing_ids": [], "error": f"Path generation error: {e}"
+            })
+            continue # Skip to next file
+            
+        verification_result = verify_output_completeness(paths.map_file, paths.analysis_file)
         verification_results.append(verification_result)
         # Log individual file verification details
         if verification_result.get("error"):
@@ -623,47 +661,67 @@ async def analyze_specific_sentences(
     task_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    Analyzes only specific sentences from an input file.
+    Analyzes specific sentences identified by their IDs within a given input file.
 
-    This function is intended for re-analysis or targeted analysis.
-    It reads the corresponding map file to get sentence text and then uses
-    the AnalysisService to build contexts and analyze only the specified IDs.
+    Reads the corresponding map file to find the text of all sentences, then extracts
+    the target sentences and their contexts. Finally, calls the analysis service
+    for the target sentences and returns the remapped results.
 
     Args:
-        input_file_path (Path): Path to the original input text file.
-        sentence_ids (List[int]): A list of sentence IDs to analyze.
-        config (Dict[str, Any]): The application configuration dictionary.
-        analysis_service (AnalysisService): Injected instance for analysis.
-        task_id (Optional[str]): Unique ID for tracking/logging.
+        input_file_path (Path): Path to the original input text file (used to find the map).
+        sentence_ids (List[int]): List of sentence IDs to analyze.
+        config (Dict[str, Any]): Application configuration.
+        analysis_service (AnalysisService): Injected analysis service instance.
+        task_id (Optional[str]): Task identifier for logging.
 
     Returns:
-        List[Dict[str, Any]]: A list of analysis result dictionaries for the
-                              specified sentence IDs.
+        List[Dict[str, Any]]: List of analysis result dictionaries for the requested sentences.
 
     Raises:
-        FileNotFoundError: If the input file or its corresponding map file is not found.
-        ValueError: If a requested sentence_id is not found in the map file.
-        Exception: Propagates errors from context building or sentence analysis.
+        FileNotFoundError: If the map file cannot be found.
+        ValueError: If requested sentence IDs are not found in the map file.
+        Exception: Propagates exceptions from analysis service or file reading.
     """
     prefix = _log_prefix(task_id)
-    logger.info(f"{prefix}Starting specific sentence analysis for {input_file_path.name}, IDs: {sentence_ids}")
-    if not sentence_ids:
-        logger.warning(f"{prefix}No sentence IDs provided for specific analysis. Returning empty list.")
-        return []
+    logger.info(f"{prefix}Starting analysis for specific sentences in: {input_file_path.name}, IDs: {sentence_ids}")
+
+    # --- Configuration and Path Setup --- 
+    try:
+        map_dir_str = config.get("paths", {}).get("map_dir", "./data/maps")
+        map_suffix = config.get("paths", {}).get("map_suffix", "_map.jsonl")
+        # Analysis path details not strictly needed here, but need valid args for helper
+        output_dir_str = config.get("paths", {}).get("output_dir", "./data/output") # Dummy
+        analysis_suffix = config.get("paths", {}).get("analysis_suffix", "_analysis.jsonl") # Dummy
+
+        map_dir = Path(map_dir_str)
+        output_dir = Path(output_dir_str) # Dummy path object
         
-    if not input_file_path.is_file():
-        logger.error(f"{prefix}Input file not found for specific analysis: {input_file_path}")
-        raise FileNotFoundError(f"Input file not found: {input_file_path}")
+        # Use path helper to get the map file path
+        pipeline_paths = generate_pipeline_paths(
+            input_file=input_file_path,
+            map_dir=map_dir,
+            output_dir=output_dir, # Pass dummy output dir
+            map_suffix=map_suffix,
+            analysis_suffix=analysis_suffix, # Pass dummy analysis suffix
+            task_id=task_id
+        )
+        map_file = pipeline_paths.map_file
+        # map_file = map_dir / f"{input_file_path.stem}{map_suffix}" # Old way
+    except KeyError as e:
+        logger.error(f"{prefix}Configuration missing required path key: {e}")
+        raise ValueError(f"Configuration missing required path key: {e}") from e
+    except ValueError as e: # Catch error from generate_pipeline_paths
+        logger.error(f"{prefix}Failed to generate map path for {input_file_path.name}: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"{prefix}Unexpected error during path setup: {e}", exc_info=True)
+        raise
 
-    # --- Find and Read Map File --- 
-    map_suffix = config.get("paths", {}).get("map_suffix", "_map.jsonl")
-    map_dir_str = config.get("paths", {}).get("map_dir", "./data/maps")
-    map_dir = Path(map_dir_str)
-    map_file = map_dir / f"{input_file_path.stem}{map_suffix}"
-
+    # --- Read Map File --- 
+    logger.info(f"{prefix}Reading map file: {map_file}")
     if not map_file.is_file():
-        logger.error(f"{prefix}Map file not found for specific analysis: {map_file}")
-        raise FileNotFoundError(f"Map file not found for {input_file_path.name}: {map_file}")
+        logger.error(f"{prefix}Map file not found: {map_file}")
+        raise FileNotFoundError(f"Map file not found: {map_file}")
 
     # Read all sentences from map file first
     all_sentences_map: Dict[int, str] = {}

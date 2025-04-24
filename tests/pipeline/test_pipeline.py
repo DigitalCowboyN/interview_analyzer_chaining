@@ -21,6 +21,7 @@ from src.config import Config
 from src.utils.metrics import MetricsTracker
 from src.services.analysis_service import AnalysisService
 from src.utils.text_processing import segment_text
+from src.utils.path_helpers import generate_pipeline_paths
 
 # Define the missing helper function
 def create_mock_analysis(sentence_id, sequence_order, sentence_text):
@@ -263,6 +264,14 @@ async def test_process_file_success_path(
     map_dir = tmp_path / "maps"
     task_id = "task-success-new"
 
+    # Calculate expected paths using the utility for consistency
+    map_suffix = mock_config["paths"]["map_suffix"]
+    analysis_suffix = mock_config["paths"]["analysis_suffix"]
+    expected_paths = generate_pipeline_paths(
+        input_file, map_dir, output_dir, map_suffix, analysis_suffix, task_id
+    )
+    expected_output_file = expected_paths.analysis_file
+
     mock_sentences = ["Sentence 1.", "Sentence 2."]
     num_sentences = len(mock_sentences)
     # Use return value from the correctly mocked build_contexts in the fixture
@@ -336,7 +345,7 @@ async def test_process_file_success_path(
         # assert created_coroutine_obj.cr_code.co_name == mock_writer_coroutine.__name__
 
         # Assert that our mock coroutine *function* was called once to create the coroutine passed to create_task
-        # Verify it was called with the MOCK queue instance
+        # Verify it was called with the MOCK queue instance and the EXPECTED output path
         mock_writer_coroutine.assert_called_once_with(
              expected_output_file, mock_queue_instance, mock_metrics_tracker, task_id
         )
@@ -546,11 +555,20 @@ async def test_analyze_specific_sentences_success_path(
     task_id = "task-specific-success-new"
     sentence_ids_to_analyze = [1, 3]
 
-    # Construct map file path and content
-    map_dir = tmp_path / mock_config["paths"]["map_dir"].lstrip('./')
-    map_dir.mkdir(parents=True, exist_ok=True)
+    # Calculate expected paths using the utility
+    map_dir_str = mock_config["paths"]["map_dir"]
+    output_dir_str = mock_config["paths"]["output_dir"]
     map_suffix = mock_config["paths"]["map_suffix"]
-    map_file_path = map_dir / f"{input_file.stem}{map_suffix}"
+    analysis_suffix = mock_config["paths"]["analysis_suffix"]
+    map_dir = tmp_path / map_dir_str.lstrip('./') # Use tmp_path base
+    output_dir = tmp_path / output_dir_str.lstrip('./') # Needed for utility
+    map_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    expected_paths = generate_pipeline_paths(
+        input_file, map_dir, output_dir, map_suffix, analysis_suffix, task_id
+    )
+    map_file_path = expected_paths.map_file # Expected path for setup/assertion
 
     all_sentences_text = ["S0.", "S1.", "S2.", "S3."]
     map_content_lines = [
@@ -632,10 +650,20 @@ async def test_analyze_specific_sentences_service_error(
     task_id = "task-specific-err-new"
     sentence_ids_to_analyze = [1, 3]
 
-    map_dir = tmp_path / mock_config["paths"]["map_dir"].lstrip('./')
-    map_dir.mkdir(parents=True, exist_ok=True)
+    # Calculate expected paths using the utility
+    map_dir_str = mock_config["paths"]["map_dir"]
+    output_dir_str = mock_config["paths"]["output_dir"]
     map_suffix = mock_config["paths"]["map_suffix"]
-    map_file_path = map_dir / f"{input_file.stem}{map_suffix}"
+    analysis_suffix = mock_config["paths"]["analysis_suffix"]
+    map_dir = tmp_path / map_dir_str.lstrip('./') # Use tmp_path base
+    output_dir = tmp_path / output_dir_str.lstrip('./') # Needed for utility
+    map_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    expected_paths = generate_pipeline_paths(
+        input_file, map_dir, output_dir, map_suffix, analysis_suffix, task_id
+    )
+    map_file_path = expected_paths.map_file # Expected path for setup/assertion
 
     all_sentences_text = ["S0.", "S1.", "S2.", "S3."]
     map_content_lines = [
@@ -709,10 +737,20 @@ async def test_analyze_specific_sentences_invalid_id_raises(
     task_id = "task-specific-invalid-new"
     sentence_ids_to_analyze = [0, 5] # Request valid ID 0 and invalid ID 5
 
-    map_dir = tmp_path / mock_config["paths"]["map_dir"].lstrip('./')
-    map_dir.mkdir(parents=True, exist_ok=True)
+    # Calculate expected paths using the utility
+    map_dir_str = mock_config["paths"]["map_dir"]
+    output_dir_str = mock_config["paths"]["output_dir"]
     map_suffix = mock_config["paths"]["map_suffix"]
-    map_file_path = map_dir / f"{input_file.stem}{map_suffix}"
+    analysis_suffix = mock_config["paths"]["analysis_suffix"]
+    map_dir = tmp_path / map_dir_str.lstrip('./') # Use tmp_path base
+    output_dir = tmp_path / output_dir_str.lstrip('./') # Needed for utility
+    map_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    expected_paths = generate_pipeline_paths(
+        input_file, map_dir, output_dir, map_suffix, analysis_suffix, task_id
+    )
+    map_file_path = expected_paths.map_file # Expected path for setup/assertion
 
     # Map content only contains valid IDs
     all_sentences_text = ["S0.", "S1."]
