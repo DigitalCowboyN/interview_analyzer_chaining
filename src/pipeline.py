@@ -274,6 +274,183 @@ def verify_output_completeness(map_path: Path, analysis_path: Path) -> Dict[str,
     }
 
 
+# --- Helper Functions for process_file Refactoring --- #
+
+async def _handle_map_creation(
+    input_file: Path,
+    map_dir: Path,
+    map_suffix: str,
+    metrics_tracker: MetricsTracker,
+    task_id: Optional[str] = None
+) -> Tuple[int, List[str]]:
+    """
+    Handles the creation of the conversation map file.
+
+    Calls create_conversation_map and manages specific exceptions,
+    logging, and metrics updates related to map creation.
+
+    Args:
+        input_file: Path to the input text file.
+        map_dir: Directory where the map file will be saved.
+        map_suffix: Suffix for the map filename.
+        metrics_tracker: Metrics tracker instance.
+        task_id: Optional task identifier.
+
+    Returns:
+        Tuple[int, List[str]]: Number of sentences and the list of sentences.
+        Returns (0, []) if the input file resulted in no sentences.
+
+    Raises:
+        FileNotFoundError: If the input file doesn't exist.
+        OSError: If the map file cannot be written.
+        Exception: For other unexpected errors during map creation.
+    """
+    prefix = _log_prefix(task_id)
+    try:
+        num_sentences, sentences = await create_conversation_map(input_file, map_dir, map_suffix, task_id)
+        metrics_tracker.set_metric(input_file.name, "sentences_found_in_map", num_sentences)
+        if num_sentences == 0:
+             logger.warning(f"{prefix}Skipping analysis for {input_file.name} as it contains no sentences.")
+             # Return 0, [] - the caller (process_file) will handle the early exit
+        return num_sentences, sentences
+    except FileNotFoundError as e:
+        logger.error(f"{prefix}Input file not found during map creation: {e}")
+        metrics_tracker.increment_errors(input_file.name)
+        # Stop timer early? No, timer is stopped in process_file's finally block.
+        raise # Re-raise to be caught by process_file
+    except OSError as e:
+        logger.error(f"{prefix}OS error during map creation for {input_file.name}: {e}", exc_info=True)
+        metrics_tracker.increment_errors(input_file.name)
+        raise # Re-raise
+    except Exception as e:
+        logger.error(f"{prefix}Unexpected error during map creation for {input_file.name}: {e}", exc_info=True)
+        metrics_tracker.increment_errors(input_file.name)
+        raise # Re-raise
+
+def _handle_context_building(
+    sentences: List[str],
+    analysis_service: AnalysisService,
+    metrics_tracker: MetricsTracker,
+    input_file_name: str, # Pass name for logging/metrics
+    task_id: Optional[str] = None
+) -> Dict[int, Dict[str, Any]]: # Assuming context is Dict[int, Dict]
+    """
+    Handles the context building step.
+
+    Calls the analysis_service's context builder and manages exceptions,
+    logging, and metrics related to this step.
+
+    Args:
+        sentences: List of sentence strings.
+        analysis_service: The analysis service instance.
+        metrics_tracker: Metrics tracker instance.
+        input_file_name: Name of the input file for context.
+        task_id: Optional task identifier.
+
+    Returns:
+        Dict[int, Dict[str, Any]]: The generated context dictionary.
+
+    Raises:
+        Exception: If context building fails.
+    """
+    prefix = _log_prefix(task_id)
+    logger.debug(f"{prefix}Building contexts for {input_file_name}...")
+    try:
+        contexts = analysis_service.build_contexts(sentences)
+        logger.debug(f"{prefix}Context building successful for {input_file_name}.")
+        return contexts
+    except Exception as e:
+        logger.error(f"{prefix}Failed to build contexts for {input_file_name}: {e}", exc_info=True)
+        metrics_tracker.increment_errors(input_file_name)
+        # Stop timer early? No, timer is stopped in process_file's finally block.
+        raise # Re-raise to process_file
+
+
+async def _orchestrate_analysis_and_writing(
+    sentences: List[str],
+    contexts: Dict[int, Dict[str, Any]],
+    analysis_file_path: Path,
+    analysis_service: AnalysisService,
+    metrics_tracker: MetricsTracker,
+    input_file_name: str, # Pass name for logging/metrics
+    task_id: Optional[str] = None
+) -> None:
+    """
+    Orchestrates sentence analysis and asynchronous result writing.
+
+    Creates a queue and a writer task, calls the analysis service,
+    puts results on the queue, and manages task/queue completion and cancellation.
+
+    Args:
+        sentences: List of sentence strings.
+        contexts: Generated context dictionary.
+        analysis_file_path: Path for the output analysis file.
+        analysis_service: The analysis service instance.
+        metrics_tracker: Metrics tracker instance.
+        input_file_name: Name of the input file for context.
+        task_id: Optional task identifier.
+
+    Raises:
+        Exception: Propagates exceptions from analysis or unexpected writer issues.
+    """
+    prefix = _log_prefix(task_id)
+    results_queue = asyncio.Queue()
+    writer_task = None # Initialize to None
+    
+    try:
+        # Create writer task first - ensure it's always cancellable in finally
+        logger.debug(f"{prefix}Creating result writer task for {analysis_file_path.name}...")
+        writer_task = asyncio.create_task(_result_writer(analysis_file_path, results_queue, metrics_tracker, task_id))
+
+        # Run analysis
+        logger.info(f"{prefix}Starting sentence analysis for {input_file_name} using AnalysisService...")
+        analysis_results = await analysis_service.analyze_sentences(sentences, contexts, task_id=task_id)
+        logger.info(f"{prefix}AnalysisService completed analysis for {input_file_name}. Found {len(analysis_results)} results.")
+        
+        # Queue results for writing
+        logger.info(f"{prefix}Queueing {len(analysis_results)} analysis results for writing...")
+        num_results = len(analysis_results)
+        for result in analysis_results:
+            await results_queue.put(result)
+            # Increment processed metric immediately after queuing
+            metrics_tracker.increment_results_processed(input_file_name)
+
+        # Signal writer completion and wait for processing
+        logger.debug(f"{prefix}Signalling writer task completion...")
+        await results_queue.put(None)
+        await results_queue.join() # Wait for queue to be emptied
+        logger.debug(f"{prefix}Result queue joined. Waiting for writer task to finish...")
+        await writer_task # Wait for writer task coroutine to fully finish
+        await asyncio.sleep(0.01) # Keep small sleep for now
+        logger.info(f"{prefix}Result writing complete for {input_file_name}.")
+        metrics_tracker.set_metric(input_file_name, "results_written", num_results) # Track written count
+
+    except Exception as e:
+        logger.error(f"{prefix}Error during sentence analysis or queuing for {input_file_name}: {e}", exc_info=True)
+        metrics_tracker.increment_errors(input_file_name)
+        raise # Re-raise the analysis/writing error
+    finally:
+        # Ensure writer task is cancelled if it exists and analysis failed 
+        # or if an unexpected error occurred during queueing/waiting
+        if writer_task and not writer_task.done():
+            logger.warning(f"{prefix}Analysis/writing orchestration failed; cancelling writer task for {input_file_name}...")
+            writer_task.cancel()
+            try:
+                await writer_task # Wait for cancellation to complete gracefully
+            except asyncio.CancelledError:
+                 logger.info(f"{prefix}Result writer task successfully cancelled for {input_file_name}.")
+            except Exception as cancel_e:
+                 # Log error during cancellation itself, but don't overshadow original error
+                 logger.error(f"{prefix}Error awaiting writer task cancellation for {input_file_name}: {cancel_e}")
+        elif writer_task and writer_task.done() and writer_task.exception():
+            # If writer task finished but with an internal exception
+            logger.error(f"{prefix}Result writer task for {input_file_name} finished with an exception: {writer_task.exception()}", exc_info=writer_task.exception())
+            # This indicates an error within _result_writer itself. Should we re-raise?
+            # The original exception from the analysis block will likely be raised anyway.
+            
+# --- End Helper Functions for process_file --- #
+
+
 async def process_file(
     input_file: Path,
     output_dir: Path,
@@ -342,8 +519,7 @@ async def process_file(
 
     # --- Step 1: Create Conversation Map --- 
     try:
-        num_sentences, sentences = await create_conversation_map(input_file, map_dir, map_suffix, task_id)
-        metrics_tracker.set_metric(input_file.name, "sentences_found_in_map", num_sentences)
+        num_sentences, sentences = await _handle_map_creation(input_file, map_dir, map_suffix, metrics_tracker, task_id)
         if num_sentences == 0:
              logger.warning(f"{prefix}Skipping analysis for {input_file.name} as it contains no sentences.")
              metrics_tracker.stop_file_timer(input_file.name)
@@ -364,66 +540,33 @@ async def process_file(
         metrics_tracker.stop_file_timer(input_file.name)
         raise # Re-raise
 
-    # --- Step 2: Build Contexts (Part of AnalysisService) --- 
-    # Moved context building logic inside AnalysisService.build_contexts
+    # --- Step 2: Build Contexts --- 
     try:
-        contexts = analysis_service.build_contexts(sentences)
-    except Exception as e:
-        logger.error(f"{prefix}Failed to build contexts for {input_file.name}: {e}", exc_info=True)
-        metrics_tracker.increment_errors(input_file.name)
-        metrics_tracker.stop_file_timer(input_file.name)
-        # Depending on policy, we might want to raise here or try to continue without context?
-        # Raising seems safer as subsequent analysis depends on context.
-        raise 
+        contexts = _handle_context_building(sentences, analysis_service, metrics_tracker, input_file.name, task_id)
+    except Exception:
+        # Error logged within helper, stop timer is handled in finally
+        raise # Re-raise to ensure timer stops and error propagates
 
-    # --- Step 3: Analyze Sentences & Write Results --- 
-    results_queue = asyncio.Queue()
-    # Pass metrics_tracker and task_id to writer
-    # Use the generated path for the output file
-    writer_task = asyncio.create_task(_result_writer(pipeline_paths.analysis_file, results_queue, metrics_tracker, task_id))
-
+    # --- Step 3: Orchestrate Analysis & Writing --- 
     try:
-        # Use AnalysisService to perform analysis, putting results on queue
-        # Analyze sentences - this now happens internally in AnalysisService
-        # Pass the actual results queue to the service method (if designed that way)
-        # OR have the service method return the results list directly.
+        # This function now contains the core analysis call and writer task management
+        await _orchestrate_analysis_and_writing(
+            sentences, 
+            contexts, 
+            pipeline_paths.analysis_file, 
+            analysis_service, 
+            metrics_tracker, 
+            input_file.name, 
+            task_id
+        )
+    except Exception:
+        # Error logged within helper, stop timer is handled in finally
+        raise # Re-raise
         
-        # Assuming analyze_sentences returns a list of result dicts
-        logger.info(f"{prefix}Starting sentence analysis for {input_file.name} using AnalysisService...")
-        # Pass task_id to the analysis service method
-        analysis_results = await analysis_service.analyze_sentences(sentences, contexts, task_id=task_id)
-        logger.info(f"{prefix}AnalysisService completed analysis for {input_file.name}. Found {len(analysis_results)} results.")
-        
-        # --- Step 4: Write results using the writer task --- 
-        logger.info(f"{prefix}Queueing {len(analysis_results)} analysis results for writing...")
-        for result in analysis_results:
-            await results_queue.put(result)
-            metrics_tracker.increment_results_processed(input_file.name)
-
-        # Signal writer completion
-        await results_queue.put(None)
-        # Wait for the queue to be fully processed
-        await results_queue.join()
-        await writer_task # Wait for writer task coroutine to finish
-        await asyncio.sleep(0.01) # Small sleep (keep for now, maybe remove later)
-        logger.info(f"{prefix}Result writing complete for {input_file.name}.")
-        metrics_tracker.set_metric(input_file.name, "results_written", len(analysis_results)) # Track written count
-
-    except Exception as e:
-        logger.error(f"{prefix}Error during sentence analysis or writing for {input_file.name}: {e}", exc_info=True)
-        metrics_tracker.increment_errors(input_file.name)
-        # Ensure writer task is cancelled if analysis fails mid-way
-        if not writer_task.done():
-            writer_task.cancel()
-            try:
-                await writer_task # Wait for cancellation to complete
-            except asyncio.CancelledError:
-                 logger.info(f"{prefix}Result writer task successfully cancelled for {input_file.name}.")
-            except Exception as cancel_e:
-                 logger.error(f"{prefix}Error awaiting writer task cancellation for {input_file.name}: {cancel_e}")
-        raise # Re-raise the analysis/writing error
+    # --- Outer Finally Block --- 
+    # This ensures the timer stops even if map creation or context building failed
+    # The analysis/writing helper has its own internal finally for cancellation
     finally:
-        # Stop timer for this file regardless of success/failure in analysis/writing stage
         metrics_tracker.stop_file_timer(input_file.name)
         elapsed_time = time.monotonic() - file_timer_start
         logger.info(f"{prefix}Finished processing {input_file.name}. Time taken: {elapsed_time:.2f} seconds.")
