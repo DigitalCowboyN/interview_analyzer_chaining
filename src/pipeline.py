@@ -43,6 +43,8 @@ from src.agents.context_builder import ContextBuilder
 from src.agents.sentence_analyzer import SentenceAnalyzer
 # Import the new path helper
 from src.utils.path_helpers import generate_pipeline_paths, PipelinePaths
+# Import dataclass if not already (it's part of typing)
+from dataclasses import dataclass
 
 logger = get_logger()
 
@@ -315,16 +317,6 @@ async def process_file(
     file_timer_start = time.monotonic()
     metrics_tracker.start_file_timer(input_file.name)
 
-    # Initialize AnalysisService (moved to run_pipeline)
-    # analyzer = SentenceAnalyzer(config=config)
-    # context_builder = ContextBuilder(config_dict=config)
-    # analysis_service = AnalysisService(
-    #     config=config, 
-    #     context_builder=context_builder, 
-    #     sentence_analyzer=analyzer, 
-    #     metrics_tracker=metrics_tracker 
-    # )
-
     # Derive output and map filenames using the utility
     try:
         map_suffix = config.get("paths", {}).get("map_suffix", "_map.jsonl")
@@ -343,12 +335,6 @@ async def process_file(
         metrics_tracker.increment_errors(input_file.name)
         metrics_tracker.stop_file_timer(input_file.name)
         raise
-
-    # Ensure output/map directories exist (create_map also does map_dir)
-    # analysis_suffix = config.get("paths", {}).get("analysis_suffix", "_analysis.jsonl")
-    # map_suffix = config.get("paths", {}).get("map_suffix", "_map.jsonl")
-    # output_file = output_dir / f"{input_file.stem}{analysis_suffix}"
-    # map_file_path = map_dir / f"{input_file.stem}{map_suffix}" # Map path handled by create_map
 
     # Ensure output/map directories exist (create_map also does map_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -443,55 +429,60 @@ async def process_file(
         logger.info(f"{prefix}Finished processing {input_file.name}. Time taken: {elapsed_time:.2f} seconds.")
 
 
-async def run_pipeline(
-    input_dir: Union[str, Path],
-    output_dir: Optional[Union[str, Path]] = None,
-    map_dir: Optional[Union[str, Path]] = None,
-    specific_file: Optional[str] = None,
-    config: Optional[Dict[str, Any]] = None,
-    task_id: Optional[str] = None # Add task_id parameter
-):
-    """
-    Runs the analysis pipeline on all .txt files in the input directory.
+# --- Helper Functions for run_pipeline Refactoring --- #
 
-    Instantiates necessary components (`ContextBuilder`, `SentenceAnalyzer`,
-    `MetricsTracker`, `AnalysisService`) once for the run. Iterates through
-    text files, processing each using `process_file` with the *same* injected
-    `AnalysisService` instance. Finally, verifies output completeness against
-    map files and logs a summary of the run.
+# Define a dataclass to hold environment setup results
+@dataclass
+class PipelineEnvironment:
+    config_dict: Dict[str, Any]
+    analysis_service: AnalysisService
+    metrics_tracker: MetricsTracker
+    input_dir_path: Path
+    output_dir_path: Path
+    map_dir_path: Path
+    num_concurrent_files: int
+    map_suffix: str
+    analysis_suffix: str
+
+def _setup_pipeline_environment(
+    input_dir: Union[str, Path],
+    output_dir: Optional[Union[str, Path]],
+    map_dir: Optional[Union[str, Path]],
+    config: Optional[Dict[str, Any]],
+    task_id: Optional[str] = None
+) -> PipelineEnvironment:
+    """
+    Loads configuration, sets up paths, creates directories, and instantiates services.
 
     Args:
-        input_dir (Path): Directory containing input .txt files.
-        output_dir (Path): Directory to save analysis output files.
-        map_dir (Path): Directory to save conversation map files.
-        config (Dict[str, Any]): Application configuration dictionary.
+        input_dir: Path to the input directory.
+        output_dir: Optional path to the output directory.
+        map_dir: Optional path to the map directory.
+        config: Optional configuration dictionary.
+        task_id: Optional task identifier for logging.
+
+    Returns:
+        A PipelineEnvironment object containing the setup results.
+
+    Raises:
+        ValueError: If configuration is invalid or paths cannot be processed.
+        RuntimeError: If core services cannot be instantiated or directories cannot be created.
     """
     prefix = _log_prefix(task_id)
-    logger.info(f"{prefix}Starting pipeline run...")
-    
+    logger.debug(f"{prefix}Setting up pipeline environment...")
+
     # --- Use provided config or load global --- 
     if config is None:
         from src.config import config as global_config # Import locally
-        config_obj = global_config
-        config_dict = config_obj.config # Assign the dict from the loaded Config object
+        config_dict = global_config.config
     else:
-        # If a dict is passed, wrap it temporarily or assume it has needed methods/keys
-        # For simplicity, assume passed config is the dict from the Config instance
-        # config_obj = config # This assumes it IS the dict
-        # Safer: If DI requires the Config object, pass that instead of the dict.
-        # For now, let's assume the functions below just need the dictionary part.
-        # If process_file or services expect the Config class instance, this needs adjustment.
-        # Let's assume the structure config['paths']['key'] works.
-        config_dict = config # Rename for clarity
+        config_dict = config
     
     # Determine directories using provided args or config defaults
-    # Ensure Paths are created correctly
     try:
-        input_dir_path = Path(input_dir) # Input is required
-        
+        input_dir_path = Path(input_dir)
         output_dir_str = output_dir or config_dict.get("paths", {}).get("output_dir", "./data/output")
         output_dir_path = Path(output_dir_str)
-        
         map_dir_str = map_dir or config_dict.get("paths", {}).get("map_dir", "./data/maps")
         map_dir_path = Path(map_dir_str)
         
@@ -513,141 +504,329 @@ async def run_pipeline(
     logger.info(f"{prefix}Max concurrent file processing: {num_concurrent_files}")
 
     # Ensure directories exist
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    map_dir_path.mkdir(parents=True, exist_ok=True)
+    try:
+        output_dir_path.mkdir(parents=True, exist_ok=True)
+        map_dir_path.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+         logger.critical(f"{prefix}Failed to create output/map directories: {e}", exc_info=True)
+         raise RuntimeError(f"Failed to create required directories ({output_dir_path}, {map_dir_path})" ) from e
 
-    # Initialize MetricsTracker (should probably be singleton or passed in)
-    # For now, re-importing the singleton instance
-    from src.utils.metrics import metrics_tracker
-    # Don't reset here if called from API; API call should manage overall timer
-    # metrics_tracker.reset()
-    # metrics_tracker.start_pipeline_timer()
+    # Initialize MetricsTracker 
+    # Assuming singleton usage for now as per original code
+    from src.utils.metrics import metrics_tracker 
 
-    # --- Instantiate Services (outside the loop for reuse) --- 
+    # --- Instantiate Services --- 
     try:
         logger.debug(f"{prefix}Instantiating AnalysisService and its dependencies...")
-        # Pass the config dictionary to components that need it
         context_builder_instance = ContextBuilder(config_dict=config_dict)
         sentence_analyzer_instance = SentenceAnalyzer(config_dict=config_dict)
         analysis_service_instance = AnalysisService(
             config=config_dict,
             context_builder=context_builder_instance,
             sentence_analyzer=sentence_analyzer_instance,
-            metrics_tracker=metrics_tracker # Pass the singleton tracker
+            metrics_tracker=metrics_tracker
         )
         logger.debug(f"{prefix}AnalysisService instantiated.")
     except Exception as e:
         logger.critical(f"{prefix}Failed to instantiate core services: {e}", exc_info=True)
         raise RuntimeError("Failed to instantiate core services") from e
 
-    # --- Determine files to process --- 
+    return PipelineEnvironment(
+        config_dict=config_dict,
+        analysis_service=analysis_service_instance,
+        metrics_tracker=metrics_tracker,
+        input_dir_path=input_dir_path,
+        output_dir_path=output_dir_path,
+        map_dir_path=map_dir_path,
+        num_concurrent_files=num_concurrent_files,
+        map_suffix=map_suffix,
+        analysis_suffix=analysis_suffix
+    )
+
+def _discover_files_to_process(
+    input_dir_path: Path,
+    specific_file: Optional[str] = None,
+    metrics_tracker: Optional[MetricsTracker] = None, # Optional for error tracking
+    task_id: Optional[str] = None
+) -> List[Path]:
+    """
+    Discovers input files (.txt) to be processed.
+
+    Args:
+        input_dir_path: Path to the input directory.
+        specific_file: Optional specific filename to process within input_dir.
+        metrics_tracker: Optional metrics tracker for incrementing errors.
+        task_id: Optional task identifier for logging.
+
+    Returns:
+        A list of Path objects for the files to process. Returns empty list if none found.
+
+    Raises:
+        FileNotFoundError: If specific_file is provided but not found.
+    """
+    prefix = _log_prefix(task_id)
+    files_to_process: List[Path] = []
+
     if specific_file:
-        files_to_process = [input_dir_path / specific_file]
-        if not files_to_process[0].is_file():
-            logger.error(f"{prefix}Specified input file not found: {files_to_process[0]}")
-            metrics_tracker.increment_errors() # Track pipeline setup error
-            raise FileNotFoundError(f"Specified input file not found: {files_to_process[0]}")
+        specific_file_path = input_dir_path / specific_file
+        if not specific_file_path.is_file():
+            logger.error(f"{prefix}Specified input file not found: {specific_file_path}")
+            if metrics_tracker:
+                 metrics_tracker.increment_errors() # Track pipeline setup error
+            raise FileNotFoundError(f"Specified input file not found: {specific_file_path}")
+        files_to_process = [specific_file_path]
         logger.info(f"{prefix}Processing specific file: {specific_file}")
     else:
-        # Find all .txt files in the input directory
+        logger.debug(f"{prefix}Discovering .txt files in: {input_dir_path}")
         files_to_process = list(input_dir_path.glob("*.txt"))
         if not files_to_process:
             logger.warning(f"{prefix}No .txt files found in input directory: {input_dir_path}")
-            # Stop timer if started, log summary, and exit cleanly
-            # metrics_tracker.stop_pipeline_timer()
-            # summary = metrics_tracker.get_summary()
-            # logger.info(f"Pipeline Execution Summary (No files processed): {json.dumps(summary, indent=2)}")
-            return
-        logger.info(f"{prefix}Found {len(files_to_process)} .txt files to process.")
+            # Return empty list, caller (run_pipeline) handles exit
+        else:
+             logger.info(f"{prefix}Found {len(files_to_process)} .txt files to process.")
 
-    # --- Process Files Concurrently --- 
-    semaphore = asyncio.Semaphore(num_concurrent_files)
+    return files_to_process
+
+
+async def _run_processing_tasks(
+    files_to_process: List[Path],
+    env: PipelineEnvironment, # Pass the setup environment object
+    task_id: Optional[str] = None
+) -> List[Union[Exception, Any]]:
+    """
+    Creates and executes concurrent tasks for processing each file.
+
+    Args:
+        files_to_process: List of file paths to process.
+        env: The PipelineEnvironment object containing config, services, paths etc.
+        task_id: Optional task identifier for logging.
+
+    Returns:
+        A list containing the results of asyncio.gather (either None on success
+        per task, or the Exception raised).
+    """
+    prefix = _log_prefix(task_id)
+    semaphore = asyncio.Semaphore(env.num_concurrent_files)
     tasks = []
     total_files = len(files_to_process)
-    metrics_tracker.set_metric("pipeline", "total_files_to_process", total_files)
+    env.metrics_tracker.set_metric("pipeline", "total_files_to_process", total_files)
 
+    # Define nested helper for semaphore usage
     async def process_with_semaphore(file_path):
         async with semaphore:
-            # Pass task_id down to process_file
+            # Pass task_id down to process_file (assuming process_file signature matches)
+            # Need to ensure process_file exists and has the correct signature
+            # Let's assume it does for now.
             await process_file(
-                file_path, output_dir_path, map_dir_path, config_dict, 
-                analysis_service_instance, metrics_tracker, task_id
+                file_path, 
+                env.output_dir_path, 
+                env.map_dir_path, 
+                env.config_dict, 
+                env.analysis_service, 
+                env.metrics_tracker, 
+                task_id # Pass task_id down
             )
 
+    logger.info(f"{prefix}Scheduling {total_files} file processing tasks...")
     for i, file_path in enumerate(files_to_process):
-        logger.info(f"{prefix}Scheduling processing for file {i+1}/{total_files}: {file_path.name}")
+        # logger.info(f"{prefix}Scheduling processing for file {i+1}/{total_files}: {file_path.name}") # Reduced verbosity
         tasks.append(process_with_semaphore(file_path))
 
-    # Execute tasks concurrently
-    logger.info(f"{prefix}Starting concurrent file processing...")
-    # Use gather with return_exceptions=True to ensure all tasks run
-    # even if some fail, allowing us to capture metrics for all attempts.
+    logger.info(f"{prefix}Starting concurrent file processing with {env.num_concurrent_files} workers...")
+    # Use gather with return_exceptions=True 
     results = await asyncio.gather(*tasks, return_exceptions=True)
     logger.info(f"{prefix}Concurrent file processing finished.")
+    return results
 
-    # --- Log results and handle exceptions from gather --- 
+
+def _log_processing_summary(
+    results: List[Union[Exception, Any]],
+    files_to_process: List[Path],
+    metrics_tracker: MetricsTracker,
+    task_id: Optional[str] = None
+) -> Tuple[int, int]:
+    """
+    Logs the outcome of each processing task and updates overall metrics.
+
+    Args:
+        results: The list of results/exceptions from asyncio.gather.
+        files_to_process: The corresponding list of file paths.
+        metrics_tracker: The metrics tracker instance.
+        task_id: Optional task identifier for logging.
+        
+    Returns:
+        Tuple[int, int]: Count of files processed successfully and files failed.
+    """
+    prefix = _log_prefix(task_id)
     files_processed_successfully = 0
     files_failed = 0
+    logger.info(f"{prefix}Summarizing processing results...")
+    
     for i, result in enumerate(results):
-        file_path = files_to_process[i] # Get corresponding file path
-        if isinstance(result, Exception):
-            files_failed += 1
-            logger.error(f"{prefix}Processing failed for {file_path.name}: {type(result).__name__}: {result}")
-            # Detailed error logged within process_file or its callees
+        # Ensure index is valid before accessing files_to_process
+        if i < len(files_to_process):
+            file_path = files_to_process[i]
+            if isinstance(result, Exception):
+                files_failed += 1
+                # Log error type and message
+                logger.error(f"{prefix}Processing failed for {file_path.name}: {type(result).__name__}: {result}")
+                # Detailed error should have been logged within process_file or its callees
+            else:
+                # Check if process_file returned something unexpected, though it shouldn't
+                if result is not None:
+                     logger.warning(f"{prefix}Processing for {file_path.name} completed but returned unexpected value: {result}")
+                files_processed_successfully += 1
+                logger.info(f"{prefix}Successfully processed {file_path.name}.")
         else:
-            # Successful completion (process_file doesn't return anything on success)
-            files_processed_successfully += 1
-            logger.info(f"{prefix}Successfully processed {file_path.name}.")
+            # This case should ideally not happen if results and files_to_process align
+            logger.error(f"{prefix}Result found at index {i} with no corresponding file path.")
             
     # Update overall pipeline metrics
     metrics_tracker.set_metric("pipeline", "files_processed_successfully", files_processed_successfully)
     metrics_tracker.set_metric("pipeline", "files_failed", files_failed)
+    logger.info(f"{prefix}Processing Summary: Successful={files_processed_successfully}, Failed={files_failed}")
+    return files_processed_successfully, files_failed
 
-    # --- Verification Step --- 
+
+def _run_verification(
+    files_to_process: List[Path],
+    env: PipelineEnvironment, # Pass the setup environment object
+    task_id: Optional[str] = None
+) -> None:
+    """
+    Runs the output completeness verification step for all processed files.
+
+    Args:
+        files_to_process: List of file paths that were attempted.
+        env: The PipelineEnvironment object containing paths and suffixes.
+        task_id: Optional task identifier for logging.
+    """
+    prefix = _log_prefix(task_id)
     logger.info(f"{prefix}Starting output verification...")
     verification_results = []
+    
+    # Ensure we only verify files that potentially ran (might include failed ones)
+    if not files_to_process:
+        logger.info(f"{prefix}No files were processed, skipping verification.")
+        return
+        
     for file_path in files_to_process:
-        # Use helper function to get paths for verification
         try:
+            # Use helper function to get paths for verification
             paths = generate_pipeline_paths(
                 input_file=file_path, 
-                map_dir=map_dir_path, 
-                output_dir=output_dir_path, 
-                map_suffix=map_suffix, 
-                analysis_suffix=analysis_suffix, 
+                map_dir=env.map_dir_path, 
+                output_dir=env.output_dir_path, 
+                map_suffix=env.map_suffix, 
+                analysis_suffix=env.analysis_suffix, 
                 task_id=task_id
             )
-        except ValueError as e:
+            verification_result = verify_output_completeness(paths.map_file, paths.analysis_file)
+            
+        except ValueError as e: # Error generating paths
             logger.error(f"{prefix}Skipping verification for {file_path.name}, cannot generate paths: {e}")
-            verification_results.append({
+            verification_result = {
                  "total_expected": 0, "total_actual": 0, "total_missing": 0,
                  "missing_ids": [], "error": f"Path generation error: {e}"
-            })
-            continue # Skip to next file
-            
-        verification_result = verify_output_completeness(paths.map_file, paths.analysis_file)
+            }
+        except Exception as e: # Catch other potential errors during verification setup
+             logger.error(f"{prefix}Unexpected error setting up verification for {file_path.name}: {e}", exc_info=True)
+             verification_result = {
+                 "total_expected": 0, "total_actual": 0, "total_missing": 0,
+                 "missing_ids": [], "error": f"Verification setup error: {type(e).__name__}"
+             }
+             
         verification_results.append(verification_result)
+        
         # Log individual file verification details
         if verification_result.get("error"):
-            logger.warning(f"{prefix}Verification check for {file_path.name} encountered an error: {verification_result['error']}")
+            logger.warning(f"{prefix}Verification check for {file_path.name}: ERROR - {verification_result['error']}")
         elif verification_result["total_missing"] > 0:
             logger.warning(f"{prefix}Verification check for {file_path.name}: MISSING {verification_result['total_missing']}/{verification_result['total_expected']} sentences. Missing IDs: {verification_result['missing_ids'][:10]}..." if verification_result['missing_ids'] else "")
         else:
-            logger.info(f"{prefix}Verification check for {file_path.name}: OK ({verification_result['total_actual']}/{verification_result['total_expected']} sentences found)." )
+            # Avoid division by zero if total_expected is 0 (e.g., empty input file)
+            expected_count = verification_result['total_expected']
+            actual_count = verification_result['total_actual']
+            logger.info(f"{prefix}Verification check for {file_path.name}: OK ({actual_count}/{expected_count} sentences found).")
             
     # Log overall verification summary (optional)
     total_missing_overall = sum(vr["total_missing"] for vr in verification_results if vr.get("error") is None)
     total_expected_overall = sum(vr["total_expected"] for vr in verification_results if vr.get("error") is None)
     verification_errors = sum(1 for vr in verification_results if vr.get("error") is not None)
     logger.info(f"{prefix}Verification Summary: Total Missing Sentences={total_missing_overall}/{total_expected_overall}, Verification Errors={verification_errors}")
-    metrics_tracker.set_metric("pipeline", "verification_total_missing", total_missing_overall)
-    metrics_tracker.set_metric("pipeline", "verification_errors", verification_errors)
+    env.metrics_tracker.set_metric("pipeline", "verification_total_missing", total_missing_overall)
+    env.metrics_tracker.set_metric("pipeline", "verification_errors", verification_errors)
 
-    # --- Final Logging --- 
-    # Pipeline timer stopped by the caller (main() or API endpoint wrapper if needed)
-    # summary = metrics_tracker.get_summary()
-    # logger.info(f"Pipeline Execution Summary:\n{json.dumps(summary, indent=2)}") # Commented out problematic line
-    logger.info(f"{prefix}Pipeline run finished.")
+# --- End Helper Functions --- #
+
+
+async def run_pipeline(
+    input_dir: Union[str, Path],
+    output_dir: Optional[Union[str, Path]] = None,
+    map_dir: Optional[Union[str, Path]] = None,
+    specific_file: Optional[str] = None,
+    config: Optional[Dict[str, Any]] = None,
+    task_id: Optional[str] = None # Add task_id parameter
+):
+    """
+    Runs the analysis pipeline on all .txt files in the input directory.
+
+    Orchestrates the pipeline by calling helper functions for setup, discovery,
+    processing, logging, and verification.
+
+    Args:
+        input_dir: Directory containing input .txt files or path to specific file's dir.
+        output_dir: Optional directory to save analysis output files.
+        map_dir: Optional directory to save conversation map files.
+        specific_file: Optional filename to process within input_dir.
+        config: Optional application configuration dictionary.
+        task_id: Optional unique ID for tracking/logging.
+    """
+    prefix = _log_prefix(task_id)
+    logger.info(f"{prefix}Starting pipeline run...")
+
+    try:
+        # --- Step 1: Setup Environment --- 
+        env = _setup_pipeline_environment(input_dir, output_dir, map_dir, config, task_id)
+
+        # --- Step 2: Discover Files --- 
+        files_to_process = _discover_files_to_process(
+            env.input_dir_path, specific_file, env.metrics_tracker, task_id
+        )
+
+        # Exit early if no files found
+        if not files_to_process:
+            logger.info(f"{prefix}Pipeline run finished: No files to process.")
+            return
+
+        # --- Step 3: Process Files Concurrently --- 
+        results = await _run_processing_tasks(files_to_process, env, task_id)
+
+        # --- Step 4: Log Processing Summary --- 
+        # This step also updates metrics_tracker for successful/failed files
+        _log_processing_summary(results, files_to_process, env.metrics_tracker, task_id)
+
+        # --- Step 5: Verification Step --- 
+        _run_verification(files_to_process, env, task_id)
+
+    except (ValueError, RuntimeError, FileNotFoundError) as setup_error:
+        # Catch critical errors during setup or file discovery
+        logger.critical(f"{prefix}Pipeline run failed during setup/discovery: {setup_error}", exc_info=True)
+        # Potentially increment a general pipeline error metric if tracker is available
+        # (Metrics tracker might not be initialized if config loading failed)
+        # Consider how to handle metrics in very early failures.
+        raise # Re-raise the critical error to the caller
+    except Exception as e:
+        # Catch unexpected errors during the main processing/verification phases
+        logger.critical(f"{prefix}Unexpected critical error during pipeline execution: {e}", exc_info=True)
+        # Increment error metric if possible
+        # if 'env' in locals() and hasattr(env, 'metrics_tracker'):
+        #     env.metrics_tracker.increment_errors("pipeline_critical") # Add specific error key?
+        raise # Re-raise
+    finally:
+        # --- Final Logging --- 
+        # Pipeline timer stopped by the caller (main() or API endpoint wrapper if needed)
+        logger.info(f"{prefix}Pipeline run finished.")
 
 
 # --- analyze_specific_sentences function --- 
