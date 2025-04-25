@@ -4,13 +4,15 @@
 
 This project provides an asynchronous pipeline and a FastAPI interface for processing text files (e.g., interview transcripts) and performing detailed, multi-dimensional analysis on each sentence. It leverages OpenAI's language models, the spaCy library for NLP tasks, and a robust, configurable architecture to produce structured JSON output.
 
-The pipeline segments input text, builds contextual information around each sentence, and uses an `AnalysisService` to orchestrate concurrent API calls to an OpenAI model (via `OpenAIAgent`) for classifying sentences based on function, structure, purpose, topic, and keywords according to configurable prompts. Results are written asynchronously.
+The pipeline segments input text, builds contextual information around each sentence, and uses an `AnalysisService` to orchestrate concurrent API calls to an OpenAI model (via `OpenAIAgent`) for classifying sentences based on function, structure, purpose, topic, and keywords according to configurable prompts. Results are written asynchronously using a **decoupled Input/Output (IO) layer defined by protocols**, allowing for different storage backends (currently implemented for local JSON Lines files).
 
 The accompanying FastAPI application allows interaction with the generated analysis files.
 
 ## Features
 
 - **Asynchronous Pipeline:** Uses `asyncio` for efficient processing, particularly for I/O-bound LLM API calls and result writing.
+- **Decoupled IO:** Defines `TextDataSource`, `ConversationMapStorage`, and `SentenceAnalysisWriter` protocols (`src/io/protocols.py`) for flexible data handling.
+- **Local File Storage:** Provides concrete implementations (`src/io/local_storage.py`) using `aiofiles` for reading text files and writing map/analysis data as JSON Lines (`*.jsonl`).
 - **Sentence Segmentation:** Utilizes `spaCy` via `src/utils/text_processing.py` for accurate text segmentation.
 - **Configurable Context Building:** `ContextBuilder` generates textual context windows (e.g., immediate, broader, observer) around each sentence based on settings in `config.yaml`.
 - **Multi-Dimensional LLM Analysis:** `SentenceAnalyzer` interacts with OpenAI API (via `OpenAIAgent`) to classify sentences across multiple dimensions (function, structure, purpose, topic, keywords).
@@ -21,13 +23,13 @@ The accompanying FastAPI application allows interaction with the generated analy
 - **Centralized Logging:** Uses Python's standard `logging` module configured for file and console output (`src/utils/logger.py`).
 - **Metrics Tracking:** Tracks API calls, token usage, processing time, successes, and errors (`src/utils/metrics.py`).
 - **FastAPI Interface:** Provides RESTful endpoints (`src/api/`) for listing analysis files and potentially triggering/viewing analysis.
-- **Modular Architecture:** Code organized into logical components (`pipeline`, `agents`, `services`, `api`, `models`, `utils`).
+- **Modular Architecture:** Code organized into logical components (`pipeline`, `agents`, `services`, `api`, `models`, `utils`, `io`).
 - **Robust Testing:** Comprehensive unit and integration tests using `pytest`, `TestClient`, and `unittest.mock`.
 
 ## Technology Stack
 
 - **Programming Language:** Python 3.11+
-- **Core Libraries:** `asyncio`, `openai`, `spacy`, `pydantic`, `python-dotenv`, `pyyaml`
+- **Core Libraries:** `asyncio`, `openai`, `spacy`, `pydantic`, `python-dotenv`, `pyyaml`, `aiofiles`, `celery`
 - **API Framework:** `fastapi`, `uvicorn`
 - **HTTP Client (Testing):** `httpx`
 - **NLP Model (Segmentation):** `en_core_web_sm` (spaCy)
@@ -48,6 +50,10 @@ The accompanying FastAPI application allows interaction with the generated analy
 ├── src/
 │   ├── agents/        # LLM interaction, context building, sentence analysis logic
 │   ├── api/           # FastAPI application: main app, routers, schemas
+│   ├── io/            # Input/Output protocols and implementations
+│   │   ├── __init__.py
+│   │   ├── protocols.py
+│   │   └── local_storage.py
 │   ├── models/        # Pydantic models for LLM responses
 │   ├── services/      # Service layer coordinating agents
 │   ├── utils/         # Helper functions, config, logger, metrics, text processing
@@ -59,6 +65,7 @@ The accompanying FastAPI application allows interaction with the generated analy
 │   ├── agents/
 │   ├── api/
 │   ├── integration/
+│   ├── io/            # Tests for IO implementations
 │   ├── services/
 │   └── utils/
 ├── .env               # Environment variables (OpenAI Key) - Gitignored
@@ -73,34 +80,34 @@ The accompanying FastAPI application allows interaction with the generated analy
 
 ## Setup and Installation
 
-1.  **Clone the Repository:**
-    ```bash
-    git clone <your-repository-url>
-    cd <repository-directory>
-    ```
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/DigitalCowboyN/interview_analyzer_chaining
+   cd interview_analyzer_chaining
+   ```
 
-2.  **Create and Activate Virtual Environment (Recommended):**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
+2. **Create and Activate Virtual Environment (Recommended):**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows use `venv\\Scripts\\activate`
+   ```
 
-3.  **Install Dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+3. **Install Dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-4.  **Download spaCy Model:**
-    ```bash
-    python -m spacy download en_core_web_sm
-    ```
+4. **Download spaCy Model:**
+   ```bash
+   python -m spacy download en_core_web_sm
+   ```
 
-5.  **Configure Environment Variables:**
-    Create a `.env` file in the project root directory (copy from `.env.example` if provided) and add your OpenAI API key:
-    ```dotenv
-    # .env
-    OPENAI_API_KEY='your_openai_api_key_here'
-    ```
+5. **Configure Environment Variables:**
+   Create a `.env` file in the project root directory (copy from `.env.example` if provided) and add your OpenAI API key:
+   ```dotenv
+   # .env
+   OPENAI_API_KEY='your_openai_api_key_here'
+   ```
 
 ## Configuration
 
