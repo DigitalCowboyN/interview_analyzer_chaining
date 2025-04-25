@@ -160,9 +160,12 @@ make run-api
 
 ## API Endpoints
 
--   **`GET /health`**: Health check endpoint.
--   **`GET /files/`**: Lists the filenames of generated analysis (`_analysis.jsonl`) files found in the configured output directory.
--   _(More endpoints to be added for file content retrieval, specific sentence analysis, and triggering pipeline runs)._
+*   **`GET /`**: Health check endpoint.
+*   **`GET /files/`**: Lists the filenames of generated analysis (`_analysis.jsonl`) files found in the configured output directory.
+*   **`GET /files/{filename}`**: Retrieves the full content of a specific analysis file.
+*   **`GET /files/{filename}/sentences/{sentence_id}`**: Retrieves the analysis result for a specific sentence ID within a given analysis file.
+*   **`POST /analysis/`**: Accepts an `input_filename` and triggers the analysis pipeline for that file to run in the background (returns `202 Accepted`).
+*   _(More endpoints could be added for detailed task status, specific analysis requests without running the full pipeline, etc.)_
 
 ## Input and Output Files
 
