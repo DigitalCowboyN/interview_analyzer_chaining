@@ -20,7 +20,7 @@ import pytest
 import json
 import asyncio
 from pathlib import Path
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, ANY
 
 # Assuming main entry point or run_pipeline can be invoked
 from src.pipeline import run_pipeline
@@ -151,21 +151,23 @@ def generate_mock_analysis(sentence_id, sequence_order, sentence):
 @pytest.mark.integration
 async def test_pipeline_integration_empty_file(integration_dirs, setup_single_empty_file):
     """
-    Test the pipeline correctly handles an empty input file.
+    Test the pipeline correctly handles an empty input file using Local IO.
 
     Verifies that:
-    - An empty map file is created.
+    - An empty map file is created via LocalJsonlMapStorage.
     - No analysis file is created.
     - No errors are raised during processing.
     """
     input_dir, output_dir, map_dir = integration_dirs
-    # FIX: Use the input file from the new fixture
-    input_files = setup_single_empty_file
+    input_files = setup_single_empty_file # Use the fixture providing only the empty file
     target_file = input_files["empty"]
     target_stem = target_file.stem
 
     # Patch the API call - it shouldn't be called for an empty file
+    # Also patch the analysis service itself, as its methods might be called
+    # even if no analysis is performed (e.g., during setup).
     with patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock) as mock_call_model, \
+         patch("src.pipeline.AnalysisService") as MockAnalysisService, \
          patch("src.pipeline.logger") as mock_pipeline_logger: # Monitor logs
 
         # Run the pipeline on the directory containing ONLY the empty file
@@ -174,66 +176,68 @@ async def test_pipeline_integration_empty_file(integration_dirs, setup_single_em
             output_dir=output_dir, 
             map_dir=map_dir, 
             config=config.config, 
-            specific_file=None
+            specific_file=target_file.name # Process only the specific empty file
         )
 
         # Assertions
         map_file = map_dir / f"{target_stem}{config['paths']['map_suffix']}"
         analysis_file = output_dir / f"{target_stem}{config['paths']['analysis_suffix']}"
 
-        # Check map file exists and is empty 
+        # Check map file exists and is empty (created by LocalJsonlMapStorage.initialize/finalize)
         assert map_file.exists(), "Map file was not created for empty input"
         map_data = load_jsonl(map_file)
         assert len(map_data) == 0, "Map file for empty input should be empty"
-        assert any(f"contains no sentences after segmentation. Map file will be empty." in call.args[0] for call in mock_pipeline_logger.warning.call_args_list)
+        
+        # Verify the log message indicating skipping due to no sentences
+        found_log = False
+        log_pattern = f"Skipping analysis for source '{target_file}' as it contains no sentences."
+        for call_args, _ in mock_pipeline_logger.warning.call_args_list:
+            if log_pattern in call_args[0]:
+                found_log = True
+                break
+        assert found_log, f"Expected log message '{log_pattern}' not found in warnings."
 
         # Analysis file SHOULD NOT be created
         assert not analysis_file.exists(), "Analysis file SHOULD NOT be created for empty input"
 
         # API should not have been called
         mock_call_model.assert_not_called() 
+        # Ensure analysis service methods were not called for processing
+        if MockAnalysisService.called:
+            instance = MockAnalysisService.return_value
+            instance.build_contexts.assert_not_called()
+            instance.analyze_sentences.assert_not_called()
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_pipeline_integration_success_rewritten(integration_dirs):
-    """Test rewritten: Full pipeline success with mocked API calls."""
+async def test_pipeline_integration_success_rewritten(integration_dirs, setup_input_files):
+    """Test rewritten: Full pipeline success with mocked API calls using Local IO."""
     input_dir, output_dir, map_dir = integration_dirs
+    input_files = setup_input_files # Use the standard fixture
+    target_file = input_files["file1"] # Use the file with content
+    target_stem = target_file.stem
 
-    # --- Setup Input File ---
-    input_file_name = "integ_success.txt"
-    input_file = input_dir / input_file_name
-    input_file.write_text("Sentence Alpha. Sentence Beta.")
-    input_file_stem = input_file.stem
-
-    # --- Mock Config (Scoped to this test) ---
-    # Use specific paths within the temp directories provided by integration_dirs
+    # Mock Config (remains largely the same, using integration_dirs)
     mock_config_dict = {
         "paths": {
-            "input_dir": str(input_dir),
             "output_dir": str(output_dir),
             "map_dir": str(map_dir),
             "map_suffix": "_map.jsonl",
             "analysis_suffix": "_analysis.jsonl",
-            "logs_dir": str(integration_dirs[0].parent / "logs") # Place logs nearby
+            "logs_dir": str(integration_dirs[0].parent / "logs")
         },
-        "pipeline": {
-            "num_concurrent_files": 1 # Keep simple for integration test
-        },
-        # Add other minimal required config sections if validation needs them
+        "pipeline": { "num_concurrent_files": 1 },
         "preprocessing": {"context_windows": {"immediate": 1, "broader": 3, "observer": 5}},
         "classification": {"local": {"prompt_files": {"no_context": "dummy"}}},
         "domain_keywords": []
     }
 
-    # --- Mock API Call Logic (Now applied to classify_sentence) ---
-    sentence_alpha = "Sentence Alpha."
-    sentence_beta = "Sentence Beta."
+    # --- Mock API Call Logic (applied to classify_sentence) ---
+    sentence_alpha = "This is the first sentence."
+    sentence_beta = "Followed by the second."
     async def mock_classify_sentence(*args, **kwargs):
-        # The actual sentence is likely the first arg to classify_sentence
         sentence = args[0] 
         if sentence == sentence_alpha:
-             # Note: classify_sentence returns only the analysis part,
-             # the worker adds sentence_id, sequence_order etc.
              result = generate_mock_analysis(0, 0, sentence_alpha)
              return {k: v for k, v in result.items() if k not in ["sentence_id", "sequence_order", "sentence"]}
         elif sentence == sentence_beta:
@@ -243,56 +247,59 @@ async def test_pipeline_integration_success_rewritten(integration_dirs):
              return {"mock_fallback": []}
 
     # --- Patching ---
-    # Patch classify_sentence directly, remove call_model patch
+    # Patch only the external dependency (classify_sentence)
+    # Remove patch for append_json_line and config
     with patch("src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence", new_callable=AsyncMock, side_effect=mock_classify_sentence) as mock_classify, \
-         patch("src.config.config", mock_config_dict) as mock_global_config, \
-         patch("src.pipeline.append_json_line") as mock_append_jsonl:
+         patch("src.pipeline.logger") as mock_pipeline_logger: # Keep logger patch if needed
 
         # --- Execute ---
         await run_pipeline(
-            input_dir=input_dir,      # Use temp dir
-            output_dir=output_dir,    # Use temp dir
-            map_dir=map_dir,          # Use temp dir
+            input_dir=input_dir,      
+            output_dir=output_dir,    
+            map_dir=map_dir,          
             config=mock_config_dict,  # Pass the test-specific config
-            specific_file=input_file_name # Process only this file
+            specific_file=target_file.name # Process only this file
         )
 
         # --- Assertions ---
-        map_file = map_dir / f"{input_file_stem}{mock_config_dict['paths']['map_suffix']}"
-        analysis_file = output_dir / f"{input_file_stem}{mock_config_dict['paths']['analysis_suffix']}"
+        map_file = map_dir / f"{target_stem}{mock_config_dict['paths']['map_suffix']}"
+        analysis_file = output_dir / f"{target_stem}{mock_config_dict['paths']['analysis_suffix']}"
 
-        # 1. Check map file
+        # 1. Check map file content
         assert map_file.exists(), f"Map file was not created at {map_file}"
         map_data = load_jsonl(map_file)
         assert len(map_data) == 2
         assert map_data[0] == {"sentence_id": 0, "sequence_order": 0, "sentence": sentence_alpha}
         assert map_data[1] == {"sentence_id": 1, "sequence_order": 1, "sentence": sentence_beta}
 
-        # 2. Check that append_json_line was called correctly (since file writing is mocked)
-        analysis_file_path = output_dir / f"{input_file_stem}{mock_config_dict['paths']['analysis_suffix']}"
-        assert mock_append_jsonl.call_count == 2, "append_json_line should have been called twice"
-
-        # Verify calls (order might not be guaranteed, check args based on content)
-        call_args_list = mock_append_jsonl.call_args_list
-        call_data = [c.args[0] for c in call_args_list] # Get the first arg (the data dict) from each call
-        call_paths = [c.args[1] for c in call_args_list] # Get the second arg (the path) from each call
-
-        # Check paths
-        assert all(p == analysis_file_path for p in call_paths), "append_json_line called with incorrect file path"
-
+        # 2. Check analysis file content
+        assert analysis_file.exists(), f"Analysis file was not created at {analysis_file}"
+        analysis_data = load_jsonl(analysis_file)
+        assert len(analysis_data) == 2
+        
         # Check data content (flexible order)
         expected_result_0 = generate_mock_analysis(0, 0, sentence_alpha)
         expected_result_1 = generate_mock_analysis(1, 1, sentence_beta)
-        assert expected_result_0 in call_data
-        assert expected_result_1 in call_data
+        
+        # Helper function to make dict values hashable (convert lists to tuples)
+        def make_hashable(d):
+            return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in d.items()))
+            
+        # Convert list of dicts to set of hashable tuples for order-independent comparison
+        analysis_data_set = {make_hashable(d) for d in analysis_data}
+        expected_set = {make_hashable(expected_result_0), make_hashable(expected_result_1)}
+        assert analysis_data_set == expected_set
 
         # 3. Check API mock was called
-        assert mock_classify.called
+        assert mock_classify.call_count >= 2 # Should be called for each sentence
+        # Check it was called with the correct sentence and ANY context
+        mock_classify.assert_any_call(sentence_alpha, ANY) 
+        mock_classify.assert_any_call(sentence_beta, ANY)
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_pipeline_integration_partial_failure_rewritten(integration_dirs):
-    """Test rewritten: Pipeline handles partial failure (one sentence error)."""
+    """Test rewritten: Pipeline handles partial failure (one sentence error) using Local IO."""
     input_dir, output_dir, map_dir = integration_dirs
 
     # --- Setup Input File ---
@@ -306,7 +313,6 @@ async def test_pipeline_integration_partial_failure_rewritten(integration_dirs):
     # --- Mock Config ---
     mock_config_dict = {
         "paths": {
-            "input_dir": str(input_dir),
             "output_dir": str(output_dir),
             "map_dir": str(map_dir),
             "map_suffix": "_map.jsonl",
@@ -332,9 +338,8 @@ async def test_pipeline_integration_partial_failure_rewritten(integration_dirs):
              return {"mock_fallback": []}
 
     # --- Patching ---
+    # Patch only the external dependency
     with patch("src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence", new_callable=AsyncMock, side_effect=mock_classify_fail_one) as mock_classify, \
-         patch("src.config.config", mock_config_dict) as mock_global_config, \
-         patch("src.pipeline.append_json_line") as mock_append_jsonl, \
          patch("src.pipeline.logger") as mock_pipeline_logger, \
          patch("src.services.analysis_service.logger") as mock_service_logger: # Patch service logger too
 
@@ -349,49 +354,56 @@ async def test_pipeline_integration_partial_failure_rewritten(integration_dirs):
 
         # --- Assertions ---
         map_file = map_dir / f"{input_file_stem}{mock_config_dict['paths']['map_suffix']}"
-        analysis_file_path = output_dir / f"{input_file_stem}{mock_config_dict['paths']['analysis_suffix']}"
+        analysis_file = output_dir / f"{input_file_stem}{mock_config_dict['paths']['analysis_suffix']}"
 
-        # 1. Check map file
+        # 1. Check map file content
         assert map_file.exists(), f"Map file was not created at {map_file}"
         map_data = load_jsonl(map_file)
         assert len(map_data) == 2
         assert map_data[0]["sentence"] == sentence_ok
         assert map_data[1]["sentence"] == sentence_fail
 
-        # 2. Check append_json_line calls
-        assert mock_append_jsonl.call_count == 2
-        call_args_list = mock_append_jsonl.call_args_list
-        call_data = {c.args[0]["sentence_id"]: c.args[0] for c in call_args_list} # Data dicts by ID
-        call_paths = [c.args[1] for c in call_args_list]
+        # 2. Check analysis file content
+        assert analysis_file.exists(), f"Analysis file was not created at {analysis_file}"
+        analysis_data = load_jsonl(analysis_file)
+        assert len(analysis_data) == 2
+        
+        # Separate expected success and error results
+        expected_success = generate_mock_analysis(0, 0, sentence_ok)
+        expected_error = {
+            "sentence_id": 1, 
+            "sequence_order": 1, 
+            "sentence": sentence_fail, 
+            "error": True, 
+            "error_type": "ValueError", 
+            "error_message": str(fail_error)
+        }
+        
+        # Find the results in the output data (order might vary)
+        result_0 = next((item for item in analysis_data if item['sentence_id'] == 0), None)
+        result_1 = next((item for item in analysis_data if item['sentence_id'] == 1), None)
 
-        # Check paths
-        assert all(p == analysis_file_path for p in call_paths)
-
-        # Check successful data (ID 0)
-        assert 0 in call_data
-        assert not call_data[0].get("error")
-        assert call_data[0]["sentence"] == sentence_ok
-        assert call_data[0]["function_type"] == "mock_func" # From generate_mock_analysis
-
-        # Check error data (ID 1)
-        assert 1 in call_data
-        assert call_data[1].get("error") is True
-        assert call_data[1]["sentence"] == sentence_fail
-        assert call_data[1]["error_type"] == "ValueError"
-        assert call_data[1]["error_message"] == "Simulated classify error"
+        assert result_0 is not None, "Result for sentence_id 0 not found in analysis file"
+        assert result_1 is not None, "Result for sentence_id 1 not found in analysis file"
+        
+        # Assert contents
+        assert result_0 == expected_success
+        assert result_1 == expected_error
 
         # 3. Check classify mock was called for both
         assert mock_classify.call_count == 2
         # Could add more detailed call arg checks if needed
         
-        # 4. Check Log (optional)
+        # 4. Check Log (optional - ensure specific error related to analysis failure is logged)
         error_logged = False
+        # Update the expected log fragment to match the worker log format
         expected_log_fragment = f"Worker 0 failed analyzing sentence_id 1: {fail_error}"
-        all_logs = mock_pipeline_logger.error.call_args_list + mock_service_logger.error.call_args_list
+        all_logs = mock_service_logger.error.call_args_list # Check service logger
         for call in all_logs:
+            # Check if the expected fragment is IN the logged message
             if expected_log_fragment in call.args[0]:
                  error_logged = True
                  break
-        assert error_logged, f"Expected worker error log not found. Logs: {all_logs}"
+        assert error_logged, f"Expected analysis error log containing '{expected_log_fragment}' not found in service logger. Logs: {all_logs}"
 
 # ... (Rest of integration tests) ... 
