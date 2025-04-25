@@ -493,15 +493,12 @@ async def _orchestrate_analysis_and_writing(
 
 # Refactor process_file to use IO protocols
 async def process_file(
-    # input_file: Path, # Replaced by data_source
-    # output_dir: Path, # No longer needed directly; info comes from analysis_writer
-    # map_dir: Path,    # No longer needed directly; info comes from map_storage
-    data_source: TextDataSource,         # New: Inject data source
-    map_storage: ConversationMapStorage, # New: Inject map storage
-    analysis_writer: SentenceAnalysisWriter, # New: Inject analysis writer
-    config: Dict[str, Any], # Keep config for potential analysis service params
-    analysis_service: AnalysisService, # Inject AnalysisService
-    metrics_tracker: MetricsTracker, # Accept MetricsTracker
+    data_source: TextDataSource,
+    map_storage: ConversationMapStorage,
+    analysis_writer: SentenceAnalysisWriter,
+    config: Dict[str, Any],
+    analysis_service: AnalysisService,
+    metrics_tracker: MetricsTracker,
     task_id: Optional[str] = None
 ):
     """
@@ -529,73 +526,54 @@ async def process_file(
         Exception: For critical, unexpected errors during processing.
     """
     prefix = _log_prefix(task_id)
-    # Use source identifier for logging and metrics key
-    source_id = data_source.get_identifier() 
+    source_id = data_source.get_identifier()
     logger.info(f"{prefix}Processing source: {source_id}")
     
-    # Start timer for this source
-    file_timer_start = time.monotonic() # Keep timer name for consistency
-    metrics_tracker.start_file_timer(source_id) # Use source_id as key
+    file_timer_start = time.monotonic()
+    metrics_tracker.start_file_timer(source_id)
 
-    # Remove path generation logic - paths are now encapsulated within protocols
-    # try:
-    #     map_suffix = config.get("paths", {}).get("map_suffix", "_map.jsonl")
-    #     analysis_suffix = config.get("paths", {}).get("analysis_suffix", "_analysis.jsonl")
-    #     pipeline_paths = generate_pipeline_paths(...)
-    # except ValueError as e: ...
-
-    # Directory creation is handled by the storage protocol implementations (e.g., in initialize)
-    # output_dir.mkdir(parents=True, exist_ok=True)
-    # map_dir.mkdir(parents=True, exist_ok=True)
-
-    # --- Step 1: Create Conversation Map --- 
+    # Wrap all steps in one try/finally to ensure metrics stop always executes
     try:
-        # Pass the protocol objects to the refactored helper
-        num_sentences, sentences = await _handle_map_creation(
-            data_source=data_source, 
-            map_storage=map_storage, 
-            metrics_tracker=metrics_tracker, 
-            task_id=task_id
-        )
-        if num_sentences == 0:
-             logger.warning(f"{prefix}Skipping analysis for source '{source_id}' as it contains no sentences.")
-             # No need to stop timer here, finally block handles it
-             return # Exit early if no sentences
-    # Keep general error handling, specific errors are logged deeper
-    except Exception as map_e:
-        logger.error(f"{prefix}Failed during map creation phase for source '{source_id}': {map_e}", exc_info=True)
-        # Stop timer is handled in finally block
-        raise # Re-raise
+        # --- Step 1: Create Conversation Map --- 
+        try:
+            num_sentences, sentences = await _handle_map_creation(
+                data_source=data_source, 
+                map_storage=map_storage, 
+                metrics_tracker=metrics_tracker, 
+                task_id=task_id
+            )
+            if num_sentences == 0:
+                logger.warning(f"{prefix}Skipping analysis for source '{source_id}' as it contains no sentences.")
+                # Return must happen *inside* the main try block but *before* the finally
+                return 
+        except Exception as map_e:
+            logger.error(f"{prefix}Failed during map creation phase for source '{source_id}': {map_e}", exc_info=True)
+            raise
 
-    # --- Step 2: Build Contexts --- 
-    try:
-        # Use source_id for the input file name context
-        contexts = _handle_context_building(sentences, analysis_service, metrics_tracker, source_id, task_id)
-    except Exception as ctx_e:
-        logger.error(f"{prefix}Failed during context building phase for source '{source_id}': {ctx_e}", exc_info=True)
-        # Stop timer is handled in finally block
-        raise # Re-raise
+        # --- Step 2: Build Contexts --- 
+        try:
+            contexts = _handle_context_building(sentences, analysis_service, metrics_tracker, source_id, task_id)
+        except Exception as ctx_e:
+            logger.error(f"{prefix}Failed during context building phase for source '{source_id}': {ctx_e}", exc_info=True)
+            raise
 
-    # --- Step 3: Orchestrate Analysis & Writing --- 
-    try:
-        # Pass the analysis_writer object to the refactored orchestrator
-        await _orchestrate_analysis_and_writing(
-            sentences=sentences, 
-            contexts=contexts, 
-            analysis_writer=analysis_writer, # Pass the writer object
-            analysis_service=analysis_service, 
-            metrics_tracker=metrics_tracker, 
-            input_file_name=source_id, # Pass source_id for context
-            task_id=task_id
-        )
-    except Exception as orch_e:
-        logger.error(f"{prefix}Failed during analysis/writing orchestration for source '{source_id}': {orch_e}", exc_info=True)
-        # Stop timer is handled in finally block
-        raise # Re-raise
-        
+        # --- Step 3: Orchestrate Analysis & Writing --- 
+        try:
+            await _orchestrate_analysis_and_writing(
+                sentences=sentences, 
+                contexts=contexts, 
+                analysis_writer=analysis_writer, 
+                analysis_service=analysis_service, 
+                metrics_tracker=metrics_tracker, 
+                input_file_name=source_id, 
+                task_id=task_id
+            )
+        except Exception as orch_e:
+            logger.error(f"{prefix}Failed during analysis/writing orchestration for source '{source_id}': {orch_e}", exc_info=True)
+            raise
     # --- Outer Finally Block --- 
+    # This block now executes regardless of where the try block exits (return or raise)
     finally:
-        # Use source_id for metrics
         metrics_tracker.stop_file_timer(source_id)
         elapsed_time = time.monotonic() - file_timer_start
         logger.info(f"{prefix}Finished processing source '{source_id}'. Time taken: {elapsed_time:.2f} seconds.")
