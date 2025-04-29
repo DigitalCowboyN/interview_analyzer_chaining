@@ -20,7 +20,7 @@ import re
 from pathlib import Path
 import json
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, Field
 
 
 # Define a Pydantic model for nested configuration sections if desired for validation
@@ -52,17 +52,16 @@ class PipelineConfig(BaseModel):
     # Optional: Add retry settings for pipeline steps if needed
 
 class ConfigModel(BaseModel):
-    openai: Dict[str, Any] = {}
-    openai_api: Dict[str, Any] = {}
-    preprocessing: Dict[str, Any] = {}
-    classification: Dict[str, Any] = {}
-    paths: Dict[str, Any] = {}
-    domain_keywords: List[str] = []
-    # Use the specific PipelineConfig model here
-    pipeline: PipelineConfig = PipelineConfig() # Use default values if not in YAML
-    logging: Dict[str, Any] = {}
-    neo4j: Optional[Neo4jConfig] = None 
-    api: Dict[str, Any] = {}
+    openai: Dict[str, Any] = Field(default_factory=dict)
+    openai_api: Dict[str, Any] = Field(default_factory=dict)
+    preprocessing: Dict[str, Any] = Field(default_factory=dict)
+    classification: Dict[str, Any] = Field(default_factory=dict)
+    paths: Dict[str, Any] = Field(default_factory=dict)
+    domain_keywords: List[str] = Field(default_factory=list)
+    pipeline: PipelineConfig = PipelineConfig()
+    logging: Dict[str, Any] = Field(default_factory=dict)
+    neo4j: Optional[Neo4jConfig] = None
+    api: Dict[str, Any] = Field(default_factory=dict)
     # Add other top-level sections as needed
 
 class Config:
@@ -127,10 +126,18 @@ class Config:
             return data
 
         final_config = remove_prefix(config_dict)
+
+        # Ensure 'logging' and 'api' are dictionaries, defaulting if None or missing
+        if final_config.get('logging') is None:
+            final_config['logging'] = {}
+        if final_config.get('api') is None:
+            final_config['api'] = {}
         
-        # Validate using Pydantic model (optional but recommended)
+        # Validate using Pydantic model
         try:
-            _ = ConfigModel(**final_config) # Validate structure
+            validated_config = ConfigModel(**final_config) # Validate structure and capture validated data
+            # Optionally convert back to dict if needed downstream, though using the model is often better
+            final_config = validated_config.model_dump() 
         except ValidationError as e:
             print(f"Configuration validation error: {e}")
             # Decide how to handle validation errors
