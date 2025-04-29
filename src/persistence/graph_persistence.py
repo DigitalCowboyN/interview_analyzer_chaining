@@ -86,13 +86,82 @@ async def save_analysis_to_graph(
         logger.debug(f"Merged SourceFile and Sentence nodes for sentence {sentence_id} from '{filename}'.")
 
         # --- 3. MERGE Type Nodes & Relationships (FunctionType, StructureType, Purpose) ---
-        # TODO: Implement Cypher query and execution
+        type_queries = []
+        # FunctionType
+        if params.get('function_type'):
+            type_queries.append("""
+            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+            MERGE (t:FunctionType {name: $function_type})
+            MERGE (s)-[:HAS_FUNCTION_TYPE]->(t)
+            """)
+        # StructureType
+        if params.get('structure_type'):
+            type_queries.append("""
+            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+            MERGE (t:StructureType {name: $structure_type})
+            MERGE (s)-[:HAS_STRUCTURE_TYPE]->(t)
+            """)
+        # Purpose
+        if params.get('purpose'):
+            type_queries.append("""
+            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+            MERGE (t:Purpose {name: $purpose})
+            MERGE (s)-[:HAS_PURPOSE]->(t)
+            """)
+        
+        # Execute type queries if any exist
+        if type_queries:
+            # Consider running these in a single transaction if possible/needed
+            # For simplicity here, running sequentially
+            for query in type_queries:
+                await connection_manager.execute_query(query, parameters=params)
+            logger.debug(f"Merged type nodes/relationships for sentence {sentence_id}.")
 
         # --- 4. MERGE Topic Nodes & Relationships ---
-        # TODO: Implement Cypher query and execution
-        
+        topic_query = """
+        MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+        // Use UNWIND to process multiple topics efficiently if they are passed as a list
+        // For now, handling topic_level_1 and topic_level_3 separately
+        // Consider refactoring if topics become a list in analysis_data
+        WITH s
+        WHERE $topic_level_1 IS NOT NULL
+        MERGE (t1:Topic {name: $topic_level_1})
+        MERGE (s)-[:HAS_TOPIC]->(t1)
+        WITH s // Pass s along for the next optional part
+        WHERE $topic_level_3 IS NOT NULL
+        MERGE (t3:Topic {name: $topic_level_3})
+        MERGE (s)-[:HAS_TOPIC]->(t3)
+        """
+        # Only execute if at least one topic level exists
+        if params.get('topic_level_1') or params.get('topic_level_3'):
+            await connection_manager.execute_query(topic_query, parameters=params)
+            logger.debug(f"Merged topic nodes/relationships for sentence {sentence_id}.")
+
         # --- 5. MERGE Keyword Nodes & Relationships ---
-        # TODO: Implement Cypher query and execution
+        keyword_queries = []
+        # Overall Keywords
+        if params.get('overall_keywords'):
+            # Use UNWIND for efficient list processing
+            keyword_queries.append("""
+            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+            UNWIND $overall_keywords AS keyword_text
+            MERGE (k:Keyword {text: keyword_text})
+            MERGE (s)-[:MENTIONS_OVERALL_KEYWORD]->(k)
+            """)
+        # Domain Keywords
+        if params.get('domain_keywords'):
+            keyword_queries.append("""
+            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+            UNWIND $domain_keywords AS keyword_text
+            MERGE (k:Keyword {text: keyword_text})
+            MERGE (s)-[:MENTIONS_DOMAIN_KEYWORD]->(k)
+            """)
+
+        # Execute keyword queries if any exist
+        if keyword_queries:
+            for query in keyword_queries:
+                await connection_manager.execute_query(query, parameters=params)
+            logger.debug(f"Merged keyword nodes/relationships for sentence {sentence_id}.")
         
         # --- 6. MERGE :FOLLOWS Relationship (Optional but Recommended) ---
         # TODO: Implement Cypher query and execution
