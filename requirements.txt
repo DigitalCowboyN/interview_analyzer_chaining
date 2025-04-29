@@ -41,3 +41,6 @@ uvicorn
 # Task Queue Manager
 celery
 redis
+
+# Database
+neo4j

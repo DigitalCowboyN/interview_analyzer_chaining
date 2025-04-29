@@ -41,6 +41,7 @@ clustering:
 
 pipeline:
   num_analysis_workers: 10
+  num_concurrent_files: 4
 
 classification:
   local:
@@ -67,3 +68,18 @@ openai_api:
   retry:
     max_attempts: 5
     backoff_factor: 2
+
+# Neo4j Database Configuration
+neo4j:
+  uri: "bolt://neo4j:7687" # Default URI for accessing within docker-compose network
+  username: "neo4j"
+  password: "${NEO4J_PASSWORD}" # Loaded from .env file
+  # database: "neo4j" # Default database, usually not needed unless using multiple DBs
+
+# Logging configuration
+logging:
+  # ... (existing settings) ...
+
+# API specific settings (if any)
+api:
+  # ... (potential API settings) ...

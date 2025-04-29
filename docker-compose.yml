@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # Main application service (FastAPI)
   app:
@@ -15,7 +17,10 @@ services:
       - PYTHONUNBUFFERED=1 # Ensure logs appear immediately
     # If the API needs to wait for Redis (good practice)
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
     # Command to run the API server (adjust if needed)
     # command: ["make", "run-api"] # Example using Makefile target
     command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -28,6 +33,11 @@ services:
       - "6379:6379" # Expose Redis port (optional, for external debugging)
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
 
   # Celery worker service
   worker:
@@ -42,8 +52,39 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
-      - redis # Depends on Redis
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
     command: ["celery", "-A", "src.celery_app", "worker", "--loglevel=info"]
 
+  # Add Neo4j service
+  neo4j:
+    image: neo4j:5 # Use a specific version, e.g., Neo4j 5
+    ports:
+      - "7474:7474" # HTTP browser
+      - "7687:7687" # Bolt driver
+    volumes:
+      - neo4j_data:/data
+    environment:
+      # Default user is neo4j. Set password via environment variable.
+      # Read NEO4J_PASSWORD from .env file, provide a default if it's missing/empty.
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-changeme} 
+      # Accept license agreement (required for Enterprise features if used, safe for Community)
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
+      # Optional: Configure memory limits
+      # NEO4J_server_memory_pagecache_size: 1G
+      # NEO4J_server_memory_heap_initial__size: 1G
+      # NEO4J_server_memory_heap_max__size: 1G
+    env_file:
+      - .env # Ensure it reads the .env file for NEO4J_PASSWORD
+    healthcheck:
+      # Check if the Bolt port is ready
+      test: ["CMD-SHELL", "tcpconnect localhost:7687 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10 # Increase retries as Neo4j can take time to start
+
 volumes:
-  redis_data: # Persist Redis data (optional) 
+  redis_data: # Define redis volume
+  neo4j_data: # Define neo4j volume (This is the correct one) 

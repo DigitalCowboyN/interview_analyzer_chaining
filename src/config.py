@@ -18,7 +18,52 @@ import os
 import yaml
 import re
 from pathlib import Path
+import json
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel, ValidationError
 
+
+# Define a Pydantic model for nested configuration sections if desired for validation
+# (Example - can be expanded)
+# class PathsConfig(BaseModel):
+#     input_dir: str
+#     output_dir: str
+#     map_dir: str
+#     # ... other path related configs ...
+
+class Neo4jConfig(BaseModel):
+    uri: str
+    username: str
+    password: str
+    # database: Optional[str] = "neo4j"
+
+class PipelineConfig(BaseModel):
+    num_analysis_workers: int = 10 # Keep existing worker count
+    num_concurrent_files: int = 4
+    # Add the new cardinality limits dictionary
+    default_cardinality_limits: Dict[str, Optional[int]] = {
+        "HAS_FUNCTION": 1,
+        "HAS_STRUCTURE": 1,
+        "HAS_PURPOSE": 1,
+        "MENTIONS_KEYWORD": 6,
+        "MENTIONS_TOPIC": None, # Use None for unlimited
+        "MENTIONS_DOMAIN_KEYWORD": None 
+    }
+    # Optional: Add retry settings for pipeline steps if needed
+
+class ConfigModel(BaseModel):
+    openai: Dict[str, Any] = {}
+    openai_api: Dict[str, Any] = {}
+    preprocessing: Dict[str, Any] = {}
+    classification: Dict[str, Any] = {}
+    paths: Dict[str, Any] = {}
+    domain_keywords: List[str] = []
+    # Use the specific PipelineConfig model here
+    pipeline: PipelineConfig = PipelineConfig() # Use default values if not in YAML
+    logging: Dict[str, Any] = {}
+    neo4j: Optional[Neo4jConfig] = None 
+    api: Dict[str, Any] = {}
+    # Add other top-level sections as needed
 
 class Config:
     """
@@ -38,66 +83,68 @@ class Config:
                            Defaults to "config.yaml".
     """
 
-    def __init__(self, config_path: str = "config.yaml"):
-        """
-        Initializes the Config instance by setting the path and loading the config.
+    _instance = None
 
-        Args:
-            config_path (str): Relative path to the configuration file. 
-                               Defaults to "config.yaml".
-        """
-        self.config_path = Path(__file__).parent.parent / config_path
-        self.config = self.load_config()
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(Config, cls).__new__(cls)
+            cls._instance._config = cls._instance._load_config()
+        return cls._instance
 
-    def load_config(self) -> dict:
-        """
-        Loads configuration from the YAML file and expands environment variables.
+    def _load_config(self) -> Dict[str, Any]:
+        project_root = Path(__file__).parent.parent
+        config_path = project_root / "config.yaml"
+        env_path = project_root / ".env" # Path reference might still be useful for debugging/context
+        
+        # Remove the call to load_dotenv, as Docker Compose/Dev Container handles it
+        # load_dotenv(dotenv_path=env_path)
 
-        Environment variables in the YAML file should be formatted as ${VAR_NAME}.
-        Variables not found in the environment retain their ${VAR_NAME} format.
-        Also specifically looks for CELERY_BROKER_URL and CELERY_RESULT_BACKEND_URL
-        in the environment first.
+        config_dict = {}
+        if config_path.exists():
+            with open(config_path, 'r') as stream:
+                try:
+                    config_dict = yaml.safe_load(stream)
+                except yaml.YAMLError as exc:
+                    print(f"Error loading config.yaml: {exc}")
+                    # Decide how to handle: raise error, use defaults, exit?
+                    raise
 
-        Returns:
-            dict: The parsed and processed configuration settings.
-        Raises:
-            FileNotFoundError: If the configuration file does not exist.
-            yaml.YAMLError: If the file content is not valid YAML.
-        """
-        if not self.config_path.exists():
-            raise FileNotFoundError(f"Config file not found: {self.config_path}")
+        # Substitute environment variables
+        config_str = json.dumps(config_dict)
+        config_str = os.path.expandvars(config_str.replace("${", "${ENV_")) # Prefixing to avoid clashes
+        config_dict = json.loads(config_str)
+        
+        # Rename keys back by removing the temporary prefix
+        def remove_prefix(data):
+            if isinstance(data, dict):
+                return {k: remove_prefix(v) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [remove_prefix(item) for item in data]
+            elif isinstance(data, str) and data.startswith("${ENV_"):
+                 env_var_name = data[6:-1] # Extract original name
+                 # Return the actual env var value, or None/empty string if not set
+                 return os.getenv(env_var_name, "") 
+            return data
 
-        content = self.config_path.read_text(encoding="utf-8")
+        final_config = remove_prefix(config_dict)
+        
+        # Validate using Pydantic model (optional but recommended)
+        try:
+            _ = ConfigModel(**final_config) # Validate structure
+        except ValidationError as e:
+            print(f"Configuration validation error: {e}")
+            # Decide how to handle validation errors
+            raise
 
-        # Explicitly expand environment variables formatted as ${VAR_NAME}
-        content = re.sub(
-            r"\$\{([^}]+)\}",
-            lambda match: os.environ.get(match.group(1), match.group(0)),
-            content
-        )
-
-        loaded_config = yaml.safe_load(content)
-
-        # --- Add Celery URL loading from environment --- 
-        # Ensure 'celery' key exists
-        if 'celery' not in loaded_config:
-            loaded_config['celery'] = {}
+        # Ensure essential keys are present (example)
+        # if "openai" not in final_config or "api_key" not in final_config["openai"]:
+        #     raise ValueError("Missing essential OpenAI configuration")
             
-        # Override broker/backend URL from environment if set
-        broker_url = os.environ.get("CELERY_BROKER_URL")
-        if broker_url:
-            loaded_config['celery']['broker_url'] = broker_url
-        elif 'broker_url' not in loaded_config['celery']: # Set a default if not in env or yaml
-             loaded_config['celery']['broker_url'] = "redis://redis:6379/0"
-             
-        backend_url = os.environ.get("CELERY_RESULT_BACKEND_URL")
-        if backend_url:
-            loaded_config['celery']['result_backend'] = backend_url
-        elif 'result_backend' not in loaded_config['celery']: # Set a default
-             loaded_config['celery']['result_backend'] = "redis://redis:6379/1"
-        # ---------------------------------------------
+        return final_config
 
-        return loaded_config
+    @property
+    def config(self) -> Dict[str, Any]:
+        return self._config
 
     def get(self, key, default=None):
         """
@@ -136,11 +183,11 @@ class Config:
         Returns:
             str: Representation including the config file path (e.g., "Config(path/to/config.yaml)").
         """
-        return f"Config(path={self.config_path})" # Added path= for clarity
+        return f"Config(path={Path(__file__).parent.parent / 'config.yaml'})" # Added path= for clarity
 
 
-# Singleton instance for global configuration access
-config = Config()
+# Singleton instance
+config = Config().config
 
 # --- Add validation or specific accessors for new config keys if needed ---
 # Example (optional validation):
