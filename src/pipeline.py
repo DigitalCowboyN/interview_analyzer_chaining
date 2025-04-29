@@ -370,10 +370,10 @@ def _handle_context_building(
     task_id: Optional[str] = None
 ) -> Dict[int, Dict[str, Any]]: # Assuming context is Dict[int, Dict]
     """
-    Handles the context building step.
+    Handles the context building step, generating surrounding text for analysis.
 
-    Calls the analysis_service's context builder and manages exceptions,
-    logging, and metrics related to this step.
+    Calls the analysis_service's context builder (`build_all_contexts`) and 
+    manages exceptions, logging, and metrics related to this step.
 
     Args:
         sentences: List of sentence strings.
@@ -413,9 +413,9 @@ async def _orchestrate_analysis_and_writing(
     """
     Orchestrates sentence analysis and asynchronous result writing via protocols.
 
-    Creates a queue and a writer task (using the passed analysis_writer),
-    calls the analysis service, puts results on the queue, and manages task/queue
-    completion and cancellation.
+    Creates an `asyncio.Queue` and an `asyncio.Task` for the `_result_writer` 
+    (using the passed `analysis_writer`), calls the analysis service to get results, 
+    puts results onto the queue, and manages task/queue completion and cancellation.
 
     Args:
         sentences: List of sentence strings.
@@ -602,6 +602,10 @@ def _setup_pipeline_environment(
 ) -> PipelineEnvironment:
     """
     Loads configuration, sets up paths, creates directories, and instantiates services.
+    
+    Initializes the core components needed for a pipeline run, including paths,
+    the singleton `MetricsTracker`, and the `AnalysisService` (which in turn
+    instantiates `ContextBuilder` and `SentenceAnalyzer`).
 
     Args:
         input_dir: Path to the input directory.
@@ -745,6 +749,11 @@ async def _run_processing_tasks(
     """
     Creates and executes concurrent tasks for processing each file using IO protocols.
 
+    Iterates through `files_to_process`, instantiating `LocalTextDataSource`,
+    `LocalJsonlMapStorage`, and `LocalJsonlAnalysisWriter` for each file path.
+    It then schedules `process_file` calls using an `asyncio.Semaphore` to 
+    limit concurrency.
+
     Args:
         files_to_process: List of file paths to process.
         env: The PipelineEnvironment object containing config, services, paths etc.
@@ -857,6 +866,10 @@ async def _run_verification(
 ) -> None:
     """
     Runs the output completeness verification step for all processed files using IO Protocols.
+    
+    Iterates through `files_to_process`, instantiating `LocalJsonlMapStorage`
+    and `LocalJsonlAnalysisWriter` for each corresponding map/analysis file pair.
+    Calls `verify_output_completeness` for each pair.
 
     Args:
         files_to_process: List of file paths that were attempted.
@@ -930,8 +943,12 @@ async def run_pipeline(
     """
     Runs the analysis pipeline on all .txt files in the input directory.
 
-    Orchestrates the pipeline by calling helper functions for setup, discovery,
-    processing, logging, and verification.
+    Orchestrates the main pipeline flow:
+    1. Setup: Calls `_setup_pipeline_environment` to initialize config, paths, services.
+    2. Discover: Calls `_discover_files_to_process` to find input files.
+    3. Process: Calls `_run_processing_tasks` to analyze files concurrently.
+    4. Summarize: Calls `_log_processing_summary` to log outcomes.
+    5. Verify: Calls `_run_verification` to check output completeness.
 
     Args:
         input_dir: Directory containing input .txt files or path to specific file's dir.

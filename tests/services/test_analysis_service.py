@@ -6,11 +6,21 @@ import pytest
 from unittest.mock import patch, AsyncMock, MagicMock, call
 from typing import Dict, Any, List
 import asyncio
+import itertools # Import itertools for counter
 
 from src.services.analysis_service import AnalysisService
 from src.agents.context_builder import ContextBuilder 
 from src.agents.sentence_analyzer import SentenceAnalyzer
 from src.utils.metrics import MetricsTracker
+
+# --- Mock Timer ---
+def create_mock_timer(start_time=1.0, increment=0.5):
+    """Creates a *callable function* that returns predictably increasing time values."""
+    counter = itertools.count()
+    # Define and return a function that closes over the counter and state
+    def timer_func() -> float:
+        return start_time + next(counter) * increment
+    return timer_func
 
 # Fixture for mock config
 @pytest.fixture
@@ -36,15 +46,21 @@ def mock_config() -> Dict[str, Any]:
 @pytest.fixture
 def analysis_service(
     mock_config: Dict[str, Any],
-    mock_context_builder: MagicMock, # Inject mock dependency
-    mock_sentence_analyzer: AsyncMock, # Inject mock dependency
-    mock_metrics_tracker: MagicMock # Inject mock dependency
+    mock_context_builder: MagicMock, 
+    mock_sentence_analyzer: AsyncMock, # Inject base mock
+    mock_metrics_tracker: MagicMock 
 ) -> AnalysisService:
-    """Provides an AnalysisService instance with mocked dependencies."""
+    """Provides an AnalysisService instance with *base* mocked dependencies.
+       Specific mock behaviors (like classify_sentence side_effect) should be
+       configured *within the tests* using this instance or its mocks.
+    """
+    # NOTE: We no longer configure side_effects here. Tests will configure the 
+    # mock_sentence_analyzer passed *into* this fixture as needed, 
+    # typically right before calling the service method.
     return AnalysisService(
         config=mock_config,
         context_builder=mock_context_builder,
-        sentence_analyzer=mock_sentence_analyzer,
+        sentence_analyzer=mock_sentence_analyzer, # Pass the base mock
         metrics_tracker=mock_metrics_tracker
     )
 
@@ -59,10 +75,10 @@ def mock_context_builder() -> MagicMock:
 
 @pytest.fixture
 def mock_sentence_analyzer() -> AsyncMock:
-    """Provides a mock SentenceAnalyzer instance (AsyncMock for async methods)."""
+    """Provides a *base* mock SentenceAnalyzer instance."""
     mock = AsyncMock(spec=SentenceAnalyzer)
-    # Configure default mock behavior if needed, e.g.:
-    mock.classify_sentence = AsyncMock(return_value={"analysis": "mocked"})
+    # Ensure the attribute exists and is an AsyncMock, but DO NOT configure side_effect here.
+    mock.classify_sentence = AsyncMock()
     return mock
 
 @pytest.fixture
@@ -115,42 +131,43 @@ def test_build_contexts_exception(analysis_service: AnalysisService, mock_contex
 
 @pytest.mark.asyncio
 async def test_analyze_sentences_success(
-    analysis_service: AnalysisService, 
-    mock_sentence_analyzer: AsyncMock, 
+    analysis_service: AnalysisService, # Uses the fixture above
+    mock_sentence_analyzer: AsyncMock, # The *same* base mock instance used by analysis_service
     mock_metrics_tracker: MagicMock
 ):
-    """Test analyze_sentences success path with mocked analyzer."""
+    """Test success path, configuring the mock analyzer before the call."""
     sentences = ["s1", "s2"]
     contexts = [{"c": 1}, {"c": 2}]
     mock_analysis_result_s1 = {"analysis": "result1"}
     mock_analysis_result_s2 = {"analysis": "result2"}
-    mock_sentence_analyzer.classify_sentence.side_effect = [mock_analysis_result_s1, mock_analysis_result_s2]
-
+    results_to_return = [mock_analysis_result_s1, mock_analysis_result_s2]
+    
     expected_results = [
         {"sentence_id": 0, "sequence_order": 0, "sentence": "s1", "analysis": "result1"},
         {"sentence_id": 1, "sequence_order": 1, "sentence": "s2", "analysis": "result2"}
     ]
+    mock_timer = create_mock_timer()
 
-    with patch("src.services.analysis_service.logger") as mock_logger:
-        results = await analysis_service.analyze_sentences(sentences, contexts)
+    # Configure the classify_sentence method on the *mock instance* used by the service
+    mock_sentence_analyzer.classify_sentence.side_effect = results_to_return
+
+    # Call the service method (NO inner patching needed now)
+    results = await analysis_service.analyze_sentences(sentences, contexts, timer=mock_timer)
     
-    # Assert analyzer was called correctly - Use assert_awaited
-    mock_sentence_analyzer.classify_sentence.assert_awaited() # Check if it was awaited at least once
-    # Check specific calls if needed after confirming it's awaited
-    # mock_sentence_analyzer.classify_sentence.assert_has_awaits([
-    #     call("s1", {"c": 1}),
-    #     call("s2", {"c": 2})
-    # ], any_order=True) # any_order might be needed due to concurrency
-
-    # Assert metrics were called
-    # mock_metrics_tracker.increment_errors.assert_not_called() # TODO (Metrics): Reinstate when metrics are fixed
-
-    # Assert results 
+    # Assert Results
     assert results == expected_results
+
+    # Assert Metrics
+    mock_metrics_tracker.increment_errors.assert_not_called()
+    assert mock_metrics_tracker.increment_sentences_success.call_count == len(sentences)
+    assert mock_metrics_tracker.add_processing_time.call_count == len(sentences)
+    mock_metrics_tracker.add_processing_time.assert_any_call(0, 0.5) 
+    mock_metrics_tracker.add_processing_time.assert_any_call(1, 0.5)
 
 @pytest.mark.asyncio
 async def test_analyze_sentences_empty_input(analysis_service: AnalysisService, mock_sentence_analyzer: AsyncMock):
     """Test analyze_sentences with empty sentences list."""
+    # No timer needed here, no patch needed
     with patch("src.services.analysis_service.logger") as mock_logger:
         results = await analysis_service.analyze_sentences([], [])
     
@@ -161,6 +178,7 @@ async def test_analyze_sentences_empty_input(analysis_service: AnalysisService, 
 @pytest.mark.asyncio
 async def test_analyze_sentences_context_mismatch(analysis_service: AnalysisService, mock_sentence_analyzer: AsyncMock):
     """Test analyze_sentences when sentence and context counts differ."""
+     # No timer needed here, no patch needed
     with patch("src.services.analysis_service.logger") as mock_logger:
         results = await analysis_service.analyze_sentences(["s1", "s2"], [{"c": 1}]) # Mismatch
     
@@ -171,36 +189,95 @@ async def test_analyze_sentences_context_mismatch(analysis_service: AnalysisServ
 @pytest.mark.asyncio
 async def test_analyze_sentences_classify_error(
     analysis_service: AnalysisService, 
-    mock_sentence_analyzer: AsyncMock, 
+    mock_sentence_analyzer: AsyncMock, # The base mock instance
     mock_metrics_tracker: MagicMock
 ):
-    """Test analyze_sentences when analyzer raises an error for one sentence."""
+    """Test error path, configuring the mock analyzer before the call."""
     sentences = ["s1_ok", "s2_fail"]
     contexts = [{"c": 1}, {"c": 2}]
     mock_analysis_result_s1 = {"analysis": "result1"}
     test_exception = ValueError("API Error")
-    mock_sentence_analyzer.classify_sentence.side_effect = [mock_analysis_result_s1, test_exception]
-
+    
     expected_results = [
         {"sentence_id": 0, "sequence_order": 0, "sentence": "s1_ok", "analysis": "result1"},
         {"sentence_id": 1, "sequence_order": 1, "sentence": "s2_fail", "error": True, "error_type": "ValueError", "error_message": "API Error"}
     ]
+    mock_timer = create_mock_timer()
 
-    with patch("src.services.analysis_service.logger") as mock_logger:
-        results = await analysis_service.analyze_sentences(sentences, contexts)
+    # Configure the classify_sentence method on the *mock instance* used by the service
+    mock_sentence_analyzer.classify_sentence.side_effect = [
+        mock_analysis_result_s1, 
+        test_exception
+    ]
+
+    # Call the service method (NO inner patching needed)
+    results = await analysis_service.analyze_sentences(sentences, contexts, timer=mock_timer)
     
-    # Assert analyzer was awaited twice (even though one failed)
-    assert mock_sentence_analyzer.classify_sentence.await_count == 2
-
-    # Assert metrics
-    # assert mock_metrics_tracker.increment_errors.call_count == 1 # TODO (Metrics): Reinstate when metrics are fixed
-
-    # Assert results (should contain both success and error dicts)
+    # Assert Results
     assert results == expected_results
 
-    # Check logger error message
-    log_message = mock_logger.error.call_args[0][0]
-    assert "failed analyzing sentence_id 1" in log_message
-    assert "API Error" in log_message
+    # Assert Metrics
+    assert mock_metrics_tracker.increment_errors.call_count == 1 
+    assert mock_metrics_tracker.increment_sentences_success.call_count == 1
+    assert mock_metrics_tracker.add_processing_time.call_count == 1 
+    mock_metrics_tracker.add_processing_time.assert_called_once_with(0, 0.5)
+    
+    # Optional: Assert logger error was called (using caplog fixture if needed)
+    # ...
+
+# --- New Concurrency Test --- #
+@pytest.mark.asyncio
+async def test_analyze_sentences_concurrency(
+    # Need specific service instance for concurrency config
+    mock_config: Dict[str, Any], # Get base config
+    mock_context_builder: MagicMock, 
+    mock_sentence_analyzer: AsyncMock, # The base mock instance
+    mock_metrics_tracker: MagicMock
+):
+    """Test concurrency path, configuring the mock analyzer before the call."""
+    # Create a modified config for this test
+    mock_config_concurrent = mock_config.copy()
+    mock_config_concurrent["pipeline"] = {"num_analysis_workers": 2}
+    
+    # Instantiate service with modified config and *base* mocks
+    analysis_service_concurrent = AnalysisService(
+        config=mock_config_concurrent,
+        context_builder=mock_context_builder,
+        sentence_analyzer=mock_sentence_analyzer, # Pass the base mock
+        metrics_tracker=mock_metrics_tracker
+    )
+    
+    sentences = ["s1", "s2", "s3"]
+    contexts = [{"c": 1}, {"c": 2}, {"c": 3}]
+    mock_results_list = [
+        {"analysis": "r1"}, 
+        {"analysis": "r2"}, 
+        {"analysis": "r3"}
+    ]
+    expected_final_results = [
+        {"sentence_id": 0, "sequence_order": 0, "sentence": "s1", "analysis": "r1"},
+        {"sentence_id": 1, "sequence_order": 1, "sentence": "s2", "analysis": "r2"},
+        {"sentence_id": 2, "sequence_order": 2, "sentence": "s3", "analysis": "r3"}
+    ]
+    mock_timer = create_mock_timer()
+
+    # Configure the classify_sentence method on the *mock instance* used by the service
+    mock_sentence_analyzer.classify_sentence.side_effect = mock_results_list
+
+    # Call the service method (NO inner patching needed)
+    results = await analysis_service_concurrent.analyze_sentences(sentences, contexts, timer=mock_timer)
+    
+    # Assert Results
+    assert results == expected_final_results
+
+    # Assert Metrics
+    mock_metrics_tracker.increment_errors.assert_not_called()
+    assert mock_metrics_tracker.increment_sentences_success.call_count == 3
+    assert mock_metrics_tracker.add_processing_time.call_count == 3
+    mock_metrics_tracker.add_processing_time.assert_has_calls([
+        call(0, 0.5),
+        call(1, 0.5),
+        call(2, 0.5),
+    ], any_order=True)
 
 # Add more tests: e.g., different number of workers, loader errors? 

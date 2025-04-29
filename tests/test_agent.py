@@ -115,11 +115,24 @@ async def test_retry_on_rate_limit(agent):
         "domain_keywords": ["assessment", "evaluation"]
     }
     error_response = RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
+    success_response = mock_response(response_content)
+    
+    # Use an async function for side_effect
+    call_count = 0
+    async def side_effect_func(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise error_response
+        else:
+            return success_response
+
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
-        # First call raises RateLimitError, second call returns a valid response.
-        mock_create.side_effect = [error_response, mock_response(response_content)]
+        # Assign the async function to side_effect
+        mock_create.side_effect = side_effect_func
         response = await agent.call_model("Test prompt")
         assert response["function_type"] == "declarative"
+        assert call_count == 2 # Ensure it was called exactly twice (initial + 1 retry)
 
 async def test_retry_on_api_error(agent):
     """
@@ -138,10 +151,24 @@ async def test_retry_on_api_error(agent):
         "domain_keywords": ["assessment", "evaluation"]
     }
     error_response = APIError("API error", request="mock_request", body="mock_body")
+    success_response = mock_response(response_content)
+    
+    # Use an async function for side_effect
+    call_count = 0
+    async def side_effect_func(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise error_response
+        else:
+            return success_response
+
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
-        mock_create.side_effect = [error_response, mock_response(response_content)]
+        # Assign the async function to side_effect
+        mock_create.side_effect = side_effect_func
         response = await agent.call_model("Test prompt")
         assert response["purpose"] == "to state a fact"
+        assert call_count == 2 # Ensure it was called exactly twice (initial + 1 retry)
 
 async def test_max_retry_exceeded(agent):
     """

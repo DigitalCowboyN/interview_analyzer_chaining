@@ -20,10 +20,10 @@ import pytest
 import json
 import asyncio
 from pathlib import Path
-from unittest.mock import patch, AsyncMock, ANY
+from unittest.mock import patch, AsyncMock, ANY, MagicMock
 
 # Assuming main entry point or run_pipeline can be invoked
-from src.pipeline import run_pipeline
+from src.pipeline import run_pipeline, PipelineEnvironment # Import PipelineEnvironment
 from src.config import config # Use the actual config
 
 # --- Fixtures ---
@@ -147,9 +147,32 @@ def generate_mock_analysis(sentence_id, sequence_order, sentence):
 
 # --- Integration Tests ---
 
+# Fixture to automatically mock the metrics singleton for integration tests
+@pytest.fixture(autouse=True)
+def mock_pipeline_metrics(monkeypatch):
+    """Mocks the singleton metrics_tracker instance in src.utils.metrics."""
+    mock_tracker = create_mock_metrics_tracker() # Use existing helper
+    monkeypatch.setattr("src.utils.metrics.metrics_tracker", mock_tracker)
+    # Return the mock so tests can use it if needed (though often not directly needed)
+    return mock_tracker
+
+def create_mock_metrics_tracker():
+    """Creates a MagicMock for MetricsTracker with necessary methods."""
+    mock_tracker = MagicMock()
+    mock_tracker.increment_files_processed = MagicMock()
+    mock_tracker.increment_files_failed = MagicMock()
+    mock_tracker.increment_sentences_processed = MagicMock() # Method called by map creation
+    mock_tracker.increment_sentences_success = MagicMock() # Method called by worker on success
+    mock_tracker.increment_errors = MagicMock() # Method called by worker on error
+    mock_tracker.add_processing_time = MagicMock() # Method called by worker on success
+    mock_tracker.add_file_processing_time = MagicMock()
+    # Add any other methods that might be called by the pipeline
+    mock_tracker.get_summary = MagicMock(return_value={})
+    return mock_tracker
+
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_pipeline_integration_empty_file(integration_dirs, setup_single_empty_file):
+async def test_pipeline_integration_empty_file(integration_dirs, setup_single_empty_file, mock_pipeline_metrics):
     """
     Test the pipeline correctly handles an empty input file using Local IO.
 
@@ -208,9 +231,14 @@ async def test_pipeline_integration_empty_file(integration_dirs, setup_single_em
             instance.build_contexts.assert_not_called()
             instance.analyze_sentences.assert_not_called()
 
+        # Assert metrics via the injected fixture
+        mock_pipeline_metrics.add_processing_time.assert_not_called()
+        mock_pipeline_metrics.increment_sentences_success.assert_not_called()
+        mock_pipeline_metrics.increment_errors.assert_not_called()
+
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_pipeline_integration_success_rewritten(integration_dirs, setup_input_files):
+async def test_pipeline_integration_success_rewritten(integration_dirs, setup_input_files, mock_pipeline_metrics):
     """Test rewritten: Full pipeline success with mocked API calls using Local IO."""
     input_dir, output_dir, map_dir = integration_dirs
     input_files = setup_input_files # Use the standard fixture
@@ -247,16 +275,15 @@ async def test_pipeline_integration_success_rewritten(integration_dirs, setup_in
              return {"mock_fallback": []}
 
     # --- Patching ---
-    # Patch only the external dependency (classify_sentence)
-    # Remove patch for append_json_line and config
+    # Patch the core dependency: sentence classification. Metrics are handled by the autouse fixture.
     with patch("src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence", new_callable=AsyncMock, side_effect=mock_classify_sentence) as mock_classify, \
-         patch("src.pipeline.logger") as mock_pipeline_logger: # Keep logger patch if needed
+         patch("src.pipeline.logger") as mock_pipeline_logger:
 
         # --- Execute ---
         await run_pipeline(
-            input_dir=input_dir,      
-            output_dir=output_dir,    
-            map_dir=map_dir,          
+            input_dir=input_dir,
+            output_dir=output_dir,
+            map_dir=map_dir,
             config=mock_config_dict,  # Pass the test-specific config
             specific_file=target_file.name # Process only this file
         )
@@ -290,15 +317,20 @@ async def test_pipeline_integration_success_rewritten(integration_dirs, setup_in
         expected_set = {make_hashable(expected_result_0), make_hashable(expected_result_1)}
         assert analysis_data_set == expected_set
 
-        # 3. Check API mock was called
+        # 3. Check classify mock was called
         assert mock_classify.call_count >= 2 # Should be called for each sentence
         # Check it was called with the correct sentence and ANY context
         mock_classify.assert_any_call(sentence_alpha, ANY) 
         mock_classify.assert_any_call(sentence_beta, ANY)
 
+        # Assert metrics via the injected fixture
+        mock_pipeline_metrics.add_processing_time.assert_called()
+        mock_pipeline_metrics.increment_sentences_success.assert_called()
+        mock_pipeline_metrics.increment_errors.assert_not_called()
+
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_pipeline_integration_partial_failure_rewritten(integration_dirs):
+async def test_pipeline_integration_partial_failure_rewritten(integration_dirs, mock_pipeline_metrics):
     """Test rewritten: Pipeline handles partial failure (one sentence error) using Local IO."""
     input_dir, output_dir, map_dir = integration_dirs
 
@@ -338,10 +370,10 @@ async def test_pipeline_integration_partial_failure_rewritten(integration_dirs):
              return {"mock_fallback": []}
 
     # --- Patching ---
-    # Patch only the external dependency
+    # Patch the core dependency: sentence classification. Metrics are handled by the autouse fixture.
     with patch("src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence", new_callable=AsyncMock, side_effect=mock_classify_fail_one) as mock_classify, \
          patch("src.pipeline.logger") as mock_pipeline_logger, \
-         patch("src.services.analysis_service.logger") as mock_service_logger: # Patch service logger too
+         patch("src.services.analysis_service.logger") as mock_service_logger:
 
         # --- Execute ---
         await run_pipeline(
@@ -405,5 +437,10 @@ async def test_pipeline_integration_partial_failure_rewritten(integration_dirs):
                  error_logged = True
                  break
         assert error_logged, f"Expected analysis error log containing '{expected_log_fragment}' not found in service logger. Logs: {all_logs}"
+
+        # Assert metrics via the injected fixture
+        mock_pipeline_metrics.add_processing_time.assert_called_once()
+        mock_pipeline_metrics.increment_sentences_success.assert_called_once()
+        mock_pipeline_metrics.increment_errors.assert_called_once()
 
 # ... (Rest of integration tests) ... 

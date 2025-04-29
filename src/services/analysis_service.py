@@ -2,6 +2,7 @@
 import asyncio
 import json
 from typing import Dict, Any, List, Tuple, Optional
+import time # Import time module
 from pathlib import Path # Added for potential future use if map reading moves here
 
 from src.utils.logger import get_logger
@@ -12,6 +13,7 @@ from src.agents.sentence_analyzer import SentenceAnalyzer # Import SentenceAnaly
 # --- Import types for dependency injection ---
 from src.agents.context_builder import ContextBuilder # Assuming ContextBuilder class exists or using duck typing
 from src.utils.metrics import MetricsTracker # Assuming MetricsTracker class exists or using duck typing
+from collections.abc import Callable # Import Callable
 
 logger = get_logger()
 
@@ -58,7 +60,8 @@ class AnalysisService:
         self, 
         sentences: List[str], 
         contexts: List[Dict[str, str]], 
-        task_id: Optional[str] = None # Keep task_id parameter
+        task_id: Optional[str] = None, # Keep task_id parameter
+        timer: Callable[[], float] = time.monotonic # Add timer dependency with default
     ) -> List[Dict[str, Any]]:
         """Analyzes a list of sentences with their corresponding contexts using concurrent workers."""
         # Remove prefix usage
@@ -77,11 +80,11 @@ class AnalysisService:
         # Use the injected analyzer instance passed in __init__
         # analyzer = SentenceAnalyzer() # REMOVE internal instantiation
 
-        # Create worker tasks - pass the injected analyzer
+        # Create worker tasks - pass the injected analyzer and the timer
         worker_tasks = []
         for i in range(num_analysis_workers):
-            # Pass self.analyzer to the worker
-            task = asyncio.create_task(self._analysis_worker(i, self.analyzer, task_queue, results_queue))
+            # Pass self.analyzer and the timer to the worker
+            task = asyncio.create_task(self._analysis_worker(i, self.analyzer, task_queue, results_queue, timer=timer))
             worker_tasks.append(task)
         logger.info(f"Started {num_analysis_workers} analysis workers.")
 
@@ -145,12 +148,24 @@ class AnalysisService:
             raise
 
     async def _analysis_worker(
-        self, worker_id: int, analyzer: SentenceAnalyzer, task_queue: asyncio.Queue, results_queue: asyncio.Queue
+        self,
+        worker_id: int,
+        analyzer: SentenceAnalyzer,
+        task_queue: asyncio.Queue,
+        results_queue: asyncio.Queue,
+        timer: Callable[[], float] # Accept timer as argument
     ):
         """
         Async worker moved from pipeline.py.
         Consumes tasks, performs analysis, puts results/errors onto results_queue.
-        Uses injected metrics_tracker.
+        Uses injected metrics_tracker and timer.
+
+        Args:
+            worker_id (int): Identifier for the worker.
+            analyzer (SentenceAnalyzer): The sentence analyzer instance.
+            task_queue (asyncio.Queue): Queue to get tasks from.
+            results_queue (asyncio.Queue): Queue to put results onto.
+            timer (Callable[[], float]): Callable to get the current time for metrics.
         """
         logger.info(f"Analysis worker {worker_id} started.")
         while True:
@@ -164,10 +179,15 @@ class AnalysisService:
             logger.debug(f"Worker {worker_id} processing sentence_id: {sentence_id}")
             
             try:
-                start_time = asyncio.get_event_loop().time()
+                # Use the injected timer
+                start_time = timer()
                 analysis_result: Dict[str, Any] = await analyzer.classify_sentence(sentence, context)
-                end_time = asyncio.get_event_loop().time()
+                end_time = timer()
                 
+                # Use the injected metrics_tracker instance
+                self.metrics_tracker.add_processing_time(sentence_id, end_time - start_time)
+                self.metrics_tracker.increment_sentences_success() # Increment success metric
+
                 full_result = {
                     "sentence_id": sentence_id,
                     "sequence_order": sequence_order,
@@ -180,7 +200,13 @@ class AnalysisService:
 
             except Exception as e:
                 logger.error(f"Worker {worker_id} failed analyzing sentence_id {sentence_id}: {e}", exc_info=True)
-                # self.metrics_tracker.increment_errors() # TODO (Metrics): Reinstate with proper Celery solution
+                # Use the injected metrics_tracker instance
+                self.metrics_tracker.increment_errors() # Increment error metric
+
+                # Optionally capture time even for errors if useful
+                # end_time = timer() 
+                # self.metrics_tracker.add_processing_time(sentence_id, end_time - start_time) # Depends on if start_time was set
+
                 error_result = {
                     "sentence_id": sentence_id,
                     "sequence_order": sequence_order,

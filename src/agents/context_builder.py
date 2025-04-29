@@ -44,21 +44,21 @@ class ContextBuilder:
         """Initializes ContextBuilder by loading context window sizes from config."""
         # Use provided config_dict or fall back to global config
         from src.config import config as global_config # Import locally
-        config_to_use = config_dict or global_config
-        
+        # Corrected logic: Use config_dict if it's not None, otherwise use global_config
+        config_to_use = global_config if config_dict is None else config_dict
+        self.config = config_to_use  # Store the config for later use
+
+        # Load the classification prompts using the determined config
         try:
-            # Read context windows from the determined config
-            self.context_windows = config_to_use["preprocessing"]["context_windows"]
+            # Access nested keys carefully using .get() to handle missing keys gracefully
+            preprocessing_cfg = config_to_use.get("preprocessing", {})
+            self.context_windows = preprocessing_cfg.get("context_windows", {}) # Default to {} if key missing
+            if not self.context_windows:
+                 logger.warning("Context windows are empty. Check config ['preprocessing']['context_windows'].")
             logger.info(f"ContextBuilder initialized with windows: {self.context_windows}")
-            self.config = config_to_use # Store for potential future use
-        except KeyError as e:
-            logger.error(f"Config key missing for context_windows: {e}. Using default empty windows.")
+        except Exception as e: # Catch potential issues like non-dict preprocessing_cfg
+            logger.error(f"Failed to load context_windows from config: {e}", exc_info=True)
             self.context_windows = {}
-            self.config = config_to_use # Still store config
-        except Exception as e:
-            logger.error(f"Failed to initialize ContextBuilder config: {e}", exc_info=True)
-            self.context_windows = {}
-            self.config = config_to_use # Still store config
 
     def build_context(self, sentences: List[str], idx: int, window_size: int) -> str:
         """

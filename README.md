@@ -4,14 +4,14 @@
 
 This project provides an asynchronous pipeline and a FastAPI interface for processing text files (e.g., interview transcripts) and performing detailed, multi-dimensional analysis on each sentence. It leverages OpenAI's language models, the spaCy library for NLP tasks, and a robust, configurable architecture to produce structured JSON output.
 
-The pipeline segments input text, builds contextual information around each sentence, and uses an `AnalysisService` to orchestrate concurrent API calls to an OpenAI model (via `OpenAIAgent`) for classifying sentences based on function, structure, purpose, topic, and keywords according to configurable prompts. Results are written asynchronously using a **decoupled Input/Output (IO) layer defined by protocols**, allowing for different storage backends (currently implemented for local JSON Lines files).
+The pipeline segments input text, builds contextual information around each sentence, and uses an `AnalysisService` to orchestrate concurrent API calls to an OpenAI model (via `OpenAIAgent`) for classifying sentences based on function, structure, purpose, topic, and keywords according to configurable prompts. Results are written asynchronously using a **decoupled Input/Output (IO) layer defined by protocols**, allowing for different storage backends (e.g., local files, cloud storage, databases). Utilities for interacting with Neo4j are also included.
 
 The accompanying FastAPI application allows interaction with the generated analysis files.
 
 ## Features
 
 - **Asynchronous Pipeline:** Uses `asyncio` for efficient processing, particularly for I/O-bound LLM API calls and result writing.
-- **Decoupled IO:** Defines `TextDataSource`, `ConversationMapStorage`, and `SentenceAnalysisWriter` protocols (`src/io/protocols.py`) for flexible data handling.
+- **Decoupled IO:** Defines `TextDataSource`, `ConversationMapStorage`, and `SentenceAnalysisWriter` protocols (`src/io/protocols.py`) for flexible data handling, enabling easy extension to different storage systems (e.g., cloud, databases).
 - **Local File Storage:** Provides concrete implementations (`src/io/local_storage.py`) using `aiofiles` for reading text files and writing map/analysis data as JSON Lines (`*.jsonl`).
 - **Sentence Segmentation:** Utilizes `spaCy` via `src/utils/text_processing.py` for accurate text segmentation.
 - **Configurable Context Building:** `ContextBuilder` generates textual context windows (e.g., immediate, broader, observer) around each sentence based on settings in `config.yaml`.
@@ -25,11 +25,13 @@ The accompanying FastAPI application allows interaction with the generated analy
 - **FastAPI Interface:** Provides RESTful endpoints (`src/api/`) for listing analysis files and potentially triggering/viewing analysis.
 - **Modular Architecture:** Code organized into logical components (`pipeline`, `agents`, `services`, `api`, `models`, `utils`, `io`).
 - **Robust Testing:** Comprehensive unit and integration tests using `pytest`, `TestClient`, and `unittest.mock`.
+- **Neo4j Utilities:** Includes `Neo4jConnectionManager` for managing asynchronous connections to a Neo4j database (if configured).
 
 ## Technology Stack
 
 - **Programming Language:** Python 3.11+
 - **Core Libraries:** `asyncio`, `openai`, `spacy`, `pydantic`, `python-dotenv`, `pyyaml`, `aiofiles`, `celery`
+- **Database Driver (Optional):** `neo4j` (Async driver)
 - **API Framework:** `fastapi`, `uvicorn`
 - **HTTP Client (Testing):** `httpx`
 - **NLP Model (Segmentation):** `en_core_web_sm` (spaCy)
@@ -119,6 +121,7 @@ Key application behaviors are configured in `config.yaml`:
 -   **`classification.local.prompt_files`:** Path to the YAML file containing classification prompts.
 -   **`paths`:** Default input/output/map/log directories and file suffixes.
 -   **`domain_keywords`:** List of keywords for domain-specific extraction.
+-   **`neo4j` (Optional):** Connection details (URI, username, password) if using Neo4j features.
 
 Modify `config.yaml` to tune performance and analysis focus.
 
@@ -158,13 +161,25 @@ make run-api
 -   Interactive documentation (Swagger UI) is available at `http://localhost:8000/docs`.
 -   Alternative documentation (ReDoc) is available at `http://localhost:8000/redoc`.
 
+### Makefile Targets
+
+Common tasks can be run using the Makefile:
+
+- `make setup`: Installs dependencies and downloads spaCy model.
+- `make run-pipeline`: Runs the analysis pipeline on the default input directory.
+- `make run-api`: Starts the FastAPI server.
+- `make test`: Runs all tests using pytest.
+- `make lint`: Checks code style using flake8.
+- `make format`: Formats code using black.
+- `make clean`: Removes temporary files (`__pycache__`, `.pytest_cache`, etc.).
+
 ## API Endpoints
 
 *   **`GET /`**: Health check endpoint.
 *   **`GET /files/`**: Lists the filenames of generated analysis (`_analysis.jsonl`) files found in the configured output directory.
 *   **`GET /files/{filename}`**: Retrieves the full content of a specific analysis file.
 *   **`GET /files/{filename}/sentences/{sentence_id}`**: Retrieves the analysis result for a specific sentence ID within a given analysis file.
-*   **`POST /analysis/`**: Accepts an `input_filename` and triggers the analysis pipeline for that file to run in the background (returns `202 Accepted`).
+*   **`POST /analysis/`**: Accepts an `input_filename` and triggers the analysis pipeline for that file to run in the background using **Celery** (returns `202 Accepted`).
 *   _(More endpoints could be added for detailed task status, specific analysis requests without running the full pipeline, etc.)_
 
 ## Input and Output Files

@@ -117,6 +117,8 @@ async def test_classify_sentence_success(sentence_analyzer_with_dict, mock_conte
     """Test successful sentence classification and aggregation."""
     sentence = "This is a test sentence."
     analyzer, mock_agent = sentence_analyzer_with_dict # Unpack fixture
+    config_dict = analyzer.config # Get config used by analyzer
+    domain_keywords_str = ", ".join(config_dict.get("domain_keywords", []))
 
     # Explicitly set call_model as AsyncMock BEFORE assigning side_effect
     mock_agent.call_model = AsyncMock()
@@ -151,9 +153,23 @@ async def test_classify_sentence_success(sentence_analyzer_with_dict, mock_conte
     assert result["overall_keywords"] == ["test", "sentence"]
     assert result["domain_keywords"] == ["dict_keyword"]
 
-    # Assert agent was called 7 times (once for each dimension)
+    # Assert agent was called 7 times
     assert mock_agent.call_model.await_count == 7
-    # Optional: More specific assertions on call args if needed
+
+    # --- New Assertions: Check call arguments more specifically --- #
+    # Build expected prompts using the same logic as the SUT
+    prompts = analyzer.prompts
+    expected_calls = [
+        call(prompts["sentence_function_type"]["prompt"].format(sentence=sentence)),
+        call(prompts["sentence_structure_type"]["prompt"].format(sentence=sentence)),
+        call(prompts["sentence_purpose"]["prompt"].format(sentence=sentence, context=mock_contexts["observer_context"])),
+        call(prompts["topic_level_1"]["prompt"].format(sentence=sentence, context=mock_contexts["immediate_context"])),
+        call(prompts["topic_level_3"]["prompt"].format(sentence=sentence, context=mock_contexts["broader_context"])),
+        call(prompts["topic_overall_keywords"]["prompt"].format(context=mock_contexts["observer_context"])),
+        call(prompts["domain_specific_keywords"]["prompt"].format(sentence=sentence, domain_keywords=domain_keywords_str))
+    ]
+    # Check that the mock was awaited with these specific calls (order might vary due to gather)
+    mock_agent.call_model.assert_has_awaits(expected_calls, any_order=True)
 
 @pytest.mark.asyncio
 async def test_classify_sentence_api_error(sentence_analyzer_with_dict, mock_contexts, caplog):
@@ -198,9 +214,11 @@ async def test_classify_sentence_validation_error(sentence_analyzer_with_dict, m
         {"overall_keywords": ["test", "sentence"]},
         {"domain_keywords": ["dict_keyword"]},
     ]
-
-    # No need to patch Pydantic models here, let validation fail
-    result = await analyzer.classify_sentence(sentence, mock_contexts)
+    
+    # Need to patch metrics_tracker as it's now called
+    with patch("src.agents.sentence_analyzer.metrics_tracker") as mock_metrics_tracker:
+        # No need to patch Pydantic models here, let validation fail
+        result = await analyzer.classify_sentence(sentence, mock_contexts)
 
     # Assertions
     assert result["sentence"] == sentence
@@ -216,6 +234,8 @@ async def test_classify_sentence_validation_error(sentence_analyzer_with_dict, m
     # Check logs for validation warning
     assert "Validation failed for Topic Level 1 response" in caplog.text
     assert "invalid_key" in caplog.text # Log should contain the failed response
-    # assert "metrics_tracker.increment_errors()" # Check if metrics tracking is called (if uncommented)
+    
+    # Assert metrics tracker was called for the specific error
+    mock_metrics_tracker.increment_errors.assert_called_once_with('validation_error_topic_level_1')
 
     assert mock_agent.call_model.await_count == 7 

@@ -169,7 +169,7 @@ class SentenceAnalyzer:
             results["function_type"] = parsed.function_type
         except ValidationError as e:
             logger.warning(f"Validation failed for Function Type response: {e}. Response: {function_response}")
-            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
+            metrics_tracker.increment_errors('validation_error_function_type')
             results["function_type"] = "" # Default value
 
         # Structure Type
@@ -178,7 +178,7 @@ class SentenceAnalyzer:
             results["structure_type"] = parsed.structure_type
         except ValidationError as e:
             logger.warning(f"Validation failed for Structure Type response: {e}. Response: {structure_response}")
-            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
+            metrics_tracker.increment_errors('validation_error_structure_type')
             results["structure_type"] = "" # Default value
 
         # Purpose
@@ -187,7 +187,7 @@ class SentenceAnalyzer:
             results["purpose"] = parsed.purpose
         except ValidationError as e:
             logger.warning(f"Validation failed for Purpose response: {e}. Response: {purpose_response}")
-            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
+            metrics_tracker.increment_errors('validation_error_purpose')
             results["purpose"] = "" # Default value
 
         # Topic Level 1
@@ -196,7 +196,7 @@ class SentenceAnalyzer:
             results["topic_level_1"] = parsed.topic_level_1
         except ValidationError as e:
             logger.warning(f"Validation failed for Topic Level 1 response: {e}. Response: {topic_lvl1_response}")
-            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
+            metrics_tracker.increment_errors('validation_error_topic_level_1')
             results["topic_level_1"] = "" # Default value
 
         # Topic Level 3
@@ -205,7 +205,7 @@ class SentenceAnalyzer:
             results["topic_level_3"] = parsed.topic_level_3
         except ValidationError as e:
             logger.warning(f"Validation failed for Topic Level 3 response: {e}. Response: {topic_lvl3_response}")
-            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
+            metrics_tracker.increment_errors('validation_error_topic_level_3')
             results["topic_level_3"] = "" # Default value
 
         # Overall Keywords
@@ -214,7 +214,7 @@ class SentenceAnalyzer:
             results["overall_keywords"] = parsed.overall_keywords
         except ValidationError as e:
             logger.warning(f"Validation failed for Overall Keywords response: {e}. Response: {overall_keywords_response}")
-            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
+            metrics_tracker.increment_errors('validation_error_overall_keywords')
             results["overall_keywords"] = [] # Default value
 
         # Domain Keywords
@@ -225,7 +225,7 @@ class SentenceAnalyzer:
             results["domain_keywords"] = parsed.domain_keywords
         except ValidationError as e:
             logger.warning(f"Validation failed for Domain Keywords response: {e}. Response: {domain_response}")
-            # metrics_tracker.increment_errors() # TODO (Metrics): Reinstate
+            metrics_tracker.increment_errors('validation_error_domain_keywords')
             results["domain_keywords"] = [] # Default value
 
         # Add the original sentence to the results.
