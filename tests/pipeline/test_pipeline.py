@@ -803,3 +803,74 @@ async def test_result_writer_handles_write_error(tmp_path, caplog):
     assert "Disk is full!" in caplog.text
     mock_tracker.increment_errors.assert_called_once() 
     mock_writer.finalize.assert_awaited_once() # Finalization should still happen 
+
+@pytest.mark.asyncio
+async def test_result_writer_handles_initialize_error(caplog):
+    """Tests _result_writer handles errors during writer initialization."""
+    mock_writer = AsyncMock(spec=SentenceAnalysisWriter)
+    mock_queue = asyncio.Queue()
+    mock_metrics = MagicMock(spec=MetricsTracker)
+    task_id = "task-init-err"
+    init_error = IOError("Disk full")
+
+    # Configure mock writer
+    mock_writer.get_identifier.return_value = "mock_writer_init_fail"
+    mock_writer.initialize.side_effect = init_error
+    mock_writer.write_result.return_value = None # Should not be called
+    mock_writer.finalize.return_value = None # Should not be called if init failed
+
+    # --- Execute and Assert Exception ---
+    with pytest.raises(IOError, match="Disk full"):
+        await _result_writer(mock_writer, mock_queue, mock_metrics, task_id)
+
+    # --- Assertions ---
+    mock_writer.initialize.assert_awaited_once()
+    mock_writer.write_result.assert_not_awaited() # Ensure no results were written
+    # Finalize should not be called because initialized flag remains False
+    mock_writer.finalize.assert_not_awaited()
+    mock_metrics.increment_errors.assert_not_called() # Errors during init/finalize not tracked here
+    
+    # Check logs
+    assert any(
+        f"[Task {task_id}] Critical error initializing writer mock_writer_init_fail: {init_error}" in rec.message
+        for rec in caplog.records if rec.levelname == "CRITICAL"
+    ), "Critical initialization error not logged"
+    assert any(
+        f"[Task {task_id}] Writer mock_writer_init_fail finalization skipped (was not initialized)" in rec.message
+        for rec in caplog.records if rec.levelname == "DEBUG"
+    ), "Finalization skipped log message missing"
+
+@pytest.mark.asyncio
+async def test_result_writer_handles_finalize_error(caplog):
+    """Tests _result_writer handles errors during writer finalization."""
+    mock_writer = AsyncMock(spec=SentenceAnalysisWriter)
+    mock_queue = asyncio.Queue()
+    mock_metrics = MagicMock(spec=MetricsTracker)
+    task_id = "task-final-err"
+    finalize_error = OSError("Cannot close file")
+    test_result = {"sentence_id": 0, "data": "test"}
+
+    # Configure mock writer
+    mock_writer.get_identifier.return_value = "mock_writer_final_fail"
+    mock_writer.initialize.return_value = None
+    mock_writer.write_result.return_value = None
+    mock_writer.finalize.side_effect = finalize_error
+
+    # Put items in queue (including sentinel)
+    await mock_queue.put(test_result)
+    await mock_queue.put(None)
+
+    # --- Execute (should not raise error from finalize) ---
+    await _result_writer(mock_writer, mock_queue, mock_metrics, task_id)
+
+    # --- Assertions ---
+    mock_writer.initialize.assert_awaited_once()
+    mock_writer.write_result.assert_awaited_once_with(test_result)
+    mock_writer.finalize.assert_awaited_once()
+    mock_metrics.increment_errors.assert_not_called() # Errors during finalize not tracked here
+
+    # Check logs
+    assert any(
+        f"[Task {task_id}] Error finalizing writer mock_writer_final_fail: {finalize_error}" in rec.message
+        for rec in caplog.records if rec.levelname == "ERROR"
+    ), "Finalization error not logged" 

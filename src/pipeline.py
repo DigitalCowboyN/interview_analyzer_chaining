@@ -24,7 +24,6 @@ Dependencies:
 """
 
 from pathlib import Path
-from src.utils.helpers import append_json_line
 import asyncio
 # SentenceAnalyzer is used indirectly via AnalysisService
 # from src.agents.sentence_analyzer import SentenceAnalyzer
@@ -33,7 +32,7 @@ from src.utils.logger import get_logger
 # from src.agents.context_builder import ContextBuilder
 from src.utils.metrics import MetricsTracker
 from src.utils.text_processing import segment_text
-import json
+# Remove commented-out import: import json
 # Import necessary types
 from typing import Dict, Any, List, Tuple, Set, Optional, Union
 from src.services.analysis_service import AnalysisService

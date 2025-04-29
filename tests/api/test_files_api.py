@@ -41,7 +41,7 @@ MOCK_CONFIG = {
 
 def test_list_analysis_files_empty():
     """Test GET /files/ when the output directory is empty."""
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath: # Patch constructor
 
         # Configure the mock instance returned for Path(MOCK_OUTPUT_DIR)
@@ -72,7 +72,7 @@ def test_list_analysis_files_success():
     mock_file2.name = f"file_c{MOCK_ANALYSIS_SUFFIX}"
     mock_file2.is_file.return_value = True
 
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
 
         mock_dir_path_instance = MagicMock(spec=Path)
@@ -97,7 +97,7 @@ def test_list_analysis_files_success():
 
 def test_list_analysis_files_dir_not_found():
     """Test GET /files/ when the output directory does not exist."""
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
         
         mock_dir_path_instance = MagicMock(spec=Path)
@@ -118,7 +118,7 @@ def test_list_analysis_files_dir_not_found():
 
 def test_list_files_internal_error():
     """Test GET /files/ when Path.glob raises an OS error."""
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
 
         mock_dir_path_instance = MagicMock(spec=Path)
@@ -170,7 +170,7 @@ EXPECTED_CONTENT_RESULT = [
 
 def test_get_file_content_success():
     """Test GET /files/{filename} successfully retrieves content."""
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath: # Patch constructor
         
         # Create mock instances for dir and file paths
@@ -203,7 +203,7 @@ def test_get_file_content_success():
 
 def test_get_file_content_not_found():
     """Test GET /files/{filename} when the file does not exist."""
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
 
         mock_dir_path = MagicMock(spec=Path)
@@ -229,7 +229,7 @@ def test_get_file_content_not_found():
 
 def test_get_file_content_read_error():
     """Test GET /files/{filename} when an IOError occurs during reading."""
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
 
         mock_dir_path = MagicMock(spec=Path)
@@ -256,7 +256,7 @@ def test_get_file_content_read_error():
 
 def test_get_file_content_malformed_json():
     """Test GET /files/{filename} when a file contains invalid JSON lines."""
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath, \
          patch("src.api.routers.files.logger") as mock_logger:
 
@@ -296,7 +296,7 @@ def test_get_specific_sentence_success():
     line2 = {"sentence_id": 2, "sequence_order": 2, "sentence": "Third.", "analysis": "C"}
     mock_file_content = f"{json.dumps(line0)}\n{json.dumps(line1)}\n{json.dumps(line2)}\n"
 
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
         
         mock_dir_path = MagicMock(spec=Path)
@@ -328,7 +328,7 @@ def test_get_specific_sentence_file_not_found():
     """Tests 404 when the analysis file itself is not found."""
     test_filename = "no_such_file.jsonl"
     target_id = 0
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
         
         mock_dir_path = MagicMock(spec=Path)
@@ -358,7 +358,7 @@ def test_get_specific_sentence_id_not_found():
     line1 = {"sentence_id": 1, "sequence_order": 1, "sentence": "Second.", "analysis": "B"}
     mock_file_content = f"{json.dumps(line0)}\n{json.dumps(line1)}\n"
 
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
         
         mock_dir_path = MagicMock(spec=Path)
@@ -387,7 +387,7 @@ def test_get_specific_sentence_read_error():
     """Tests 500 response when an OS error occurs during file read."""
     test_filename = "read_error_file.jsonl"
     target_id = 0
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
         
         mock_dir_path = MagicMock(spec=Path)
@@ -422,7 +422,7 @@ def test_get_specific_sentence_skips_malformed():
     bad_line2 = "{\\\"incomplete json\\\"}"
     mock_file_content = f"{json.dumps(line0)}\n{bad_line1}\n{json.dumps(line2)}\n{bad_line2}\n"
 
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath, \
          patch("src.api.routers.files.logger") as mock_logger:
 
@@ -457,7 +457,7 @@ def test_get_specific_sentence_validation_error():
     bad_line1 = {"sentence_id": target_id, "sequence_order": 1, "sentence": 12345, "analysis": "B"} # sentence should be str
     mock_file_content = f"{json.dumps(line0)}\n{json.dumps(bad_line1)}\n"
 
-    with patch.dict("src.api.routers.files.config.config", MOCK_CONFIG, clear=True), \
+    with patch.dict("src.config.config", MOCK_CONFIG, clear=True), \
          patch("src.api.routers.files.Path") as MockPath:
 
         mock_dir_path = MagicMock(spec=Path)

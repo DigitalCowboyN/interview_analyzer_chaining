@@ -175,7 +175,7 @@ async def test_pipeline_integration_empty_file(integration_dirs, setup_single_em
             input_dir=input_dir, 
             output_dir=output_dir, 
             map_dir=map_dir, 
-            config=config.config, 
+            config=config,
             specific_file=target_file.name # Process only the specific empty file
         )
 
