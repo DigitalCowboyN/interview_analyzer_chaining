@@ -50,38 +50,55 @@ async def save_analysis_to_graph(
 
     logger.debug(f"Saving analysis for sentence {sentence_id} from file '{filename}' to graph.")
 
+    params = {
+        'filename': filename,
+        'sentence_id': sentence_id,
+        'sequence_order': sequence_order,
+        'text': sentence_text,
+        # Add other analysis data fields as needed for later steps
+        'function_type': analysis_data.get('function_type'),
+        'structure_type': analysis_data.get('structure_type'),
+        'purpose': analysis_data.get('purpose'),
+        'topic_level_1': analysis_data.get('topic_level_1'),
+        'topic_level_3': analysis_data.get('topic_level_3'),
+        'overall_keywords': analysis_data.get('overall_keywords', []),
+        'domain_keywords': analysis_data.get('domain_keywords', [])
+    }
+    # Filter out None values for cleaner parameter passing, if desired by Cypher logic
+    # params = {k: v for k, v in params.items() if v is not None}
+
     try:
-        # --- 1. MERGE SourceFile Node ---
-        # TODO: Implement Cypher query and execution
-        
-        # --- 2. MERGE Sentence Node & Link to SourceFile ---
-        # Ensure properties like text, sequence_order are set/updated
-        # TODO: Implement Cypher query and execution
+        # Combine steps 1 & 2 into a single query for efficiency and atomicity
+        # Ensure SourceFile exists, then MERGE Sentence and link it.
+        # Using the (filename, sentence_id) NODE KEY for Sentence merge.
+        query_sentence = """
+        MERGE (f:SourceFile {filename: $filename})
+        MERGE (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+        ON CREATE SET 
+            s.text = $text, 
+            s.sequence_order = $sequence_order
+        ON MATCH SET 
+            s.text = $text, 
+            s.sequence_order = $sequence_order
+        MERGE (s)-[:PART_OF_FILE]->(f)
+        """
+        await connection_manager.execute_query(query_sentence, parameters=params)
+        logger.debug(f"Merged SourceFile and Sentence nodes for sentence {sentence_id} from '{filename}'.")
 
         # --- 3. MERGE Type Nodes & Relationships (FunctionType, StructureType, Purpose) ---
-        # Example for FunctionType:
-        # function_type = analysis_data.get('function_type')
-        # if function_type:
-        #     # MERGE (ft:FunctionType {name: $name})
-        #     # MERGE (s)-[:HAS_FUNCTION_TYPE]->(ft) where s is the Sentence node
-        # TODO: Implement for all three types
-        
+        # TODO: Implement Cypher query and execution
+
         # --- 4. MERGE Topic Nodes & Relationships ---
-        # Handle topic_level_1 and topic_level_3
         # TODO: Implement Cypher query and execution
         
         # --- 5. MERGE Keyword Nodes & Relationships ---
-        # Handle overall_keywords (MENTIONS_OVERALL_KEYWORD)
-        # Handle domain_keywords (MENTIONS_DOMAIN_KEYWORD)
         # TODO: Implement Cypher query and execution
         
         # --- 6. MERGE :FOLLOWS Relationship (Optional but Recommended) ---
-        # Find previous sentence (sequence_order - 1 in the same file) and MERGE relationship
         # TODO: Implement Cypher query and execution
 
-        logger.debug(f"Successfully saved sentence {sentence_id} from '{filename}' to graph.")
+        logger.debug(f"Successfully processed graph updates for sentence {sentence_id} from '{filename}'.")
 
     except Exception as e:
-        logger.error(f"Failed to save sentence {sentence_id} from '{filename}' to graph: {e}", exc_info=True)
-        # Re-raise the exception so the caller (e.g., writer) knows about the failure
+        logger.error(f"Failed during graph update for sentence {sentence_id} from '{filename}': {e}", exc_info=True)
         raise 
