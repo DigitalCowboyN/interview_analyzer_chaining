@@ -8,7 +8,7 @@ from typing import Dict, Any
 from src.utils.neo4j_driver import Neo4jConnectionManager
 from src.utils.logger import get_logger
 
-logger = get_logger(__name__)
+logger = get_logger()
 
 async def save_analysis_to_graph(
     analysis_data: Dict[str, Any], 
