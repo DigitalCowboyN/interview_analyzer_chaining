@@ -52,6 +52,9 @@ from src.io.local_storage import (
     LocalJsonlMapStorage,
     LocalJsonlAnalysisWriter
 )
+# Import graph persistence components
+from src.persistence.graph_persistence import save_analysis_to_graph
+from src.utils.neo4j_driver import connection_manager # Import the singleton
 
 logger = get_logger()
 
@@ -180,25 +183,41 @@ async def _result_writer(
                     results_queue.task_done() # Mark sentinel as processed
                     break
 
-                try:
+                # Process the result: Write to JSONL and Save to Graph
+                if isinstance(result, dict):
                     sentence_id = result.get('sentence_id', 'N/A')
-                    logger.debug(f"{prefix}Writer attempting to write result ID: {sentence_id} to {writer_id}")
-                    # Use the analysis_writer protocol method
-                    await analysis_writer.write_result(result)
-                    results_written += 1
-                    logger.debug(f"{prefix}Writer successfully wrote result ID: {sentence_id} to {writer_id}")
-                    # Optionally track write success metric
-                    # metrics_tracker.increment_write_success()
-                except Exception as write_e:
-                    # Log error details including sentence ID if available
-                    sentence_id_info = f"result {result.get('sentence_id', 'N/A')}" if isinstance(result, dict) else "result (unknown ID)"
-                    logger.error(f"{prefix}Writer failed writing {sentence_id_info} to {writer_id}: {write_e}", exc_info=True)
-                    metrics_tracker.increment_errors() # Use passed-in tracker
-                    # Decide if we should break the loop on write error? 
-                    # For now, continue processing other items in the queue.
-                finally:
-                    results_queue.task_done() # Mark result as processed
+                    filename = result.get('filename') # Extract filename added earlier
+                    
+                    # 1. Write to JSONL (existing logic)
+                    try:
+                        logger.debug(f"{prefix}Writer attempting to write result ID: {sentence_id} to {writer_id}")
+                        await analysis_writer.write_result(result)
+                        results_written += 1
+                        logger.debug(f"{prefix}Writer successfully wrote result ID: {sentence_id} to {writer_id}")
+                    except Exception as write_e:
+                        sentence_id_info = f"result {sentence_id}" if sentence_id != 'N/A' else "result (unknown ID)"
+                        logger.error(f"{prefix}Writer failed writing {sentence_id_info} to {writer_id}: {write_e}", exc_info=True)
+                        metrics_tracker.increment_errors() # Increment general errors
+                        # Continue to next item even if JSONL write fails
 
+                    # 2. Save to Graph (New Logic)
+                    if filename: # Ensure filename is present
+                        try:
+                            logger.debug(f"{prefix}Writer attempting to save result ID: {sentence_id} from {filename} to graph.")
+                            # Use the imported singleton connection_manager
+                            await save_analysis_to_graph(result, filename, connection_manager)
+                            logger.debug(f"{prefix}Writer successfully saved result ID: {sentence_id} from {filename} to graph.")
+                        except Exception as graph_e:
+                            logger.error(f"{prefix}Writer failed saving result ID: {sentence_id} from {filename} to graph: {graph_e}", exc_info=True)
+                            # Increment a specific metric for graph errors
+                            metrics_tracker.increment_errors(f"{filename}_graph_save") 
+                            # Continue to next item even if graph save fails
+                    else:
+                        logger.warning(f"{prefix}Filename missing in result data for sentence_id {sentence_id}, skipping graph save.")
+                        
+                else: # Handle non-dict results (e.g., if None sneaked past somehow)
+                    logger.warning(f"{prefix}Writer received non-dictionary item from queue: {type(result)}. Skipping processing.")
+                    
             except asyncio.CancelledError:
                 logger.info(f"{prefix}Writer for {writer_id} cancelled during queue processing.")
                 raise # Re-raise CancelledError to be handled by outer block/caller
@@ -449,6 +468,9 @@ async def _orchestrate_analysis_and_writing(
         logger.info(f"{prefix}Queueing {len(analysis_results)} analysis results for writing to {writer_id}...")
         num_results = len(analysis_results)
         for result in analysis_results:
+            # Add filename to result dict for persistence layer context
+            if isinstance(result, dict):
+                result['filename'] = input_file_name 
             await results_queue.put(result)
             # Increment processed metric immediately after queuing
             metrics_tracker.increment_results_processed(input_file_name)
