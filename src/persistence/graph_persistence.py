@@ -164,9 +164,28 @@ async def save_analysis_to_graph(
             logger.debug(f"Merged keyword nodes/relationships for sentence {sentence_id}.")
         
         # --- 6. MERGE :FOLLOWS Relationship (Optional but Recommended) ---
-        # TODO: Implement Cypher query and execution
+        # Only attempt to create FOLLOWS if sequence_order > 0
+        if sequence_order is not None and sequence_order > 0:
+            follows_query = """
+            // Match the current sentence (s2)
+            MATCH (s2:Sentence {sentence_id: $sentence_id, filename: $filename})
+            // Match the previous sentence (s1) in the same file
+            MATCH (s1:Sentence {sequence_order: $sequence_order - 1, filename: $filename})
+            // Ensure the relationship doesn't already exist, then create it
+            MERGE (s1)-[r:FOLLOWS]->(s2)
+            """
+            # Note: No parameters needed beyond sequence_order and sentence_id, 
+            # which are already in the params dictionary.
+            # We calculate the previous sequence order directly in the query.
+            # Need to handle the case where sequence_order might be 0 or None explicitly.
+            try:
+                await connection_manager.execute_query(follows_query, parameters=params)
+                logger.debug(f"Merged :FOLLOWS relationship for sentence {sentence_id}.")
+            except Exception as follows_e:
+                # Log specifically if FOLLOWS fails, but don't necessarily fail the whole save
+                logger.warning(f"Could not create :FOLLOWS relationship for sentence {sentence_id} (prev: {sequence_order - 1}): {follows_e}")
 
-        logger.debug(f"Successfully processed graph updates for sentence {sentence_id} from '{filename}'.")
+        logger.info(f"Successfully completed graph updates for sentence {sentence_id} from '{filename}'.") # Changed level to INFO
 
     except Exception as e:
         logger.error(f"Failed during graph update for sentence {sentence_id} from '{filename}': {e}", exc_info=True)
