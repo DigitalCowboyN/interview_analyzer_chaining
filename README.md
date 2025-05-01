@@ -255,7 +255,7 @@ Common tasks can be run using the Makefile within the Docker environment:
 *   **`GET /files/`**: Lists the filenames of generated analysis (`_analysis.jsonl`) files found in the configured output directory.
 *   **`GET /files/{filename}`**: Retrieves the full content of a specific analysis file.
 *   **`GET /files/{filename}/sentences/{sentence_id}`**: Retrieves the analysis result for a specific sentence ID within a given analysis file.
-*   **`POST /analysis/`**: Accepts an `input_filename` and triggers the analysis pipeline for that file to run in the background using **Celery** (returns `202 Accepted`).
+*   **`POST /analysis/`**: Accepts an `input_filename` and schedules the analysis pipeline for that file using **FastAPI BackgroundTasks** (returns `202 Accepted`).
 *   _(More endpoints could be added for detailed task status, specific analysis requests without running the full pipeline, etc.)_
 
 ## Input and Output Files
