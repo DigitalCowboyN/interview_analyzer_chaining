@@ -25,6 +25,7 @@ from unittest.mock import patch, AsyncMock, ANY, MagicMock
 # Assuming main entry point or run_pipeline can be invoked
 from src.pipeline import run_pipeline, PipelineEnvironment # Import PipelineEnvironment
 from src.config import config # Use the actual config
+from src.utils.neo4j_driver import Neo4jConnectionManager # Import for type hint
 
 # --- Fixtures ---
 
@@ -115,9 +116,9 @@ def load_jsonl(file_path: Path) -> list:
     return lines
 
 # --- Mock Analysis Data ---
-def generate_mock_analysis(sentence_id, sequence_order, sentence):
+def generate_mock_analysis(sentence_id, sequence_order, sentence, filename):
     """
-    Generate a simple, consistent mock analysis result dictionary.
+    Generate a simple, consistent mock analysis result dictionary, including filename.
 
     Used in tests to provide predictable return values when mocking the actual
     sentence analysis process.
@@ -126,13 +127,15 @@ def generate_mock_analysis(sentence_id, sequence_order, sentence):
         sentence_id (int): The ID of the sentence.
         sequence_order (int): The original sequence order of the sentence.
         sentence (str): The text of the sentence.
+        filename (str): The source filename.
 
     Returns:
         dict: A dictionary representing a mock analysis result, including the input
-              IDs/text and placeholder values for analysis fields.
+              IDs/text/filename and placeholder values for analysis fields.
     """
     # Simple mock analysis result
     return {
+        "filename": filename,
         "sentence_id": sentence_id,
         "sequence_order": sequence_order,
         "sentence": sentence,
@@ -172,7 +175,12 @@ def create_mock_metrics_tracker():
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_pipeline_integration_empty_file(integration_dirs, setup_single_empty_file, mock_pipeline_metrics):
+async def test_pipeline_integration_empty_file(
+    integration_dirs, 
+    setup_single_empty_file, 
+    mock_pipeline_metrics, 
+    clear_test_db
+):
     """
     Test the pipeline correctly handles an empty input file using Local IO.
 
@@ -238,7 +246,13 @@ async def test_pipeline_integration_empty_file(integration_dirs, setup_single_em
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_pipeline_integration_success_rewritten(integration_dirs, setup_input_files, mock_pipeline_metrics):
+async def test_pipeline_integration_success_rewritten(
+    integration_dirs, 
+    setup_input_files, 
+    mock_pipeline_metrics, 
+    clear_test_db, 
+    test_db_manager: Neo4jConnectionManager # Inject DB manager for verification
+):
     """Test rewritten: Full pipeline success with mocked API calls using Local IO."""
     input_dir, output_dir, map_dir = integration_dirs
     input_files = setup_input_files # Use the standard fixture
@@ -263,14 +277,18 @@ async def test_pipeline_integration_success_rewritten(integration_dirs, setup_in
     # --- Mock API Call Logic (applied to classify_sentence) ---
     sentence_alpha = "This is the first sentence."
     sentence_beta = "Followed by the second."
+    filename_path = target_file # Use the full Path object
+    filename_str = str(filename_path) # Use the full path string for generation/assertion
     async def mock_classify_sentence(*args, **kwargs):
         sentence = args[0] 
         if sentence == sentence_alpha:
-             result = generate_mock_analysis(0, 0, sentence_alpha)
-             return {k: v for k, v in result.items() if k not in ["sentence_id", "sequence_order", "sentence"]}
+             # Pass full path string to generator
+             result = generate_mock_analysis(0, 0, sentence_alpha, filename_str)
+             return {k: v for k, v in result.items() if k not in ["sentence_id", "sequence_order", "sentence", "filename"]}
         elif sentence == sentence_beta:
-             result = generate_mock_analysis(1, 1, sentence_beta)
-             return {k: v for k, v in result.items() if k not in ["sentence_id", "sequence_order", "sentence"]}
+             # Pass full path string to generator
+             result = generate_mock_analysis(1, 1, sentence_beta, filename_str)
+             return {k: v for k, v in result.items() if k not in ["sentence_id", "sequence_order", "sentence", "filename"]}
         else:
              return {"mock_fallback": []}
 
@@ -285,7 +303,7 @@ async def test_pipeline_integration_success_rewritten(integration_dirs, setup_in
             output_dir=output_dir,
             map_dir=map_dir,
             config=mock_config_dict,  # Pass the test-specific config
-            specific_file=target_file.name # Process only this file
+            specific_file=filename_path.name # Pass basename here for discovery
         )
 
         # --- Assertions ---
@@ -305,8 +323,8 @@ async def test_pipeline_integration_success_rewritten(integration_dirs, setup_in
         assert len(analysis_data) == 2
         
         # Check data content (flexible order)
-        expected_result_0 = generate_mock_analysis(0, 0, sentence_alpha)
-        expected_result_1 = generate_mock_analysis(1, 1, sentence_beta)
+        expected_result_0 = generate_mock_analysis(0, 0, sentence_alpha, filename_str)
+        expected_result_1 = generate_mock_analysis(1, 1, sentence_beta, filename_str)
         
         # Helper function to make dict values hashable (convert lists to tuples)
         def make_hashable(d):
@@ -328,19 +346,86 @@ async def test_pipeline_integration_success_rewritten(integration_dirs, setup_in
         mock_pipeline_metrics.increment_sentences_success.assert_called()
         mock_pipeline_metrics.increment_errors.assert_not_called()
 
+        # 4. Assert Graph Database Content
+        async with test_db_manager.get_session() as session:
+            # Check SourceFile
+            result = await session.run("MATCH (f:SourceFile {filename: $fname}) RETURN count(f)", fname=filename_str)
+            count = await result.single()
+            assert count[0] == 1, "SourceFile node not created or duplicated"
+
+            # Check Sentences
+            result = await session.run(
+                "MATCH (s:Sentence)-[:PART_OF_FILE]->(f:SourceFile {filename: $fname}) "
+                "WHERE s.sentence_id IN [0, 1] "
+                "RETURN s ORDER BY s.sequence_order", 
+                fname=filename_str
+            )
+            records = await result.data()
+            assert len(records) == 2, "Incorrect number of Sentence nodes found"
+            assert records[0]['s']['text'] == sentence_alpha
+            assert records[0]['s']['sequence_order'] == 0
+            assert records[1]['s']['text'] == sentence_beta
+            assert records[1]['s']['sequence_order'] == 1
+            
+            # Check :FOLLOWS relationship
+            result = await session.run(
+                 "MATCH (:Sentence {filename: $fname, sentence_id: 0})-"
+                 "[r:FOLLOWS]->(:Sentence {filename: $fname, sentence_id: 1}) "
+                 "RETURN count(r)",
+                 fname=filename_str
+            )
+            count = await result.single()
+            assert count[0] == 1, ":FOLLOWS relationship not created"
+
+            # Check one Type relationship (e.g., FunctionType)
+            result = await session.run(
+                "MATCH (s:Sentence {filename: $fname, sentence_id: 0})-"
+                "[:HAS_FUNCTION_TYPE]->(ft:FunctionType {name: $ft_name}) "
+                "RETURN count(ft)", 
+                fname=filename_str, ft_name="mock_func" # Based on generate_mock_analysis
+            )
+            count = await result.single()
+            assert count[0] == 1, "FunctionType node/relationship not created correctly for sentence 0"
+            
+            # Check one Topic relationship
+            result = await session.run(
+                "MATCH (s:Sentence {filename: $fname, sentence_id: 1})-"
+                "[:HAS_TOPIC]->(t:Topic {name: $topic_name}) "
+                "RETURN count(t)", 
+                fname=filename_str, topic_name="mock_topic3" # Based on generate_mock_analysis
+            )
+            count = await result.single()
+            assert count[0] == 1, "Topic node/relationship not created correctly for sentence 1"
+            
+            # Check one Keyword relationship (Overall)
+            result = await session.run(
+                "MATCH (s:Sentence {filename: $fname, sentence_id: 0})-"
+                "[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword {text: $kw_text}) "
+                "RETURN count(k)", 
+                fname=filename_str, kw_text="mock" # Based on generate_mock_analysis
+            )
+            count = await result.single()
+            assert count[0] == 1, "Overall Keyword node/relationship not created correctly for sentence 0"
+
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_pipeline_integration_partial_failure_rewritten(integration_dirs, mock_pipeline_metrics):
+async def test_pipeline_integration_partial_failure_rewritten(
+    integration_dirs, 
+    mock_pipeline_metrics, 
+    clear_test_db, 
+    test_db_manager: Neo4jConnectionManager # Inject DB manager
+):
     """Test rewritten: Pipeline handles partial failure (one sentence error) using Local IO."""
     input_dir, output_dir, map_dir = integration_dirs
 
     # --- Setup Input File ---
-    input_file_name = "integ_partial.txt"
-    input_file = input_dir / input_file_name
+    input_file_name_base = "integ_partial.txt"
+    input_file_path = input_dir / input_file_name_base # Use full Path object
+    input_filename_str = str(input_file_path) # Use full path string for generation/assertion
     sentence_ok = "This sentence is fine."
     sentence_fail = "This sentence will fail."
-    input_file.write_text(f"{sentence_ok} {sentence_fail}")
-    input_file_stem = input_file.stem
+    input_file_path.write_text(f"{sentence_ok} {sentence_fail}")
+    input_file_stem = input_file_path.stem
 
     # --- Mock Config ---
     mock_config_dict = {
@@ -362,8 +447,9 @@ async def test_pipeline_integration_partial_failure_rewritten(integration_dirs, 
     async def mock_classify_fail_one(*args, **kwargs):
         sentence = args[0]
         if sentence == sentence_ok:
-             result = generate_mock_analysis(0, 0, sentence_ok)
-             return {k: v for k, v in result.items() if k not in ["sentence_id", "sequence_order", "sentence"]}
+             # Pass full path string to generator
+             result = generate_mock_analysis(0, 0, sentence_ok, input_filename_str)
+             return {k: v for k, v in result.items() if k not in ["sentence_id", "sequence_order", "sentence", "filename"]}
         elif sentence == sentence_fail:
              raise fail_error
         else:
@@ -381,7 +467,7 @@ async def test_pipeline_integration_partial_failure_rewritten(integration_dirs, 
             output_dir=output_dir,
             map_dir=map_dir,
             config=mock_config_dict,
-            specific_file=input_file_name
+            specific_file=input_file_name_base # Pass basename for discovery
         )
 
         # --- Assertions ---
@@ -401,8 +487,9 @@ async def test_pipeline_integration_partial_failure_rewritten(integration_dirs, 
         assert len(analysis_data) == 2
         
         # Separate expected success and error results
-        expected_success = generate_mock_analysis(0, 0, sentence_ok)
+        expected_success = generate_mock_analysis(0, 0, sentence_ok, input_filename_str)
         expected_error = {
+            "filename": input_filename_str,
             "sentence_id": 1, 
             "sequence_order": 1, 
             "sentence": sentence_fail, 
@@ -442,5 +529,46 @@ async def test_pipeline_integration_partial_failure_rewritten(integration_dirs, 
         mock_pipeline_metrics.add_processing_time.assert_called_once()
         mock_pipeline_metrics.increment_sentences_success.assert_called_once()
         mock_pipeline_metrics.increment_errors.assert_called_once()
+
+        # 5. Assert Graph Database Content (Verify only successful sentence data is fully present)
+        async with test_db_manager.get_session() as session:
+            # Check SourceFile exists using full path string
+            result = await session.run("MATCH (f:SourceFile {filename: $fname}) RETURN count(f)", fname=input_filename_str)
+            count = await result.single()
+            assert count[0] == 1
+
+            # Check Sentence 0 (Success) using full path string
+            result = await session.run(
+                "MATCH (s:Sentence {filename: $fname, sentence_id: 0}) "
+                "OPTIONAL MATCH (s)-[:HAS_FUNCTION_TYPE]->(ft) "
+                "RETURN s.text as text, ft.name as func_type", 
+                fname=input_filename_str
+            )
+            record = await result.single()
+            assert record is not None, "Sentence 0 node not found"
+            assert record["text"] == sentence_ok
+            assert record["func_type"] is not None, "Sentence 0 relationship (e.g., FunctionType) missing"
+
+            # Check Sentence 1 (Failure) using full path string
+            result = await session.run(
+                "MATCH (s:Sentence {filename: $fname, sentence_id: 1}) "
+                "OPTIONAL MATCH (s)-[:HAS_FUNCTION_TYPE]->(ft) "
+                "RETURN s.text as text, ft.name as func_type", 
+                fname=input_filename_str
+            )
+            record = await result.single()
+            assert record is not None, "Sentence 1 node not found"
+            assert record["text"] == sentence_fail # Text should still be there
+            assert record["func_type"] is None, "Sentence 1 should NOT have analysis relationships (e.g., FunctionType)"
+
+            # Check :FOLLOWS using full path string
+            result = await session.run(
+                 "MATCH (:Sentence {filename: $fname, sentence_id: 0})-"
+                 "[r:FOLLOWS]->(:Sentence {filename: $fname, sentence_id: 1}) "
+                 "RETURN count(r)",
+                 fname=input_filename_str
+            )
+            count = await result.single()
+            assert count[0] == 1, ":FOLLOWS relationship not created"
 
 # ... (Rest of integration tests) ... 

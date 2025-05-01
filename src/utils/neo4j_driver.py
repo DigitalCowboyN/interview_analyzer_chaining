@@ -126,4 +126,7 @@ async def example_neo4j_query():
 #     # Actions on shutdown
 #     await shutdown_neo4j_driver()
 #
-# app = FastAPI(lifespan=lifespan, ...) 
+# app = FastAPI(lifespan=lifespan, ...)
+
+# Create the singleton instance for easy import
+connection_manager = Neo4jConnectionManager() 

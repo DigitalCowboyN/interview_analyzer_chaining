@@ -165,4 +165,27 @@ db-down:
 .PHONY: run-pipeline
 run-pipeline:
 	@echo "Running pipeline..."
-	docker compose run --rm app python src/main.py --run-pipeline $(ARGS) 
+	docker compose run --rm app python src/main.py --run-pipeline $(ARGS)
+
+# --- Test Database Management --- #
+
+.PHONY: db-test-up
+db-test-up:
+	@echo "Starting TEST Neo4j database service (without waiting)..."
+	# Start only the test database, DON'T wait for healthcheck
+	docker compose up -d neo4j-test
+
+.PHONY: db-test-down
+db-test-down:
+	@echo "Stopping and removing TEST Neo4j database service..."
+	# Stop and remove the container and its volume
+	docker compose down -v neo4j-test
+
+.PHONY: db-test-clear
+db-test-clear:
+	@echo "Clearing TEST Neo4j database..."
+	# Execute cypher command inside the test container to delete all nodes/relationships
+	docker compose exec neo4j-test cypher-shell -u neo4j -p testpassword -d neo4j "MATCH (n) DETACH DELETE n;"
+	@echo "TEST Neo4j database cleared."
+
+# --- End Test Database Management --- # 

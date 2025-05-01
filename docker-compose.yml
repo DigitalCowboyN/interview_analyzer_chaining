@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8' # Obsolete, removed.
 
 services:
   # Main application service (FastAPI)
@@ -20,7 +20,7 @@ services:
       redis:
         condition: service_healthy
       neo4j:
-        condition: service_healthy
+        condition: service_started
     # Command to run the API server (adjust if needed)
     # command: ["make", "run-api"] # Example using Makefile target
     command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -55,36 +55,51 @@ services:
       redis:
         condition: service_healthy
       neo4j:
-        condition: service_healthy
+        condition: service_started
     command: ["celery", "-A", "src.celery_app", "worker", "--loglevel=info"]
 
   # Add Neo4j service
   neo4j:
-    image: neo4j:5 # Use a specific version, e.g., Neo4j 5
+    image: neo4j:5.22.0 # Use Neo4j 5.x again
     ports:
       - "7474:7474" # HTTP browser
       - "7687:7687" # Bolt driver
     volumes:
       - neo4j_data:/data
     environment:
-      # Default user is neo4j. Set password via environment variable.
-      # Read NEO4J_PASSWORD from .env file, provide a default if it's missing/empty.
-      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-changeme} 
-      # Accept license agreement (required for Enterprise features if used, safe for Community)
+      # Use Neo4j 5 format, sourced from .env (no default)
+      NEO4J_INITIAL_PASSWORD: ${NEO4J_PASSWORD}
+      # Keep license agreement env var
       NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
-      # Optional: Configure memory limits
-      # NEO4J_server_memory_pagecache_size: 1G
-      # NEO4J_server_memory_heap_initial__size: 1G
-      # NEO4J_server_memory_heap_max__size: 1G
     env_file:
       - .env # Ensure it reads the .env file for NEO4J_PASSWORD
-    healthcheck:
-      # Check if the Bolt port is ready
-      test: ["CMD-SHELL", "tcpconnect localhost:7687 || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 10 # Increase retries as Neo4j can take time to start
+    # healthcheck: # Temporarily remove healthcheck
+    #   test: ["CMD-SHELL", "tcpconnect localhost:7687 || exit 1"]
+    #   interval: 5s
+    #   timeout: 10s 
+    #   retries: 20
+
+  # Neo4j service for TESTING
+  neo4j-test:
+    image: neo4j:5.22.0 # Use Neo4j 5.x again
+    container_name: interview_analyzer_neo4j_test # Distinct name
+    ports:
+      # Use different host ports to avoid conflicts with the main neo4j service
+      - "7475:7474" # Test HTTP browser (different host port)
+      - "7688:7687" # Test Bolt driver (different host port)
+    volumes:
+      - neo4j_test_data:/data # Use a separate volume for test data
+    environment:
+      # Use Neo4j 5 format for testing
+      NEO4J_INITIAL_PASSWORD: testpassword
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
+    # healthcheck: # Keep commented out for now
+    #   test: ["CMD-SHELL", "tcpconnect localhost:7687 || exit 1"]
+    #   interval: 5s
+    #   timeout: 10s # Increased timeout from 3s to 10s
+    #   retries: 20 # Keep increased retries
 
 volumes:
   redis_data: # Define redis volume
-  neo4j_data: # Define neo4j volume (This is the correct one) 
+  neo4j_data: # Define neo4j volume (This is the correct one)
+  neo4j_test_data: # Define volume for test database 

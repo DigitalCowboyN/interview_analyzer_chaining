@@ -174,13 +174,15 @@ async def _result_writer(
         logger.debug(f"{prefix}Initialized writer: {writer_id}")
 
         while True:
+            task_item_debug = None # For logging in case of error
             try:
-                logger.debug(f"{prefix}Writer waiting for item...")
+                logger.info(f"{prefix}Writer {writer_id} waiting for item...") # DEBUG
                 result = await results_queue.get()
-                logger.debug(f"{prefix}Writer received item: {type(result)}")
+                task_item_debug = result # Store for logging
+                logger.info(f"{prefix}Writer {writer_id} received item type: {type(result)}") # DEBUG
                 if result is None: # Sentinel value indicates completion
-                    logger.info(f"{prefix}Writer received sentinel. Exiting loop for {writer_id}.")
-                    results_queue.task_done() # Mark sentinel as processed
+                    logger.info(f"{prefix}Writer {writer_id} received sentinel. Exiting loop.") # DEBUG
+                    results_queue.task_done()
                     break
 
                 # Process the result: Write to JSONL and Save to Graph
@@ -188,25 +190,24 @@ async def _result_writer(
                     sentence_id = result.get('sentence_id', 'N/A')
                     filename = result.get('filename') # Extract filename added earlier
                     
-                    # 1. Write to JSONL (existing logic)
+                    # 1. Write to JSONL
                     try:
-                        logger.debug(f"{prefix}Writer attempting to write result ID: {sentence_id} to {writer_id}")
+                        logger.info(f"{prefix}Writer {writer_id} attempting JSONL write for ID {sentence_id}") # DEBUG
                         await analysis_writer.write_result(result)
                         results_written += 1
-                        logger.debug(f"{prefix}Writer successfully wrote result ID: {sentence_id} to {writer_id}")
+                        logger.info(f"{prefix}Writer {writer_id} successful JSONL write for ID {sentence_id}") # DEBUG
                     except Exception as write_e:
                         sentence_id_info = f"result {sentence_id}" if sentence_id != 'N/A' else "result (unknown ID)"
                         logger.error(f"{prefix}Writer failed writing {sentence_id_info} to {writer_id}: {write_e}", exc_info=True)
                         metrics_tracker.increment_errors() # Increment general errors
                         # Continue to next item even if JSONL write fails
 
-                    # 2. Save to Graph (New Logic)
-                    if filename: # Ensure filename is present
+                    # 2. Save to Graph
+                    if filename:
                         try:
-                            logger.debug(f"{prefix}Writer attempting to save result ID: {sentence_id} from {filename} to graph.")
-                            # Use the imported singleton connection_manager
+                            logger.info(f"{prefix}Writer {writer_id} attempting graph save for ID {sentence_id} file {filename}") # DEBUG
                             await save_analysis_to_graph(result, filename, connection_manager)
-                            logger.debug(f"{prefix}Writer successfully saved result ID: {sentence_id} from {filename} to graph.")
+                            logger.info(f"{prefix}Writer {writer_id} successful graph save for ID {sentence_id} file {filename}") # DEBUG
                         except Exception as graph_e:
                             logger.error(f"{prefix}Writer failed saving result ID: {sentence_id} from {filename} to graph: {graph_e}", exc_info=True)
                             # Increment a specific metric for graph errors
@@ -219,12 +220,19 @@ async def _result_writer(
                     logger.warning(f"{prefix}Writer received non-dictionary item from queue: {type(result)}. Skipping processing.")
                     
             except asyncio.CancelledError:
-                logger.info(f"{prefix}Writer for {writer_id} cancelled during queue processing.")
-                raise # Re-raise CancelledError to be handled by outer block/caller
+                logger.info(f"{prefix}Writer {writer_id} CANCELLED during queue processing.") # DEBUG
+                raise
             except Exception as queue_e:
-                logger.critical(f"{prefix}Critical error getting item from queue for {writer_id}: {queue_e}", exc_info=True)
-                break # Exit loop on critical queue error
-                
+                logger.critical(f"{prefix}Writer {writer_id} critical queue error: {queue_e} on item {task_item_debug}", exc_info=True) # DEBUG
+                break
+            finally:
+                # Ensure task_done is called even if processing failed mid-way
+                if task_item_debug is not None: # Check if we got an item before failing
+                    logger.info(f"{prefix}Writer {writer_id} calling task_done() for item type {type(task_item_debug)}") # DEBUG
+                    results_queue.task_done()
+                else:
+                    logger.info(f"{prefix}Writer {writer_id} did not get item before exception/break, skipping task_done()") # DEBUG
+
     except asyncio.CancelledError:
         # Handle cancellation requested before or during initialization, or re-raised from inner loop
         logger.info(f"{prefix}Result writer task for {writer_id} cancelled.")
@@ -460,29 +468,30 @@ async def _orchestrate_analysis_and_writing(
         writer_task = asyncio.create_task(_result_writer(analysis_writer, results_queue, metrics_tracker, task_id))
 
         # Run analysis
-        logger.info(f"{prefix}Starting sentence analysis for {input_file_name} using AnalysisService...")
+        logger.info(f"{prefix}Orchestrator calling analysis_service.analyze_sentences for {input_file_name}") # DEBUG
         analysis_results = await analysis_service.analyze_sentences(sentences, contexts, task_id=task_id)
-        logger.info(f"{prefix}AnalysisService completed analysis for {input_file_name}. Found {len(analysis_results)} results.")
+        logger.info(f"{prefix}Orchestrator received {len(analysis_results)} analysis results for {input_file_name}") # DEBUG
         
         # Queue results for writing
-        logger.info(f"{prefix}Queueing {len(analysis_results)} analysis results for writing to {writer_id}...")
+        logger.info(f"{prefix}Orchestrator queueing results for {input_file_name}") # DEBUG
         num_results = len(analysis_results)
-        for result in analysis_results:
+        for i, result in enumerate(analysis_results):
             # Add filename to result dict for persistence layer context
             if isinstance(result, dict):
                 result['filename'] = input_file_name 
+            logger.info(f"{prefix}Orchestrator queueing result {i+1}/{num_results} for {input_file_name}") # DEBUG
             await results_queue.put(result)
             # Increment processed metric immediately after queuing
             metrics_tracker.increment_results_processed(input_file_name)
 
         # Signal writer completion and wait for processing
-        logger.debug(f"{prefix}Signalling writer task completion for {writer_id}...")
+        logger.info(f"{prefix}Orchestrator signalling writer task completion for {writer_id}") # DEBUG
         await results_queue.put(None)
+        logger.info(f"{prefix}Orchestrator awaiting results_queue.join() for {writer_id}") # DEBUG
         await results_queue.join() # Wait for queue to be emptied
-        logger.debug(f"{prefix}Result queue joined. Waiting for writer task ({writer_id}) to finish...")
+        logger.info(f"{prefix}Orchestrator results_queue joined for {writer_id}. Awaiting writer_task...") # DEBUG
         await writer_task # Wait for writer task coroutine to fully finish
-        await asyncio.sleep(0.01) # Keep small sleep for now
-        logger.info(f"{prefix}Result writing complete via {writer_id} for {input_file_name}.")
+        logger.info(f"{prefix}Orchestrator writer_task finished for {writer_id}.") # DEBUG
         metrics_tracker.set_metric(input_file_name, "results_written", num_results) # Track written count
 
     except Exception as e:

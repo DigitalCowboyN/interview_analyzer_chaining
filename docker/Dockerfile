@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.10.14-slim
 
 # Set working directory
 WORKDIR /workspaces/interview_analyzer_chaining
@@ -9,19 +9,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     redis-tools \
+    # Upgrade installed packages
+    && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
 RUN pip install --upgrade pip
 
-# Set OpenAI API key as an environment variable
-ENV OPENAI_API_KEY=""
-
 # Copy project files
 COPY . ./.
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Also install pip-audit for vulnerability scanning
+RUN pip install --no-cache-dir -r requirements.txt pip-audit
+
+# Scan installed packages for vulnerabilities
+RUN pip-audit
 
 # Install spaCy model
 RUN python -m spacy download en_core_web_sm

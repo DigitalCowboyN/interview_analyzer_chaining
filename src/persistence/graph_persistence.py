@@ -68,122 +68,122 @@ async def save_analysis_to_graph(
     # params = {k: v for k, v in params.items() if v is not None}
 
     try:
-        # Combine steps 1 & 2 into a single query for efficiency and atomicity
-        # Ensure SourceFile exists, then MERGE Sentence and link it.
-        # Using the (filename, sentence_id) NODE KEY for Sentence merge.
-        query_sentence = """
-        MERGE (f:SourceFile {filename: $filename})
-        MERGE (s:Sentence {sentence_id: $sentence_id, filename: $filename})
-        ON CREATE SET 
-            s.text = $text, 
-            s.sequence_order = $sequence_order
-        ON MATCH SET 
-            s.text = $text, 
-            s.sequence_order = $sequence_order
-        MERGE (s)-[:PART_OF_FILE]->(f)
-        """
-        await connection_manager.execute_query(query_sentence, parameters=params)
-        logger.debug(f"Merged SourceFile and Sentence nodes for sentence {sentence_id} from '{filename}'.")
-
-        # --- 3. MERGE Type Nodes & Relationships (FunctionType, StructureType, Purpose) ---
-        type_queries = []
-        # FunctionType
-        if params.get('function_type'):
-            type_queries.append("""
-            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
-            MERGE (t:FunctionType {name: $function_type})
-            MERGE (s)-[:HAS_FUNCTION_TYPE]->(t)
-            """)
-        # StructureType
-        if params.get('structure_type'):
-            type_queries.append("""
-            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
-            MERGE (t:StructureType {name: $structure_type})
-            MERGE (s)-[:HAS_STRUCTURE_TYPE]->(t)
-            """)
-        # Purpose
-        if params.get('purpose'):
-            type_queries.append("""
-            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
-            MERGE (t:Purpose {name: $purpose})
-            MERGE (s)-[:HAS_PURPOSE]->(t)
-            """)
-        
-        # Execute type queries if any exist
-        if type_queries:
-            # Consider running these in a single transaction if possible/needed
-            # For simplicity here, running sequentially
-            for query in type_queries:
-                await connection_manager.execute_query(query, parameters=params)
-            logger.debug(f"Merged type nodes/relationships for sentence {sentence_id}.")
-
-        # --- 4. MERGE Topic Nodes & Relationships ---
-        topic_query = """
-        MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
-        // Use UNWIND to process multiple topics efficiently if they are passed as a list
-        // For now, handling topic_level_1 and topic_level_3 separately
-        // Consider refactoring if topics become a list in analysis_data
-        WITH s
-        WHERE $topic_level_1 IS NOT NULL
-        MERGE (t1:Topic {name: $topic_level_1})
-        MERGE (s)-[:HAS_TOPIC]->(t1)
-        WITH s // Pass s along for the next optional part
-        WHERE $topic_level_3 IS NOT NULL
-        MERGE (t3:Topic {name: $topic_level_3})
-        MERGE (s)-[:HAS_TOPIC]->(t3)
-        """
-        # Only execute if at least one topic level exists
-        if params.get('topic_level_1') or params.get('topic_level_3'):
-            await connection_manager.execute_query(topic_query, parameters=params)
-            logger.debug(f"Merged topic nodes/relationships for sentence {sentence_id}.")
-
-        # --- 5. MERGE Keyword Nodes & Relationships ---
-        keyword_queries = []
-        # Overall Keywords
-        if params.get('overall_keywords'):
-            # Use UNWIND for efficient list processing
-            keyword_queries.append("""
-            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
-            UNWIND $overall_keywords AS keyword_text
-            MERGE (k:Keyword {text: keyword_text})
-            MERGE (s)-[:MENTIONS_OVERALL_KEYWORD]->(k)
-            """)
-        # Domain Keywords
-        if params.get('domain_keywords'):
-            keyword_queries.append("""
-            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
-            UNWIND $domain_keywords AS keyword_text
-            MERGE (k:Keyword {text: keyword_text})
-            MERGE (s)-[:MENTIONS_DOMAIN_KEYWORD]->(k)
-            """)
-
-        # Execute keyword queries if any exist
-        if keyword_queries:
-            for query in keyword_queries:
-                await connection_manager.execute_query(query, parameters=params)
-            logger.debug(f"Merged keyword nodes/relationships for sentence {sentence_id}.")
-        
-        # --- 6. MERGE :FOLLOWS Relationship (Optional but Recommended) ---
-        # Only attempt to create FOLLOWS if sequence_order > 0
-        if sequence_order is not None and sequence_order > 0:
-            follows_query = """
-            // Match the current sentence (s2)
-            MATCH (s2:Sentence {sentence_id: $sentence_id, filename: $filename})
-            // Match the previous sentence (s1) in the same file
-            MATCH (s1:Sentence {sequence_order: $sequence_order - 1, filename: $filename})
-            // Ensure the relationship doesn't already exist, then create it
-            MERGE (s1)-[r:FOLLOWS]->(s2)
+        # Use the imported singleton instance, assuming driver is pre-initialized
+        # AWAIT the coroutine to get the actual session context manager
+        async with await connection_manager.get_session() as session:
+            # Combine steps 1 & 2 into a single query for efficiency and atomicity
+            query_sentence = """
+            MERGE (f:SourceFile {filename: $filename})
+            MERGE (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+            ON CREATE SET 
+                s.text = $text, 
+                s.sequence_order = $sequence_order
+            ON MATCH SET 
+                s.text = $text, 
+                s.sequence_order = $sequence_order
+            MERGE (s)-[:PART_OF_FILE]->(f)
             """
-            # Note: No parameters needed beyond sequence_order and sentence_id, 
-            # which are already in the params dictionary.
-            # We calculate the previous sequence order directly in the query.
-            # Need to handle the case where sequence_order might be 0 or None explicitly.
-            try:
-                await connection_manager.execute_query(follows_query, parameters=params)
-                logger.debug(f"Merged :FOLLOWS relationship for sentence {sentence_id}.")
-            except Exception as follows_e:
-                # Log specifically if FOLLOWS fails, but don't necessarily fail the whole save
-                logger.warning(f"Could not create :FOLLOWS relationship for sentence {sentence_id} (prev: {sequence_order - 1}): {follows_e}")
+            # Execute using the session
+            await session.run(query_sentence, parameters=params)
+            logger.debug(f"Merged SourceFile and Sentence nodes for sentence {sentence_id} from '{filename}'.")
+
+            # --- 3. MERGE Type Nodes & Relationships (FunctionType, StructureType, Purpose) ---
+            type_queries = []
+            # FunctionType
+            if params.get('function_type'):
+                type_queries.append("""
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                MERGE (t:FunctionType {name: $function_type})
+                MERGE (s)-[:HAS_FUNCTION_TYPE]->(t)
+                """)
+            # StructureType
+            if params.get('structure_type'):
+                type_queries.append("""
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                MERGE (t:StructureType {name: $structure_type})
+                MERGE (s)-[:HAS_STRUCTURE_TYPE]->(t)
+                """)
+            # Purpose
+            if params.get('purpose'):
+                type_queries.append("""
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                MERGE (t:Purpose {name: $purpose})
+                MERGE (s)-[:HAS_PURPOSE]->(t)
+                """)
+            
+            # Execute type queries using the session
+            if type_queries:
+                for query in type_queries:
+                    await session.run(query, parameters=params)
+                logger.debug(f"Merged type nodes/relationships for sentence {sentence_id}.")
+
+            # --- 4. MERGE Topic Nodes & Relationships ---
+            topic_query = """
+            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+            // Use UNWIND to process multiple topics efficiently if they are passed as a list
+            // For now, handling topic_level_1 and topic_level_3 separately
+            // Consider refactoring if topics become a list in analysis_data
+            WITH s
+            WHERE $topic_level_1 IS NOT NULL
+            MERGE (t1:Topic {name: $topic_level_1})
+            MERGE (s)-[:HAS_TOPIC]->(t1)
+            WITH s // Pass s along for the next optional part
+            WHERE $topic_level_3 IS NOT NULL
+            MERGE (t3:Topic {name: $topic_level_3})
+            MERGE (s)-[:HAS_TOPIC]->(t3)
+            """
+            # Only execute if at least one topic level exists
+            if params.get('topic_level_1') or params.get('topic_level_3'):
+                await session.run(topic_query, parameters=params)
+                logger.debug(f"Merged topic nodes/relationships for sentence {sentence_id}.")
+
+            # --- 5. MERGE Keyword Nodes & Relationships ---
+            keyword_queries = []
+            # Overall Keywords
+            if params.get('overall_keywords'):
+                # Use UNWIND for efficient list processing
+                keyword_queries.append("""
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                UNWIND $overall_keywords AS keyword_text
+                MERGE (k:Keyword {text: keyword_text})
+                MERGE (s)-[:MENTIONS_OVERALL_KEYWORD]->(k)
+                """)
+            # Domain Keywords
+            if params.get('domain_keywords'):
+                keyword_queries.append("""
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                UNWIND $domain_keywords AS keyword_text
+                MERGE (k:Keyword {text: keyword_text})
+                MERGE (s)-[:MENTIONS_DOMAIN_KEYWORD]->(k)
+                """)
+
+            # Execute keyword queries using the session
+            if keyword_queries:
+                for query in keyword_queries:
+                    await session.run(query, parameters=params)
+                logger.debug(f"Merged keyword nodes/relationships for sentence {sentence_id}.")
+            
+            # --- 6. MERGE :FOLLOWS Relationship (Optional but Recommended) ---
+            # Only attempt to create FOLLOWS if sequence_order > 0
+            if sequence_order is not None and sequence_order > 0:
+                follows_query = """
+                // Match the current sentence (s2)
+                MATCH (s2:Sentence {sentence_id: $sentence_id, filename: $filename})
+                // Match the previous sentence (s1) in the same file
+                MATCH (s1:Sentence {sequence_order: $sequence_order - 1, filename: $filename})
+                // Ensure the relationship doesn't already exist, then create it
+                MERGE (s1)-[r:FOLLOWS]->(s2)
+                """
+                # Note: No parameters needed beyond sequence_order and sentence_id, 
+                # which are already in the params dictionary.
+                # We calculate the previous sequence order directly in the query.
+                # Need to handle the case where sequence_order might be 0 or None explicitly.
+                try:
+                    await session.run(follows_query, parameters=params)
+                    logger.debug(f"Merged :FOLLOWS relationship for sentence {sentence_id}.")
+                except Exception as follows_e:
+                    # Log specifically if FOLLOWS fails, but don't necessarily fail the whole save
+                    logger.warning(f"Could not create :FOLLOWS relationship for sentence {sentence_id} (prev: {sequence_order - 1}): {follows_e}")
 
         logger.info(f"Successfully completed graph updates for sentence {sentence_id} from '{filename}'.") # Changed level to INFO
 
