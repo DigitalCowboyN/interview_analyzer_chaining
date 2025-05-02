@@ -16,14 +16,21 @@ services:
     environment:
       - PYTHONUNBUFFERED=1 # Ensure logs appear immediately
     # If the API needs to wait for Redis (good practice)
+    # Also add explicit depends_on for the test database
     depends_on:
       redis:
         condition: service_healthy
       neo4j:
         condition: service_started
+      # Add dependency for the test container
+      neo4j-test:
+        condition: service_started # Or just service_healthy if we re-add healthcheck
     # Command to run the API server (adjust if needed)
     # command: ["make", "run-api"] # Example using Makefile target
     command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # Restore network attachment
+    networks:
+      - interview_net # Attach app to the same network
 
   # Redis service for Celery broker/backend
   redis:
@@ -78,6 +85,8 @@ services:
     #   interval: 5s
     #   timeout: 10s 
     #   retries: 20
+    networks:
+      - interview_net # Attach to custom network
 
   # Neo4j service for TESTING
   neo4j-test:
@@ -90,9 +99,11 @@ services:
     volumes:
       - neo4j_test_data:/data # Use a separate volume for test data
     environment:
-      # Use Neo4j 5 format for testing
-      NEO4J_INITIAL_PASSWORD: testpassword
+      # Correct environment variable for Neo4j 5.x authentication
+      NEO4J_AUTH: neo4j/testpassword 
       NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
+    networks:
+      - interview_net # Attach to custom network
     # healthcheck: # Keep commented out for now
     #   test: ["CMD-SHELL", "tcpconnect localhost:7687 || exit 1"]
     #   interval: 5s
@@ -103,3 +114,7 @@ volumes:
   redis_data: # Define redis volume
   neo4j_data: # Define neo4j volume (This is the correct one)
   neo4j_test_data: # Define volume for test database 
+
+# Define the custom network
+networks:
+  interview_net:

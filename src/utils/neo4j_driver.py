@@ -8,6 +8,7 @@ from src.config import config # Import the global config object
 from src.utils.logger import get_logger
 import asyncio
 from typing import Optional
+import os # <---- Added os import
 
 logger = get_logger()
 
@@ -20,14 +21,15 @@ class Neo4jConnectionManager:
         """
         Gets the singleton Neo4j AsyncDriver instance.
 
-        Initializes the driver on first call using configuration from src.config.
+        Initializes the driver on first call using configuration first from environment 
+        variables (NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD) and falling back to src.config.
         Uses an async lock to ensure thread-safe initialization.
 
         Returns:
             AsyncDriver: The initialized Neo4j driver instance.
 
         Raises:
-            ValueError: If Neo4j configuration is missing or invalid in src.config.
+            ValueError: If Neo4j configuration is missing or invalid from both env vars and src.config.
             Exception: Propagates errors from driver initialization (e.g., connection issues).
         """
         if cls._driver is None:
@@ -35,28 +37,41 @@ class Neo4jConnectionManager:
                 # Double-check if another coroutine initialized it while waiting for the lock
                 if cls._driver is None:
                     logger.info("Initializing Neo4j Async Driver...")
-                    try:
-                        neo4j_config = config.get('neo4j')
-                        if not neo4j_config:
-                            raise ValueError("Neo4j configuration section is missing in config.")
-                        
-                        uri = neo4j_config.get('uri')
-                        username = neo4j_config.get('username')
-                        password = neo4j_config.get('password') # Should be loaded from env via config
+                    uri = None
+                    username = None
+                    password = None
+                    config_source = "unknown"
 
-                        if not uri or not username or password is None: # Check if password is None or empty string
-                            raise ValueError("Neo4j URI, username, or password missing in configuration.")
-                        
-                        # Note: password might be an empty string if NEO4J_PASSWORD env var is set but empty. 
-                        # The driver might handle this, or Neo4j server might reject.
-                        # Consider adding explicit check: if not password: raise ValueError(...)
+                    try:
+                        # Prioritize Environment Variables
+                        uri = os.getenv('NEO4J_URI')
+                        username = os.getenv('NEO4J_USER')
+                        password = os.getenv('NEO4J_PASSWORD') # Returns None if not set
+
+                        if uri and username and password is not None:
+                            config_source = "environment variables"
+                            logger.info("Using Neo4j config from environment variables.")
+                        else:
+                            # Fallback to global config object
+                            logger.info("Attempting to use Neo4j config from global config object.")
+                            neo4j_config = config.get('neo4j')
+                            if neo4j_config:
+                                uri = neo4j_config.get('uri')
+                                username = neo4j_config.get('username')
+                                password = neo4j_config.get('password') # Should be loaded from env via config if set there
+                                config_source = "global config object"
+                            else:
+                                raise ValueError("Neo4j configuration not found in environment variables or global config.")
+
+                        if not uri or not username or password is None: # Final check after fallback attempt
+                            raise ValueError(f"Neo4j URI, username, or password missing in configuration (source: {config_source}).")
                         
                         auth = (username, password)
                         # max_connection_lifetime=3600 * 24 * 30, # Example: 30 days
                         # max_connection_pool_size=50,
                         # connection_acquisition_timeout=60
                         cls._driver = AsyncGraphDatabase.driver(uri, auth=auth)
-                        logger.info(f"Neo4j Async Driver initialized for URI: {uri}")
+                        logger.info(f"Neo4j Async Driver initialized for URI: {uri} (from {config_source})")
                         # Optional: Verify connectivity on initialization
                         # await cls._driver.verify_connectivity() 
                         # logger.info("Neo4j connectivity verified.")

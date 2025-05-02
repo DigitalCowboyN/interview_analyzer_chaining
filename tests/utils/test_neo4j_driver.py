@@ -64,7 +64,7 @@ async def test_get_driver_success_first_call(mock_neo4j_config_valid):
             auth=("mockuser", "mockpass")
         )
         mock_logger.info.assert_any_call("Initializing Neo4j Async Driver...")
-        mock_logger.info.assert_any_call(f"Neo4j Async Driver initialized for URI: {mock_neo4j_config_valid['neo4j']['uri']}")
+        mock_logger.info.assert_any_call(f"Neo4j Async Driver initialized for URI: {mock_neo4j_config_valid['neo4j']['uri']} (from global config object)")
         assert Neo4jConnectionManager._driver is mock_driver_instance
 
 @pytest.mark.asyncio
@@ -91,7 +91,7 @@ async def test_get_driver_missing_config(mock_neo4j_config_missing):
     with patch('src.utils.neo4j_driver.config', mock_neo4j_config_missing), \
          patch('src.utils.neo4j_driver.logger') as mock_logger:
 
-        with pytest.raises(ValueError, match="Neo4j configuration section is missing"):
+        with pytest.raises(ValueError, match="Neo4j configuration not found in environment variables or global config."):
             await Neo4jConnectionManager.get_driver()
         assert Neo4jConnectionManager._driver is None
         mock_logger.critical.assert_called_once()
@@ -193,6 +193,8 @@ async def test_get_session_with_database(mock_neo4j_config_valid):
 async def test_get_session_init_error(mock_neo4j_config_missing):
     #Test get_session propagates errors from get_driver.
     with patch('src.utils.neo4j_driver.config', mock_neo4j_config_missing):
-        
-        with pytest.raises(ValueError, match="configuration section is missing"): 
+        # Ensure driver is reset
+        Neo4jConnectionManager._driver = None
+
+        with pytest.raises(ValueError, match="Neo4j configuration not found in environment variables or global config."):
              _ = await Neo4jConnectionManager.get_session() 

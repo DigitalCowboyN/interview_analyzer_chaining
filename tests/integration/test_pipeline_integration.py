@@ -347,7 +347,9 @@ async def test_pipeline_integration_success_rewritten(
         mock_pipeline_metrics.increment_errors.assert_not_called()
 
         # 4. Assert Graph Database Content
-        async with test_db_manager.get_session() as session:
+        # Correctly await the session context manager first
+        session_cm = await test_db_manager.get_session()
+        async with session_cm as session:
             # Check SourceFile
             result = await session.run("MATCH (f:SourceFile {filename: $fname}) RETURN count(f)", fname=filename_str)
             count = await result.single()
@@ -531,44 +533,63 @@ async def test_pipeline_integration_partial_failure_rewritten(
         mock_pipeline_metrics.increment_errors.assert_called_once()
 
         # 5. Assert Graph Database Content (Verify only successful sentence data is fully present)
-        async with test_db_manager.get_session() as session:
-            # Check SourceFile exists using full path string
-            result = await session.run("MATCH (f:SourceFile {filename: $fname}) RETURN count(f)", fname=input_filename_str)
-            count = await result.single()
-            assert count[0] == 1
+        # Correctly await the session context manager first
+        session_cm = await test_db_manager.get_session()
+        async with session_cm as session:
+            # Simply count all Sentence nodes created for this file
+            query_count = """
+            MATCH (f:SourceFile {filename: $filepath})<-[:PART_OF_FILE]-(s:Sentence)
+            RETURN count(s) as sentence_count
+            """
+            result_count = await session.run(query_count, filepath=input_filename_str)
+            record_count = await result_count.single()
+            print(f"DEBUG: Found {record_count['sentence_count'] if record_count else 'None'} sentence nodes.")
+            
+            assert record_count is not None, "Count query returned no result."
+            # We expect both sentence nodes to be created even if analysis fails for one
+            assert record_count["sentence_count"] == 2, f"Expected 2 sentence nodes, found {record_count['sentence_count']}"
+            
+            # --- Restore and fix detailed assertions --- 
+            print(f"DEBUG: Querying for sentence_id 0 with text: {sentence_ok}")
+            # await asyncio.sleep(0.5) # Delay likely not needed now
+            
+            # Check successful sentence node exists and has relationships
+            query_success = """
+            MATCH (f:SourceFile {filename: $filepath})<-[:PART_OF_FILE]-(s:Sentence {sentence_id: 0, text: $text})
+            // Check for at least one type/topic/keyword relationship as proof of successful persistence
+            MATCH (s)-[:HAS_FUNCTION_TYPE]->()
+            MATCH (s)-[:HAS_TOPIC]->()
+            MATCH (s)-[:MENTIONS_OVERALL_KEYWORD]->()
+            RETURN s IS NOT NULL as exists
+            """
+            result_success = await session.run(query_success, filepath=input_filename_str, text=sentence_ok)
+            record_success = await result_success.single()
+            assert record_success and record_success["exists"], "Successful sentence node (with relationships) not found"
 
-            # Check Sentence 0 (Success) using full path string
-            result = await session.run(
-                "MATCH (s:Sentence {filename: $fname, sentence_id: 0}) "
-                "OPTIONAL MATCH (s)-[:HAS_FUNCTION_TYPE]->(ft) "
-                "RETURN s.text as text, ft.name as func_type", 
-                fname=input_filename_str
-            )
-            record = await result.single()
-            assert record is not None, "Sentence 0 node not found"
-            assert record["text"] == sentence_ok
-            assert record["func_type"] is not None, "Sentence 0 relationship (e.g., FunctionType) missing"
+            # Check failed sentence node exists BUT has no analysis relationships (types, topics, keywords)
+            print(f"DEBUG: Querying for sentence_id 1 with text: {sentence_fail}")
+            # await asyncio.sleep(0.5) # Delay likely not needed now
 
-            # Check Sentence 1 (Failure) using full path string
-            result = await session.run(
-                "MATCH (s:Sentence {filename: $fname, sentence_id: 1}) "
-                "OPTIONAL MATCH (s)-[:HAS_FUNCTION_TYPE]->(ft) "
-                "RETURN s.text as text, ft.name as func_type", 
-                fname=input_filename_str
-            )
-            record = await result.single()
-            assert record is not None, "Sentence 1 node not found"
-            assert record["text"] == sentence_fail # Text should still be there
-            assert record["func_type"] is None, "Sentence 1 should NOT have analysis relationships (e.g., FunctionType)"
+            query_fail = """
+            MATCH (f:SourceFile {filename: $filepath})<-[:PART_OF_FILE]-(s:Sentence {sentence_id: 1, text: $text})
+            // Ensure it does NOT have the analysis relationships
+            WHERE NOT EXISTS ((s)-[:HAS_FUNCTION_TYPE]->()) 
+              AND NOT EXISTS ((s)-[:HAS_TOPIC]->()) 
+              AND NOT EXISTS ((s)-[:MENTIONS_OVERALL_KEYWORD]->()) 
+              AND NOT EXISTS ((s)-[:MENTIONS_DOMAIN_KEYWORD]->())
+            RETURN s IS NOT NULL as exists
+            """
+            result_fail = await session.run(query_fail, filepath=input_filename_str, text=sentence_fail)
+            record_fail = await result_fail.single()
+            assert record_fail and record_fail["exists"], "Failed sentence node (without analysis relationships) not found or has unexpected relationships"
 
-            # Check :FOLLOWS using full path string
-            result = await session.run(
-                 "MATCH (:Sentence {filename: $fname, sentence_id: 0})-"
-                 "[r:FOLLOWS]->(:Sentence {filename: $fname, sentence_id: 1}) "
-                 "RETURN count(r)",
-                 fname=input_filename_str
-            )
-            count = await result.single()
-            assert count[0] == 1, ":FOLLOWS relationship not created"
+            # Check FOLLOWS relationship still exists
+            query_follows = """
+            MATCH (:Sentence {filename: $filepath, sentence_id: 0})-[r:FOLLOWS]->(:Sentence {filename: $filepath, sentence_id: 1})
+            RETURN count(r) as count
+            """
+            result_follows = await session.run(query_follows, filepath=input_filename_str)
+            record_follows = await result_follows.single()
+            assert record_follows and record_follows["count"] == 1, ":FOLLOWS relationship missing in partial failure test"
 
 # ... (Rest of integration tests) ... 
