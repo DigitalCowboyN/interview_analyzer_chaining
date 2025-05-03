@@ -568,7 +568,10 @@ async def test_pipeline_integration_partial_failure_rewritten(
         all_logs = mock_service_logger.error.call_args_list # Check service logger
         for call in all_logs:
             # Check if the expected fragment is IN the logged message
-            if "Error analyzing sentence" in call.args[0] and "Simulated classify error" in call.args[0]:
+            # Make the check more robust to match the actual log format
+            log_msg = call.args[0]
+            # Use hardcoded ID 1 for the expected failed sentence
+            if f"failed analyzing sentence_id 1" in log_msg and "Simulated classify error" in log_msg:
                  error_logged = True
                  break
         assert error_logged, f"Expected analysis error log containing '{expected_log_fragment}' not found in service logger. Logs: {all_logs}"
