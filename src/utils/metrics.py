@@ -5,7 +5,8 @@ Provides a simple centralized tracker for key performance and cost metrics.
 """
 
 from time import time
-from typing import Dict, Any
+from typing import Any, Dict
+
 
 class MetricsTracker:
     """
@@ -33,9 +34,9 @@ class MetricsTracker:
         self.total_tokens: int = 0
         self.pipeline_start_time: float | None = None
         self.pipeline_end_time: float | None = None
-        self.errors: int = 0 # Basic error tracking
-        self.custom_metrics: Dict[str, Dict[str, Any]] = {} # Initialize custom metrics storage
-        self.file_timers: Dict[str, float] = {} # Track start times for individual files
+        self.errors: int = 0  # Basic error tracking
+        self.custom_metrics: Dict[str, Dict[str, Any]] = {}  # Initialize custom metrics storage
+        self.file_timers: Dict[str, float] = {}  # Track start times for individual files
 
     def increment_api_calls(self, count: int = 1):
         """
@@ -74,7 +75,7 @@ class MetricsTracker:
             category (str): The category or scope of the error (e.g., 'pipeline', 'file_name'). Defaults to 'global'.
             count (int): The number of errors to add. Defaults to 1.
         """
-        self.errors += count # Keep global count for simplicity in summary? Or make it category based?
+        self.errors += count  # Keep global count for simplicity in summary? Or make it category based?
         # Optionally track errors per category
         # self.set_metric(category, "errors", self.custom_metrics.get(category, {}).get("errors", 0) + count)
 
@@ -89,7 +90,7 @@ class MetricsTracker:
             elapsed = time() - self.file_timers[filename]
             self.set_metric(filename, "processing_time_seconds", round(elapsed, 2))
             # Remove from active timers once stopped
-            # del self.file_timers[filename] # Keep it? Or clear? Keep for now.
+            # del self.file_timers[filename]  # Keep it? Or clear? Keep for now.
         else:
             # Log a warning?
             pass
@@ -123,12 +124,21 @@ class MetricsTracker:
             self.set_metric(category, key, current_value + increment_by)
         else:
             # Log warning: trying to increment non-numeric metric
-            self.set_metric(category, key, increment_by) # Overwrite if not numeric?
+            self.set_metric(category, key, increment_by)  # Overwrite if not numeric?
 
     # --- Add increment_results_processed (specific helper needed in pipeline) ---
     def increment_results_processed(self, filename: str, count: int = 1):
         """Helper to increment results processed count for a file."""
         self.increment_metric(filename, "results_processed", count)
+
+    # --- Add convenience methods for backward compatibility with tests ---
+    def increment_files_processed(self, count: int = 1):
+        """Helper to increment files processed count."""
+        self.increment_metric("pipeline", "files_processed", count)
+
+    def increment_files_failed(self, count: int = 1):
+        """Helper to increment files failed count."""
+        self.increment_metric("pipeline", "files_failed", count)
 
     def get_summary(self) -> dict:
         """
@@ -146,11 +156,12 @@ class MetricsTracker:
         summary = {
             "total_api_calls": self.api_calls,
             "total_tokens_used": self.total_tokens,
-            "total_errors": self.errors, # Overall error count
+            "total_errors": self.errors,  # Overall error count
             "pipeline_duration_seconds": duration,
-            "custom_metrics": self.custom_metrics # Include all custom metrics
+            "custom_metrics": self.custom_metrics  # Include all custom metrics
         }
         return summary
 
+
 # Global instance
-metrics_tracker = MetricsTracker() 
+metrics_tracker = MetricsTracker()

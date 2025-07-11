@@ -1,7 +1,7 @@
 """
 test_context_builder.py
 
-This module contains unit tests for the `ContextBuilder` class from 
+This module contains unit tests for the `ContextBuilder` class from
 `src.agents.context_builder.py`, focusing on its textual context generation capabilities.
 
 The tests cover:
@@ -19,10 +19,12 @@ Usage:
         pytest tests/test_context_builder.py
 """
 
+# import numpy as np  # Only needed for embedding context tests, which are currently commented out
 import pytest
-import numpy as np
+
 from src.agents.context_builder import ContextBuilder
-from src.config import config # To access configured embedding dimension
+from src.config import config  # To access configured embedding dimension
+
 
 @pytest.fixture
 def sentences():
@@ -34,12 +36,13 @@ def sentences():
     """
     # Sample sentences for testing
     return [
-        "Sentence 0.", # idx 0
-        "Sentence 1.", # idx 1
-        "Sentence 2 is the target.", # idx 2
-        "Sentence 3.", # idx 3
+        "Sentence 0.",  # idx 0
+        "Sentence 1.",  # idx 1
+        "Sentence 2 is the target.",  # idx 2
+        "Sentence 3.",  # idx 3
         "Sentence 4."  # idx 4
     ]
+
 
 @pytest.fixture
 def builder():
@@ -51,6 +54,7 @@ def builder():
     """
     # Fixture to provide a ContextBuilder instance
     return ContextBuilder()
+
 
 def test_build_context_basic(builder, sentences):
     """
@@ -70,6 +74,7 @@ def test_build_context_basic(builder, sentences):
 Sentence 3."""
     assert context == expected
 
+
 def test_build_context_start(builder, sentences):
     """
     Test `build_context` correctly handles the first sentence (index 0).
@@ -86,6 +91,7 @@ def test_build_context_start(builder, sentences):
     expected = """>>> TARGET: Sentence 0. <<<
 Sentence 1."""
     assert context == expected
+
 
 def test_build_context_end(builder, sentences):
     """
@@ -104,6 +110,7 @@ def test_build_context_end(builder, sentences):
 >>> TARGET: Sentence 4. <<<"""
     assert context == expected
 
+
 def test_build_context_zero_window(builder, sentences):
     """
     Test `build_context` with window_size=0.
@@ -117,6 +124,7 @@ def test_build_context_zero_window(builder, sentences):
     context = builder.build_context(sentences, idx=2, window_size=0)
     expected = ">>> TARGET: Sentence 2 is the target. <<<"
     assert context == expected
+
 
 def test_build_context_large_window(builder, sentences):
     """
@@ -137,7 +145,8 @@ Sentence 1.
 Sentence 3.
 Sentence 4."""
     assert context == expected
-    
+
+
 def test_build_context_invalid_idx(builder, sentences):
     """
     Test `build_context` returns an empty string for invalid indices.
@@ -152,6 +161,7 @@ def test_build_context_invalid_idx(builder, sentences):
     assert builder.build_context(sentences, idx=-1, window_size=1) == ""
     assert builder.build_context(sentences, idx=len(sentences), window_size=1) == ""
 
+
 def test_build_context_empty_list(builder):
     """
     Test `build_context` returns an empty string when given an empty list.
@@ -160,6 +170,7 @@ def test_build_context_empty_list(builder):
         builder: Fixture providing a `ContextBuilder` instance.
     """
     assert builder.build_context([], idx=0, window_size=1) == ""
+
 
 # --- Embedding Context Tests --- (Commented out as build_embedding_context is commented out)
 # def test_build_embedding_context_basic(builder, sentences):
@@ -200,7 +211,7 @@ def test_build_context_empty_list(builder):
 #     expected_dim = builder.embedder.get_sentence_embedding_dimension()
 #     assert isinstance(embedding_context, np.ndarray)
 #     assert embedding_context.shape == (expected_dim,)
-#     assert np.any(embedding_context != 0) 
+#     assert np.any(embedding_context != 0)
 #
 # def test_build_embedding_context_end(builder, sentences):
 #     """
@@ -234,6 +245,7 @@ def test_build_context_empty_list(builder):
 
 # --- build_all_contexts Tests ---
 
+
 def test_build_all_contexts_structure(builder, sentences):
     """
     Test the structure and content returned by `build_all_contexts`.
@@ -250,18 +262,19 @@ def test_build_all_contexts_structure(builder, sentences):
     contexts = builder.build_all_contexts(sentences)
     assert len(contexts) == len(sentences)
     expected_keys = list(config["preprocessing"]["context_windows"].keys())
-    
+
     for idx in range(len(sentences)):
         assert idx in contexts
         assert isinstance(contexts[idx], dict)
         # Check all expected keys are present and in the same order (Python 3.7+ dicts preserve order)
-        assert list(contexts[idx].keys()) == expected_keys 
+        assert list(contexts[idx].keys()) == expected_keys
         for key in expected_keys:
-             assert isinstance(contexts[idx][key], str)
-             # Check that the target sentence is marked within each context string
-             # Ensure sentence text exists before checking substring
-             if sentences[idx]: 
-                 assert f">>> TARGET: {sentences[idx]} <<<" in contexts[idx][key]
+            assert isinstance(contexts[idx][key], str)
+            # Check that the target sentence is marked within each context string
+            # Ensure sentence text exists before checking substring
+            if sentences[idx]:
+                assert f">>> TARGET: {sentences[idx]} <<<" in contexts[idx][key]
+
 
 def test_build_all_contexts_empty_list(builder):
     """

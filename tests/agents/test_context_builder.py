@@ -3,10 +3,11 @@ Tests for src/agents/context_builder.py
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+
 from src.agents.context_builder import ContextBuilder
 
 # --- Fixtures ---
+
 
 @pytest.fixture
 def mock_config_valid():
@@ -14,7 +15,7 @@ def mock_config_valid():
     return {
         "preprocessing": {
             "context_windows": {
-                "immediate": 0, # Window of 0 means just the target sentence
+                "immediate": 0,  # Window of 0 means just the target sentence
                 "narrow": 1,    # Target + 1 before/after
                 "broad": 2      # Target + 2 before/after
             }
@@ -22,15 +23,18 @@ def mock_config_valid():
         # Other config sections not needed by ContextBuilder
     }
 
+
 @pytest.fixture
 def mock_config_missing_preprocessing():
     """Config missing the 'preprocessing' section."""
     return {}
 
+
 @pytest.fixture
 def mock_config_missing_windows():
     """Config missing the 'context_windows' sub-section."""
     return {"preprocessing": {}}
+
 
 @pytest.fixture
 def sample_sentences():
@@ -45,24 +49,27 @@ def sample_sentences():
 
 # --- Tests for __init__ ---
 
+
 def test_init_success(mock_config_valid):
     """Test successful initialization with valid config."""
     builder = ContextBuilder(config_dict=mock_config_valid)
     assert builder.context_windows == mock_config_valid["preprocessing"]["context_windows"]
 
+
 def test_init_missing_preprocessing(mock_config_missing_preprocessing, caplog):
     """Test initialization when 'preprocessing' key is missing."""
     builder = ContextBuilder(config_dict=mock_config_missing_preprocessing)
-    assert builder.context_windows == {} # Should default to empty
+    assert builder.context_windows == {}  # Should default to empty
     # Check for the WARNING log about empty windows
     assert "Context windows are empty. Check config ['preprocessing']['context_windows']." in caplog.text
     # Ensure the old error log is NOT present
     assert "Config key missing for context_windows: 'preprocessing'" not in caplog.text
 
+
 def test_init_missing_windows(mock_config_missing_windows, caplog):
     """Test initialization when 'context_windows' key is missing."""
     builder = ContextBuilder(config_dict=mock_config_missing_windows)
-    assert builder.context_windows == {} # Should default to empty
+    assert builder.context_windows == {}  # Should default to empty
     # Check for the WARNING log about empty windows
     assert "Context windows are empty. Check config ['preprocessing']['context_windows']." in caplog.text
     # Ensure the old error log is NOT present
@@ -70,10 +77,11 @@ def test_init_missing_windows(mock_config_missing_windows, caplog):
 
 # --- Tests for build_context ---
 
+
 def test_build_context_middle(sample_sentences, mock_config_valid):
     """Test building context for a sentence in the middle of the list."""
     builder = ContextBuilder(config_dict=mock_config_valid)
-    
+
     # Window size 1 (narrow)
     context = builder.build_context(sample_sentences, idx=2, window_size=1)
     expected = (
@@ -82,7 +90,7 @@ def test_build_context_middle(sample_sentences, mock_config_valid):
         "Sentence 3."
     )
     assert context == expected
-    
+
     # Window size 2 (broad)
     context = builder.build_context(sample_sentences, idx=2, window_size=2)
     expected = (
@@ -94,10 +102,11 @@ def test_build_context_middle(sample_sentences, mock_config_valid):
     )
     assert context == expected
 
+
 def test_build_context_start(sample_sentences, mock_config_valid):
     """Test building context for the first sentence."""
     builder = ContextBuilder(config_dict=mock_config_valid)
-    
+
     # Window size 1 (narrow)
     context = builder.build_context(sample_sentences, idx=0, window_size=1)
     expected = (
@@ -106,10 +115,11 @@ def test_build_context_start(sample_sentences, mock_config_valid):
     )
     assert context == expected
 
+
 def test_build_context_end(sample_sentences, mock_config_valid):
     """Test building context for the last sentence."""
     builder = ContextBuilder(config_dict=mock_config_valid)
-    
+
     # Window size 1 (narrow)
     context = builder.build_context(sample_sentences, idx=4, window_size=1)
     expected = (
@@ -117,7 +127,7 @@ def test_build_context_end(sample_sentences, mock_config_valid):
         ">>> TARGET: Sentence 4. <<<"
     )
     assert context == expected
-    
+
     # Window size 2 (broad) - should clip at the end
     context = builder.build_context(sample_sentences, idx=4, window_size=2)
     expected = (
@@ -127,6 +137,7 @@ def test_build_context_end(sample_sentences, mock_config_valid):
     )
     assert context == expected
 
+
 def test_build_context_window_zero(sample_sentences, mock_config_valid):
     """Test building context with window size 0."""
     builder = ContextBuilder(config_dict=mock_config_valid)
@@ -134,10 +145,11 @@ def test_build_context_window_zero(sample_sentences, mock_config_valid):
     expected = ">>> TARGET: Sentence 2. <<<"
     assert context == expected
 
+
 def test_build_context_large_window(sample_sentences, mock_config_valid):
     """Test window size larger than list boundaries."""
     builder = ContextBuilder(config_dict=mock_config_valid)
-    context = builder.build_context(sample_sentences, idx=2, window_size=10) # Window > list size
+    context = builder.build_context(sample_sentences, idx=2, window_size=10)  # Window > list size
     expected = (
         "Sentence 0.\n"
         "Sentence 1.\n"
@@ -145,13 +157,15 @@ def test_build_context_large_window(sample_sentences, mock_config_valid):
         "Sentence 3.\n"
         "Sentence 4."
     )
-    assert context == expected # Should be clipped to list boundaries
+    assert context == expected  # Should be clipped to list boundaries
+
 
 def test_build_context_invalid_index(sample_sentences, mock_config_valid):
     """Test building context with an out-of-bounds index."""
     builder = ContextBuilder(config_dict=mock_config_valid)
     assert builder.build_context(sample_sentences, idx=-1, window_size=1) == ""
     assert builder.build_context(sample_sentences, idx=len(sample_sentences), window_size=1) == ""
+
 
 def test_build_context_empty_list(mock_config_valid):
     """Test building context with an empty sentence list."""
@@ -160,12 +174,13 @@ def test_build_context_empty_list(mock_config_valid):
 
 # --- Tests for build_all_contexts ---
 
+
 def test_build_all_contexts_success(sample_sentences, mock_config_valid):
     """Test building all contexts for a list of sentences."""
     builder = ContextBuilder(config_dict=mock_config_valid)
     all_contexts = builder.build_all_contexts(sample_sentences)
 
-    assert len(all_contexts) == len(sample_sentences) # Should have entry for each sentence
+    assert len(all_contexts) == len(sample_sentences)  # Should have entry for each sentence
 
     # Check context for sentence 2 (as an example)
     assert 2 in all_contexts
@@ -176,7 +191,7 @@ def test_build_all_contexts_success(sample_sentences, mock_config_valid):
 
     # Verify immediate context (window 0)
     assert context_s2["immediate"] == ">>> TARGET: Sentence 2. <<<"
-    
+
     # Verify narrow context (window 1)
     expected_narrow = (
         "Sentence 1.\n"
@@ -204,10 +219,12 @@ def test_build_all_contexts_success(sample_sentences, mock_config_valid):
     )
     assert context_s0["narrow"] == expected_narrow_s0
 
+
 def test_build_all_contexts_empty_input(mock_config_valid):
     """Test build_all_contexts returns empty dict for empty sentence list."""
     builder = ContextBuilder(config_dict=mock_config_valid)
     assert builder.build_all_contexts([]) == {}
+
 
 def test_build_all_contexts_uses_config_windows(sample_sentences):
     """Test that build_all_contexts uses the specific windows from config."""
@@ -215,7 +232,7 @@ def test_build_all_contexts_uses_config_windows(sample_sentences):
         "preprocessing": {
             "context_windows": {
                 "tiny": 0,
-                "medium": 1 
+                "medium": 1
                 # Only these two windows defined
             }
         }
@@ -224,15 +241,15 @@ def test_build_all_contexts_uses_config_windows(sample_sentences):
     all_contexts = builder.build_all_contexts(sample_sentences)
 
     assert len(all_contexts) == len(sample_sentences)
-    
+
     # Check an arbitrary sentence's contexts
     assert 1 in all_contexts
     context_s1 = all_contexts[1]
-    
+
     # Should have keys from custom_config, not the default fixture
     assert "tiny" in context_s1
     assert "medium" in context_s1
-    assert "immediate" not in context_s1 # From default fixture
+    assert "immediate" not in context_s1  # From default fixture
     assert "narrow" not in context_s1    # From default fixture
     assert "broad" not in context_s1     # From default fixture
 
@@ -245,6 +262,6 @@ def test_build_all_contexts_uses_config_windows(sample_sentences):
     )
     assert context_s1["medium"] == expected_medium
 
-# Potential test for build_sentence_context if needed, 
+# Potential test for build_sentence_context if needed,
 # but focusing on the primary build_all_contexts method first.
-# def test_build_sentence_context_variant(...) 
+# def test_build_sentence_context_variant(...)

@@ -19,14 +19,13 @@ RUN pip install --upgrade pip
 # Copy project files
 COPY . ./.
 
-# Install Python dependencies
-# Also install pip-audit for vulnerability scanning
+# Install Python dependencies (requirements.txt is the single source of truth)
 RUN pip install --no-cache-dir -r requirements.txt pip-audit
 
 # Scan installed packages for vulnerabilities
 RUN pip-audit
 
-# Install spaCy model
+# Install spaCy model (must match requirements.txt version)
 RUN python -m spacy download en_core_web_sm
 
 # command to run when the container starts

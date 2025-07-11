@@ -16,12 +16,15 @@ Usage Example:
         pytest tests/test_openai_agent_response.py
 """
 
-import pytest
 import json
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from src.agents.agent import OpenAIAgent
 
 pytestmark = pytest.mark.asyncio
+
 
 def mock_response(content_dict):
     """
@@ -46,6 +49,7 @@ def mock_response(content_dict):
     mock_output.content = [mock_content]
     mock_resp.output = [mock_output]
     return mock_resp
+
 
 async def test_openai_response_structure():
     """

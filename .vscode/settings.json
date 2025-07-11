@@ -1,0 +1,16 @@
+{
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=120",
+        "--ignore=E203,W503,F401"
+    ],
+    "python.linting.enabled": true,
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length=120"
+    ],
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    }
+}

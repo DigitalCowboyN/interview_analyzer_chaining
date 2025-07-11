@@ -13,12 +13,15 @@ Usage Example:
         pytest tests/integration/test_api_calls.py
 """
 
-import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from src.agents.agent import OpenAIAgent
 
 pytestmark = pytest.mark.asyncio
+
 
 def mock_response(content_dict):
     """
@@ -41,6 +44,7 @@ def mock_response(content_dict):
     mock_output.content = [mock_content]
     mock_resp.output = [mock_output]
     return mock_resp
+
 
 async def test_openai_integration():
     """
@@ -75,7 +79,7 @@ async def test_openai_integration():
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_create.return_value = mock_response(response_content)
         response = await agent.call_model("Integration test prompt")
-    
+
     # Verify the response structure and values.
     assert isinstance(response, dict)
     assert response.get("function_type") == "declarative"

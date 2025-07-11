@@ -1,46 +1,48 @@
 # Core
-openai
-google-genai
-sentence-transformers==2.6.1
-spacy==3.7.4
+openai==1.93.3
+google-genai  # (version not pinned, update if needed)
+sentence-transformers==5.0.0
+spacy==3.8.7
 hdbscan==0.8.33
-numpy==1.26.4
-pandas==2.2.1
-pyyaml==6.0.1
-torch>=2.6.0
-torchaudio>=2.6.0
-torchvision>=0.21.0
+numpy==2.1.3
+pandas==2.2.3
+pyyaml==6.0.2
+torch==2.7.1
+# torchaudio and torchvision not installed, add if needed
 
 # Utilities
-loguru==0.7.2
-tqdm>=4.66.3
-scikit-learn>=1.5.0
-matplotlib==3.8.3
+loguru==0.7.3
+tqdm==4.67.1
+scikit-learn==1.6.1
+matplotlib==3.10.0
 
 # Embeddings & NLP
-transformers>=4.50.0
+transformers==4.53.1
 
 # Development
 pytest==8.3.3
 pytest-asyncio
 black==24.3.0
-flake8==7.0.0
+flake8==7.3.0
 isort==5.13.2
 
-# spaCy model
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
+# Security
+setuptools==75.8.0
+
+# spaCy model (install via Dockerfile or manually)
+# en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
 
 # Additional dependencies for enhanced functionality
-pydantic  # Ensure Pydantic is included for data validation
-aiofiles  # For async file handling
+pydantic==2.11.7
+aiofiles==24.1.0
 
 # FastAPI
-fastapi
-uvicorn
+fastapi==0.116.0
+uvicorn==0.35.0
 
 # Task Queue Manager
-celery
-redis
+celery==5.5.3
+redis==6.2.0
 
 # Database
-neo4j
+neo4j==5.28.1

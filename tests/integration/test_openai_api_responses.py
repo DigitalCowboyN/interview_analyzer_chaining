@@ -17,10 +17,11 @@ Usage Example:
 Note: Running the integration test requires a valid OPENAI_API_KEY environment variable.
 """
 
-import os
-import pytest
 import json
-from unittest.mock import patch, AsyncMock, MagicMock
+import os
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from openai import AsyncOpenAI
 
 # Make sure your OPENAI_API_KEY is set in the environment.
@@ -29,6 +30,7 @@ if not API_KEY:
     raise ValueError("API key is not set. Please set the OPENAI_API_KEY environment variable.")
 
 client = AsyncOpenAI(api_key=API_KEY)
+
 
 def mock_response(content_dict):
     """
@@ -52,6 +54,7 @@ def mock_response(content_dict):
     mock_resp.output = [mock_output]
     return mock_resp
 
+
 @pytest.mark.asyncio
 async def test_responses_create_structured_json():
     """
@@ -70,7 +73,8 @@ async def test_responses_create_structured_json():
 
     Raises:
         pytest.fail: If any exception occurs during the API call or assertions.
-                     (Indicates failure like API errors, network issues, invalid response structure, or failed assertions).
+                     (Indicates failure like API errors, network issues, invalid response
+                     structure, or failed assertions).
         ValueError: If the OPENAI_API_KEY environment variable is not set.
     """
     try:
@@ -83,8 +87,10 @@ async def test_responses_create_structured_json():
         # Check that there is output.
         assert response.output, "No output in response"
         first_output = response.output[0]
-        assert first_output.content, "No content in first output item"
-        output_message = first_output.content[0].text.strip()
+        # Access content with type assertion - the actual API returns this structure
+        content_items = getattr(first_output, 'content', None)
+        assert content_items, "No content in first output item"
+        output_message = content_items[0].text.strip()
         print("\nStructured JSON response:", output_message)
 
         # Parse the JSON.
@@ -95,6 +101,7 @@ async def test_responses_create_structured_json():
             "The 'capital' value should be a non-empty string"
     except Exception as e:
         pytest.fail(f"An error occurred: {e}")
+
 
 @pytest.mark.asyncio
 async def test_responses_create_malformed_json():
@@ -131,5 +138,7 @@ async def test_responses_create_malformed_json():
             )
             # Attempt to parse the malformed response.
             first_output = response.output[0]
-            output_message = first_output.content[0].text.strip()
+            content_items = getattr(first_output, 'content', None)
+            assert content_items, "No content in first output item"
+            output_message = content_items[0].text.strip()
             json.loads(output_message)

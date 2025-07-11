@@ -12,15 +12,19 @@ are logged under specific conditions (e.g., simulated API errors).
 
 # tests/utils/test_logging.py
 
-import pytest
 import json
-import logging # Import logging for caplog level
-from unittest.mock import patch, AsyncMock, MagicMock
+import logging  # Import logging for caplog level
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from openai import RateLimitError
+
 from src.agents.agent import OpenAIAgent
+
 # Removed: from src.utils.logger import get_logger (not needed for test logic itself)
 
 pytestmark = pytest.mark.asyncio
+
 
 def mock_response(content_dict):
     """
@@ -45,6 +49,7 @@ def mock_response(content_dict):
     mock_resp.output = [mock_output]
     return mock_resp
 
+
 @pytest.fixture
 def agent():
     """
@@ -54,7 +59,8 @@ def agent():
 
 # Removed the Loguru-specific log_sink fixture
 
-async def test_retry_log_message(agent, caplog): # Use caplog fixture
+
+async def test_retry_log_message(agent, caplog):  # Use caplog fixture
     """
     Test that the agent's retry logic logs a specific message upon API error.
 
@@ -75,7 +81,7 @@ async def test_retry_log_message(agent, caplog): # Use caplog fixture
     """
     # Set caplog level to capture INFO messages (retry logs at INFO)
     caplog.set_level(logging.INFO)
-    
+
     response_content = {
         "function_type": "declarative",
         "structure_type": "simple sentence",
@@ -90,6 +96,6 @@ async def test_retry_log_message(agent, caplog): # Use caplog fixture
         # First call raises an error, second call returns a valid response.
         mock_create.side_effect = [error_response, mock_response(response_content)]
         await agent.call_model("Test prompt")
-    
+
     # Check that the captured log text contains "Retrying after"
     assert "Retrying after" in caplog.text, "Expected retry log message not found in logs"

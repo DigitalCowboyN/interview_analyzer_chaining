@@ -2,19 +2,15 @@
 Tests for the API endpoints defined in src/api/routers/analysis.py.
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock, ANY
+from fastapi import status
 from fastapi.testclient import TestClient
-from fastapi import status, BackgroundTasks
-import pathlib # Import pathlib
-from uuid import UUID
 
 # Import the FastAPI app to create a TestClient
-from src.main import app 
-# Import schemas used in requests/responses
-from src.api.schemas import AnalysisTriggerRequest, AnalysisTriggerResponse
-from src.services.analysis_service import AnalysisService
-from src.utils.metrics import MetricsTracker
+from src.main import app
+
 
 # FIX: Add the client fixture definition
 @pytest.fixture(scope="module")
@@ -22,6 +18,7 @@ def client():
     """Provides a FastAPI TestClient instance for API tests."""
     with TestClient(app) as c:
         yield c
+
 
 # Mock config data used by tests
 MOCK_INPUT_DIR = "/mock/input/dir"
@@ -31,6 +28,7 @@ NON_EXISTENT_FILENAME = "ghost.txt"
 INVALID_FILENAME_FORMAT = "../sneaky_file.txt"
 
 # Test functions will go here
+
 
 @pytest.fixture
 def mock_config_global():
@@ -58,6 +56,7 @@ def mock_config_global():
         })
         yield mock_config
 
+
 @pytest.mark.usefixtures("client", "mock_config_global")  # Ensure client and config mock are used
 def test_trigger_analysis_success(client: TestClient):
     """Test POST /analysis/ success path (202 Accepted)."""
@@ -73,7 +72,7 @@ def test_trigger_analysis_success(client: TestClient):
          patch("uuid.uuid4", return_value=mock_task_id), \
          patch("pathlib.Path.is_file", return_value=True) as mock_is_file, \
          patch("src.config.config", {"paths": {"input_dir": "/mock"}}) as mock_cfg:
-         # Provide a minimal config dict for the endpoint to read input_dir
+        # Provide a minimal config dict for the endpoint to read input_dir
 
         # --- Execute ---
         response = client.post("/analysis/", json=request_data)
@@ -89,11 +88,18 @@ def test_trigger_analysis_success(client: TestClient):
         mock_add_task.assert_called_once()
         call_args, call_kwargs = mock_add_task.call_args
         assert call_args[0] == mock_run_pipeline
-        assert call_kwargs.get("specific_file") == filename # Check specific_file kwarg
+        assert call_kwargs.get("specific_file") == filename  # Check specific_file kwarg
         assert call_kwargs.get("task_id") == mock_task_id
 
         # 3. Ensure pipeline wasn't awaited in the request handler
         mock_run_pipeline.assert_not_awaited()
+
+        # 4. Verify file existence check was performed
+        mock_is_file.assert_called_once()
+
+        # 5. Verify config was accessed for input directory
+        assert mock_cfg["paths"]["input_dir"] == "/mock"
+
 
 @pytest.mark.usefixtures("client", "mock_config_global")
 def test_trigger_analysis_invalid_filename(client: TestClient):
@@ -103,12 +109,14 @@ def test_trigger_analysis_invalid_filename(client: TestClient):
     assert response.status_code == 400  # Bad Request
     assert "Invalid input filename format." in response.json()["detail"]
 
+
 @pytest.mark.usefixtures("client", "mock_config_global")
 def test_trigger_analysis_missing_filename(client: TestClient):
     """Test triggering analysis with missing 'input_filename' in request body."""
     request_data = {}  # Missing input_filename
     response = client.post("/analysis/", json=request_data)
     assert response.status_code == 422  # Unprocessable Entity (validation error)
+
 
 @pytest.mark.usefixtures("client")
 def test_trigger_analysis_pipeline_error_still_accepts(client: TestClient):
@@ -139,7 +147,7 @@ def test_trigger_analysis_pipeline_error_still_accepts(client: TestClient):
         # 2. Background Task Scheduling (Should still be called)
         mock_add_task.assert_called_once()
         call_args, call_kwargs = mock_add_task.call_args
-        assert call_args[0] == mock_run_pipeline # The mock that raises error
+        assert call_args[0] == mock_run_pipeline  # The mock that raises error
         assert call_kwargs.get("specific_file") == filename
         assert call_kwargs.get("task_id") == mock_task_id
 
@@ -148,6 +156,10 @@ def test_trigger_analysis_pipeline_error_still_accepts(client: TestClient):
 
         # 4. Pipeline function itself was not awaited by the endpoint
         mock_run_pipeline.assert_not_awaited()
+
+        # 5. Verify config was accessed for input directory
+        assert mock_cfg["paths"]["input_dir"] == "/mock"
+
 
 @pytest.mark.usefixtures("client")
 def test_trigger_analysis_file_not_found_raises_404(client: TestClient):
@@ -159,7 +171,6 @@ def test_trigger_analysis_file_not_found_raises_404(client: TestClient):
     # --- Patching ---
     with patch("src.pipeline.run_pipeline", new_callable=AsyncMock) as mock_run_pipeline, \
          patch("src.api.routers.analysis.BackgroundTasks.add_task") as mock_add_task, \
-         patch("uuid.uuid4") as mock_uuid, \
          patch("pathlib.Path.is_file", return_value=False) as mock_is_file, \
          patch("src.config.config", {"paths": {"input_dir": "/mock"}}) as mock_cfg:
 
@@ -180,6 +191,9 @@ def test_trigger_analysis_file_not_found_raises_404(client: TestClient):
         mock_run_pipeline.assert_not_awaited()
         mock_run_pipeline.assert_not_called()
 
+        # 4. Verify config was accessed for input directory
+        assert mock_cfg["paths"]["input_dir"] == "/mock"
+
 # Potential future tests:
 # - Test validation of filename format (e.g., prevent path traversal)
-# - Test behaviour when config cannot be loaded (though this might be better in config tests) 
+# - Test behaviour when config cannot be loaded (though this might be better in config tests)

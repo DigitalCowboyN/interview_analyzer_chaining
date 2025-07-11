@@ -3,12 +3,22 @@
 Defines Protocol interfaces for data source and sink abstractions in the pipeline.
 """
 
-from typing import Protocol, List, Dict, Any, AsyncIterable, Iterable, Set
 # Note: Path might not be strictly necessary in protocols, 
 # identifiers could be strings (URIs, etc.)
-from pathlib import Path 
+from pathlib import Path
+from typing import (
+    Any,
+    AsyncIterable,
+    Dict,
+    Iterable,
+    List,
+    Protocol,
+    Set,
+    runtime_checkable,
+)
 
 
+@runtime_checkable
 class TextDataSource(Protocol):
     """Protocol for reading input text data."""
 

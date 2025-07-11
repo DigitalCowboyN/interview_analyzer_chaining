@@ -12,13 +12,16 @@ Usage Example:
         pytest tests/test_prompts.py
 """
 
+import json
+from unittest.mock import AsyncMock, patch
+
 import pytest
 import yaml
-import json
-from unittest.mock import patch, AsyncMock
+
 from src.agents.agent import OpenAIAgent
 
 pytestmark = pytest.mark.asyncio
+
 
 def mock_response(content_dict):
     """
@@ -45,6 +48,7 @@ def mock_response(content_dict):
     mock_resp.output = [mock_output]
     return mock_resp
 
+
 @pytest.fixture
 def load_prompts():
     """
@@ -65,6 +69,7 @@ def load_prompts():
     with open("prompts/task_prompts.yaml") as f:
         task_prompts = yaml.safe_load(f)
     return domain_prompts, task_prompts
+
 
 @patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock)
 async def test_prompt_attributes(mock_call_model, load_prompts):

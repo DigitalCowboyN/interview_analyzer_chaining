@@ -3,12 +3,13 @@
 Tests for utility functions in src.utils.path_helpers.
 """
 
-import pytest
+import logging  # Import the logging module
 from pathlib import Path
-import logging # Import the logging module
+
+import pytest
 
 # Import the function and dataclass to test
-from src.utils.path_helpers import generate_pipeline_paths, PipelinePaths
+from src.utils.path_helpers import PipelinePaths, generate_pipeline_paths
 
 
 def test_generate_pipeline_paths_success(tmp_path):
@@ -21,7 +22,7 @@ def test_generate_pipeline_paths_success(tmp_path):
     output_dir.mkdir()
 
     input_file = input_dir / "test_doc.txt"
-    input_file.touch() # Create the dummy file
+    input_file.touch()  # Create the dummy file
 
     map_suffix = "_map.jsonl"
     analysis_suffix = "_analysis.jsonl"
@@ -78,8 +79,8 @@ def test_generate_pipeline_paths_different_suffixes(tmp_path):
 @pytest.mark.parametrize(
     "invalid_input_path",
     [
-        Path("."), 
-        Path("/"), 
+        Path("."),
+        Path("/"),
         # Path("no_suffix") # This actually has stem "no_suffix", name "no_suffix"
         # Path(".hiddenfile") # This has stem ".hiddenfile", name ".hiddenfile"
     ],
@@ -100,6 +101,7 @@ def test_generate_pipeline_paths_invalid_input_stem(tmp_path, invalid_input_path
             map_suffix=map_suffix,
             analysis_suffix=analysis_suffix
         )
+
 
 # Optional: Test with task_id for logging coverage if needed, though it's minor.
 def test_generate_pipeline_paths_with_task_id(tmp_path, caplog):
@@ -126,4 +128,4 @@ def test_generate_pipeline_paths_with_task_id(tmp_path, caplog):
 
     assert f"[Task {task_id}]" in caplog.text
     assert "Generating pipeline paths" in caplog.text
-    assert "Generated paths: Map=" in caplog.text 
+    assert "Generated paths: Map=" in caplog.text
