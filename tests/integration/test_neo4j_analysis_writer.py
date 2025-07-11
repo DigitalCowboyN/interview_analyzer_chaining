@@ -1569,24 +1569,30 @@ async def test_database_connection_error_write_result(clear_test_db):
     })
     await map_storage.finalize()
 
-    # Create writer and close the connection to simulate connection error
+    # Create writer
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
-    # Close the Neo4j connection to simulate connection failure
-    await Neo4jConnectionManager.close_driver()
+    # Mock the session.run method to raise a ServiceUnavailable error
+    from unittest.mock import AsyncMock, patch
 
-    # Try to write analysis - should raise an exception
-    analysis_result = {
-        "sentence_id": 0,
-        "function_type": "declarative"
-    }
+    from neo4j.exceptions import ServiceUnavailable
 
-    with pytest.raises(Exception):  # Should raise some kind of connection/database error
-        await writer.write_result(analysis_result)
+    mock_error = ServiceUnavailable("Database service unavailable")
 
-    # Restore connection for cleanup
-    # The connection will be automatically restored by the test fixture
+    with patch.object(Neo4jConnectionManager, 'get_session') as mock_get_session:
+        mock_session = AsyncMock()
+        mock_session.run.side_effect = mock_error
+        mock_get_session.return_value.__aenter__.return_value = mock_session
+
+        analysis_result = {
+            "sentence_id": 0,
+            "function_type": "declarative"
+        }
+
+        # Should raise the ServiceUnavailable error
+        with pytest.raises(ServiceUnavailable):
+            await writer.write_result(analysis_result)
 
 
 async def test_database_connection_error_read_analysis_ids(clear_test_db):
@@ -1598,15 +1604,21 @@ async def test_database_connection_error_read_analysis_ids(clear_test_db):
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
-    # Close the Neo4j connection to simulate connection failure
-    await Neo4jConnectionManager.close_driver()
+    # Mock the session.run method to raise a ServiceUnavailable error
+    from unittest.mock import AsyncMock, patch
 
-    # Try to read analysis IDs - should raise an exception
-    with pytest.raises(Exception):  # Should raise some kind of connection/database error
-        await writer.read_analysis_ids()
+    from neo4j.exceptions import ServiceUnavailable
 
-    # Restore connection for cleanup
-    # The connection will be automatically restored by the test fixture
+    mock_error = ServiceUnavailable("Database service unavailable")
+
+    with patch.object(Neo4jConnectionManager, 'get_session') as mock_get_session:
+        mock_session = AsyncMock()
+        mock_session.run.side_effect = mock_error
+        mock_get_session.return_value.__aenter__.return_value = mock_session
+
+        # Should raise the ServiceUnavailable error
+        with pytest.raises(ServiceUnavailable):
+            await writer.read_analysis_ids()
 
 
 async def test_invalid_cypher_query_handling(clear_test_db):
@@ -1799,38 +1811,20 @@ async def test_partial_write_failure_recovery(clear_test_db):
     await writer.initialize()
 
     # Mock the session to succeed for some operations but fail for others
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import patch
 
     from neo4j.exceptions import ClientError
 
-    call_count = 0
+    # Mock only the specific method that should fail
+    original_handle_dimension_list_link = writer._handle_dimension_list_link
 
-    def mock_run(query, *args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-
-        if call_count == 1:  # Sentence lookup succeeds
-            mock_result = AsyncMock()
-            mock_result.single.return_value = {"s": "mock_sentence"}
-            return mock_result
-        elif call_count == 2:  # Analysis merge succeeds
-            mock_result = AsyncMock()
-            mock_result.single.return_value = {"a": AsyncMock(id=123)}
-            return mock_result
-        elif "HAS_FUNCTION" in query:  # Function dimension succeeds
-            mock_result = AsyncMock()
-            return mock_result
-        elif "MENTIONS_KEYWORD" in query:  # Keyword dimension fails
+    async def mock_handle_dimension_list_link(session, *, relationship_type, **kwargs):
+        if relationship_type == "MENTIONS_KEYWORD":
             raise ClientError("Property constraint violation", "CLIENT_ERROR", "Invalid property")
-        else:  # Other operations succeed
-            mock_result = AsyncMock()
-            return mock_result
+        else:
+            return await original_handle_dimension_list_link(session, relationship_type=relationship_type, **kwargs)
 
-    with patch.object(Neo4jConnectionManager, 'get_session') as mock_get_session:
-        mock_session = AsyncMock()
-        mock_session.run.side_effect = mock_run
-        mock_get_session.return_value.__aenter__.return_value = mock_session
-
+    with patch.object(writer, '_handle_dimension_list_link', side_effect=mock_handle_dimension_list_link):
         analysis_result = {
             "sentence_id": 0,
             "function_type": "declarative",
@@ -2149,11 +2143,12 @@ async def test_project_partial_limit_overrides(clear_test_db):
     # Verify keyword limit is enforced but topics are unlimited
     async with await Neo4jConnectionManager.get_session() as session:
         result = await session.run("""
-            MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-            OPTIONAL MATCH (a)-[:MENTIONS_KEYWORD]->(k:Keyword)
-            OPTIONAL MATCH (a)-[:MENTIONS_TOPIC]->(t:Topic)
-            RETURN count(k) as keyword_count, count(t) as topic_count
-        """)
+            MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: 0})
+                  -[:HAS_ANALYSIS]->(a:Analysis)
+            RETURN
+                COUNT { (a)-[:MENTIONS_KEYWORD]->(:Keyword) } as keyword_count,
+                COUNT { (a)-[:MENTIONS_TOPIC]->(:Topic) } as topic_count
+        """, interview_id=interview_id)
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 2  # Custom limit enforced
@@ -2269,18 +2264,13 @@ async def test_project_limits_all_dimensions(clear_test_db):
         result = await session.run("""
             MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: 0})
                     -[:HAS_ANALYSIS]->(a:Analysis)
-            OPTIONAL MATCH (a)-[:HAS_FUNCTION]->(f:FunctionType)
-            OPTIONAL MATCH (a)-[:HAS_STRUCTURE]->(st:StructureType)
-            OPTIONAL MATCH (a)-[:HAS_PURPOSE]->(p:Purpose)
-            OPTIONAL MATCH (a)-[:MENTIONS_KEYWORD]->(k:Keyword)
-            OPTIONAL MATCH (a)-[:MENTIONS_TOPIC]->(t:Topic)
-            OPTIONAL MATCH (a)-[:MENTIONS_DOMAIN_KEYWORD]->(d:DomainKeyword)
-            RETURN count(f) as function_count,
-                    count(st) as structure_count,
-                    count(p) as purpose_count,
-                    count(k) as keyword_count,
-                    count(t) as topic_count,
-                    count(d) as domain_keyword_count
+            RETURN
+                COUNT { (a)-[:HAS_FUNCTION]->(:FunctionType) } as function_count,
+                COUNT { (a)-[:HAS_STRUCTURE]->(:StructureType) } as structure_count,
+                COUNT { (a)-[:HAS_PURPOSE]->(:Purpose) } as purpose_count,
+                COUNT { (a)-[:MENTIONS_KEYWORD]->(:Keyword) } as keyword_count,
+                COUNT { (a)-[:MENTIONS_TOPIC]->(:Topic) } as topic_count,
+                COUNT { (a)-[:MENTIONS_DOMAIN_KEYWORD]->(:DomainKeyword) } as domain_keyword_count
         """, interview_id=interview_id)
         record = await result.single()
         assert record is not None

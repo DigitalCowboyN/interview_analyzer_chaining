@@ -330,6 +330,14 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             )
             return
 
+        # Check cardinality limit - if it's 0, don't create any relationships
+        if cardinality_limit is not None and cardinality_limit == 0:
+            logger.debug(
+                f"Skipping link {relationship_type} from Analysis {analysis_node_id}: "
+                f"Cardinality limit is 0."
+            )
+            return
+
         # Create dimension node properties
         dim_props = {dimension_key: dimension_value}
         dim_props.update(props_on_create)  # Add extra props like level if needed
@@ -462,8 +470,13 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
 
         # 5. Add new relationships up to the available slot limit
         if values_to_add_set and slots_available > 0:
-            # Limit the list of values to add based on available slots
-            values_to_add_list = list(values_to_add_set)
+            # Preserve original order by filtering the original list and deduplicating
+            seen = set()
+            values_to_add_list = []
+            for value in dimension_values:
+                if value in values_to_add_set and value not in seen:
+                    values_to_add_list.append(value)
+                    seen.add(value)
             if slots_available != float("inf"):
                 values_to_add_list = values_to_add_list[
                     : int(slots_available)
@@ -479,7 +492,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
                     MATCH (a:Analysis) WHERE id(a) = $analysis_node_id
                     MERGE (d:{dimension_label} {{{dimension_key}: $new_value}})
                     ON CREATE SET d += $computed_props
-                    MERGE (a)-[r:{relationship_type} {{is_edited: false}}]->(d)
+                    CREATE (a)-[r:{relationship_type} {{is_edited: false}}]->(d)
                     """
 
                     await session.run(
