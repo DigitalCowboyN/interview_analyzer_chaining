@@ -110,6 +110,114 @@ def test_init_falls_back_to_global_config(sentence_analyzer, mock_global_config)
     # load_yaml assertion happens within the fixture now
 
 
+def test_init_missing_classification_key(caplog):
+    """Test initialization when classification key is missing from config."""
+    caplog.set_level(logging.ERROR)
+
+    config_missing_classification = {"domain_keywords": ["test"]}
+
+    with patch("src.agents.sentence_analyzer.load_yaml") as mock_load_yaml:
+        analyzer = SentenceAnalyzer(config_dict=config_missing_classification)
+
+        # Should not call load_yaml due to missing key
+        mock_load_yaml.assert_not_called()
+
+        # Should have empty prompts
+        assert analyzer.prompts == {}
+
+        # Should log error
+        assert "Failed to get prompt path from config" in caplog.text
+        assert "Using empty prompts" in caplog.text
+
+
+def test_init_missing_nested_keys(caplog):
+    """Test initialization when nested keys are missing from config."""
+    caplog.set_level(logging.ERROR)
+
+    config_missing_nested = {
+        "classification": {
+            "local": {}  # Missing prompt_files key
+        }
+    }
+
+    with patch("src.agents.sentence_analyzer.load_yaml") as mock_load_yaml:
+        analyzer = SentenceAnalyzer(config_dict=config_missing_nested)
+
+        # Should not call load_yaml due to missing nested key
+        mock_load_yaml.assert_not_called()
+
+        # Should have empty prompts
+        assert analyzer.prompts == {}
+
+        # Should log error
+        assert "Failed to get prompt path from config" in caplog.text
+
+
+def test_init_empty_prompt_path(caplog):
+    """Test initialization when prompt path is empty string."""
+    caplog.set_level(logging.ERROR)
+
+    config_empty_path = {
+        "classification": {
+            "local": {"prompt_files": {"no_context": ""}}  # Empty path
+        }
+    }
+
+    with patch("src.agents.sentence_analyzer.load_yaml") as mock_load_yaml:
+        analyzer = SentenceAnalyzer(config_dict=config_empty_path)
+
+        # Should not call load_yaml due to empty path
+        mock_load_yaml.assert_not_called()
+
+        # Should have empty prompts
+        assert analyzer.prompts == {}
+
+        # Should log error
+        assert "Failed to get prompt path from config" in caplog.text
+
+
+def test_init_file_not_found_error(caplog):
+    """Test initialization when prompt file is not found."""
+    caplog.set_level(logging.ERROR)
+
+    config_dict = {
+        "classification": {
+            "local": {"prompt_files": {"no_context": "nonexistent/prompts.yaml"}}
+        }
+    }
+
+    with patch("src.agents.sentence_analyzer.load_yaml", side_effect=FileNotFoundError()):
+        analyzer = SentenceAnalyzer(config_dict=config_dict)
+
+        # Should have empty prompts
+        assert analyzer.prompts == {}
+
+        # Should log error
+        assert "Prompt file not found at path" in caplog.text
+        assert "Using empty prompts" in caplog.text
+
+
+def test_init_general_exception(caplog):
+    """Test initialization when load_yaml raises a general exception."""
+    caplog.set_level(logging.ERROR)
+
+    config_dict = {
+        "classification": {
+            "local": {"prompt_files": {"no_context": "prompts.yaml"}}
+        }
+    }
+
+    with patch("src.agents.sentence_analyzer.load_yaml", side_effect=ValueError("YAML parsing error")):
+        analyzer = SentenceAnalyzer(config_dict=config_dict)
+
+        # Should have empty prompts
+        assert analyzer.prompts == {}
+
+        # Should log error with exception info
+        assert "Failed to load prompts yaml from prompts.yaml" in caplog.text
+        assert "YAML parsing error" in caplog.text
+
+
 # === Test classify_sentence ===
 
 
@@ -288,3 +396,213 @@ async def test_classify_sentence_validation_error(
     )
 
     assert mock_agent.call_model.await_count == 7
+
+
+# === Test validation error handling for each dimension ===
+
+
+@pytest.mark.asyncio
+async def test_classify_sentence_function_validation_error(
+    sentence_analyzer_with_dict, mock_contexts, caplog
+):
+    """Test validation error handling for function type dimension."""
+    caplog.set_level(logging.WARNING)
+    sentence = "Test sentence."
+    analyzer, mock_agent = sentence_analyzer_with_dict
+
+    mock_agent.call_model = AsyncMock()
+    mock_agent.call_model.side_effect = [
+        {"invalid": "data"},  # Invalid for function
+        {"structure_type": "simple"},
+        {"purpose": "inform"},
+        {"topic_level_1": "testing"},
+        {"topic_level_3": "unit testing"},
+        {"overall_keywords": ["test"]},
+        {"domain_keywords": ["keyword"]},
+    ]
+
+    with patch("src.agents.sentence_analyzer.metrics_tracker") as mock_metrics_tracker:
+        result = await analyzer.classify_sentence(sentence, mock_contexts)
+
+    assert result["function_type"] == ""  # Default value
+    assert "Validation failed for Function Type response" in caplog.text
+    mock_metrics_tracker.increment_errors.assert_called_with("validation_error_function_type")
+
+
+@pytest.mark.asyncio
+async def test_classify_sentence_structure_validation_error(
+    sentence_analyzer_with_dict, mock_contexts, caplog
+):
+    """Test validation error handling for structure type dimension."""
+    caplog.set_level(logging.WARNING)
+    sentence = "Test sentence."
+    analyzer, mock_agent = sentence_analyzer_with_dict
+
+    mock_agent.call_model = AsyncMock()
+    mock_agent.call_model.side_effect = [
+        {"function_type": "declarative"},
+        {"invalid": "data"},  # Invalid for structure
+        {"purpose": "inform"},
+        {"topic_level_1": "testing"},
+        {"topic_level_3": "unit testing"},
+        {"overall_keywords": ["test"]},
+        {"domain_keywords": ["keyword"]},
+    ]
+
+    with patch("src.agents.sentence_analyzer.metrics_tracker") as mock_metrics_tracker:
+        result = await analyzer.classify_sentence(sentence, mock_contexts)
+
+    assert result["structure_type"] == ""  # Default value
+    assert "Validation failed for Structure Type response" in caplog.text
+    mock_metrics_tracker.increment_errors.assert_called_with("validation_error_structure_type")
+
+
+@pytest.mark.asyncio
+async def test_classify_sentence_purpose_validation_error(
+    sentence_analyzer_with_dict, mock_contexts, caplog
+):
+    """Test validation error handling for purpose dimension."""
+    caplog.set_level(logging.WARNING)
+    sentence = "Test sentence."
+    analyzer, mock_agent = sentence_analyzer_with_dict
+
+    mock_agent.call_model = AsyncMock()
+    mock_agent.call_model.side_effect = [
+        {"function_type": "declarative"},
+        {"structure_type": "simple"},
+        {"invalid": "data"},  # Invalid for purpose
+        {"topic_level_1": "testing"},
+        {"topic_level_3": "unit testing"},
+        {"overall_keywords": ["test"]},
+        {"domain_keywords": ["keyword"]},
+    ]
+
+    with patch("src.agents.sentence_analyzer.metrics_tracker") as mock_metrics_tracker:
+        result = await analyzer.classify_sentence(sentence, mock_contexts)
+
+    assert result["purpose"] == ""  # Default value
+    assert "Validation failed for Purpose response" in caplog.text
+    mock_metrics_tracker.increment_errors.assert_called_with("validation_error_purpose")
+
+
+@pytest.mark.asyncio
+async def test_classify_sentence_topic_level_3_validation_error(
+    sentence_analyzer_with_dict, mock_contexts, caplog
+):
+    """Test validation error handling for topic level 3 dimension."""
+    caplog.set_level(logging.WARNING)
+    sentence = "Test sentence."
+    analyzer, mock_agent = sentence_analyzer_with_dict
+
+    mock_agent.call_model = AsyncMock()
+    mock_agent.call_model.side_effect = [
+        {"function_type": "declarative"},
+        {"structure_type": "simple"},
+        {"purpose": "inform"},
+        {"topic_level_1": "testing"},
+        {"invalid": "data"},  # Invalid for topic level 3
+        {"overall_keywords": ["test"]},
+        {"domain_keywords": ["keyword"]},
+    ]
+
+    with patch("src.agents.sentence_analyzer.metrics_tracker") as mock_metrics_tracker:
+        result = await analyzer.classify_sentence(sentence, mock_contexts)
+
+    assert result["topic_level_3"] == ""  # Default value
+    assert "Validation failed for Topic Level 3 response" in caplog.text
+    mock_metrics_tracker.increment_errors.assert_called_with("validation_error_topic_level_3")
+
+
+@pytest.mark.asyncio
+async def test_classify_sentence_multiple_validation_errors(
+    sentence_analyzer_with_dict, mock_contexts, caplog
+):
+    """Test handling of multiple validation errors in a single call."""
+    caplog.set_level(logging.WARNING)
+    sentence = "Test sentence."
+    analyzer, mock_agent = sentence_analyzer_with_dict
+
+    mock_agent.call_model = AsyncMock()
+    mock_agent.call_model.side_effect = [
+        {"invalid": "data"},  # Invalid for function
+        {"invalid": "data"},  # Invalid for structure
+        {"purpose": "inform"},
+        {"topic_level_1": "testing"},
+        {"topic_level_3": "unit testing"},
+        {"overall_keywords": ["test"]},  # Valid for overall keywords
+        {"domain_keywords": ["keyword"]},
+    ]
+
+    # Patch only the successful validations, let the others fail
+    with patch("src.agents.sentence_analyzer.SentencePurposeResponse", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.TopicLevel1Response", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.TopicLevel3Response", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.OverallKeywordsResponse", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.DomainKeywordsResponse", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.metrics_tracker") as mock_metrics_tracker:
+
+        result = await analyzer.classify_sentence(sentence, mock_contexts)
+
+    # Check default values for failed validations
+    assert result["function_type"] == ""
+    assert result["structure_type"] == ""
+
+    # Check successful validations
+    assert result["purpose"] == "inform"
+    assert result["topic_level_1"] == "testing"
+    assert result["topic_level_3"] == "unit testing"
+    assert result["overall_keywords"] == ["test"]
+    assert result["domain_keywords"] == ["keyword"]
+
+    # Check that function and structure errors were logged
+    assert "Validation failed for Function Type response" in caplog.text
+    assert "Validation failed for Structure Type response" in caplog.text
+
+    # Check that metrics were tracked for the errors
+    expected_calls = [
+        call("validation_error_function_type"),
+        call("validation_error_structure_type"),
+    ]
+    mock_metrics_tracker.increment_errors.assert_has_calls(expected_calls, any_order=True)
+
+
+@pytest.mark.asyncio
+async def test_classify_sentence_empty_domain_keywords(sentence_analyzer_with_dict, mock_contexts):
+    """Test classify_sentence with empty domain_keywords in config."""
+    sentence = "Test sentence."
+    analyzer, mock_agent = sentence_analyzer_with_dict
+
+    # Override config to have empty domain_keywords
+    analyzer.config = {
+        "classification": analyzer.config["classification"],
+        "domain_keywords": []  # Empty list
+    }
+
+    mock_agent.call_model = AsyncMock()
+    mock_agent.call_model.side_effect = [
+        {"function_type": "declarative"},
+        {"structure_type": "simple"},
+        {"purpose": "inform"},
+        {"topic_level_1": "testing"},
+        {"topic_level_3": "unit testing"},
+        {"overall_keywords": ["test"]},
+        {"domain_keywords": []},
+    ]
+
+    with patch("src.agents.sentence_analyzer.SentenceFunctionResponse", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.SentenceStructureResponse", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.SentencePurposeResponse", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.TopicLevel1Response", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.TopicLevel3Response", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.OverallKeywordsResponse", MockValidationModel), \
+         patch("src.agents.sentence_analyzer.DomainKeywordsResponse", MockValidationModel):
+
+        result = await analyzer.classify_sentence(sentence, mock_contexts)
+
+    # Check that domain_keywords prompt was called with empty string
+    expected_domain_prompt = analyzer.prompts["domain_specific_keywords"]["prompt"].format(
+        sentence=sentence, domain_keywords=""
+    )
+    mock_agent.call_model.assert_any_await(expected_domain_prompt)
+
+    assert result["domain_keywords"] == []
