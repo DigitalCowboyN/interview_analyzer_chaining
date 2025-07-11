@@ -3,14 +3,11 @@
 Defines Protocol interfaces for data source and sink abstractions in the pipeline.
 """
 
-# Note: Path might not be strictly necessary in protocols, 
+# Note: Path might not be strictly necessary in protocols,
 # identifiers could be strings (URIs, etc.)
-from pathlib import Path
 from typing import (
     Any,
-    AsyncIterable,
     Dict,
-    Iterable,
     List,
     Protocol,
     Set,
@@ -38,7 +35,7 @@ class SentenceAnalysisWriter(Protocol):
         """Initializes the writer (e.g., opens file, establishes connection)."""
         # This method is optional to implement if initialization is not needed
         # or handled elsewhere (e.g., __init__ or async context manager).
-        pass 
+        pass
 
     async def write_result(self, result: Dict[str, Any]) -> None:
         """Writes a single analysis result dictionary."""

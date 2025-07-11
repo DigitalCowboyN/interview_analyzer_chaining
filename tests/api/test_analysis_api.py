@@ -35,29 +35,31 @@ def mock_config_global():
     """Mocks the global config object."""
     # Mock config to provide necessary paths
     with patch("src.config.config", new_callable=dict) as mock_config:
-        mock_config.update({
-            "paths": {
-                "input_dir": MOCK_INPUT_DIR,
-                "output_dir": "/mock/output",
-                "templates_dir": "/mock/templates"
-            },
-            "analysis_service": {
-                "batch_size": 10,
-                "max_workers": 4,
-                "progress_interval": 10
-            },
-            "sentence_analyzer": {
-                "model_name": "mock_model",
-                "api_key": "mock_key"
-            },
-            "context_builder": {
-                "context_window": 5
+        mock_config.update(
+            {
+                "paths": {
+                    "input_dir": MOCK_INPUT_DIR,
+                    "output_dir": "/mock/output",
+                    "templates_dir": "/mock/templates",
+                },
+                "analysis_service": {
+                    "batch_size": 10,
+                    "max_workers": 4,
+                    "progress_interval": 10,
+                },
+                "sentence_analyzer": {
+                    "model_name": "mock_model",
+                    "api_key": "mock_key",
+                },
+                "context_builder": {"context_window": 5},
             }
-        })
+        )
         yield mock_config
 
 
-@pytest.mark.usefixtures("client", "mock_config_global")  # Ensure client and config mock are used
+@pytest.mark.usefixtures(
+    "client", "mock_config_global"
+)  # Ensure client and config mock are used
 def test_trigger_analysis_success(client: TestClient):
     """Test POST /analysis/ success path (202 Accepted)."""
     # --- Setup ---
@@ -67,11 +69,17 @@ def test_trigger_analysis_success(client: TestClient):
 
     # --- Patching ---
     # Patch dependencies directly within the test
-    with patch("src.pipeline.run_pipeline", new_callable=AsyncMock) as mock_run_pipeline, \
-         patch("src.api.routers.analysis.BackgroundTasks.add_task") as mock_add_task, \
-         patch("uuid.uuid4", return_value=mock_task_id), \
-         patch("pathlib.Path.is_file", return_value=True) as mock_is_file, \
-         patch("src.config.config", {"paths": {"input_dir": "/mock"}}) as mock_cfg:
+    with patch(
+        "src.pipeline.run_pipeline", new_callable=AsyncMock
+    ) as mock_run_pipeline, patch(
+        "src.api.routers.analysis.BackgroundTasks.add_task"
+    ) as mock_add_task, patch(
+        "uuid.uuid4", return_value=mock_task_id
+    ), patch(
+        "pathlib.Path.is_file", return_value=True
+    ) as mock_is_file, patch(
+        "src.config.config", {"paths": {"input_dir": "/mock"}}
+    ) as mock_cfg:
         # Provide a minimal config dict for the endpoint to read input_dir
 
         # --- Execute ---
@@ -82,7 +90,10 @@ def test_trigger_analysis_success(client: TestClient):
         assert response.status_code == status.HTTP_202_ACCEPTED
         response_data = response.json()
         assert response_data["task_id"] == mock_task_id
-        assert response_data["message"] == "Analysis task accepted and scheduled to run in background."
+        assert (
+            response_data["message"]
+            == "Analysis task accepted and scheduled to run in background."
+        )
 
         # 2. Background Task Scheduling
         mock_add_task.assert_called_once()
@@ -128,11 +139,17 @@ def test_trigger_analysis_pipeline_error_still_accepts(client: TestClient):
     pipeline_error = ValueError("Pipeline processing failed!")
 
     # --- Patching ---
-    with patch("src.pipeline.run_pipeline", new_callable=AsyncMock, side_effect=pipeline_error) as mock_run_pipeline, \
-         patch("src.api.routers.analysis.BackgroundTasks.add_task") as mock_add_task, \
-         patch("uuid.uuid4", return_value=mock_task_id), \
-         patch("pathlib.Path.is_file", return_value=True) as mock_is_file, \
-         patch("src.config.config", {"paths": {"input_dir": "/mock"}}) as mock_cfg:
+    with patch(
+        "src.pipeline.run_pipeline", new_callable=AsyncMock, side_effect=pipeline_error
+    ) as mock_run_pipeline, patch(
+        "src.api.routers.analysis.BackgroundTasks.add_task"
+    ) as mock_add_task, patch(
+        "uuid.uuid4", return_value=mock_task_id
+    ), patch(
+        "pathlib.Path.is_file", return_value=True
+    ) as mock_is_file, patch(
+        "src.config.config", {"paths": {"input_dir": "/mock"}}
+    ) as mock_cfg:
 
         # --- Execute ---
         response = client.post("/analysis/", json=request_data)
@@ -142,7 +159,10 @@ def test_trigger_analysis_pipeline_error_still_accepts(client: TestClient):
         assert response.status_code == status.HTTP_202_ACCEPTED
         response_data = response.json()
         assert response_data["task_id"] == mock_task_id
-        assert response_data["message"] == "Analysis task accepted and scheduled to run in background."
+        assert (
+            response_data["message"]
+            == "Analysis task accepted and scheduled to run in background."
+        )
 
         # 2. Background Task Scheduling (Should still be called)
         mock_add_task.assert_called_once()
@@ -169,10 +189,15 @@ def test_trigger_analysis_file_not_found_raises_404(client: TestClient):
     request_data = {"input_filename": filename}
 
     # --- Patching ---
-    with patch("src.pipeline.run_pipeline", new_callable=AsyncMock) as mock_run_pipeline, \
-         patch("src.api.routers.analysis.BackgroundTasks.add_task") as mock_add_task, \
-         patch("pathlib.Path.is_file", return_value=False) as mock_is_file, \
-         patch("src.config.config", {"paths": {"input_dir": "/mock"}}) as mock_cfg:
+    with patch(
+        "src.pipeline.run_pipeline", new_callable=AsyncMock
+    ) as mock_run_pipeline, patch(
+        "src.api.routers.analysis.BackgroundTasks.add_task"
+    ) as mock_add_task, patch(
+        "pathlib.Path.is_file", return_value=False
+    ) as mock_is_file, patch(
+        "src.config.config", {"paths": {"input_dir": "/mock"}}
+    ) as mock_cfg:
 
         # --- Execute ---
         response = client.post("/analysis/", json=request_data)
@@ -193,6 +218,7 @@ def test_trigger_analysis_file_not_found_raises_404(client: TestClient):
 
         # 4. Verify config was accessed for input directory
         assert mock_cfg["paths"]["input_dir"] == "/mock"
+
 
 # Potential future tests:
 # - Test validation of filename format (e.g., prevent path traversal)

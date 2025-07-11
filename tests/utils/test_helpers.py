@@ -38,7 +38,7 @@ def test_append_json_line_new_file(tmp_path):
 
     # Check file exists and content is correct
     assert output_file.exists()
-    lines = output_file.read_text(encoding='utf-8').strip().split('\n')
+    lines = output_file.read_text(encoding="utf-8").strip().split("\n")
     assert len(lines) == 1
     assert json.loads(lines[0]) == data_to_append
 
@@ -65,7 +65,7 @@ def test_append_json_line_existing_file(tmp_path):
 
     # Check file content
     assert output_file.exists()
-    lines = output_file.read_text(encoding='utf-8').strip().split('\n')
+    lines = output_file.read_text(encoding="utf-8").strip().split("\n")
     assert len(lines) == 2
     assert json.loads(lines[0]) == data1
     assert json.loads(lines[1]) == data2
@@ -87,7 +87,7 @@ def test_append_json_line_empty_dict(tmp_path):
     append_json_line(data_to_append, output_file)
 
     assert output_file.exists()
-    lines = output_file.read_text(encoding='utf-8').strip().split('\n')
+    lines = output_file.read_text(encoding="utf-8").strip().split("\n")
     assert len(lines) == 1
     assert json.loads(lines[0]) == data_to_append
 
@@ -106,13 +106,13 @@ def test_append_json_line_complex_dict(tmp_path):
     data_to_append = {
         "id": 10,
         "data": {"values": [1, 2, 3], "flag": True},
-        "timestamp": "2024-01-01T12:00:00Z"
+        "timestamp": "2024-01-01T12:00:00Z",
     }
 
     append_json_line(data_to_append, output_file)
 
     assert output_file.exists()
-    lines = output_file.read_text(encoding='utf-8').strip().split('\n')
+    lines = output_file.read_text(encoding="utf-8").strip().split("\n")
     assert len(lines) == 1
     assert json.loads(lines[0]) == data_to_append
 

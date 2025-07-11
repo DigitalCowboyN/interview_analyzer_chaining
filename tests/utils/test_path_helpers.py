@@ -36,7 +36,7 @@ def test_generate_pipeline_paths_success(tmp_path):
         map_dir=map_dir,
         output_dir=output_dir,
         map_suffix=map_suffix,
-        analysis_suffix=analysis_suffix
+        analysis_suffix=analysis_suffix,
     )
 
     # Assertions
@@ -69,7 +69,7 @@ def test_generate_pipeline_paths_different_suffixes(tmp_path):
         map_dir=map_dir,
         output_dir=output_dir,
         map_suffix=map_suffix,
-        analysis_suffix=analysis_suffix
+        analysis_suffix=analysis_suffix,
     )
 
     assert result_paths.map_file == expected_map_path
@@ -84,7 +84,7 @@ def test_generate_pipeline_paths_different_suffixes(tmp_path):
         # Path("no_suffix") # This actually has stem "no_suffix", name "no_suffix"
         # Path(".hiddenfile") # This has stem ".hiddenfile", name ".hiddenfile"
     ],
-    ids=["dot", "root"]
+    ids=["dot", "root"],
 )
 def test_generate_pipeline_paths_invalid_input_stem(tmp_path, invalid_input_path):
     """Tests that ValueError is raised for input paths without a valid stem."""
@@ -99,7 +99,7 @@ def test_generate_pipeline_paths_invalid_input_stem(tmp_path, invalid_input_path
             map_dir=map_dir,
             output_dir=output_dir,
             map_suffix=map_suffix,
-            analysis_suffix=analysis_suffix
+            analysis_suffix=analysis_suffix,
         )
 
 
@@ -123,7 +123,7 @@ def test_generate_pipeline_paths_with_task_id(tmp_path, caplog):
         output_dir=output_dir,
         map_suffix="_m.jsonl",
         analysis_suffix="_a.jsonl",
-        task_id=task_id
+        task_id=task_id,
     )
 
     assert f"[Task {task_id}]" in caplog.text

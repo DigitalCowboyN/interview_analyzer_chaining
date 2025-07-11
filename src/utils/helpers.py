@@ -6,10 +6,11 @@ saving data in JSON, YAML, and pandas DataFrame formats (CSV/Excel).
 """
 
 import json
-import yaml
-import pandas as pd
 from pathlib import Path
-from typing import Dict, Any, Union
+from typing import Any, Dict, Union
+
+import pandas as pd
+import yaml
 
 
 def save_json(data: Any, file_path: Union[str, Path], indent: int = 4):
@@ -62,10 +63,10 @@ def append_json_line(data: Dict[str, Any], file_path: Union[str, Path]):
     file_path = Path(file_path)
     # Ensure the output directory exists
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Convert the dictionary to a JSON string
     json_string = json.dumps(data, ensure_ascii=False)
-    
+
     # Append the JSON string followed by a newline
     with file_path.open("a", encoding="utf-8") as f:
         f.write(json_string + "\n")
@@ -105,7 +106,9 @@ def load_yaml(file_path: Union[str, Path]) -> dict:
         return yaml.safe_load(f)
 
 
-def save_dataframe(df: pd.DataFrame, file_path: Union[str, Path], file_type: str = "csv"):
+def save_dataframe(
+    df: pd.DataFrame, file_path: Union[str, Path], file_type: str = "csv"
+):
     """
     Save a pandas DataFrame to a CSV or Excel file.
 
@@ -114,7 +117,7 @@ def save_dataframe(df: pd.DataFrame, file_path: Union[str, Path], file_type: str
     Args:
         df (pd.DataFrame): The DataFrame to save.
         file_path (Union[str, Path]): The path for the output file.
-        file_type (str): The type of file to save ('csv' or 'excel'). 
+        file_type (str): The type of file to save ('csv' or 'excel').
                          Defaults to 'csv'.
 
     Raises:

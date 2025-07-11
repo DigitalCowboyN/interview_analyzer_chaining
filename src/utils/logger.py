@@ -25,8 +25,8 @@ Subsequent calls to `get_logger` return the same configured logger instance.
 
 import logging
 import sys
-import os # Keep os import
 from pathlib import Path
+
 from src.config import config
 
 # --- Configuration Constants ---
@@ -34,6 +34,7 @@ _logger_instance = None
 _DEFAULT_LOG_DIR = "./logs"
 _DEFAULT_LOG_FILENAME = "pipeline.log"
 _APP_LOGGER_NAME = "pipeline"
+
 
 def _setup_logger() -> logging.Logger:
     """
@@ -57,7 +58,7 @@ def _setup_logger() -> logging.Logger:
         return _logger_instance
 
     logger = logging.getLogger(_APP_LOGGER_NAME)
-    logger.setLevel(logging.DEBUG) # Set root level to lowest handler level
+    logger.setLevel(logging.DEBUG)  # Set root level to lowest handler level
 
     # Prevent adding handlers multiple times
     if logger.hasHandlers():
@@ -68,19 +69,18 @@ def _setup_logger() -> logging.Logger:
         "%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
     )
     console_formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)-8s | %(message)s",
-        datefmt="%H:%M:%S"
+        "%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%H:%M:%S"
     )
 
     # --- Stream Handler (Console) ---
     try:
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG) # Log DEBUG and above to console
+        console_handler.setLevel(logging.DEBUG)  # Log DEBUG and above to console
         console_handler.setFormatter(console_formatter)
         logger.addHandler(console_handler)
     except Exception as e:
         # Fallback basic logging if stream handler fails
-        logging.basicConfig(level=logging.WARNING) # Use basicConfig on the root logger
+        logging.basicConfig(level=logging.WARNING)  # Use basicConfig on the root logger
         logging.error(f"Failed to configure console logging: {e}", exc_info=True)
         # Continue to try setting up file handler
 
@@ -91,21 +91,26 @@ def _setup_logger() -> logging.Logger:
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file_path = log_dir / _DEFAULT_LOG_FILENAME
 
-        file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
-        file_handler.setLevel(logging.INFO) # Log INFO and above to file
+        file_handler = logging.FileHandler(log_file_path, encoding="utf-8")
+        file_handler.setLevel(logging.INFO)  # Log INFO and above to file
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
 
     except KeyError as e:
         # Log error using the already configured console handler (or basicConfig)
-        logger.error(f"Log directory path key missing in config: {e}. File logging disabled.")
+        logger.error(
+            f"Log directory path key missing in config: {e}. File logging disabled."
+        )
     except OSError as e:
-        logger.error(f"Failed to create log directory or file at '{log_dir_path_str}': {e}. File logging disabled.")
+        logger.error(
+            f"Failed to create log directory or file at '{log_dir_path_str}': {e}. File logging disabled."
+        )
     except Exception as e:
         logger.error(f"Unexpected error configuring file logging: {e}", exc_info=True)
 
     _logger_instance = logger
     return _logger_instance
+
 
 def get_logger() -> logging.Logger:
     """
@@ -119,6 +124,7 @@ def get_logger() -> logging.Logger:
         logging.Logger: The application's configured logger instance.
     """
     return _setup_logger()
+
 
 # Initialize logger on import (optional, ensures setup happens early)
 # get_logger()

@@ -7,6 +7,7 @@ It handles command-line arguments for input
 and output directories and initiates
 the pipeline processing.
 """
+
 import argparse
 import asyncio
 import json  # Import json for logging summary
@@ -30,7 +31,7 @@ logger = get_logger()
 app = FastAPI(
     title="Interview Analyzer API",
     description="API for analyzing interview transcripts.",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 # --- Include the routers ---
@@ -67,9 +68,7 @@ def main():
         Exception: If `run_pipeline` encounters a critical, unhandled error.
     """
     # Create an argument parser to handle command-line arguments
-    parser = argparse.ArgumentParser(
-        description="Enriched Sentence Analysis Pipeline"
-    )
+    parser = argparse.ArgumentParser(description="Enriched Sentence Analysis Pipeline")
     parser.add_argument(
         "--input_dir",
         type=Path,
@@ -116,12 +115,14 @@ def main():
     logger.info("Starting the Enriched Sentence Analysis Pipeline")
     try:
         # Pass the necessary arguments to run_pipeline
-        asyncio.run(run_pipeline(
-            input_dir=args.input_dir,
-            output_dir=args.output_dir,
-            map_dir=map_dir_to_use,  # Pass map directory
-            config_dict=config  # Pass the loaded config object
-        ))
+        asyncio.run(
+            run_pipeline(
+                input_dir=args.input_dir,
+                output_dir=args.output_dir,
+                map_dir=map_dir_to_use,  # Pass map directory
+                config_dict=config,  # Pass the loaded config object
+            )
+        )
         logger.info("Pipeline execution completed.")
     except Exception as e:
         logger.critical(f"Pipeline execution failed: {e}", exc_info=True)
@@ -130,9 +131,7 @@ def main():
         # Stop timer and log metrics summary
         metrics_tracker.stop_pipeline_timer()
         summary = metrics_tracker.get_summary()
-        logger.info(
-            f"Pipeline Execution Summary: {json.dumps(summary, indent=2)}"
-        )
+        logger.info(f"Pipeline Execution Summary: {json.dumps(summary, indent=2)}")
 
 
 if __name__ == "__main__":

@@ -73,10 +73,12 @@ async def test_openai_integration():
         "topic_level_1": "integration testing",
         "topic_level_3": "API evaluation",
         "overall_keywords": ["integration", "API"],
-        "domain_keywords": ["integration"]
+        "domain_keywords": ["integration"],
     }
     # Patch the create method on the agent's client using AsyncMock.
-    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
+    with patch.object(
+        agent.client.responses, "create", new_callable=AsyncMock
+    ) as mock_create:
         mock_create.return_value = mock_response(response_content)
         response = await agent.call_model("Integration test prompt")
 

@@ -10,7 +10,7 @@ string is marked.
 
 Usage:
     from src.agents.context_builder import context_builder
-    
+
     sentences = ["Sentence one.", "Sentence two.", "Sentence three."]
     # Get contexts for all sentences based on config settings
     all_contexts = context_builder.build_all_contexts(sentences)
@@ -19,8 +19,8 @@ Usage:
 
 """
 
-from typing import List, Dict, Any, Optional
-from src.config import config  # Project configuration settings.
+from typing import Any, Dict, List, Optional
+
 from src.utils.logger import get_logger  # Centralized logger for the project.
 
 # Initialize the logger.
@@ -40,10 +40,12 @@ class ContextBuilder:
         context_windows (dict): Dictionary mapping context type keys (str) to
                                 window sizes (int), loaded from configuration.
     """
+
     def __init__(self, config_dict: Optional[Dict[str, Any]] = None):
         """Initializes ContextBuilder by loading context window sizes from config."""
         # Use provided config_dict or fall back to global config
-        from src.config import config as global_config # Import locally
+        from src.config import config as global_config  # Import locally
+
         # Corrected logic: Use config_dict if it's not None, otherwise use global_config
         config_to_use = global_config if config_dict is None else config_dict
         self.config = config_to_use  # Store the config for later use
@@ -52,12 +54,20 @@ class ContextBuilder:
         try:
             # Access nested keys carefully using .get() to handle missing keys gracefully
             preprocessing_cfg = config_to_use.get("preprocessing", {})
-            self.context_windows = preprocessing_cfg.get("context_windows", {}) # Default to {} if key missing
+            self.context_windows = preprocessing_cfg.get(
+                "context_windows", {}
+            )  # Default to {} if key missing
             if not self.context_windows:
-                 logger.warning("Context windows are empty. Check config ['preprocessing']['context_windows'].")
-            logger.info(f"ContextBuilder initialized with windows: {self.context_windows}")
-        except Exception as e: # Catch potential issues like non-dict preprocessing_cfg
-            logger.error(f"Failed to load context_windows from config: {e}", exc_info=True)
+                logger.warning(
+                    "Context windows are empty. Check config ['preprocessing']['context_windows']."
+                )
+            logger.info(
+                f"ContextBuilder initialized with windows: {self.context_windows}"
+            )
+        except Exception as e:  # Catch potential issues like non-dict preprocessing_cfg
+            logger.error(
+                f"Failed to load context_windows from config: {e}", exc_info=True
+            )
             self.context_windows = {}
 
     def build_context(self, sentences: List[str], idx: int, window_size: int) -> str:
@@ -79,12 +89,14 @@ class ContextBuilder:
                  the input `sentences` list is empty or `idx` is out of bounds.
         """
         if not sentences or idx < 0 or idx >= len(sentences):
-            logger.warning(f"Attempted to build context with invalid input: len(sentences)={len(sentences)}, idx={idx}")
+            logger.warning(
+                f"Attempted to build context with invalid input: len(sentences)={len(sentences)}, idx={idx}"
+            )
             return ""
-            
+
         start = max(0, idx - window_size)
         end = min(len(sentences), idx + window_size + 1)
-        
+
         context_parts = []
         for i in range(start, end):
             sentence_text = sentences[i]
@@ -93,7 +105,7 @@ class ContextBuilder:
                 context_parts.append(f">>> TARGET: {sentence_text} <<<")
             else:
                 context_parts.append(sentence_text)
-                
+
         # Join the parts with actual newlines
         context = "\n".join(context_parts)
 
@@ -117,7 +129,10 @@ class ContextBuilder:
     #         np.array: The average embedding vector of the surrounding context sentences.
     #     """
     #     if not sentences or idx < 0 or idx >= len(sentences):
-    #         logger.warning(f"Attempted to build embedding context with invalid input: len(sentences)={len(sentences)}, idx={idx}. Returning zero vector.")
+    #         logger.warning(
+    #             f"Attempted to build embedding context with invalid input: "
+    #             f"len(sentences)={len(sentences)}, idx={idx}. Returning zero vector."
+    #         )
     #         return np.zeros(self.embedder.get_sentence_embedding_dimension())
     #
     #     start = max(0, idx - window_size)
@@ -125,9 +140,12 @@ class ContextBuilder:
     #
     #     # Explicitly exclude the target sentence for embedding calculation
     #     context_sentences_for_embedding = [sent for i, sent in enumerate(sentences[start:end]) if i + start != idx]
-    #     
+    #
     #     if not context_sentences_for_embedding:
-    #         logger.debug(f"No surrounding context sentences available for embedding (sentence {idx}), returning zero vector.")
+    #         logger.debug(
+    #             f"No surrounding context sentences available for embedding (sentence {idx}), "
+    #             f"returning zero vector."
+    #         )
     #         # Note: Previously warning, changed to debug as zero window size is valid use case
     #         return np.zeros(self.embedder.get_sentence_embedding_dimension())
     #
@@ -162,22 +180,26 @@ class ContextBuilder:
         if not sentences:
             logger.warning("build_all_contexts called with empty sentences list.")
             return {}
-            
+
         contexts = {}
         # Pre-calculate keys to avoid dictionary lookups inside the loop
         window_keys = list(self.context_windows.keys())
-        
+
         for idx, sentence in enumerate(sentences):
             sentence_contexts = {}
             for key in window_keys:
-                window_size = self.context_windows.get(key, 0) # Default to 0 if key missing
+                window_size = self.context_windows.get(
+                    key, 0
+                )  # Default to 0 if key missing
                 sentence_contexts[key] = self.build_context(sentences, idx, window_size)
             contexts[idx] = sentence_contexts
-            
+
         logger.info(f"Built all textual contexts for {len(sentences)} sentences.")
         return contexts
 
-    def build_sentence_context(self, sentences: List[str], index: int) -> Dict[str, str]:
+    def build_sentence_context(
+        self, sentences: List[str], index: int
+    ) -> Dict[str, str]:
         """
         Builds context for a specific sentence index using configured windows.
 

@@ -40,7 +40,7 @@ def sentences():
         "Sentence 1.",  # idx 1
         "Sentence 2 is the target.",  # idx 2
         "Sentence 3.",  # idx 3
-        "Sentence 4."  # idx 4
+        "Sentence 4.",  # idx 4
     ]
 
 

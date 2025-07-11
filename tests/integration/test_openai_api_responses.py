@@ -27,7 +27,9 @@ from openai import AsyncOpenAI
 # Make sure your OPENAI_API_KEY is set in the environment.
 API_KEY = os.environ.get("OPENAI_API_KEY")
 if not API_KEY:
-    raise ValueError("API key is not set. Please set the OPENAI_API_KEY environment variable.")
+    raise ValueError(
+        "API key is not set. Please set the OPENAI_API_KEY environment variable."
+    )
 
 client = AsyncOpenAI(api_key=API_KEY)
 
@@ -82,13 +84,13 @@ async def test_responses_create_structured_json():
             model="gpt-4o",
             instructions="You are a coding assistant. Return JSON with keys: capital, country.",
             input="What is the capital of France? Respond in JSON.",
-            text={"format": {"type": "json_object"}}
+            text={"format": {"type": "json_object"}},
         )
         # Check that there is output.
         assert response.output, "No output in response"
         first_output = response.output[0]
         # Access content with type assertion - the actual API returns this structure
-        content_items = getattr(first_output, 'content', None)
+        content_items = getattr(first_output, "content", None)
         assert content_items, "No content in first output item"
         output_message = content_items[0].text.strip()
         print("\nStructured JSON response:", output_message)
@@ -96,9 +98,12 @@ async def test_responses_create_structured_json():
         # Parse the JSON.
         parsed_json = json.loads(output_message)
         # Check that expected keys are present and "capital" is non-empty.
-        assert "capital" in parsed_json, "Expected key 'capital' not found in JSON response"
-        assert isinstance(parsed_json["capital"], str) and parsed_json["capital"].strip(), \
-            "The 'capital' value should be a non-empty string"
+        assert (
+            "capital" in parsed_json
+        ), "Expected key 'capital' not found in JSON response"
+        assert (
+            isinstance(parsed_json["capital"], str) and parsed_json["capital"].strip()
+        ), "The 'capital' value should be a non-empty string"
     except Exception as e:
         pytest.fail(f"An error occurred: {e}")
 
@@ -127,18 +132,20 @@ async def test_responses_create_malformed_json():
     mock_output.content = [mock_content]
     mock_resp.output = [mock_output]
 
-    with patch.object(client.responses, "create", new_callable=AsyncMock) as mock_create:
+    with patch.object(
+        client.responses, "create", new_callable=AsyncMock
+    ) as mock_create:
         mock_create.return_value = mock_resp
         with pytest.raises(json.JSONDecodeError):
             response = await client.responses.create(
                 model="gpt-4o",
                 instructions="Return JSON.",
                 input="Test malformed JSON response.",
-                text={"format": {"type": "json_object"}}
+                text={"format": {"type": "json_object"}},
             )
             # Attempt to parse the malformed response.
             first_output = response.output[0]
-            content_items = getattr(first_output, 'content', None)
+            content_items = getattr(first_output, "content", None)
             assert content_items, "No content in first output item"
             output_message = content_items[0].text.strip()
             json.loads(output_message)

@@ -40,6 +40,7 @@ def mock_response(content_dict):
                    `client.responses.create`.
     """
     from unittest.mock import MagicMock
+
     mock_resp = MagicMock()
     mock_output = MagicMock()
     mock_content = MagicMock()
@@ -108,7 +109,7 @@ async def test_prompt_attributes(mock_call_model, load_prompts):
         "topic_level_1": "topic_level_1",
         "topic_level_3": "topic_level_3",
         "topic_overall_keywords": "overall_keywords",
-        "domain_specific_keywords": "domain_keywords"
+        "domain_specific_keywords": "domain_keywords",
     }
 
     # Loop over each task prompt.
@@ -120,7 +121,7 @@ async def test_prompt_attributes(mock_call_model, load_prompts):
         formatted_prompt = prompt_config["prompt"].format(
             sentence=dummy_sentence,
             context=dummy_context,
-            domain_keywords=dummy_domain_keywords
+            domain_keywords=dummy_domain_keywords,
         )
         # Set the fake response to include the expected key with a known test value.
         fake_value = f"test_{expected_keys[prompt_key]}"
@@ -133,7 +134,7 @@ async def test_prompt_attributes(mock_call_model, load_prompts):
         assert response.get(expected_keys[prompt_key]) == fake_value
 
     # Test domain prompts: for each keyword in domain_prompts, simulate a prompt.
-    for keyword in domain_prompts['domain_keywords']:
+    for keyword in domain_prompts["domain_keywords"]:
         fake_response = {"domain_keywords": [keyword]}
         mock_call_model.return_value = fake_response
         response = await agent.call_model(f"Identify the keyword: {keyword}")

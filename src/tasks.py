@@ -15,7 +15,13 @@ logger = get_logger()
 
 
 @celery_app.task(bind=True)
-def run_pipeline_for_file(self, input_file_path_str: str, output_dir_str: str, map_dir_str: str, config_dict: dict):
+def run_pipeline_for_file(
+    self,
+    input_file_path_str: str,
+    output_dir_str: str,
+    map_dir_str: str,
+    config_dict: dict,
+):
     """
     Celery task to run the analysis pipeline for a single input file.
 
@@ -39,21 +45,29 @@ def run_pipeline_for_file(self, input_file_path_str: str, output_dir_str: str, m
         # --- Run Core Pipeline Logic ---
         logger.info(f"[Task {task_id}] Starting run_pipeline for {input_file}")
 
-        asyncio.run(run_pipeline(
-            input_dir=input_file.parent,  # Use the directory containing the file
-            output_dir=output_dir,
-            map_dir=map_dir,
-            specific_file=input_file.name,  # Pass the filename
-            config_dict=config_dict,
-            task_id=task_id
-        ))
+        asyncio.run(
+            run_pipeline(
+                input_dir=input_file.parent,  # Use the directory containing the file
+                output_dir=output_dir,
+                map_dir=map_dir,
+                specific_file=input_file.name,  # Pass the filename
+                config_dict=config_dict,
+                task_id=task_id,
+            )
+        )
 
         logger.info(f"[Task {task_id}] Successfully processed: {input_file_path_str}")
         return {"status": "Success", "file": input_file_path_str}
 
     except FileNotFoundError:
-        logger.error(f"[Task {task_id}] Input file not found during processing: {input_file_path_str}", exc_info=True)
+        logger.error(
+            f"[Task {task_id}] Input file not found during processing: {input_file_path_str}",
+            exc_info=True,
+        )
         raise
     except Exception as e:
-        logger.error(f"[Task {task_id}] Error processing file {input_file_path_str}: {e}", exc_info=True)
+        logger.error(
+            f"[Task {task_id}] Error processing file {input_file_path_str}: {e}",
+            exc_info=True,
+        )
         raise  # Re-raise the exception so Celery marks the task as FAILED

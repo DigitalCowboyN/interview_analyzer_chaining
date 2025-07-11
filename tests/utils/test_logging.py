@@ -57,6 +57,7 @@ def agent():
     """
     return OpenAIAgent()
 
+
 # Removed the Loguru-specific log_sink fixture
 
 
@@ -89,13 +90,19 @@ async def test_retry_log_message(agent, caplog):  # Use caplog fixture
         "topic_level_1": "retry test",
         "topic_level_3": "test",
         "overall_keywords": ["test"],
-        "domain_keywords": ["test"]
+        "domain_keywords": ["test"],
     }
-    error_response = RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
-    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
+    error_response = RateLimitError(
+        "Rate limit exceeded", response=MagicMock(), body=None
+    )
+    with patch.object(
+        agent.client.responses, "create", new_callable=AsyncMock
+    ) as mock_create:
         # First call raises an error, second call returns a valid response.
         mock_create.side_effect = [error_response, mock_response(response_content)]
         await agent.call_model("Test prompt")
 
     # Check that the captured log text contains "Retrying after"
-    assert "Retrying after" in caplog.text, "Expected retry log message not found in logs"
+    assert (
+        "Retrying after" in caplog.text
+    ), "Expected retry log message not found in logs"

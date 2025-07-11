@@ -54,7 +54,7 @@ class PipelineConfig(BaseModel):
         "HAS_PURPOSE": 1,
         "MENTIONS_KEYWORD": 6,
         "MENTIONS_TOPIC": None,  # Use None for unlimited
-        "MENTIONS_DOMAIN_KEYWORD": None
+        "MENTIONS_DOMAIN_KEYWORD": None,
     }
     # Optional: Add retry settings for pipeline steps if needed
 
@@ -113,7 +113,7 @@ class Config:
 
         config_dict = {}
         if config_path.exists():
-            with open(config_path, 'r') as stream:
+            with open(config_path, "r") as stream:
                 try:
                     config_dict = yaml.safe_load(stream)
                 except yaml.YAMLError as exc:
@@ -144,10 +144,10 @@ class Config:
 
         # Ensure 'logging' and 'api' are dictionaries,
         # defaulting if None or missing
-        if final_config.get('logging') is None:
-            final_config['logging'] = {}
-        if final_config.get('api') is None:
-            final_config['api'] = {}
+        if final_config.get("logging") is None:
+            final_config["logging"] = {}
+        if final_config.get("api") is None:
+            final_config["api"] = {}
 
         # Validate using Pydantic model
         try:

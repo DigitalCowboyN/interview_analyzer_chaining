@@ -1,6 +1,7 @@
 """
 Configuration and fixtures for integration tests.
 """
+
 import asyncio  # Import asyncio for await
 import os
 import socket  # Import socket module
@@ -19,7 +20,9 @@ TEST_NEO4J_PASS = "testpassword"
 
 
 # --- Helper Function ---
-def wait_for_port(host: str, port: int, timeout: float = 30.0, retry_interval: float = 1.0):
+def wait_for_port(
+    host: str, port: int, timeout: float = 30.0, retry_interval: float = 1.0
+):
     """Waits for a network port to become available on a host."""
     start_time = time.monotonic()
     while True:
@@ -35,10 +38,12 @@ def wait_for_port(host: str, port: int, timeout: float = 30.0, retry_interval: f
                     f"Port {port} on host {host} did not become available within {timeout} seconds."
                 ) from e
             time.sleep(retry_interval)
+
+
 # --- End Helper Function ---
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def manage_test_db():
     """
     Session-scoped fixture to start/stop the neo4j-test container.
@@ -59,7 +64,9 @@ def manage_test_db():
         try:
             logs_result = subprocess.run(
                 ["docker", "logs", "interview_analyzer_neo4j_test"],
-                capture_output=True, text=True, timeout=10
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             print("--- NEO4J LOGS ON PORT WAIT TIMEOUT ---")
             print(logs_result.stdout)
@@ -72,7 +79,9 @@ def manage_test_db():
     # Pre-initialize the driver using test env vars
     print("Pre-initializing Neo4j driver for tests...")
     try:
-        asyncio.run(Neo4jConnectionManager.get_driver())  # Use asyncio.run for top-level await
+        asyncio.run(
+            Neo4jConnectionManager.get_driver()
+        )  # Use asyncio.run for top-level await
         print("Neo4j driver pre-initialized successfully.")
     except Exception as e:
         print(f"ERROR: Failed to pre-initialize Neo4j driver: {e}")
@@ -88,11 +97,13 @@ def manage_test_db():
     except Exception as e:
         print(f"Warning: Error closing Neo4j driver during teardown: {e}")
 
-    subprocess.run(["make", "db-test-down"], check=True, capture_output=True, timeout=30)
+    subprocess.run(
+        ["make", "db-test-down"], check=True, capture_output=True, timeout=30
+    )
     print("neo4j-test container stopped.")
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 async def clear_test_db(manage_test_db, set_test_db_env_vars):
     """
     Async function-scoped fixture to clear the test database using the driver.
@@ -111,7 +122,9 @@ async def clear_test_db(manage_test_db, set_test_db_env_vars):
                 cleared_successfully = True
                 print("Database cleared successfully (verified count is 0).")
             else:
-                print(f"WARNING: Database clear verification failed. Count: {record['count'] if record else 'N/A'}")
+                print(
+                    f"WARNING: Database clear verification failed. Count: {record['count'] if record else 'N/A'}"
+                )
 
     except Exception as e:
         print(f"ERROR: Failed to clear neo4j-test database using driver: {e}")
@@ -124,7 +137,7 @@ async def clear_test_db(manage_test_db, set_test_db_env_vars):
     print("Finished test, DB will be cleared again on next run.")
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def test_db_manager() -> Neo4jConnectionManager:
     """
     Provides a Neo4jConnectionManager instance configured for the TEST database.
@@ -150,12 +163,13 @@ def test_db_manager() -> Neo4jConnectionManager:
     # TODO: Revisit lifecycle management if needed.
     return test_manager
 
+
 # Fixture to set environment variables for the test session
 # Use function scope because monkeypatch is function-scoped.
 # Use autouse=True to ensure it runs before each test.
 
 
-@pytest.fixture(scope='function', autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def set_test_db_env_vars(monkeypatch):
     """Sets environment variables for the test Neo4j database before each test function."""
     print("\nSetting test Neo4j env vars for function...")
@@ -183,6 +197,7 @@ def set_test_db_env_vars(monkeypatch):
     # No need to reload config object explicitly, as Neo4jConnectionManager now reads env vars.
     yield  # Let the function run
     print("\nTest function finished. Env vars automatically cleaned up by monkeypatch.")
+
 
 # Commented out original attempt
 # @pytest.fixture(scope='session', autouse=True)

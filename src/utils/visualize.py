@@ -6,11 +6,12 @@ high-dimensional embeddings using dimensionality reduction techniques like t-SNE
 """
 
 # src/utils/visualize.py
-import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
 from pathlib import Path
+from typing import List, Optional, Union
+
+import matplotlib.pyplot as plt
 import numpy as np
-from typing import Optional, List, Union
+from sklearn.manifold import TSNE
 
 
 def plot_embeddings(
@@ -32,19 +33,19 @@ def plot_embeddings(
 
     Args:
         embeddings (np.ndarray): A 2D numpy array where each row is an embedding vector.
-        labels (Optional[Union[np.ndarray, List]]): An optional array or list of labels 
-            corresponding to each embedding. If provided, points in the plot will be 
+        labels (Optional[Union[np.ndarray, List]]): An optional array or list of labels
+            corresponding to each embedding. If provided, points in the plot will be
             colored by label. Defaults to None.
-        output_file (Union[str, Path]): The path (including filename) where the plot 
+        output_file (Union[str, Path]): The path (including filename) where the plot
             image will be saved. Defaults to "embedding_plot.png".
         title (str): The title for the plot. Defaults to "Embeddings Visualization".
-        figsize (tuple): The figure size (width, height) in inches for the plot. 
+        figsize (tuple): The figure size (width, height) in inches for the plot.
                        Defaults to (12, 8).
-        perplexity (int): The perplexity parameter for t-SNE, related to the number 
+        perplexity (int): The perplexity parameter for t-SNE, related to the number
                           of nearest neighbors. Defaults to 30.
-        n_iter (int): The number of iterations for the t-SNE optimization. 
+        n_iter (int): The number of iterations for the t-SNE optimization.
                       Defaults to 1000.
-        random_state (int): The seed for the random number generator used by t-SNE 
+        random_state (int): The seed for the random number generator used by t-SNE
                             for reproducibility. Defaults to 42.
 
     Raises:
@@ -57,7 +58,7 @@ def plot_embeddings(
     tsne = TSNE(
         n_components=2,
         perplexity=perplexity,
-        n_iter=n_iter,
+        max_iter=n_iter,
         random_state=random_state,
         init="pca",
     )

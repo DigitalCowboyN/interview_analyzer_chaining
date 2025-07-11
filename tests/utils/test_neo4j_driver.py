@@ -19,7 +19,7 @@ def mock_neo4j_config_valid():
         "neo4j": {
             "uri": "bolt://mockneo4j:7687",
             "username": "mockuser",
-            "password": "mockpass"
+            "password": "mockpass",
         }
     }
 
@@ -34,7 +34,7 @@ def mock_neo4j_config_incomplete():
     return {
         "neo4j": {
             "uri": "bolt://mockneo4j:7687",
-            "username": "mockuser"
+            "username": "mockuser",
             # Missing password
         }
     }
@@ -54,21 +54,21 @@ async def reset_neo4j_manager():
 
 # --- Tests for get_driver ---
 
+
 @pytest.mark.asyncio
 async def test_get_driver_success_first_call(mock_neo4j_config_valid):
     """Test successful driver initialization on the first call."""
     mock_driver_instance = AsyncMock(spec=AsyncDriver)
 
-    with patch('src.utils.neo4j_driver.config', mock_neo4j_config_valid), \
-         patch('neo4j.AsyncGraphDatabase.driver', return_value=mock_driver_instance) as mock_neo4j_driver_call, \
-         patch('src.utils.neo4j_driver.logger') as mock_logger:
+    with patch("src.utils.neo4j_driver.config", mock_neo4j_config_valid), patch(
+        "neo4j.AsyncGraphDatabase.driver", return_value=mock_driver_instance
+    ) as mock_neo4j_driver_call, patch("src.utils.neo4j_driver.logger") as mock_logger:
 
         driver = await Neo4jConnectionManager.get_driver()
 
         assert driver is mock_driver_instance
         mock_neo4j_driver_call.assert_called_once_with(
-            mock_neo4j_config_valid['neo4j']['uri'],
-            auth=("mockuser", "mockpass")
+            mock_neo4j_config_valid["neo4j"]["uri"], auth=("mockuser", "mockpass")
         )
         mock_logger.info.assert_any_call("Initializing Neo4j Async Driver...")
         mock_logger.info.assert_any_call(
@@ -83,8 +83,9 @@ async def test_get_driver_success_subsequent_call(mock_neo4j_config_valid):
     """Test that subsequent calls return the existing driver instance."""
     mock_driver_instance = AsyncMock(spec=AsyncDriver)
 
-    with patch('src.utils.neo4j_driver.config', mock_neo4j_config_valid), \
-         patch('neo4j.AsyncGraphDatabase.driver', return_value=mock_driver_instance) as mock_neo4j_driver_call:
+    with patch("src.utils.neo4j_driver.config", mock_neo4j_config_valid), patch(
+        "neo4j.AsyncGraphDatabase.driver", return_value=mock_driver_instance
+    ) as mock_neo4j_driver_call:
 
         # First call
         driver1 = await Neo4jConnectionManager.get_driver()
@@ -100,12 +101,13 @@ async def test_get_driver_success_subsequent_call(mock_neo4j_config_valid):
 @pytest.mark.asyncio
 async def test_get_driver_missing_config(mock_neo4j_config_missing):
     """Test get_driver raises ValueError if neo4j config section is missing."""
-    with patch('src.utils.neo4j_driver.config', mock_neo4j_config_missing), \
-         patch('src.utils.neo4j_driver.logger') as mock_logger:
+    with patch("src.utils.neo4j_driver.config", mock_neo4j_config_missing), patch(
+        "src.utils.neo4j_driver.logger"
+    ) as mock_logger:
 
         with pytest.raises(
             ValueError,
-            match="Neo4j configuration not found in environment variables or global config."
+            match="Neo4j configuration not found in environment variables or global config.",
         ):
             await Neo4jConnectionManager.get_driver()
         assert Neo4jConnectionManager._driver is None
@@ -115,12 +117,12 @@ async def test_get_driver_missing_config(mock_neo4j_config_missing):
 @pytest.mark.asyncio
 async def test_get_driver_incomplete_config(mock_neo4j_config_incomplete):
     """Test get_driver raises ValueError if uri/user/pass is missing."""
-    with patch('src.utils.neo4j_driver.config', mock_neo4j_config_incomplete), \
-         patch('src.utils.neo4j_driver.logger') as mock_logger:
+    with patch("src.utils.neo4j_driver.config", mock_neo4j_config_incomplete), patch(
+        "src.utils.neo4j_driver.logger"
+    ) as mock_logger:
 
         with pytest.raises(
-            ValueError,
-            match="Neo4j URI, username, or password missing"
+            ValueError, match="Neo4j URI, username, or password missing"
         ):
             await Neo4jConnectionManager.get_driver()
         assert Neo4jConnectionManager._driver is None
@@ -131,9 +133,9 @@ async def test_get_driver_incomplete_config(mock_neo4j_config_incomplete):
 async def test_get_driver_init_exception(mock_neo4j_config_valid):
     """Test get_driver handles exceptions during driver initialization."""
     init_error = ConnectionError("Failed to connect to mock DB")
-    with patch('src.utils.neo4j_driver.config', mock_neo4j_config_valid), \
-         patch('neo4j.AsyncGraphDatabase.driver', side_effect=init_error) as mock_neo4j_driver_call, \
-         patch('src.utils.neo4j_driver.logger') as mock_logger:
+    with patch("src.utils.neo4j_driver.config", mock_neo4j_config_valid), patch(
+        "neo4j.AsyncGraphDatabase.driver", side_effect=init_error
+    ) as mock_neo4j_driver_call, patch("src.utils.neo4j_driver.logger") as mock_logger:
 
         with pytest.raises(ConnectionError, match="Failed to connect to mock DB"):
             await Neo4jConnectionManager.get_driver()
@@ -147,14 +149,15 @@ async def test_get_driver_init_exception(mock_neo4j_config_valid):
 
 # --- Tests for close_driver ---
 
+
 @pytest.mark.asyncio
 async def test_close_driver_success(mock_neo4j_config_valid):
     # Test closing an initialized driver.
     mock_driver_instance = AsyncMock(spec=AsyncDriver)
     mock_driver_instance.close = AsyncMock()  # Mock the close method
-    with patch('src.utils.neo4j_driver.config', mock_neo4j_config_valid), \
-         patch('neo4j.AsyncGraphDatabase.driver', return_value=mock_driver_instance), \
-         patch('src.utils.neo4j_driver.logger') as mock_logger:
+    with patch("src.utils.neo4j_driver.config", mock_neo4j_config_valid), patch(
+        "neo4j.AsyncGraphDatabase.driver", return_value=mock_driver_instance
+    ), patch("src.utils.neo4j_driver.logger") as mock_logger:
         # Initialize driver first
         await Neo4jConnectionManager.get_driver()
         assert Neo4jConnectionManager._driver is mock_driver_instance
@@ -169,7 +172,7 @@ async def test_close_driver_success(mock_neo4j_config_valid):
 @pytest.mark.asyncio
 async def test_close_driver_no_driver():
     # Test closing when the driver hasn't been initialized.
-    with patch('src.utils.neo4j_driver.logger') as mock_logger:
+    with patch("src.utils.neo4j_driver.logger") as mock_logger:
         # Ensure driver is None
         assert Neo4jConnectionManager._driver is None
         # Attempt to close
@@ -183,6 +186,7 @@ async def test_close_driver_no_driver():
 
 # --- Tests for get_session ---
 
+
 @pytest.mark.asyncio
 async def test_get_session_success(mock_neo4j_config_valid):
     """Test getting a session from an initialized driver."""
@@ -190,14 +194,17 @@ async def test_get_session_success(mock_neo4j_config_valid):
     mock_driver_instance = AsyncMock(spec=AsyncDriver)
     mock_driver_instance.session.return_value = mock_session
 
-    with patch('src.utils.neo4j_driver.config', mock_neo4j_config_valid), \
-         patch('neo4j.AsyncGraphDatabase.driver', return_value=mock_driver_instance):
+    with patch("src.utils.neo4j_driver.config", mock_neo4j_config_valid), patch(
+        "neo4j.AsyncGraphDatabase.driver", return_value=mock_driver_instance
+    ):
 
         # get_session implicitly calls get_driver
         session_context_manager = await Neo4jConnectionManager.get_session()
 
         assert session_context_manager is mock_session
-        mock_driver_instance.session.assert_called_once_with(database=None)  # Check default db
+        mock_driver_instance.session.assert_called_once_with(
+            database=None
+        )  # Check default db
 
 
 @pytest.mark.asyncio
@@ -207,10 +214,13 @@ async def test_get_session_with_database(mock_neo4j_config_valid):
     mock_driver_instance = AsyncMock(spec=AsyncDriver)
     mock_driver_instance.session.return_value = mock_session
 
-    with patch('src.utils.neo4j_driver.config', mock_neo4j_config_valid), \
-         patch('neo4j.AsyncGraphDatabase.driver', return_value=mock_driver_instance):
+    with patch("src.utils.neo4j_driver.config", mock_neo4j_config_valid), patch(
+        "neo4j.AsyncGraphDatabase.driver", return_value=mock_driver_instance
+    ):
 
-        session_context_manager = await Neo4jConnectionManager.get_session(database="customdb")
+        session_context_manager = await Neo4jConnectionManager.get_session(
+            database="customdb"
+        )
 
         assert session_context_manager is mock_session
         mock_driver_instance.session.assert_called_once_with(database="customdb")
@@ -219,12 +229,12 @@ async def test_get_session_with_database(mock_neo4j_config_valid):
 @pytest.mark.asyncio
 async def test_get_session_init_error(mock_neo4j_config_missing):
     # Test get_session propagates errors from get_driver.
-    with patch('src.utils.neo4j_driver.config', mock_neo4j_config_missing):
+    with patch("src.utils.neo4j_driver.config", mock_neo4j_config_missing):
         # Ensure driver is reset
         Neo4jConnectionManager._driver = None
 
         with pytest.raises(
             ValueError,
-            match="Neo4j configuration not found in environment variables or global config."
+            match="Neo4j configuration not found in environment variables or global config.",
         ):
             _ = await Neo4jConnectionManager.get_session()

@@ -48,13 +48,14 @@ async def test_local_text_data_source_read_file_not_found(tmp_path: Path):
 
 # --- Tests for LocalJsonlAnalysisWriter ---
 
+
 async def test_local_analysis_writer_write_and_finalize(tmp_path: Path) -> None:
     """Tests initializing, writing results, and finalizing the writer."""
     file_path = tmp_path / "output" / "analysis.jsonl"  # Test directory creation
     writer = LocalJsonlAnalysisWriter(file_path)
     results: List[Dict[str, Any]] = [
         {"sentence_id": 0, "text": "one", "score": 0.9},
-        {"sentence_id": 1, "text": "two", "score": 0.8}
+        {"sentence_id": 1, "text": "two", "score": 0.8},
     ]
 
     await writer.initialize()
@@ -90,7 +91,7 @@ async def test_local_analysis_writer_read_ids(tmp_path: Path) -> None:
         {"sentence_id": 2, "text": "two"},
         {"sentence_id": 5, "text": "five again"},  # Duplicate ID
         {"id_other": 9, "text": "no sentence id"},  # Missing ID
-        {"sentence_id": 0, "text": "zero"}
+        {"sentence_id": 0, "text": "zero"},
     ]
     expected_ids: Set[int] = {0, 2, 5}
 
@@ -121,7 +122,7 @@ async def test_local_map_storage_write_read_finalize(tmp_path: Path) -> None:
     entries: List[Dict[str, Any]] = [
         {"sentence_id": 0, "sequence_order": 0, "sentence": "Sentence zero."},
         {"sentence_id": 1, "sequence_order": 1, "sentence": "Sentence one."},
-        {"sentence_id": 2, "sequence_order": 2, "sentence": "Sentence two."}
+        {"sentence_id": 2, "sequence_order": 2, "sentence": "Sentence two."},
     ]
     expected_ids: Set[int] = {0, 1, 2}
 

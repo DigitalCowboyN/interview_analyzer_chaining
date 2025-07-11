@@ -24,6 +24,7 @@ class MetricsTracker:
         errors (int): Count of errors encountered during processing.
         custom_metrics (Dict[str, Dict[str, Any]]): Storage for arbitrary metrics categorized by scope.
     """
+
     def __init__(self):
         """Initializes the MetricsTracker by resetting all counters."""
         self.reset()
@@ -35,8 +36,12 @@ class MetricsTracker:
         self.pipeline_start_time: float | None = None
         self.pipeline_end_time: float | None = None
         self.errors: int = 0  # Basic error tracking
-        self.custom_metrics: Dict[str, Dict[str, Any]] = {}  # Initialize custom metrics storage
-        self.file_timers: Dict[str, float] = {}  # Track start times for individual files
+        self.custom_metrics: Dict[str, Dict[str, Any]] = (
+            {}
+        )  # Initialize custom metrics storage
+        self.file_timers: Dict[str, float] = (
+            {}
+        )  # Track start times for individual files
 
     def increment_api_calls(self, count: int = 1):
         """
@@ -140,6 +145,20 @@ class MetricsTracker:
         """Helper to increment files failed count."""
         self.increment_metric("pipeline", "files_failed", count)
 
+    def add_processing_time(self, sentence_id: str, processing_time: float):
+        """
+        Records the processing time for a specific sentence.
+
+        Args:
+            sentence_id (str): The identifier for the sentence.
+            processing_time (float): The processing time in seconds.
+        """
+        self.set_metric("sentences", f"processing_time_{sentence_id}", processing_time)
+
+    def increment_sentences_success(self, count: int = 1):
+        """Helper to increment successful sentences count."""
+        self.increment_metric("pipeline", "sentences_success", count)
+
     def get_summary(self) -> dict:
         """
         Returns a dictionary summarizing the tracked metrics, including custom ones.
@@ -158,7 +177,7 @@ class MetricsTracker:
             "total_tokens_used": self.total_tokens,
             "total_errors": self.errors,  # Overall error count
             "pipeline_duration_seconds": duration,
-            "custom_metrics": self.custom_metrics  # Include all custom metrics
+            "custom_metrics": self.custom_metrics,  # Include all custom metrics
         }
         return summary
 

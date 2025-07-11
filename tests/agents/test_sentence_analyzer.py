@@ -21,11 +21,7 @@ def mock_config_dict() -> dict:
     """Fixture for a config dictionary with nested structure."""
     return {
         "classification": {
-            "local": {
-                "prompt_files": {
-                    "no_context": "dict/prompts/no_context.yaml"
-                }
-            }
+            "local": {"prompt_files": {"no_context": "dict/prompts/no_context.yaml"}}
         },
         "domain_keywords": ["dict_keyword"],
         # Add other keys if SentenceAnalyzer uses them directly
@@ -39,11 +35,7 @@ def mock_global_config() -> MagicMock:
     # Mock attribute access as dictionary access
     cfg.get.side_effect = lambda key, default=None: {
         "classification": {
-            "local": {
-                "prompt_files": {
-                    "no_context": "global/prompts/no_context.yaml"
-                }
-            }
+            "local": {"prompt_files": {"no_context": "global/prompts/no_context.yaml"}}
         },
         "domain_keywords": ["global_keyword"],
     }.get(key, default)
@@ -61,7 +53,9 @@ def loaded_prompts() -> dict:
         "topic_level_1": {"prompt": "Topic1: {sentence}, Context: {context}"},
         "topic_level_3": {"prompt": "Topic3: {sentence}, Context: {context}"},
         "topic_overall_keywords": {"prompt": "Overall Kwds: Context: {context}"},
-        "domain_specific_keywords": {"prompt": "Domain Kwds: {sentence}, Keywords: {domain_keywords}"},
+        "domain_specific_keywords": {
+            "prompt": "Domain Kwds: {sentence}, Keywords: {domain_keywords}"
+        },
     }
 
 
@@ -69,9 +63,11 @@ def loaded_prompts() -> dict:
 def sentence_analyzer(mock_global_config, loaded_prompts):
     """Fixture providing SentenceAnalyzer and the mocked agent (using global config)."""
     # Patch global config, load_yaml, and agent used by SentenceAnalyzer
-    with patch("src.agents.sentence_analyzer.global_config", mock_global_config), \
-         patch("src.agents.sentence_analyzer.load_yaml", return_value=loaded_prompts) as mock_load_yaml, \
-         patch("src.agents.sentence_analyzer.agent") as mock_agent_module_level:  # Renamed mock
+    with patch("src.agents.sentence_analyzer.global_config", mock_global_config), patch(
+        "src.agents.sentence_analyzer.load_yaml", return_value=loaded_prompts
+    ) as mock_load_yaml, patch(
+        "src.agents.sentence_analyzer.agent"
+    ) as mock_agent_module_level:  # Renamed mock
 
         analyzer = SentenceAnalyzer()  # Initialize without dict
         mock_load_yaml.assert_called_once_with("global/prompts/no_context.yaml")
@@ -83,13 +79,17 @@ def sentence_analyzer(mock_global_config, loaded_prompts):
 def sentence_analyzer_with_dict(mock_config_dict, loaded_prompts):
     """Fixture providing SentenceAnalyzer and the mocked agent (using config_dict)."""
     # Patch load_yaml and agent used by SentenceAnalyzer
-    with patch("src.agents.sentence_analyzer.load_yaml", return_value=loaded_prompts) as mock_load_yaml, \
-         patch("src.agents.sentence_analyzer.agent") as mock_agent_module_level:  # Renamed mock
+    with patch(
+        "src.agents.sentence_analyzer.load_yaml", return_value=loaded_prompts
+    ) as mock_load_yaml, patch(
+        "src.agents.sentence_analyzer.agent"
+    ) as mock_agent_module_level:  # Renamed mock
 
         analyzer = SentenceAnalyzer(config_dict=mock_config_dict)
         mock_load_yaml.assert_called_once_with("dict/prompts/no_context.yaml")
         # Yield analyzer AND the mock agent created by the patch
         yield analyzer, mock_agent_module_level
+
 
 # === Test __init__ ===
 
@@ -108,6 +108,7 @@ def test_init_falls_back_to_global_config(sentence_analyzer, mock_global_config)
     # Check that the stored config is the global mock
     assert analyzer.config == mock_global_config
     # load_yaml assertion happens within the fixture now
+
 
 # === Test classify_sentence ===
 
@@ -134,22 +135,30 @@ async def test_classify_sentence_success(sentence_analyzer_with_dict, mock_conte
     mock_agent.call_model = AsyncMock()
     mock_agent.call_model.side_effect = [
         {"function_type": "declarative"},  # function_prompt
-        {"structure_type": "simple"},      # structure_prompt
-        {"purpose": "inform"},            # purpose_prompt
-        {"topic_level_1": "testing"},     # topic_lvl1_prompt
+        {"structure_type": "simple"},  # structure_prompt
+        {"purpose": "inform"},  # purpose_prompt
+        {"topic_level_1": "testing"},  # topic_lvl1_prompt
         {"topic_level_3": "unit testing"},  # topic_lvl3_prompt
         {"overall_keywords": ["test", "sentence"]},  # overall_keywords_prompt
         {"domain_keywords": ["dict_keyword"]},  # domain_prompt
     ]
 
     # Patch Pydantic models used for validation to bypass actual validation
-    with patch("src.agents.sentence_analyzer.SentenceFunctionResponse", MockValidationModel), \
-         patch("src.agents.sentence_analyzer.SentenceStructureResponse", MockValidationModel), \
-         patch("src.agents.sentence_analyzer.SentencePurposeResponse", MockValidationModel), \
-         patch("src.agents.sentence_analyzer.TopicLevel1Response", MockValidationModel), \
-         patch("src.agents.sentence_analyzer.TopicLevel3Response", MockValidationModel), \
-         patch("src.agents.sentence_analyzer.OverallKeywordsResponse", MockValidationModel), \
-         patch("src.agents.sentence_analyzer.DomainKeywordsResponse", MockValidationModel):
+    with patch(
+        "src.agents.sentence_analyzer.SentenceFunctionResponse", MockValidationModel
+    ), patch(
+        "src.agents.sentence_analyzer.SentenceStructureResponse", MockValidationModel
+    ), patch(
+        "src.agents.sentence_analyzer.SentencePurposeResponse", MockValidationModel
+    ), patch(
+        "src.agents.sentence_analyzer.TopicLevel1Response", MockValidationModel
+    ), patch(
+        "src.agents.sentence_analyzer.TopicLevel3Response", MockValidationModel
+    ), patch(
+        "src.agents.sentence_analyzer.OverallKeywordsResponse", MockValidationModel
+    ), patch(
+        "src.agents.sentence_analyzer.DomainKeywordsResponse", MockValidationModel
+    ):
 
         result = await analyzer.classify_sentence(sentence, mock_contexts)
 
@@ -172,23 +181,40 @@ async def test_classify_sentence_success(sentence_analyzer_with_dict, mock_conte
     expected_calls = [
         call(prompts["sentence_function_type"]["prompt"].format(sentence=sentence)),
         call(prompts["sentence_structure_type"]["prompt"].format(sentence=sentence)),
-        call(prompts["sentence_purpose"]["prompt"].format(
-            sentence=sentence, context=mock_contexts["observer_context"])),
-        call(prompts["topic_level_1"]["prompt"].format(
-            sentence=sentence, context=mock_contexts["immediate_context"])),
-        call(prompts["topic_level_3"]["prompt"].format(
-            sentence=sentence, context=mock_contexts["broader_context"])),
-        call(prompts["topic_overall_keywords"]["prompt"].format(
-            context=mock_contexts["observer_context"])),
-        call(prompts["domain_specific_keywords"]["prompt"].format(
-            sentence=sentence, domain_keywords=domain_keywords_str))
+        call(
+            prompts["sentence_purpose"]["prompt"].format(
+                sentence=sentence, context=mock_contexts["observer_context"]
+            )
+        ),
+        call(
+            prompts["topic_level_1"]["prompt"].format(
+                sentence=sentence, context=mock_contexts["immediate_context"]
+            )
+        ),
+        call(
+            prompts["topic_level_3"]["prompt"].format(
+                sentence=sentence, context=mock_contexts["broader_context"]
+            )
+        ),
+        call(
+            prompts["topic_overall_keywords"]["prompt"].format(
+                context=mock_contexts["observer_context"]
+            )
+        ),
+        call(
+            prompts["domain_specific_keywords"]["prompt"].format(
+                sentence=sentence, domain_keywords=domain_keywords_str
+            )
+        ),
     ]
     # Check that the mock was awaited with these specific calls (order might vary due to gather)
     mock_agent.call_model.assert_has_awaits(expected_calls, any_order=True)
 
 
 @pytest.mark.asyncio
-async def test_classify_sentence_api_error(sentence_analyzer_with_dict, mock_contexts, caplog):
+async def test_classify_sentence_api_error(
+    sentence_analyzer_with_dict, mock_contexts, caplog
+):
     """Test classify_sentence correctly handles and propagates API errors from agent.call_model."""
     caplog.set_level(logging.ERROR)  # Ensure ERROR logs are captured
     sentence = "Sentence triggering API error."
@@ -205,7 +231,10 @@ async def test_classify_sentence_api_error(sentence_analyzer_with_dict, mock_con
     # Assert that the error was logged
     assert len(caplog.records) == 1  # Should be exactly one error log
     assert caplog.records[0].levelname == "ERROR"
-    assert f"Error during concurrent API calls for sentence '{sentence[:50]}...'" in caplog.text
+    assert (
+        f"Error during concurrent API calls for sentence '{sentence[:50]}...'"
+        in caplog.text
+    )
     assert "Simulated API Error" in caplog.text
 
     # Verify that call_model was attempted (likely just once before gather raises)
@@ -213,7 +242,9 @@ async def test_classify_sentence_api_error(sentence_analyzer_with_dict, mock_con
 
 
 @pytest.mark.asyncio
-async def test_classify_sentence_validation_error(sentence_analyzer_with_dict, mock_contexts, caplog):
+async def test_classify_sentence_validation_error(
+    sentence_analyzer_with_dict, mock_contexts, caplog
+):
     """Test classify_sentence when Pydantic validation fails for one dimension."""
     # Set caplog level to capture WARNING messages
     caplog.set_level(logging.WARNING)
@@ -252,6 +283,8 @@ async def test_classify_sentence_validation_error(sentence_analyzer_with_dict, m
     assert "Validation failed for Topic Level 1 response" in caplog.text
 
     # Assert metrics tracker was called for the specific error
-    mock_metrics_tracker.increment_errors.assert_called_once_with('validation_error_topic_level_1')
+    mock_metrics_tracker.increment_errors.assert_called_once_with(
+        "validation_error_topic_level_1"
+    )
 
     assert mock_agent.call_model.await_count == 7

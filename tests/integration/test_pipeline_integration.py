@@ -17,6 +17,7 @@ repeatable and do not rely on external services.
 """
 
 import json
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -26,7 +27,7 @@ import pytest
 from src.config import config  # Use the actual config
 
 # Assuming main entry point or run_pipeline can be invoked
-from src.pipeline import run_pipeline  # Updated Import
+from src.pipeline import PipelineOrchestrator, run_pipeline  # Updated Import
 from src.utils.neo4j_driver import Neo4jConnectionManager  # Import for type hint
 
 # --- Fixtures ---
@@ -83,10 +84,7 @@ def setup_input_files(integration_dirs):
     file_empty = input_dir / "empty.txt"
     file_empty.write_text("")
 
-    return {
-        "file1": file1,
-        "empty": file_empty
-    }
+    return {"file1": file1, "empty": file_empty}
 
 
 @pytest.fixture(scope="function")
@@ -115,7 +113,7 @@ def load_jsonl(file_path: Path) -> list:
     if not file_path.exists():
         return []
     lines = []
-    with file_path.open('r', encoding='utf-8') as f:
+    with file_path.open("r", encoding="utf-8") as f:
         for line in f:
             if line.strip():
                 lines.append(json.loads(line))
@@ -126,19 +124,24 @@ def load_jsonl(file_path: Path) -> list:
 async def _assert_graph_state(
     db_manager: Neo4jConnectionManager,
     expected_result_success: Dict[str, Any],
-    expected_result_fail: Optional[Dict[str, Any]] = None
+    expected_result_fail: Optional[Dict[str, Any]] = None,
 ):
     """Asserts the state of the Neo4j graph based on expected results."""
     session_cm = await db_manager.get_session()
     async with session_cm as session:
-        filename_base = expected_result_success['filename']  # Get basename from result
-        sentence_id_success = expected_result_success['sentence_id']
-        text_success = expected_result_success['sentence']
+        filename_base = expected_result_success["filename"]  # Get basename from result
+        sentence_id_success = expected_result_success["sentence_id"]
+        text_success = expected_result_success["sentence"]
 
         # Check SourceFile
-        result_file = await session.run("MATCH (f:SourceFile {filename: $fname}) RETURN count(f)", fname=filename_base)
+        result_file = await session.run(
+            "MATCH (f:SourceFile {filename: $fname}) RETURN count(f)",
+            fname=filename_base,
+        )
         count_file = await result_file.single()
-        assert count_file and count_file[0] == 1, f"SourceFile node not created or duplicated for {filename_base}"
+        assert (
+            count_file and count_file[0] == 1
+        ), f"SourceFile node not created or duplicated for {filename_base}"
 
         # Check successful sentence node and relationships
         query_success = """\
@@ -150,17 +153,20 @@ async def _assert_graph_state(
         RETURN s IS NOT NULL as exists
         """
         result_success_node = await session.run(
-            query_success, fname=filename_base, sid=sentence_id_success, text=text_success
+            query_success,
+            fname=filename_base,
+            sid=sentence_id_success,
+            text=text_success,
         )
         record_success_node = await result_success_node.single()
-        assert record_success_node and record_success_node["exists"], (
-            f"Successful sentence node ({sentence_id_success}) with relationships not found for {filename_base}"
-        )
+        assert (
+            record_success_node and record_success_node["exists"]
+        ), f"Successful sentence node ({sentence_id_success}) with relationships not found for {filename_base}"
 
         # Check failed sentence node (if applicable)
         if expected_result_fail:
-            sentence_id_fail = expected_result_fail['sentence_id']
-            text_fail = expected_result_fail['sentence']
+            sentence_id_fail = expected_result_fail["sentence_id"]
+            text_fail = expected_result_fail["sentence"]
 
             # This block now asserts the *second successful* sentence in the success test case,
             # or the *failed* sentence node in the partial failure case.
@@ -179,12 +185,15 @@ async def _assert_graph_state(
             RETURN s IS NOT NULL as exists
             """
             result_second_node = await session.run(
-                query_second_sentence, fname=filename_base, sid=sentence_id_fail, text=text_fail
+                query_second_sentence,
+                fname=filename_base,
+                sid=sentence_id_fail,
+                text=text_fail,
             )
             record_second_node = await result_second_node.single()
-            assert record_second_node and record_second_node["exists"], (
-                f"Second sentence node ({sentence_id_fail}) *with* analysis relationships not found for {filename_base}"
-            )
+            assert (
+                record_second_node and record_second_node["exists"]
+            ), f"Second sentence node ({sentence_id_fail}) *with* analysis relationships not found for {filename_base}"
 
             # Check FOLLOWS relationship between success and second sentence
             query_follows = """\
@@ -193,7 +202,10 @@ async def _assert_graph_state(
             RETURN count(r) as count
             """
             result_follows = await session.run(
-                query_follows, fname=filename_base, sid1=sentence_id_success, sid2=sentence_id_fail
+                query_follows,
+                fname=filename_base,
+                sid1=sentence_id_success,
+                sid2=sentence_id_fail,
             )
             record_follows = await result_follows.single()
             assert record_follows and record_follows["count"] == 1, (
@@ -206,7 +218,9 @@ async def _assert_graph_state(
             MATCH (s1:Sentence {filename: $fname, sentence_id: $sid1})-[r:FOLLOWS]->()
             RETURN count(r) as count
             """
-            result_no_follows = await session.run(query_no_follows, fname=filename_base, sid1=sentence_id_success)
+            result_no_follows = await session.run(
+                query_no_follows, fname=filename_base, sid1=sentence_id_success
+            )
             record_no_follows = await result_no_follows.single()
             assert record_no_follows and record_no_follows["count"] == 0, (
                 f"Sentence {sentence_id_success} should not have an outgoing FOLLOWS relationship "
@@ -244,8 +258,9 @@ def generate_mock_analysis(sentence_id, sequence_order, sentence, filename):
         "topic_level_1": "mock_topic1",
         "topic_level_3": "mock_topic3",
         "overall_keywords": ["mock"],
-        "domain_keywords": ["mock"]
+        "domain_keywords": ["mock"],
     }
+
 
 # --- Integration Tests ---
 
@@ -266,8 +281,12 @@ def create_mock_metrics_tracker():
     mock_tracker = MagicMock()
     mock_tracker.increment_files_processed = MagicMock()
     mock_tracker.increment_files_failed = MagicMock()
-    mock_tracker.increment_sentences_processed = MagicMock()  # Method called by map creation
-    mock_tracker.increment_sentences_success = MagicMock()  # Method called by worker on success
+    mock_tracker.increment_sentences_processed = (
+        MagicMock()
+    )  # Method called by map creation
+    mock_tracker.increment_sentences_success = (
+        MagicMock()
+    )  # Method called by worker on success
     mock_tracker.increment_errors = MagicMock()  # Method called by worker on error
     mock_tracker.add_processing_time = MagicMock()  # Method called by worker on success
     mock_tracker.add_file_processing_time = MagicMock()
@@ -282,10 +301,7 @@ def create_mock_metrics_tracker():
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_pipeline_integration_empty_file(
-    integration_dirs,
-    setup_single_empty_file,
-    mock_pipeline_metrics,
-    clear_test_db
+    integration_dirs, setup_single_empty_file, mock_pipeline_metrics, clear_test_db
 ):
     """
     Test the pipeline correctly handles an empty input file using Local IO.
@@ -296,15 +312,21 @@ async def test_pipeline_integration_empty_file(
     - No errors are raised during processing.
     """
     input_dir, output_dir, map_dir = integration_dirs
-    input_files = setup_single_empty_file  # Use the fixture providing only the empty file
+    input_files = (
+        setup_single_empty_file  # Use the fixture providing only the empty file
+    )
     target_file = input_files["empty"]
     target_stem = target_file.stem
     task_id = "int-test-empty"  # Added Task ID
 
     # Patch the API call, AnalysisService, and logger
-    with patch("src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock) as mock_call_model, \
-         patch("src.pipeline.AnalysisService") as MockAnalysisService, \
-         patch("src.pipeline.logger") as mock_pipeline_logger:
+    with patch(
+        "src.agents.agent.OpenAIAgent.call_model", new_callable=AsyncMock
+    ) as mock_call_model, patch(
+        "src.pipeline.AnalysisService"
+    ) as MockAnalysisService, patch(
+        "src.pipeline.logger"
+    ) as mock_pipeline_logger:
 
         # Configure mocks (metrics mock comes from fixture)
         # mock_metrics_instance = create_mock_metrics_tracker()
@@ -317,12 +339,14 @@ async def test_pipeline_integration_empty_file(
             map_dir=map_dir,
             config_dict=config,  # Pass config as dict
             specific_file=target_file.name,  # Process only the specific empty file
-            task_id=task_id  # Added Task ID
+            task_id=task_id,  # Added Task ID
         )
 
         # Assertions
         map_file = map_dir / f"{target_stem}{config['paths']['map_suffix']}"
-        analysis_file = output_dir / f"{target_stem}{config['paths']['analysis_suffix']}"
+        analysis_file = (
+            output_dir / f"{target_stem}{config['paths']['analysis_suffix']}"
+        )
 
         # Check map file exists and is empty (created by LocalJsonlMapStorage.initialize/finalize)
         assert map_file.exists(), "Map file was not created for empty input"
@@ -330,7 +354,9 @@ async def test_pipeline_integration_empty_file(
         assert len(map_data) == 0, "Map file for empty input should be empty"
 
         # Analysis file SHOULD NOT be created
-        assert not analysis_file.exists(), "Analysis file SHOULD NOT be created for empty input"
+        assert (
+            not analysis_file.exists()
+        ), "Analysis file SHOULD NOT be created for empty input"
 
         # API should not have been called
         mock_call_model.assert_not_called()
@@ -352,10 +378,12 @@ async def test_pipeline_integration_empty_file(
         mock_pipeline_logger.info.assert_called()
         # Verify that the pipeline logged the start and completion of processing
         info_calls = [call.args[0] for call in mock_pipeline_logger.info.call_args_list]
-        assert any("Starting processing" in call for call in info_calls), "Pipeline should log processing start"
-        assert any("Finished processing empty file" in call for call in info_calls), (
-            "Pipeline should log empty file completion"
-        )
+        assert any(
+            "Starting processing" in call for call in info_calls
+        ), "Pipeline should log processing start"
+        assert any(
+            "Finished processing empty file" in call for call in info_calls
+        ), "Pipeline should log empty file completion"
 
 
 @pytest.mark.asyncio
@@ -365,7 +393,7 @@ async def test_pipeline_integration_success_rewritten(
     setup_input_files,
     mock_pipeline_metrics,
     clear_test_db,
-    test_db_manager: Neo4jConnectionManager  # Inject DB manager for verification
+    test_db_manager: Neo4jConnectionManager,  # Inject DB manager for verification
 ):
     """Test rewritten: Full pipeline success with mocked API calls using Local IO."""
     input_dir, output_dir, map_dir = integration_dirs
@@ -381,19 +409,23 @@ async def test_pipeline_integration_success_rewritten(
             "map_dir": str(map_dir),
             "map_suffix": "_map.jsonl",
             "analysis_suffix": "_analysis.jsonl",
-            "logs_dir": str(integration_dirs[0].parent / "logs")
+            "logs_dir": str(integration_dirs[0].parent / "logs"),
         },
         "pipeline": {"num_concurrent_files": 1},
-        "preprocessing": {"context_windows": {"immediate": 1, "broader": 3, "observer": 5}},
+        "preprocessing": {
+            "context_windows": {"immediate": 1, "broader": 3, "observer": 5}
+        },
         "classification": {"local": {"prompt_files": {"no_context": "dummy"}}},
-        "domain_keywords": []
+        "domain_keywords": [],
     }
 
     # --- Mock API Call Logic (applied to classify_sentence) ---
     sentence_alpha = "This is the first sentence."
     sentence_beta = "Followed by the second."
     filename_path = target_file  # Use the full Path object
-    filename_str = str(filename_path)  # Use the full path string for generation/assertion
+    filename_str = str(
+        filename_path
+    )  # Use the full path string for generation/assertion
 
     async def mock_classify_sentence(*args, **kwargs):
         sentence = args[0]
@@ -411,10 +443,13 @@ async def test_pipeline_integration_success_rewritten(
 
     # --- Patching ---
     # Patch the core dependency: sentence classification, AnalysisService, logger
-    with patch("src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence",
-               new_callable=AsyncMock, side_effect=mock_classify_sentence), \
-         patch("src.pipeline.AnalysisService") as MockAnalysisService, \
-         patch("src.pipeline.logger") as mock_pipeline_logger:
+    with patch(
+        "src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence",
+        new_callable=AsyncMock,
+        side_effect=mock_classify_sentence,
+    ), patch("src.pipeline.AnalysisService") as MockAnalysisService, patch(
+        "src.pipeline.logger"
+    ) as mock_pipeline_logger:
 
         # Configure mocks (metrics mock comes from fixture)
         # mock_metrics_instance = create_mock_metrics_tracker()
@@ -422,17 +457,22 @@ async def test_pipeline_integration_success_rewritten(
         # Configure the mock AnalysisService instance
         mock_analysis_service_instance = MockAnalysisService.return_value
         # Mock build_contexts (return value might not be critical for this test)
-        mock_analysis_service_instance.build_contexts = MagicMock(return_value=[
-            {'ctx': 'mock_ctx_alpha'},
-            {'ctx': 'mock_ctx_beta'}
-        ])
+        mock_analysis_service_instance.build_contexts = MagicMock(
+            return_value=[{"ctx": "mock_ctx_alpha"}, {"ctx": "mock_ctx_beta"}]
+        )
         # Mock analyze_sentences to return the expected structured results
         # Ensure filename uses the basename, matching what the orchestrator saves
         expected_results = [
-            generate_mock_analysis(0, 0, sentence_alpha, filename_path.name),  # Use BASENAME
-            generate_mock_analysis(1, 1, sentence_beta, filename_path.name)  # Use BASENAME
+            generate_mock_analysis(
+                0, 0, sentence_alpha, filename_path.name
+            ),  # Use BASENAME
+            generate_mock_analysis(
+                1, 1, sentence_beta, filename_path.name
+            ),  # Use BASENAME
         ]
-        mock_analysis_service_instance.analyze_sentences = AsyncMock(return_value=expected_results)
+        mock_analysis_service_instance.analyze_sentences = AsyncMock(
+            return_value=expected_results
+        )
 
         # --- Execute ---
         await run_pipeline(
@@ -441,36 +481,59 @@ async def test_pipeline_integration_success_rewritten(
             map_dir=map_dir,
             config_dict=mock_config_dict,  # Pass the test-specific config
             specific_file=filename_path.name,  # Pass basename here for discovery
-            task_id=task_id  # Added Task ID
+            task_id=task_id,  # Added Task ID
         )
 
         # --- Assertions ---
         map_file = map_dir / f"{target_stem}{mock_config_dict['paths']['map_suffix']}"
-        analysis_file = output_dir / f"{target_stem}{mock_config_dict['paths']['analysis_suffix']}"
+        analysis_file = (
+            output_dir / f"{target_stem}{mock_config_dict['paths']['analysis_suffix']}"
+        )
 
         # 1. Check map file content
         assert map_file.exists(), f"Map file was not created at {map_file}"
         map_data = load_jsonl(map_file)
         assert len(map_data) == 2
-        assert map_data[0] == {"sentence_id": 0, "sequence_order": 0, "sentence": sentence_alpha}
-        assert map_data[1] == {"sentence_id": 1, "sequence_order": 1, "sentence": sentence_beta}
+        assert map_data[0] == {
+            "sentence_id": 0,
+            "sequence_order": 0,
+            "sentence": sentence_alpha,
+        }
+        assert map_data[1] == {
+            "sentence_id": 1,
+            "sequence_order": 1,
+            "sentence": sentence_beta,
+        }
 
         # 2. Check analysis file content
-        assert analysis_file.exists(), f"Analysis file was not created at {analysis_file}"
+        assert (
+            analysis_file.exists()
+        ), f"Analysis file was not created at {analysis_file}"
         analysis_data = load_jsonl(analysis_file)
         assert len(analysis_data) == 2
 
         # Check data content (flexible order)
-        expected_result_0 = generate_mock_analysis(0, 0, sentence_alpha, filename_path.name)  # Use BASENAME
-        expected_result_1 = generate_mock_analysis(1, 1, sentence_beta, filename_path.name)  # Use BASENAME
+        expected_result_0 = generate_mock_analysis(
+            0, 0, sentence_alpha, filename_path.name
+        )  # Use BASENAME
+        expected_result_1 = generate_mock_analysis(
+            1, 1, sentence_beta, filename_path.name
+        )  # Use BASENAME
 
         # Helper function to make dict values hashable (convert lists to tuples)
         def make_hashable(d):
-            return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in d.items()))
+            return tuple(
+                sorted(
+                    (k, tuple(v) if isinstance(v, list) else v) for k, v in d.items()
+                )
+            )
 
         # Convert list of dicts to set of hashable tuples for order-independent comparison
         analysis_data_set = {make_hashable(d) for d in analysis_data}
-        expected_set = {make_hashable(expected_result_0), make_hashable(expected_result_1)}
+        expected_set = {
+            make_hashable(expected_result_0),
+            make_hashable(expected_result_1),
+        }
         assert analysis_data_set == expected_set
 
         # 3. Check mocked AnalysisService was called
@@ -481,10 +544,16 @@ async def test_pipeline_integration_success_rewritten(
         await _assert_graph_state(test_db_manager, expected_result_0, expected_result_1)
 
         # 5. Assert metrics via the fixture mock
-        mock_pipeline_metrics.start_file_timer.assert_called_once_with(filename_path.name)
-        mock_pipeline_metrics.stop_file_timer.assert_called_once_with(filename_path.name)
+        mock_pipeline_metrics.start_file_timer.assert_called_once_with(
+            filename_path.name
+        )
+        mock_pipeline_metrics.stop_file_timer.assert_called_once_with(
+            filename_path.name
+        )
         mock_pipeline_metrics.increment_files_processed.assert_called_once_with(1)
-        mock_pipeline_metrics.increment_results_processed.assert_called_with(filename_path.name)
+        mock_pipeline_metrics.increment_results_processed.assert_called_with(
+            filename_path.name
+        )
         assert mock_pipeline_metrics.increment_results_processed.call_count == 2
         mock_pipeline_metrics.increment_errors.assert_not_called()
         mock_pipeline_metrics.increment_files_failed.assert_not_called()
@@ -492,10 +561,12 @@ async def test_pipeline_integration_success_rewritten(
         # 6. Assert logging behavior
         mock_pipeline_logger.info.assert_called()
         info_calls = [call.args[0] for call in mock_pipeline_logger.info.call_args_list]
-        assert any("Starting processing" in call for call in info_calls), "Pipeline should log processing start"
-        assert any("Successfully finished processing" in call for call in info_calls), (
-            "Pipeline should log successful completion"
-        )
+        assert any(
+            "Starting processing" in call for call in info_calls
+        ), "Pipeline should log processing start"
+        assert any(
+            "Successfully finished processing" in call for call in info_calls
+        ), "Pipeline should log successful completion"
 
 
 @pytest.mark.asyncio
@@ -504,7 +575,7 @@ async def test_pipeline_integration_partial_failure_rewritten(
     integration_dirs,
     mock_pipeline_metrics,
     clear_test_db,
-    test_db_manager: Neo4jConnectionManager  # Inject DB manager
+    test_db_manager: Neo4jConnectionManager,  # Inject DB manager
 ):
     """Test rewritten: Pipeline handles partial failure (one sentence error) using Local IO."""
     input_dir, output_dir, map_dir = integration_dirs
@@ -512,7 +583,9 @@ async def test_pipeline_integration_partial_failure_rewritten(
     # --- Setup Input File ---
     input_file_name_base = "integ_partial.txt"
     input_file_path = input_dir / input_file_name_base  # Use full Path object
-    input_filename_str = str(input_file_path)  # Use full path string for generation/assertion
+    input_filename_str = str(
+        input_file_path
+    )  # Use full path string for generation/assertion
     sentence_ok = "This sentence is fine."
     sentence_fail = "This sentence will fail."
     input_file_path.write_text(f"{sentence_ok} {sentence_fail}")
@@ -526,12 +599,14 @@ async def test_pipeline_integration_partial_failure_rewritten(
             "map_dir": str(map_dir),
             "map_suffix": "_map.jsonl",
             "analysis_suffix": "_analysis.jsonl",
-            "logs_dir": str(integration_dirs[0].parent / "logs")
+            "logs_dir": str(integration_dirs[0].parent / "logs"),
         },
         "pipeline": {"num_concurrent_files": 1},
-        "preprocessing": {"context_windows": {"immediate": 1, "broader": 3, "observer": 5}},
+        "preprocessing": {
+            "context_windows": {"immediate": 1, "broader": 3, "observer": 5}
+        },
         "classification": {"local": {"prompt_files": {"no_context": "dummy"}}},
-        "domain_keywords": []
+        "domain_keywords": [],
     }
 
     # --- Mock classify_sentence Logic ---
@@ -551,10 +626,13 @@ async def test_pipeline_integration_partial_failure_rewritten(
 
     # --- Patching ---
     # Patch dependencies: classify, loggers. Let AnalysisService run.
-    with patch("src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence",
-               new_callable=AsyncMock, side_effect=mock_classify_fail_one), \
-         patch("src.pipeline.logger") as mock_pipeline_logger, \
-         patch("src.services.analysis_service.logger") as mock_service_logger:
+    with patch(
+        "src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence",
+        new_callable=AsyncMock,
+        side_effect=mock_classify_fail_one,
+    ), patch("src.pipeline.logger") as mock_pipeline_logger, patch(
+        "src.services.analysis_service.logger"
+    ) as mock_service_logger:
 
         # --- Execute ---
         await run_pipeline(
@@ -563,12 +641,17 @@ async def test_pipeline_integration_partial_failure_rewritten(
             map_dir=map_dir,
             config_dict=mock_config_dict,
             specific_file=input_file_name_base,  # Pass basename for discovery
-            task_id=task_id  # Added Task ID
+            task_id=task_id,  # Added Task ID
         )
 
         # --- Assertions ---
-        map_file = map_dir / f"{input_file_stem}{mock_config_dict['paths']['map_suffix']}"
-        analysis_file = output_dir / f"{input_file_stem}{mock_config_dict['paths']['analysis_suffix']}"
+        map_file = (
+            map_dir / f"{input_file_stem}{mock_config_dict['paths']['map_suffix']}"
+        )
+        analysis_file = (
+            output_dir
+            / f"{input_file_stem}{mock_config_dict['paths']['analysis_suffix']}"
+        )
 
         # 1. Check map file content
         assert map_file.exists(), f"Map file was not created at {map_file}"
@@ -578,34 +661,52 @@ async def test_pipeline_integration_partial_failure_rewritten(
         assert map_data[1]["sentence"] == sentence_fail
 
         # 2. Check analysis file content
-        assert analysis_file.exists(), f"Analysis file was not created at {analysis_file}"
+        assert (
+            analysis_file.exists()
+        ), f"Analysis file was not created at {analysis_file}"
         analysis_data = load_jsonl(analysis_file)
         assert len(analysis_data) == 1
 
         # Check data content
-        expected_result_ok = generate_mock_analysis(0, 0, sentence_ok, input_file_path.name)  # Use BASENAME
+        expected_result_ok = generate_mock_analysis(
+            0, 0, sentence_ok, input_file_path.name
+        )  # Use BASENAME
 
         # ADDED Definition for make_hashable
         def make_hashable(d):
-            return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in d.items()))
+            return tuple(
+                sorted(
+                    (k, tuple(v) if isinstance(v, list) else v) for k, v in d.items()
+                )
+            )
 
         # Convert list of dicts to set of hashable tuples for order-independent comparison
         analysis_data_set = {make_hashable(d) for d in analysis_data}
         expected_set = {make_hashable(expected_result_ok)}  # Only expect the OK one
-        assert analysis_data_set == expected_set, "Analysis file content mismatch for successful sentence"
+        assert (
+            analysis_data_set == expected_set
+        ), "Analysis file content mismatch for successful sentence"
 
         # 3. Check mocked AnalysisService was called
         # Note: We can't check mock_classify directly since we removed the variable assignment
         # The test verifies the end result through file content and graph state
 
         # 4. Check graph database state (only successful sentence should be there)
-        await _assert_graph_state(test_db_manager, expected_result_ok, None)  # Pass None for expected_result_fail
+        await _assert_graph_state(
+            test_db_manager, expected_result_ok, None
+        )  # Pass None for expected_result_fail
 
         # 5. Assert metrics via the fixture mock
-        mock_pipeline_metrics.start_file_timer.assert_called_once_with(input_file_path.name)
-        mock_pipeline_metrics.stop_file_timer.assert_called_once_with(input_file_path.name)
+        mock_pipeline_metrics.start_file_timer.assert_called_once_with(
+            input_file_path.name
+        )
+        mock_pipeline_metrics.stop_file_timer.assert_called_once_with(
+            input_file_path.name
+        )
         mock_pipeline_metrics.increment_files_processed.assert_called_once_with(1)
-        mock_pipeline_metrics.increment_results_processed.assert_called_once_with(input_file_path.name)
+        mock_pipeline_metrics.increment_results_processed.assert_called_once_with(
+            input_file_path.name
+        )
         # Error should be logged by AnalysisService now, not during saving by orchestrator
         # mock_pipeline_metrics.increment_errors.assert_called_with(f"{input_file_path.name}_result_save_failure")
         # Check if *any* error was incremented (likely by AnalysisService)
@@ -624,7 +725,10 @@ async def test_pipeline_integration_partial_failure_rewritten(
             # Make the check more robust to match the actual log format
             log_msg = call.args[0]
             # Use hardcoded ID 1 for the expected failed sentence
-            if "failed analyzing sentence_id 1" in log_msg and "Simulated classify error" in log_msg:
+            if (
+                "failed analyzing sentence_id 1" in log_msg
+                and "Simulated classify error" in log_msg
+            ):
                 error_logged = True
                 break
         assert error_logged, (
@@ -635,9 +739,219 @@ async def test_pipeline_integration_partial_failure_rewritten(
         # 7. Assert pipeline logging behavior
         mock_pipeline_logger.info.assert_called()
         info_calls = [call.args[0] for call in mock_pipeline_logger.info.call_args_list]
-        assert any("Starting processing" in call for call in info_calls), "Pipeline should log processing start"
-        assert any("Successfully finished processing" in call for call in info_calls), (
-            "Pipeline should log successful completion even with partial failures"
+        assert any(
+            "Starting processing" in call for call in info_calls
+        ), "Pipeline should log processing start"
+        assert any(
+            "Successfully finished processing" in call for call in info_calls
+        ), "Pipeline should log successful completion even with partial failures"
+
+
+# --- NEW TEST: Pipeline with Real Neo4j Analysis Writer ---
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_pipeline_integration_with_real_neo4j_writer(
+    integration_dirs,
+    mock_pipeline_metrics,
+    clear_test_db,
+    test_db_manager: Neo4jConnectionManager,
+):
+    """
+    Test pipeline integration using real Neo4jAnalysisWriter instead of mocked AnalysisService.
+
+    This test demonstrates how the pipeline can optionally use real Neo4j storage
+    instead of always mocking the analysis service.
+    """
+    input_dir, output_dir, map_dir = integration_dirs
+
+    # Create test input file
+    input_file_name = "test_neo4j_integration.txt"
+    input_file_path = input_dir / input_file_name
+    sentence_alpha = "This is the first sentence."
+    sentence_beta = "Followed by the second."
+    input_file_path.write_text(f"{sentence_alpha} {sentence_beta}")
+
+    # Generate unique project and interview IDs
+    project_id = str(uuid.uuid4())
+    interview_id = str(uuid.uuid4())
+
+    # Mock Config for Neo4j integration
+    mock_config_dict = {
+        "paths": {
+            "output_dir": str(output_dir),
+            "map_dir": str(map_dir),
+            "map_suffix": "_map.jsonl",
+            "analysis_suffix": "_analysis.jsonl",
+            "logs_dir": str(integration_dirs[0].parent / "logs"),
+        },
+        "pipeline": {
+            "num_concurrent_files": 1,
+            "default_cardinality_limits": {
+                "HAS_FUNCTION": 1,
+                "HAS_STRUCTURE": 1,
+                "HAS_PURPOSE": 1,
+                "MENTIONS_KEYWORD": 6,
+                "MENTIONS_TOPIC": None,
+                "MENTIONS_DOMAIN_KEYWORD": None,
+            }
+        },
+        "preprocessing": {
+            "context_windows": {"immediate": 1, "broader": 3, "observer": 5}
+        },
+        "classification": {"local": {"prompt_files": {"no_context": "dummy"}}},
+        "domain_keywords": [],
+    }
+
+    # Create a custom orchestrator that uses Neo4j storage
+    class Neo4jIntegrationOrchestrator(PipelineOrchestrator):
+        def __init__(self, *args, **kwargs):
+            self.project_id = project_id
+            self.interview_id = interview_id
+            super().__init__(*args, **kwargs)
+
+        def _setup_file_io(self, file_path: Path):
+            """Override to use Neo4j storage instead of local storage."""
+            from src.io.local_storage import LocalTextDataSource
+            from src.io.neo4j_analysis_writer import Neo4jAnalysisWriter
+            from src.io.neo4j_map_storage import Neo4jMapStorage
+            from src.utils.path_helpers import generate_pipeline_paths
+
+            # Generate paths (still needed for some operations)
+            paths = generate_pipeline_paths(
+                input_file=file_path,
+                map_dir=self.map_dir_path,
+                output_dir=self.output_dir_path,
+                map_suffix=self.map_suffix,
+                analysis_suffix=self.analysis_suffix,
+                task_id=self.task_id,
+            )
+
+            # Use local data source but Neo4j storage for map and analysis
+            data_source = LocalTextDataSource(file_path)
+            map_storage = Neo4jMapStorage(self.project_id, self.interview_id)
+            analysis_writer = Neo4jAnalysisWriter(self.project_id, self.interview_id)
+
+            return data_source, map_storage, analysis_writer, paths
+
+    # Mock the sentence analysis to return predictable results
+    async def mock_classify_sentence(*args, **kwargs):
+        sentence = args[0]
+        if sentence == sentence_alpha:
+            return {
+                "function_type": "statement",
+                "structure_type": "simple",
+                "purpose": "information",
+                "topics": ["communication"],
+                "keywords": ["first", "sentence"],
+                "domain_keywords": ["text"]
+            }
+        elif sentence == sentence_beta:
+            return {
+                "function_type": "statement",
+                "structure_type": "simple",
+                "purpose": "continuation",
+                "topics": ["sequence"],
+                "keywords": ["second", "followed"],
+                "domain_keywords": ["text"]
+            }
+        else:
+            return {
+                "function_type": "unknown",
+                "structure_type": "unknown",
+                "purpose": "unknown",
+                "topics": [],
+                "keywords": [],
+                "domain_keywords": []
+            }
+
+    # Execute pipeline with real Neo4j storage
+    with patch(
+        "src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence",
+        new_callable=AsyncMock,
+        side_effect=mock_classify_sentence,
+    ), patch("src.pipeline.logger"):
+
+        # Create and run the custom orchestrator
+        orchestrator = Neo4jIntegrationOrchestrator(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            map_dir=map_dir,
+            config_dict=mock_config_dict,
+            task_id="test-neo4j-integration"
         )
 
-# ... (Rest of integration tests) ...
+        await orchestrator.execute(specific_file=input_file_name)
+
+    # Verify results in Neo4j database
+    async with await Neo4jConnectionManager.get_session() as session:
+        # Check that project and interview exist
+        project_result = await session.run(
+            "MATCH (p:Project {project_id: $project_id}) RETURN p",
+            project_id=project_id
+        )
+        project_record = await project_result.single()
+        assert project_record is not None, "Project should exist in Neo4j"
+
+        interview_result = await session.run(
+            "MATCH (i:Interview {interview_id: $interview_id}) RETURN i",
+            interview_id=interview_id
+        )
+        interview_record = await interview_result.single()
+        assert interview_record is not None, "Interview should exist in Neo4j"
+
+        # Check that sentences were stored with analysis
+        analysis_result = await session.run(
+            """
+            MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
+            MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
+            RETURN s.sentence_id as sentence_id, s.text as text,
+                   count(a) as analysis_count
+            ORDER BY s.sentence_id
+            """,
+            interview_id=interview_id
+        )
+
+        sentences = []
+        async for record in analysis_result:
+            sentences.append({
+                "sentence_id": record["sentence_id"],
+                "text": record["text"],
+                "analysis_count": record["analysis_count"]
+            })
+
+        assert len(sentences) == 2, "Should have 2 sentences with analysis"
+        assert sentences[0]["text"] == sentence_alpha
+        assert sentences[1]["text"] == sentence_beta
+        assert sentences[0]["analysis_count"] == 1
+        assert sentences[1]["analysis_count"] == 1
+
+        # Check that dimension relationships were created
+        dimensions_result = await session.run(
+            """
+            MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
+            MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
+            OPTIONAL MATCH (a)-[:HAS_FUNCTION]->(f:FunctionType)
+            OPTIONAL MATCH (a)-[:MENTIONS_KEYWORD]->(k:Keyword)
+            OPTIONAL MATCH (a)-[:MENTIONS_TOPIC]->(t:Topic)
+            RETURN count(DISTINCT f) as function_count,
+                   count(DISTINCT k) as keyword_count,
+                   count(DISTINCT t) as topic_count
+            """,
+            interview_id=interview_id
+        )
+
+        dimensions_record = await dimensions_result.single()
+        assert dimensions_record is not None
+
+        # Should have function types for both sentences
+        assert dimensions_record["function_count"] >= 1, "Should have function relationships"
+        # Should have keywords from both sentences
+        assert dimensions_record["keyword_count"] >= 2, "Should have keyword relationships"
+        # Should have topics from both sentences
+        assert dimensions_record["topic_count"] >= 2, "Should have topic relationships"
+
+    # Verify metrics were tracked
+    mock_pipeline_metrics.start_file_timer.assert_called_once_with(input_file_name)
+    mock_pipeline_metrics.stop_file_timer.assert_called_once_with(input_file_name)
+    mock_pipeline_metrics.increment_files_processed.assert_called_once_with(1)

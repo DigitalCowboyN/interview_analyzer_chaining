@@ -78,9 +78,11 @@ async def test_openai_response_structure():
         "topic_level_1": "geography",
         "topic_level_3": "capitals",
         "overall_keywords": ["France", "Paris"],
-        "domain_keywords": ["geography"]
+        "domain_keywords": ["geography"],
     }
-    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
+    with patch.object(
+        agent.client.responses, "create", new_callable=AsyncMock
+    ) as mock_create:
         mock_create.return_value = mock_response(response_content)
         response = await agent.call_model(prompt)
     # Now we expect the response to be a dictionary with the expected keys.
