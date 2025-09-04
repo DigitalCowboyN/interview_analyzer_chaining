@@ -8,7 +8,6 @@ broker settings, serialization, and task discovery.
 import os
 from unittest.mock import patch
 
-import pytest
 from celery import Celery
 
 from src.celery_app import celery_app
