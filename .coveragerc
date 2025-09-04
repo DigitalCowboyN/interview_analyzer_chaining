@@ -1,0 +1,70 @@
+[run]
+# Measure branch coverage in addition to statement coverage
+branch = True
+
+# Source code directory to measure
+source = src
+
+# Omit certain files/patterns from coverage measurement
+omit =
+    # Test files
+    */tests/*
+    */test_*
+    # Empty __init__.py files (no executable code)
+    */__init__.py
+    # Virtual environments
+    */venv/*
+    */env/*
+    */.venv/*
+    # System/library files
+    */site-packages/*
+    # Cache and build directories
+    */__pycache__/*
+    */build/*
+    */dist/*
+    # Entry points (main.py is tested separately)
+    */main.py
+
+[report]
+# Don't show missing lines in terminal report (use HTML for details)
+show_missing = True
+
+# Skip covered files in terminal report
+skip_covered = False
+
+# Sort by coverage percentage
+sort = Cover
+
+# Precision for coverage percentages
+precision = 1
+
+# Exclude lines from coverage (e.g., debug code, platform-specific)
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+    
+    # Don't complain about missing debug-only code:
+    def __repr__
+    if self\.debug
+    
+    # Don't complain if tests don't hit defensive assertion code:
+    raise AssertionError
+    raise NotImplementedError
+    
+    # Don't complain if non-runnable code isn't run:
+    if 0:
+    if __name__ == .__main__.:
+    
+    # Don't complain about abstract methods
+    @(abc\.)?abstractmethod
+
+[html]
+# Directory for HTML coverage reports
+directory = htmlcov
+
+# Show contexts in HTML report
+show_contexts = True
+
+[xml]
+# Output file for XML coverage reports (useful for CI/CD)
+output = coverage.xml

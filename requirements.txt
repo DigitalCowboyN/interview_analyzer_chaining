@@ -22,6 +22,9 @@ transformers==4.53.1
 # Development
 pytest==8.3.3
 pytest-asyncio
+pytest-cov==6.0.0
+pytest-mock==3.12.0
+coverage==7.6.9
 black==24.3.0
 flake8==7.3.0
 isort==5.13.2

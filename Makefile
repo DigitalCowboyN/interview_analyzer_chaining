@@ -27,6 +27,50 @@ test:
 	@echo "Running tests..."
 	$(PYTHON) -m pytest $(TEST_DIR)
 
+# Testing with coverage
+.PHONY: test-cov
+test-cov:
+	@echo "Running tests with coverage..."
+	$(PYTHON) -m pytest --cov=$(MODULE_NAME) --cov-report=term-missing --cov-report=html
+
+# Coverage report only (terminal)
+.PHONY: coverage
+coverage:
+	@echo "Generating coverage report..."
+	$(PYTHON) -m coverage report --show-missing
+
+# Coverage report HTML
+.PHONY: coverage-html
+coverage-html:
+	@echo "Generating HTML coverage report..."
+	$(PYTHON) -m coverage html
+	@echo "Coverage report generated in htmlcov/index.html"
+
+# Coverage report XML (for CI/CD)
+.PHONY: coverage-xml
+coverage-xml:
+	@echo "Generating XML coverage report..."
+	$(PYTHON) -m coverage xml
+
+# Quick unit tests (exclude integration tests)
+.PHONY: test-unit
+test-unit:
+	@echo "Running unit tests..."
+	$(PYTHON) -m pytest -m "not integration" --cov=$(MODULE_NAME) --cov-report=term-missing
+
+# Integration tests only
+.PHONY: test-integration
+test-integration:
+	@echo "Running integration tests..."
+	$(PYTHON) -m pytest -m integration
+
+# Clean coverage data
+.PHONY: clean-coverage
+clean-coverage:
+	@echo "Cleaning coverage data..."
+	rm -rf htmlcov/
+	rm -f .coverage coverage.xml
+
 # Run API (Development)
 .PHONY: run-api
 run-api:
@@ -106,6 +150,12 @@ help:
 	@echo "  run-pipeline   Run the processing pipeline within a container."
 	@echo "  run-api        Run the FastAPI server within a container (same as run)."
 	@echo "  test           Run pytest tests within a container."
+	@echo "  test-cov       Run tests with coverage reporting."
+	@echo "  test-unit      Run unit tests only (exclude integration tests)."
+	@echo "  test-integration Run integration tests only."
+	@echo "  coverage       Generate terminal coverage report."
+	@echo "  coverage-html  Generate HTML coverage report."
+	@echo "  coverage-xml   Generate XML coverage report (for CI/CD)."
 	@echo "  lint           Run flake8 linter within a container."
 	@echo "  format         Run black code formatter within a container."
 	@echo "  clean          Stop and remove containers, remove volumes."
