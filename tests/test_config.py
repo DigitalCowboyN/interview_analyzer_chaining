@@ -10,10 +10,7 @@ substitution, Pydantic validation, and access methods following cardinal rules:
 """
 
 import os
-import tempfile
-from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import mock_open, patch
 
 import pytest
 import yaml
@@ -415,7 +412,10 @@ class TestAccessMethods:
         Config._instance = None
         Config._config = None
 
-        test_config = {"openai": {"api_key": "value1"}, "paths": {"input_dir": "value2"}}
+        test_config = {
+            "openai": {"api_key": "value1"},
+            "paths": {"input_dir": "value2"},
+        }
 
         with patch("pathlib.Path.exists", return_value=True), patch(
             "builtins.open", mock_open(read_data=yaml.dump(test_config))
