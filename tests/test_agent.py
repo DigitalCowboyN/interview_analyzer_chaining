@@ -123,74 +123,99 @@ def test_initialization_success():
 # === Test Successful API Calls ===
 
 
-async def test_successful_call(agent):
+async def test_successful_call_with_realistic_interview_response(agent):
     """
-    Tests `call_model` with a valid, successful mock API response.
+    Tests `call_model` with a realistic technical interview response.
 
-    Verifies that the returned dictionary correctly parses the JSON content
-    from the mock response and contains the expected keys and values.
+    Uses authentic interview analysis data to verify that the returned dictionary
+    correctly parses the JSON content and contains realistic analysis results.
     """
+    # Realistic response for: "Can you explain your experience with microservices architecture?"
     response_content = {
-        "function_type": "declarative",
-        "structure_type": "simple sentence",
-        "purpose": "to state a fact",
-        "topic_level_1": "testing",
-        "topic_level_3": "evaluation",
-        "overall_keywords": ["test"],
-        "domain_keywords": ["assessment", "evaluation"],
+        "function_type": "interrogative",
+        "structure_type": "complex",
+        "purpose": "technical_assessment",
+        "topic_level_1": "technical_skills",
+        "topic_level_3": "system_architecture",
+        "overall_keywords": ["experience", "microservices", "architecture", "explain"],
+        "domain_keywords": ["microservices", "architecture", "distributed_systems"],
     }
     # Patch the API call on the agent's client to use AsyncMock
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_create.return_value = mock_response(response_content)
-        response = await agent.call_model("Test prompt")
+        # Use realistic technical interview prompt
+        interview_prompt = """
+        Analyze this interview question: "Can you explain your experience with microservices architecture?"
+        
+        Classify the function type, structure, purpose, and identify relevant topics and keywords.
+        Provide your response in JSON format.
+        """
+        response = await agent.call_model(interview_prompt)
 
-        # Define the expected keys in the JSON response.
-        expected_keys = [
-            "function_type",
-            "structure_type",
-            "purpose",
-            "topic_level_1",
-            "topic_level_3",
-            "overall_keywords",
-            "domain_keywords",
-        ]
-        # Verify that the response is a dictionary with all expected keys and correct values.
+        # Verify response structure and realistic content
         assert isinstance(response, dict)
-        for key in expected_keys:
-            assert key in response, f"Missing key: {key}"
-        assert response["function_type"] == "declarative"
-        assert response["structure_type"] == "simple sentence"
-        assert response["purpose"] == "to state a fact"
-        assert response["topic_level_1"] == "testing"
-        assert response["topic_level_3"] == "evaluation"
-        assert response["overall_keywords"] == ["test"]
-        assert response["domain_keywords"] == ["assessment", "evaluation"]
+
+        # Test realistic analysis results
+        assert response["function_type"] == "interrogative"  # It's a question
+        assert response["structure_type"] == "complex"  # Complex sentence structure
+        assert response["purpose"] == "technical_assessment"  # Interview assessment purpose
+        assert response["topic_level_1"] == "technical_skills"  # High-level topic
+        assert response["topic_level_3"] == "system_architecture"  # Specific topic
+
+        # Test realistic keywords
+        overall_keywords = response["overall_keywords"]
+        assert "microservices" in overall_keywords
+        assert "architecture" in overall_keywords
+        assert "experience" in overall_keywords
+
+        domain_keywords = response["domain_keywords"]
+        assert "microservices" in domain_keywords
+        assert "distributed_systems" in domain_keywords
 
 
-async def test_successful_call_with_token_usage(agent):
+async def test_successful_call_with_token_usage_realistic_scenario(agent):
     """
-    Tests `call_model` with successful response including token usage data.
+    Tests `call_model` with realistic interview response including token usage data.
 
-    Verifies that token usage is properly tracked when available.
+    Uses authentic interview analysis to verify that token usage is properly tracked.
     """
-    response_content = {"function_type": "declarative"}
-    usage_data = {"total_tokens": 150, "input_tokens": 100, "output_tokens": 50}
+    # Realistic response for a candidate's technical explanation
+    response_content = {
+        "function_type": "declarative",
+        "structure_type": "compound",
+        "purpose": "experience_sharing",
+        "topic_level_1": "technical_experience",
+        "topic_level_3": "containerization",
+        "overall_keywords": ["working", "Docker", "containers", "years", "production"],
+        "domain_keywords": ["Docker", "containerization", "DevOps", "deployment"],
+    }
+    # Realistic token usage for technical interview analysis
+    usage_data = {"total_tokens": 245, "input_tokens": 180, "output_tokens": 65}
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create, patch("src.agents.agent.metrics_tracker") as mock_metrics:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
+        "src.agents.agent.metrics_tracker"
+    ) as mock_metrics:
 
         mock_create.return_value = mock_response(response_content, usage_data)
-        response = await agent.call_model("Test prompt")
 
-        # Verify response
-        assert response["function_type"] == "declarative"
+        # Use realistic technical interview prompt
+        candidate_response_prompt = """
+        Analyze this candidate response: "I've been working with Docker containers in production for 3 years, 
+        managing deployments across multiple environments."
+        
+        Classify the response and extract relevant technical information.
+        """
+        response = await agent.call_model(candidate_response_prompt)
 
-        # Verify metrics tracking
+        # Verify realistic response content
+        assert response["function_type"] == "declarative"  # Statement about experience
+        assert response["purpose"] == "experience_sharing"  # Sharing technical background
+        assert "Docker" in response["domain_keywords"]  # Technical keyword identified
+        assert "containerization" in response["domain_keywords"]  # Related concept
+
+        # Verify realistic token usage tracking
         mock_metrics.increment_api_calls.assert_called_once()
-        mock_metrics.add_tokens.assert_called_once_with(150)
+        mock_metrics.add_tokens.assert_called_once_with(245)  # Realistic token count
 
 
 async def test_successful_call_without_token_usage(agent):
@@ -201,9 +226,9 @@ async def test_successful_call_without_token_usage(agent):
     """
     response_content = {"function_type": "declarative"}
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create, patch("src.agents.agent.metrics_tracker") as mock_metrics:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
+        "src.agents.agent.metrics_tracker"
+    ) as mock_metrics:
 
         mock_create.return_value = mock_response(response_content)  # No usage data
         response = await agent.call_model("Test prompt")
@@ -240,9 +265,9 @@ async def test_successful_call_with_incomplete_token_usage(agent):
     del mock_usage.total_tokens
     mock_resp.usage = mock_usage
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create, patch("src.agents.agent.metrics_tracker") as mock_metrics:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
+        "src.agents.agent.metrics_tracker"
+    ) as mock_metrics:
 
         mock_create.return_value = mock_resp
         response = await agent.call_model("Test prompt")
@@ -258,25 +283,24 @@ async def test_successful_call_with_incomplete_token_usage(agent):
 # === Test Retry Logic ===
 
 
-async def test_retry_on_rate_limit(agent):
+async def test_retry_on_rate_limit_with_realistic_interview_scenario(agent):
     """
-    Tests `call_model` successfully retries after a `RateLimitError`.
+    Tests `call_model` successfully retries after a `RateLimitError` during interview analysis.
 
-    Mocks the API call to raise `RateLimitError` once, then return success.
-    Asserts the final returned dictionary matches the successful response content.
+    Uses realistic interview content to test retry logic when analyzing
+    a challenging technical question that initially hits rate limits.
     """
+    # Realistic response for complex system design question
     response_content = {
-        "function_type": "declarative",
-        "structure_type": "simple sentence",
-        "purpose": "to state a fact",
-        "topic_level_1": "testing",
-        "topic_level_3": "evaluation",
-        "overall_keywords": ["test"],
-        "domain_keywords": ["assessment", "evaluation"],
+        "function_type": "interrogative",
+        "structure_type": "complex",
+        "purpose": "system_design_assessment",
+        "topic_level_1": "technical_challenges",
+        "topic_level_3": "scalability_design",
+        "overall_keywords": ["design", "scalable", "system", "millions", "users"],
+        "domain_keywords": ["scalability", "load_balancing", "distributed_systems", "performance"],
     }
-    error_response = RateLimitError(
-        "Rate limit exceeded", response=MagicMock(), body=None
-    )
+    error_response = RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
     success_response = mock_response(response_content)
 
     # Use an async function for side_effect
@@ -290,13 +314,23 @@ async def test_retry_on_rate_limit(agent):
         else:
             return success_response
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         # Assign the async function to side_effect
         mock_create.side_effect = side_effect_func
-        response = await agent.call_model("Test prompt")
-        assert response["function_type"] == "declarative"
+
+        # Use realistic system design interview prompt
+        system_design_prompt = """
+        Analyze this system design question: "How would you design a scalable system 
+        to handle millions of concurrent users for a social media platform?"
+        
+        Focus on the technical complexity and scalability challenges discussed.
+        """
+        response = await agent.call_model(system_design_prompt)
+
+        # Verify realistic analysis after retry
+        assert response["function_type"] == "interrogative"  # It's a design question
+        assert response["purpose"] == "system_design_assessment"  # Complex assessment
+        assert "scalability" in response["domain_keywords"]  # Key technical concept
         assert call_count == 2  # Ensure it was called exactly twice (initial + 1 retry)
 
 
@@ -330,9 +364,7 @@ async def test_retry_on_api_error(agent):
         else:
             return success_response
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         # Assign the async function to side_effect
         mock_create.side_effect = side_effect_func
         response = await agent.call_model("Test prompt")
@@ -348,12 +380,8 @@ async def test_max_retry_exceeded(agent):
     `pytest.raises(APIError)` correctly catches the exception after the configured
     number of attempts and that the mock was called the expected number of times.
     """
-    error_to_raise = RateLimitError(
-        "Rate limit exceeded repeatedly", response=MagicMock(), body=None
-    )
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    error_to_raise = RateLimitError("Rate limit exceeded repeatedly", response=MagicMock(), body=None)
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         # Simulate the error occurring on every call
         mock_create.side_effect = error_to_raise
         # Expect the specific APIError (or subclass) to be raised after retries
@@ -369,9 +397,7 @@ async def test_retry_on_unexpected_exception(agent):
     """
     error_to_raise = ValueError("Unexpected error")
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_create.side_effect = error_to_raise
 
         with pytest.raises(ValueError, match="Unexpected error"):
@@ -388,9 +414,7 @@ async def test_empty_output(agent):
     """
     Tests `call_model` raises `ValueError` for an API response with an empty `output` list.
     """
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         # Create a mock response with an empty 'output' list.
         mock_resp = MagicMock()
         mock_resp.output = []
@@ -403,17 +427,13 @@ async def test_empty_content(agent):
     """
     Tests `call_model` raises `ValueError` for an API response with empty `output[0].content`.
     """
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_resp = MagicMock()
         mock_output = MagicMock()
         mock_output.content = []
         mock_resp.output = [mock_output]
         mock_create.return_value = mock_resp
-        with pytest.raises(
-            ValueError, match="No content received from OpenAI API response."
-        ):
+        with pytest.raises(ValueError, match="No content received from OpenAI API response."):
             await agent.call_model("Test prompt")
 
 
@@ -421,9 +441,7 @@ async def test_empty_message(agent):
     """
     Tests `call_model` raises `ValueError` for an API response with empty/whitespace text.
     """
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_resp = MagicMock()
         mock_output = MagicMock()
         mock_content = MagicMock()
@@ -432,22 +450,20 @@ async def test_empty_message(agent):
         mock_resp.output = [mock_output]
         mock_create.return_value = mock_resp
         # Expect ValueError with the updated message from agent.py
-        with pytest.raises(
-            ValueError, match="Received empty response content from OpenAI API."
-        ):
+        with pytest.raises(ValueError, match="Received empty response content from OpenAI API."):
             await agent.call_model("Test prompt for empty message")
 
 
-async def test_malformed_json_response(agent):
+async def test_malformed_json_response_during_interview_analysis(agent):
     """
-    Tests `call_model` returns an empty dict `{}` for a non-JSON API response.
+    Tests `call_model` returns an empty dict `{}` for a non-JSON API response during interview analysis.
 
-    Verifies that `JSONDecodeError` is caught internally and an empty dict is returned,
-    allowing processing to potentially continue for other items.
+    Uses realistic interview prompt to verify that `JSONDecodeError` is caught internally
+    and an empty dict is returned, allowing batch processing to continue.
     """
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create, patch("src.agents.agent.metrics_tracker") as mock_metrics:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
+        "src.agents.agent.metrics_tracker"
+    ) as mock_metrics:
 
         mock_resp = MagicMock()
         mock_output = MagicMock()
@@ -457,11 +473,21 @@ async def test_malformed_json_response(agent):
         mock_resp.output = [mock_output]
         mock_create.return_value = mock_resp
 
+        # Use realistic interview analysis prompt that might fail parsing
+        complex_analysis_prompt = """
+        Analyze this complex interview exchange:
+        
+        Interviewer: "Describe your approach to handling database transactions in a distributed system."
+        Candidate: "I use two-phase commit protocols with eventual consistency models..."
+        
+        Extract technical concepts and classify the discussion complexity.
+        """
+
         # Expected behavior: returns {} and logs error, does not raise JSONDecodeError
-        result = await agent.call_model("Test prompt for malformed JSON")
+        result = await agent.call_model(complex_analysis_prompt)
         assert result == {}
 
-        # Verify error was tracked
+        # Verify error was tracked for this realistic scenario
         mock_metrics.increment_errors.assert_called_once()
 
 
@@ -488,12 +514,8 @@ async def test_retry_log_message(agent, caplog):
         "overall_keywords": ["test"],
         "domain_keywords": ["assessment", "evaluation"],
     }
-    error_response = RateLimitError(
-        "Rate limit exceeded", response=MagicMock(), body=None
-    )
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    error_response = RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
         mock_create.side_effect = [error_response, mock_response(response_content)]
         await agent.call_model("Test prompt")
 
@@ -515,14 +537,12 @@ async def test_zero_retry_attempts(agent):
     # Set retry attempts to 0 to trigger the fallback logic
     agent.retry_attempts = 0
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create, patch("src.agents.agent.metrics_tracker") as mock_metrics:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
+        "src.agents.agent.metrics_tracker"
+    ) as mock_metrics:
 
         # This should never be called since retry_attempts is 0
-        mock_create.side_effect = RateLimitError(
-            "Rate limit", response=MagicMock(), body=None
-        )
+        mock_create.side_effect = RateLimitError("Rate limit", response=MagicMock(), body=None)
 
         # Should raise the fallback exception
         with pytest.raises(
@@ -547,9 +567,9 @@ async def test_negative_retry_attempts(agent):
     # Set retry attempts to negative value to trigger the fallback logic
     agent.retry_attempts = -1
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create, patch("src.agents.agent.metrics_tracker") as mock_metrics:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
+        "src.agents.agent.metrics_tracker"
+    ) as mock_metrics:
 
         # Should raise the fallback exception
         with pytest.raises(
@@ -575,9 +595,7 @@ async def test_fallback_with_last_exception(agent):
     # Create a custom exception that will be stored as last_exception
     test_exception = ValueError("Test exception")
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
 
         # Mock the scenario where an exception occurs and is stored as last_exception
         # but somehow the loop exits (this is a contrived scenario for coverage)
@@ -598,13 +616,11 @@ async def test_metrics_tracking_on_api_error(agent):
     """
     Tests that metrics are properly tracked when API errors occur after retries.
     """
-    error_to_raise = APIError(
-        "Persistent API error", request=MagicMock(), body=MagicMock()
-    )
+    error_to_raise = APIError("Persistent API error", request=MagicMock(), body=MagicMock())
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create, patch("src.agents.agent.metrics_tracker") as mock_metrics:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
+        "src.agents.agent.metrics_tracker"
+    ) as mock_metrics:
 
         mock_create.side_effect = error_to_raise
 
@@ -621,9 +637,9 @@ async def test_metrics_tracking_on_unexpected_error(agent):
     """
     error_to_raise = ValueError("Unexpected error")
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create, patch("src.agents.agent.metrics_tracker") as mock_metrics:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
+        "src.agents.agent.metrics_tracker"
+    ) as mock_metrics:
 
         mock_create.side_effect = error_to_raise
 
@@ -692,9 +708,7 @@ async def test_api_call_parameters(agent):
     """
     response_content = {"function_type": "declarative"}
 
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
+    with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
 
         mock_create.return_value = mock_response(response_content)
         await agent.call_model("Test prompt")
