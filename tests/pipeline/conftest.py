@@ -225,8 +225,7 @@ def real_analysis_service_with_mocked_llm(realistic_config, mock_metrics_tracker
     from src.agents.sentence_analyzer import SentenceAnalyzer
 
     # Create real components with proper context windows
-    context_windows = realistic_config["preprocessing"]["context_windows"]
-    context_builder = ContextBuilder(context_windows)
+    context_builder = ContextBuilder(realistic_config)
 
     # Create sentence analyzer with mocked LLM calls
     sentence_analyzer = SentenceAnalyzer(realistic_config)

@@ -152,9 +152,13 @@ class TestPipelineIntegration:
             assert entry["sentence"] == expected_sentences[i]
 
     async def test_context_building_with_real_analysis_service(
-        self, tmp_path, expected_sentences, real_analysis_service_with_mocked_llm
+        self,
+        tmp_path,
+        expected_sentences,
+        real_analysis_service_with_mocked_llm,
+        realistic_config,
     ):
-        """Test context building integration with real AnalysisService."""
+        """Test context building integration with real AnalysisService validates actual functionality."""
         input_dir = tmp_path / "input"
         input_dir.mkdir(exist_ok=True)
 
@@ -170,26 +174,49 @@ class TestPipelineIntegration:
         assert isinstance(contexts, list)
         assert len(contexts) == len(expected_sentences)
 
+        # Get expected context windows from actual config (not hardcoded)
+        context_windows = realistic_config["preprocessing"]["context_windows"]
+        expected_keys = set(context_windows.keys())
+
         for i, context in enumerate(contexts):
             assert isinstance(context, dict)
 
-            # Check for expected context window keys
-            expected_keys = {
-                "structure_analysis",
-                "immediate_context",
-                "observer_context",
-                "broader_context",
-                "overall_context",
-            }
+            # Check for expected context window keys from actual config
             assert all(key in context for key in expected_keys)
 
-            # Context should be derived from actual sentences, not hardcoded
-            for key, context_sentences in context.items():
-                assert isinstance(context_sentences, list)
-                # Context sentences should be from our actual sentence list
-                for ctx_sentence in context_sentences:
-                    if ctx_sentence:  # Skip empty context
-                        assert ctx_sentence in expected_sentences
+            # Test actual context building functionality for each window
+            target_sentence = expected_sentences[i]
+
+            for window_name, window_size in context_windows.items():
+                context_string = context[window_name]
+                assert isinstance(context_string, str)
+
+                if window_size == 0:
+                    # Structure analysis should only contain the target sentence
+                    if context_string.strip():
+                        assert f">>> TARGET: {target_sentence} <<<" in context_string
+                        # Should not contain other sentences for size 0
+                        context_lines = context_string.split("\n")
+                        assert len(context_lines) == 1
+                else:
+                    # Non-zero windows should contain target sentence with context
+                    if context_string.strip():
+                        # Target sentence should be marked
+                        assert f">>> TARGET: {target_sentence} <<<" in context_string
+
+                        # Context should contain appropriate neighboring sentences
+                        start_idx = max(0, i - window_size)
+                        end_idx = min(len(expected_sentences), i + window_size + 1)
+
+                        # All sentences in the expected window should appear in context
+                        for j in range(start_idx, end_idx):
+                            expected_sentence = expected_sentences[j]
+                            if j == i:
+                                # Target sentence should be marked
+                                assert f">>> TARGET: {expected_sentence} <<<" in context_string
+                            else:
+                                # Non-target sentences should appear unmarked
+                                assert expected_sentence in context_string
 
     async def test_analysis_with_real_service_integration(
         self, tmp_path, expected_sentences, real_analysis_service_with_mocked_llm
@@ -253,7 +280,12 @@ class TestPipelineIntegration:
             assert result["sentence_id"] == i
 
             # Verify analysis is realistic, not hardcoded
-            assert result["function_type"] in ["declarative", "interrogative", "exclamatory", "request"]
+            assert result["function_type"] in [
+                "declarative",
+                "interrogative",
+                "exclamatory",
+                "request",
+            ]
             assert result["structure_type"] in ["simple", "compound", "complex"]
 
     def test_error_handling_with_nonexistent_input_directory(self, tmp_path):

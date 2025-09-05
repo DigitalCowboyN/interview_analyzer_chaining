@@ -255,10 +255,14 @@ class TestPipelineOrchestratorTextProcessing:
             assert entry["sequence_order"] == i
             assert entry["sentence"] == expected_sentences[i]
 
-    async def test_context_building_with_real_analysis_service(
-        self, tmp_path, expected_sentences, real_analysis_service_with_mocked_llm
+    def test_context_building_with_real_analysis_service(
+        self,
+        tmp_path,
+        expected_sentences,
+        real_analysis_service_with_mocked_llm,
+        realistic_config,
     ):
-        """Test context building with real analysis service and real sentences."""
+        """Test context building with real analysis service validates window sizing and target marking."""
         input_dir = tmp_path / "input"
         input_dir.mkdir(exist_ok=True)
 
@@ -274,26 +278,53 @@ class TestPipelineOrchestratorTextProcessing:
         assert isinstance(contexts, list)
         assert len(contexts) == len(expected_sentences)
 
-        # Validate context content is realistic
+        # Get expected context windows from actual config (not hardcoded)
+        context_windows = realistic_config["preprocessing"]["context_windows"]
+        expected_keys = set(context_windows.keys())
+
+        # Validate context content tests actual functionality
         for i, context in enumerate(contexts):
             assert isinstance(context, dict)
 
-            # Check for expected context window keys from real ContextBuilder
-            expected_keys = {
-                "structure_analysis",
-                "immediate_context",
-                "observer_context",
-                "broader_context",
-                "overall_context",
-            }
+            # Check for expected context window keys from actual config
             assert all(key in context for key in expected_keys)
 
-            # Verify context contains actual sentences from our test data
-            for key, context_sentences in context.items():
-                assert isinstance(context_sentences, list)
-                for ctx_sentence in context_sentences:
-                    if ctx_sentence.strip():  # Skip empty context
-                        assert ctx_sentence in expected_sentences
+            # Test that each window size produces correct context boundaries
+            target_sentence = expected_sentences[i]
+
+            for window_name, window_size in context_windows.items():
+                context_string = context[window_name]
+                assert isinstance(context_string, str)
+
+                if window_size == 0:
+                    # Zero-size window should only contain target sentence
+                    if context_string.strip():
+                        assert context_string.strip() == f">>> TARGET: {target_sentence} <<<"
+                else:
+                    # Non-zero windows should have proper boundaries and target marking
+                    if context_string.strip():
+                        # Target sentence must be marked
+                        assert f">>> TARGET: {target_sentence} <<<" in context_string
+
+                        # Verify window boundaries are correct
+                        expected_start = max(0, i - window_size)
+                        expected_end = min(len(expected_sentences), i + window_size + 1)
+                        expected_sentence_count = expected_end - expected_start
+
+                        context_lines = [line for line in context_string.split("\n") if line.strip()]
+                        assert len(context_lines) == expected_sentence_count
+
+                        # Verify all expected sentences are present in correct order
+                        for j, line in enumerate(context_lines):
+                            expected_sentence_idx = expected_start + j
+                            expected_sentence = expected_sentences[expected_sentence_idx]
+
+                            if expected_sentence_idx == i:
+                                # Target sentence should be marked
+                                assert line == f">>> TARGET: {expected_sentence} <<<"
+                            else:
+                                # Non-target sentences should be unmarked
+                                assert line == expected_sentence
 
 
 class TestSpecificAnalysisHelperFunctions:
@@ -330,8 +361,13 @@ class TestSpecificAnalysisHelperFunctions:
         for i, sentence in enumerate(expected_sentences):
             assert full_context_list[i] == sentence
 
-    def test_context_building_for_specific_analysis(self, expected_sentences, real_analysis_service_with_mocked_llm):
-        """Test context building for specific analysis with real service."""
+    def test_context_building_for_specific_analysis(
+        self,
+        expected_sentences,
+        real_analysis_service_with_mocked_llm,
+        realistic_config,
+    ):
+        """Test context building for specific analysis validates actual window functionality."""
         full_sentence_list = expected_sentences
         target_indices = [0, 2] if len(expected_sentences) >= 3 else [0]
         prefix = "[Context Test] "
@@ -346,17 +382,39 @@ class TestSpecificAnalysisHelperFunctions:
         # Validate context structure
         assert len(target_contexts) == len(target_indices)
 
-        for context in target_contexts:
+        # Get expected context windows from actual config (not hardcoded)
+        context_windows = realistic_config["preprocessing"]["context_windows"]
+        expected_keys = set(context_windows.keys())
+
+        for idx, context in enumerate(target_contexts):
             assert isinstance(context, dict)
-            # Should have context windows from real ContextBuilder
-            expected_keys = {
-                "structure_analysis",
-                "immediate_context",
-                "observer_context",
-                "broader_context",
-                "overall_context",
-            }
+            # Should have context windows from actual config
             assert all(key in context for key in expected_keys)
+
+            # Test that context building produces correct results for specific indices
+            target_idx = target_indices[idx]
+            target_sentence = expected_sentences[target_idx]
+
+            for window_name, window_size in context_windows.items():
+                context_string = context[window_name]
+                assert isinstance(context_string, str)
+
+                # Test actual window functionality
+                if context_string.strip():
+                    # Target sentence should be marked regardless of window size
+                    assert f">>> TARGET: {target_sentence} <<<" in context_string
+
+                    if window_size > 0:
+                        # Verify context contains appropriate neighboring sentences
+                        expected_start = max(0, target_idx - window_size)
+                        expected_end = min(len(expected_sentences), target_idx + window_size + 1)
+
+                        for j in range(expected_start, expected_end):
+                            expected_sentence = expected_sentences[j]
+                            if j == target_idx:
+                                assert f">>> TARGET: {expected_sentence} <<<" in context_string
+                            else:
+                                assert expected_sentence in context_string
 
     def test_post_processing_with_realistic_results(self, expected_sentences):
         """Test post-processing with realistic analysis results."""
@@ -429,7 +487,11 @@ class TestPipelineOrchestratorErrorHandling:
         # Mix valid and invalid entries
         valid_entries = create_realistic_map_entries(expected_sentences[:2])
         invalid_entries = [
-            {"sentence_id": "not_an_integer", "sequence_order": 2, "sentence": "Invalid ID"},
+            {
+                "sentence_id": "not_an_integer",
+                "sequence_order": 2,
+                "sentence": "Invalid ID",
+            },
             {"sentence_id": 3, "sequence_order": 3},  # Missing sentence
             {"sequence_order": 4, "sentence": "Missing ID"},  # Missing sentence_id
         ]
