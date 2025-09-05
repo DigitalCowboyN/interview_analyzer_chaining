@@ -10,13 +10,10 @@ using authentic interview content and realistic analysis workflows.
 """
 
 import itertools  # Import itertools for counter
-import tempfile
-from pathlib import Path
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
-import yaml
 
 from src.agents.context_builder import ContextBuilder
 from src.agents.sentence_analyzer import SentenceAnalyzer
