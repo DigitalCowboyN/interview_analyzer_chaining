@@ -258,11 +258,9 @@ class TestEnvironmentVariables:
         Config._config = None
 
         test_config = {
-            "nested": {
-                "dict": {"key": "${TEST_NESTED}"},
-                "list": ["${TEST_LIST_ITEM}", "static_item", "${TEST_ANOTHER}"],
-            },
-            "simple": "${TEST_SIMPLE}",
+            "openai": {"api_key": "${TEST_SIMPLE}"},
+            "paths": {"input_dir": "${TEST_NESTED}"},
+            "domain_keywords": ["${TEST_LIST_ITEM}", "static_item", "${TEST_ANOTHER}"],
         }
 
         test_env = {
@@ -280,13 +278,13 @@ class TestEnvironmentVariables:
             loaded_config = config.config
 
             # Test nested dict substitution
-            assert loaded_config["nested"]["dict"]["key"] == "nested_value"
+            assert loaded_config["paths"]["input_dir"] == "nested_value"
             # Test list substitution (line 135 - list processing)
-            assert loaded_config["nested"]["list"][0] == "list_value"
-            assert loaded_config["nested"]["list"][1] == "static_item"
-            assert loaded_config["nested"]["list"][2] == "another_value"
+            assert loaded_config["domain_keywords"][0] == "list_value"
+            assert loaded_config["domain_keywords"][1] == "static_item"
+            assert loaded_config["domain_keywords"][2] == "another_value"
             # Test simple substitution
-            assert loaded_config["simple"] == "simple_value"
+            assert loaded_config["openai"]["api_key"] == "simple_value"
 
 
 class TestValidation:
@@ -417,7 +415,7 @@ class TestAccessMethods:
         Config._instance = None
         Config._config = None
 
-        test_config = {"section1": {"key1": "value1"}, "section2": {"key2": "value2"}}
+        test_config = {"openai": {"api_key": "value1"}, "paths": {"input_dir": "value2"}}
 
         with patch("pathlib.Path.exists", return_value=True), patch(
             "builtins.open", mock_open(read_data=yaml.dump(test_config))
@@ -426,8 +424,8 @@ class TestAccessMethods:
             config = Config()
 
             # Test __getitem__ method (line 209)
-            assert config["section1"]["key1"] == "value1"
-            assert config["section2"]["key2"] == "value2"
+            assert config["openai"]["api_key"] == "value1"
+            assert config["paths"]["input_dir"] == "value2"
 
     def test_dictionary_access_key_error(self):
         """Test KeyError when accessing non-existent keys."""
@@ -454,8 +452,8 @@ class TestAccessMethods:
         Config._config = None
 
         test_config = {
-            "existing_key": "existing_value",
-            "nested": {"inner": "inner_value"},
+            "openai": {"api_key": "existing_value"},
+            "paths": {"input_dir": "inner_value"},
         }
 
         with patch("pathlib.Path.exists", return_value=True), patch(
@@ -465,12 +463,12 @@ class TestAccessMethods:
             config = Config()
 
             # Test get method (line 194)
-            assert config.get("existing_key") == "existing_value"
+            assert config.get("openai")["api_key"] == "existing_value"
             assert config.get("non_existent", "default_value") == "default_value"
             assert config.get("non_existent") is None  # Default None
 
             # Test existing nested structure
-            assert config.get("nested")["inner"] == "inner_value"
+            assert config.get("paths")["input_dir"] == "inner_value"
 
     def test_config_property_runtime_error(self):
         """Test RuntimeError when config property accessed with None config."""
@@ -590,12 +588,8 @@ class TestErrorHandling:
         Config._config = None
 
         test_config = {
-            "mixed": {
-                "partial_env": "prefix_${TEST_VAR}_suffix",
-                "multiple_env": "${VAR1}_${VAR2}",
-                "no_env": "normal_string",
-                "empty_env": "${EMPTY_VAR}",
-            }
+            "openai": {"api_key": "${TEST_VAR}", "model_name": "${VAR1}"},
+            "paths": {"input_dir": "normal_string", "output_dir": "${EMPTY_VAR}"},
         }
 
         test_env = {
@@ -613,8 +607,7 @@ class TestErrorHandling:
             loaded_config = config.config
 
             # Test various environment variable scenarios
-            mixed = loaded_config["mixed"]
-            assert mixed["partial_env"] == "prefix_middle_suffix"
-            assert mixed["multiple_env"] == "first_second"
-            assert mixed["no_env"] == "normal_string"
-            assert mixed["empty_env"] == ""  # Undefined env var becomes empty string
+            assert loaded_config["openai"]["api_key"] == "middle"
+            assert loaded_config["openai"]["model_name"] == "first"
+            assert loaded_config["paths"]["input_dir"] == "normal_string"
+            assert loaded_config["paths"]["output_dir"] == ""  # Undefined env var becomes empty string

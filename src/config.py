@@ -115,7 +115,7 @@ class Config:
         if config_path.exists():
             with open(config_path, "r") as stream:
                 try:
-                    config_dict = yaml.safe_load(stream)
+                    config_dict = yaml.safe_load(stream) or {}
                 except yaml.YAMLError as exc:
                     print(f"Error loading config.yaml: {exc}")
                     # Decide how to handle: raise error, use defaults, exit?
