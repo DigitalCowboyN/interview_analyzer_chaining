@@ -365,26 +365,30 @@ def test_build_contexts_with_realistic_interview_data(
         assert "observer" in ctx
 
 
-def test_build_contexts_empty(analysis_service: AnalysisService, mock_context_builder: MagicMock) -> None:
+def test_build_contexts_empty(
+    realistic_analysis_service: AnalysisService, realistic_context_builder: MagicMock
+) -> None:
     """Test build_contexts with empty sentence list."""
     sentences: List[str] = []
-    mock_context_builder.build_all_contexts.return_value = {}
+    realistic_context_builder.build_all_contexts.return_value = {}
 
-    result = analysis_service.build_contexts(sentences)
+    result = realistic_analysis_service.build_contexts(sentences)
 
-    mock_context_builder.build_all_contexts.assert_called_once_with(sentences)
+    realistic_context_builder.build_all_contexts.assert_called_once_with(sentences)
     assert result == []
 
 
-def test_build_contexts_exception(analysis_service: AnalysisService, mock_context_builder: MagicMock) -> None:
+def test_build_contexts_exception(
+    realistic_analysis_service: AnalysisService, realistic_context_builder: MagicMock
+) -> None:
     """Test build_contexts when the context builder raises an exception."""
     sentences: List[str] = ["s1"]
-    mock_context_builder.build_all_contexts.side_effect = ValueError("Builder failed")
+    realistic_context_builder.build_all_contexts.side_effect = ValueError("Builder failed")
 
     with pytest.raises(ValueError, match="Builder failed"):
-        analysis_service.build_contexts(sentences)
+        realistic_analysis_service.build_contexts(sentences)
 
-    mock_context_builder.build_all_contexts.assert_called_once_with(sentences)
+    realistic_context_builder.build_all_contexts.assert_called_once_with(sentences)
 
 
 # --- Tests for analyze_sentences ---
@@ -457,30 +461,32 @@ async def test_analyze_sentences_with_realistic_interview_content(
 
 @pytest.mark.asyncio
 async def test_analyze_sentences_empty_input(
-    analysis_service: AnalysisService, mock_sentence_analyzer: AsyncMock
+    realistic_analysis_service: AnalysisService, realistic_sentence_analyzer: AsyncMock
 ) -> None:
     """Test analyze_sentences with empty sentences list."""
     # No timer needed here, no patch needed
     with patch("src.services.analysis_service.logger") as mock_logger:
-        results = await analysis_service.analyze_sentences([], [])
+        results = await realistic_analysis_service.analyze_sentences([], [])
 
     assert results == []
-    mock_sentence_analyzer.classify_sentence.assert_not_awaited()
+    # Verify the realistic analyzer wasn't called (no sentences to analyze)
+    assert realistic_sentence_analyzer.classify_sentence.call_count == 0
     mock_logger.warning.assert_called_with("analyze_sentences called with no sentences. Returning empty list.")
 
 
 @pytest.mark.asyncio
 async def test_analyze_sentences_context_mismatch(
-    analysis_service: AnalysisService, mock_sentence_analyzer: AsyncMock
+    realistic_analysis_service: AnalysisService, realistic_sentence_analyzer: AsyncMock
 ) -> None:
     """Test analyze_sentences when sentence and context counts differ."""
     # No timer needed here, no patch needed
 
     with patch("src.services.analysis_service.logger") as mock_logger:
-        results = await analysis_service.analyze_sentences(["s1", "s2"], [{"c": "1"}])  # Mismatch
+        results = await realistic_analysis_service.analyze_sentences(["s1", "s2"], [{"c": "1"}])  # Mismatch
 
     assert results == []
-    mock_sentence_analyzer.classify_sentence.assert_not_awaited()
+    # Verify the realistic analyzer wasn't called (context mismatch)
+    assert realistic_sentence_analyzer.classify_sentence.call_count == 0
     mock_logger.error.assert_called_with(
         "Sentence count (2) and context count (1) mismatch in analyze_sentences. Aborting."
     )
@@ -488,27 +494,58 @@ async def test_analyze_sentences_context_mismatch(
 
 @pytest.mark.asyncio
 async def test_analyze_sentences_classify_error(
-    analysis_service: AnalysisService,
-    mock_sentence_analyzer: AsyncMock,  # The base mock instance
-    mock_metrics_tracker: MagicMock,
+    realistic_analysis_service: AnalysisService,
+    realistic_sentence_analyzer: AsyncMock,  # The base mock instance
+    realistic_metrics_tracker: MagicMock,
 ) -> None:
-    """Test error path, configuring the mock analyzer before the call."""
-    sentences: List[str] = ["s1_ok", "s2_fail"]
-    contexts: List[Dict[str, str]] = [{"c": "1"}, {"c": "2"}]
-    mock_analysis_result_s1 = {"analysis": "result1"}
+    """Test error path with realistic interview sentences and error handling."""
+    # Use realistic interview sentences that might fail
+    sentences: List[str] = [
+        "I have experience with distributed systems.",  # Should succeed
+        "This is a malformed response that causes errors.",  # Will cause error
+    ]
+    contexts: List[Dict[str, str]] = [
+        {"immediate": "Technical experience discussion", "broader": "Interview context"},
+        {"immediate": "Error scenario context", "broader": "Testing error handling"},
+    ]
+
+    # Create a realistic analyzer that fails on the second sentence
     test_exception = ValueError("API Error")
+
+    async def mock_classify_with_error(sentence: str, context: Dict[str, str]) -> Dict[str, Any]:
+        if "malformed" in sentence.lower():
+            raise test_exception
+        # Return realistic analysis for successful sentence
+        return {
+            "function_type": "declarative",
+            "structure_type": "simple",
+            "purpose": "experience_sharing",
+            "topic_level_1": "technical_experience",
+            "topic_level_3": "technical_implementation",
+            "overall_keywords": ["experience", "distributed", "systems"],
+            "domain_keywords": ["distributed_systems"],
+        }
+
+    # Replace the realistic analyzer with our error-testing version
+    realistic_sentence_analyzer.classify_sentence = mock_classify_with_error
 
     expected_results = [
         {
             "sentence_id": 0,
             "sequence_order": 0,
-            "sentence": "s1_ok",
-            "analysis": "result1",
+            "sentence": sentences[0],
+            "function_type": "declarative",
+            "structure_type": "simple",
+            "purpose": "experience_sharing",
+            "topic_level_1": "technical_experience",
+            "topic_level_3": "technical_implementation",
+            "overall_keywords": ["experience", "distributed", "systems"],
+            "domain_keywords": ["distributed_systems"],
         },
         {
             "sentence_id": 1,
             "sequence_order": 1,
-            "sentence": "s2_fail",
+            "sentence": sentences[1],
             "error": True,
             "error_type": "ValueError",
             "error_message": "API Error",
@@ -516,23 +553,17 @@ async def test_analyze_sentences_classify_error(
     ]
     mock_timer = create_mock_timer()
 
-    # Configure the classify_sentence method on the *mock instance* used by the service
-    mock_sentence_analyzer.classify_sentence.side_effect = [
-        mock_analysis_result_s1,
-        test_exception,
-    ]
-
     # Call the service method (NO inner patching needed)
-    results = await analysis_service.analyze_sentences(sentences, contexts, timer=mock_timer)
+    results = await realistic_analysis_service.analyze_sentences(sentences, contexts, timer=mock_timer)
 
     # Assert Results
     assert results == expected_results
 
     # Assert Metrics
-    assert mock_metrics_tracker.increment_errors.call_count == 1
-    assert mock_metrics_tracker.increment_sentences_success.call_count == 1
-    assert mock_metrics_tracker.add_processing_time.call_count == 1
-    mock_metrics_tracker.add_processing_time.assert_called_once_with(0, 0.5)
+    assert realistic_metrics_tracker.increment_errors.call_count == 1
+    assert realistic_metrics_tracker.increment_sentences_success.call_count == 1
+    assert realistic_metrics_tracker.add_processing_time.call_count == 1
+    realistic_metrics_tracker.add_processing_time.assert_called_once_with(0, 0.5)
 
     # Optional: Assert logger error was called (using caplog fixture if needed)
     # ...
@@ -542,36 +573,68 @@ async def test_analyze_sentences_classify_error(
 @pytest.mark.asyncio
 async def test_analyze_sentences_concurrency(
     # Need specific service instance for concurrency config
-    mock_config: Dict[str, Any],  # Get base config
-    mock_context_builder: MagicMock,
-    mock_sentence_analyzer: AsyncMock,  # The base mock instance
-    mock_metrics_tracker: MagicMock,
+    realistic_config: Dict[str, Any],  # Get base config
+    realistic_context_builder: MagicMock,
+    realistic_sentence_analyzer: AsyncMock,  # The base mock instance
+    realistic_metrics_tracker: MagicMock,
 ) -> None:
     """Test concurrency path, configuring the mock analyzer before the call."""
     # Create a modified config for this test
-    mock_config_concurrent = mock_config.copy()
-    mock_config_concurrent["pipeline"] = {"num_analysis_workers": 2}
+    realistic_config_concurrent = realistic_config.copy()
+    realistic_config_concurrent["pipeline"] = {"num_analysis_workers": 2}
 
     # Instantiate service with modified config and *base* mocks
     analysis_service_concurrent = AnalysisService(
-        config=mock_config_concurrent,
-        context_builder=mock_context_builder,
-        sentence_analyzer=mock_sentence_analyzer,  # Pass the base mock
-        metrics_tracker=mock_metrics_tracker,
+        config=realistic_config_concurrent,
+        context_builder=realistic_context_builder,
+        sentence_analyzer=realistic_sentence_analyzer,  # Pass the base mock
+        metrics_tracker=realistic_metrics_tracker,
     )
 
-    sentences: List[str] = ["s1", "s2", "s3"]
-    contexts: List[Dict[str, str]] = [{"c": "1"}, {"c": "2"}, {"c": "3"}]
-    mock_results_list = [{"analysis": "r1"}, {"analysis": "r2"}, {"analysis": "r3"}]
-    expected_final_results = [
-        {"sentence_id": 0, "sequence_order": 0, "sentence": "s1", "analysis": "r1"},
-        {"sentence_id": 1, "sequence_order": 1, "sentence": "s2", "analysis": "r2"},
-        {"sentence_id": 2, "sequence_order": 2, "sentence": "s3", "analysis": "r3"},
+    # Use realistic interview sentences for concurrency testing
+    sentences: List[str] = [
+        "I have experience with microservices.",
+        "What challenges did you face with Docker?",
+        "We implemented distributed tracing solutions.",
     ]
-    mock_timer = create_mock_timer()
+    contexts: List[Dict[str, str]] = [
+        {"immediate": "Technical experience", "broader": "Interview discussion"},
+        {"immediate": "Challenge assessment", "broader": "Problem-solving evaluation"},
+        {"immediate": "Implementation details", "broader": "Technical solutions"},
+    ]
 
-    # Configure the classify_sentence method on the *mock instance* used by the service
-    mock_sentence_analyzer.classify_sentence.side_effect = mock_results_list
+    # Create expected results based on realistic analysis patterns
+    expected_final_results = []
+    for i, sentence in enumerate(sentences):
+        if sentence.endswith("?"):
+            result = {
+                "sentence_id": i,
+                "sequence_order": i,
+                "sentence": sentence,
+                "function_type": "interrogative",
+                "structure_type": "simple",
+                "purpose": "technical_assessment",
+                "topic_level_1": "technical_skills",
+                "topic_level_3": "technical_implementation",
+                "overall_keywords": [word for word in sentence.lower().split() if len(word) > 3][:6],
+                "domain_keywords": [],
+            }
+        else:
+            result = {
+                "sentence_id": i,
+                "sequence_order": i,
+                "sentence": sentence,
+                "function_type": "declarative",
+                "structure_type": "simple",
+                "purpose": "experience_sharing",
+                "topic_level_1": "technical_experience",
+                "topic_level_3": "technical_implementation",
+                "overall_keywords": [word for word in sentence.lower().split() if len(word) > 3][:6],
+                "domain_keywords": [],
+            }
+        expected_final_results.append(result)
+
+    mock_timer = create_mock_timer()
 
     # Call the service method (NO inner patching needed)
     results = await analysis_service_concurrent.analyze_sentences(sentences, contexts, timer=mock_timer)
@@ -580,10 +643,10 @@ async def test_analyze_sentences_concurrency(
     assert results == expected_final_results
 
     # Assert Metrics
-    mock_metrics_tracker.increment_errors.assert_not_called()
-    assert mock_metrics_tracker.increment_sentences_success.call_count == 3
-    assert mock_metrics_tracker.add_processing_time.call_count == 3
-    mock_metrics_tracker.add_processing_time.assert_has_calls(
+    realistic_metrics_tracker.increment_errors.assert_not_called()
+    assert realistic_metrics_tracker.increment_sentences_success.call_count == 3
+    assert realistic_metrics_tracker.add_processing_time.call_count == 3
+    realistic_metrics_tracker.add_processing_time.assert_has_calls(
         [
             call(0, 0.5),
             call(1, 0.5),

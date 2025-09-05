@@ -29,8 +29,7 @@ from openai import APIError, RateLimitError
 
 from src.agents.agent import OpenAIAgent
 
-# This marks all tests in this file as asynchronous tests.
-pytestmark = pytest.mark.asyncio
+# Note: Only async tests are marked with @pytest.mark.asyncio individually
 
 
 def mock_response(content_dict, usage_data=None):
@@ -123,6 +122,7 @@ def test_initialization_success():
 # === Test Successful API Calls ===
 
 
+@pytest.mark.asyncio
 async def test_successful_call_with_realistic_interview_response(agent):
     """
     Tests `call_model` with a realistic technical interview response.
@@ -173,6 +173,7 @@ async def test_successful_call_with_realistic_interview_response(agent):
         assert "distributed_systems" in domain_keywords
 
 
+@pytest.mark.asyncio
 async def test_successful_call_with_token_usage_realistic_scenario(agent):
     """
     Tests `call_model` with realistic interview response including token usage data.
@@ -218,6 +219,7 @@ async def test_successful_call_with_token_usage_realistic_scenario(agent):
         mock_metrics.add_tokens.assert_called_once_with(245)  # Realistic token count
 
 
+@pytest.mark.asyncio
 async def test_successful_call_without_token_usage(agent):
     """
     Tests `call_model` with successful response but no token usage data.
@@ -241,6 +243,7 @@ async def test_successful_call_without_token_usage(agent):
         mock_metrics.add_tokens.assert_not_called()  # Should not be called without usage data
 
 
+@pytest.mark.asyncio
 async def test_successful_call_with_incomplete_token_usage(agent):
     """
     Tests `call_model` with response that has usage object but no total_tokens.
@@ -334,6 +337,7 @@ async def test_retry_on_rate_limit_with_realistic_interview_scenario(agent):
         assert call_count == 2  # Ensure it was called exactly twice (initial + 1 retry)
 
 
+@pytest.mark.asyncio
 async def test_retry_on_api_error(agent):
     """
     Tests `call_model` successfully retries after a generic `APIError`.
@@ -372,6 +376,7 @@ async def test_retry_on_api_error(agent):
         assert call_count == 2  # Ensure it was called exactly twice (initial + 1 retry)
 
 
+@pytest.mark.asyncio
 async def test_max_retry_exceeded(agent):
     """
     Tests `call_model` raises the original `APIError` after exhausting all retries.
@@ -391,6 +396,7 @@ async def test_max_retry_exceeded(agent):
         assert mock_create.call_count == agent.retry_attempts
 
 
+@pytest.mark.asyncio
 async def test_retry_on_unexpected_exception(agent):
     """
     Tests `call_model` retries on unexpected exceptions and eventually raises them.
@@ -410,6 +416,7 @@ async def test_retry_on_unexpected_exception(agent):
 # === Test Response Validation ===
 
 
+@pytest.mark.asyncio
 async def test_empty_output(agent):
     """
     Tests `call_model` raises `ValueError` for an API response with an empty `output` list.
@@ -423,6 +430,7 @@ async def test_empty_output(agent):
             await agent.call_model("Test prompt")
 
 
+@pytest.mark.asyncio
 async def test_empty_content(agent):
     """
     Tests `call_model` raises `ValueError` for an API response with empty `output[0].content`.
@@ -437,6 +445,7 @@ async def test_empty_content(agent):
             await agent.call_model("Test prompt")
 
 
+@pytest.mark.asyncio
 async def test_empty_message(agent):
     """
     Tests `call_model` raises `ValueError` for an API response with empty/whitespace text.
@@ -494,6 +503,7 @@ async def test_malformed_json_response_during_interview_analysis(agent):
 # === Test Logging ===
 
 
+@pytest.mark.asyncio
 async def test_retry_log_message(agent, caplog):
     """
     Tests `call_model` logs the correct retry message when retrying API calls.
@@ -528,6 +538,7 @@ async def test_retry_log_message(agent, caplog):
 # === Test Edge Cases ===
 
 
+@pytest.mark.asyncio
 async def test_zero_retry_attempts(agent):
     """
     Tests `call_model` with zero retry attempts configured.
@@ -558,6 +569,7 @@ async def test_zero_retry_attempts(agent):
         mock_metrics.increment_errors.assert_called_once()
 
 
+@pytest.mark.asyncio
 async def test_negative_retry_attempts(agent):
     """
     Tests `call_model` with negative retry attempts configured.
@@ -585,6 +597,7 @@ async def test_negative_retry_attempts(agent):
         mock_metrics.increment_errors.assert_called_once()
 
 
+@pytest.mark.asyncio
 async def test_fallback_with_last_exception(agent):
     """
     Tests the fallback logic when a last_exception exists but loop exits unexpectedly.
@@ -612,6 +625,7 @@ async def test_fallback_with_last_exception(agent):
 # === Test Metrics Integration ===
 
 
+@pytest.mark.asyncio
 async def test_metrics_tracking_on_api_error(agent):
     """
     Tests that metrics are properly tracked when API errors occur after retries.
@@ -631,6 +645,7 @@ async def test_metrics_tracking_on_api_error(agent):
         mock_metrics.increment_errors.assert_called_once()
 
 
+@pytest.mark.asyncio
 async def test_metrics_tracking_on_unexpected_error(agent):
     """
     Tests that metrics are properly tracked when unexpected errors occur after retries.
@@ -702,6 +717,7 @@ def test_initialization_with_partial_retry_config():
 # === Test API Call Parameters ===
 
 
+@pytest.mark.asyncio
 async def test_api_call_parameters(agent):
     """
     Tests that the API call is made with correct parameters.
