@@ -181,7 +181,7 @@ class TestOpenAIAgentAPIInteraction:
         ]
 
         for i, test_case in enumerate(test_cases):
-            prompt = f"Analyze: '{test_case['sentence']}'. Return JSON with function_type and purpose fields."
+            prompt = f"Analyze: '{test_case['sentence']}'. " f"Return JSON with function_type and purpose fields."
 
             expected_response = {
                 "function_type": test_case["expected_function"],
@@ -209,7 +209,8 @@ class TestOpenAIAgentAPIInteraction:
         mock_response_invalid_json = MagicMock()
         mock_output = MagicMock()
         mock_content = MagicMock()
-        mock_content.text = '{"function_type": "declarative", "invalid": json}'  # Invalid JSON
+        # Invalid JSON
+        mock_content.text = '{"function_type": "declarative", "invalid": json}'
         mock_output.content = [mock_content]
         mock_response_invalid_json.output = [mock_output]
 
@@ -257,7 +258,7 @@ class TestOpenAIAgentAPIInteraction:
         with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
             # First call fails, second succeeds
             mock_create.side_effect = [
-                Exception("Temporary server error"),  # Use generic exception instead of APIError
+                Exception("Temporary server error"),  # Generic exception
                 self.create_realistic_openai_response(successful_response),
             ]
 
@@ -291,6 +292,21 @@ class TestOpenAIAgentIntegration:
         with patch("src.agents.agent.config", interview_config):
             return OpenAIAgent()
 
+    def create_realistic_openai_response(self, content_dict: Dict[str, Any]) -> MagicMock:
+        """Helper method to create realistic OpenAI response structure."""
+        mock_response = MagicMock()
+        mock_output = MagicMock()
+        mock_content = MagicMock()
+        mock_content.text = json.dumps(content_dict)
+        mock_output.content = [mock_content]
+        mock_response.output = [mock_output]
+
+        # Add realistic metadata
+        mock_response.id = "resp-integration-test"
+        mock_response.model = "gpt-4"
+
+        return mock_response
+
     @pytest.mark.asyncio
     async def test_concurrent_api_calls_simulation(self, interview_analysis_agent):
         """Test behavior under concurrent API calls (simulating SentenceAnalyzer usage)."""
@@ -299,8 +315,8 @@ class TestOpenAIAgentIntegration:
         # Simulate multiple concurrent prompts like SentenceAnalyzer would send
         prompts = [
             "Analyze function: 'Tell me about your background.' Return JSON with function_type.",
-            "Analyze structure: 'What programming languages do you know?' Return JSON with structure_type.",
-            "Analyze purpose: 'I have experience with Python, Java, and JavaScript.' Return JSON with purpose.",
+            "Analyze structure: 'What programming languages do you know?' " "Return JSON with structure_type.",
+            "Analyze purpose: 'I have experience with Python, Java, and JavaScript.' " "Return JSON with purpose.",
             "Analyze topic: 'Can you solve this algorithm problem?' Return JSON with topic_level_1.",
         ]
 
@@ -329,21 +345,6 @@ class TestOpenAIAgentIntegration:
         # All API calls should have been made
         assert mock_create.call_count == 4
 
-    def create_realistic_openai_response(self, content_dict: Dict[str, Any]) -> MagicMock:
-        """Helper method to create realistic OpenAI response structure."""
-        mock_response = MagicMock()
-        mock_output = MagicMock()
-        mock_content = MagicMock()
-        mock_content.text = json.dumps(content_dict)
-        mock_output.content = [mock_content]
-        mock_response.output = [mock_output]
-
-        # Add realistic metadata
-        mock_response.id = "resp-integration-test"
-        mock_response.model = "gpt-4"
-
-        return mock_response
-
     @pytest.mark.asyncio
     async def test_prompt_formatting_and_response_processing(self, interview_analysis_agent):
         """Test that prompts are processed correctly and responses parsed properly."""
@@ -354,7 +355,8 @@ class TestOpenAIAgentIntegration:
         Analyze this interview exchange:
 
         Interviewer: "What's your experience with microservices architecture?"
-        Candidate: "I've designed and implemented microservices using Docker and Kubernetes for the past 3 years."
+        Candidate: "I've designed and implemented microservices using Docker and Kubernetes
+        for the past 3 years."
 
         Return JSON analysis:
         {

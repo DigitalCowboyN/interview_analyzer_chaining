@@ -9,6 +9,9 @@ The tests verify protocol definitions, method signatures, and integration with c
 - ConversationMapStorage: Protocol for reading/writing conversation map data
 
 Tests focus on protocol structure, method signatures, and behavior with real implementations.
+Following cardinal rules:
+1. Test actual functionality, not mock interactions
+2. Use realistic data and scenarios, not hardcoded values
 """
 
 import asyncio
@@ -399,6 +402,62 @@ class TestConversationMapStorageProtocol:
 
         sentence_ids = await storage.read_sentence_ids()
         assert sentence_ids == {1}  # Only valid integer IDs
+
+
+class TestProtocolRealisticImplementations:
+    """Test protocols with realistic implementations using actual interview data."""
+
+    @pytest.fixture
+    def realistic_interview_content(self):
+        """Provide realistic interview content for testing."""
+        return """Tell me about yourself and your experience with software development.
+
+I have been working as a software engineer for over 5 years,
+primarily focusing on Python and web development.
+I've worked with various frameworks including Django and FastAPI.
+
+What challenges have you faced in your previous projects?
+
+One of the biggest challenges was implementing a microservices architecture for a large e-commerce platform.
+We had to ensure proper communication between services while maintaining data consistency.
+How do you approach debugging complex issues?
+I typically start by reproducing the issue in a controlled environment, then use systematic debugging techniques
+like adding logging and using debugging tools to trace through the code execution."""
+
+    async def test_text_data_source_realistic_implementation(self, realistic_interview_content):
+        """Test TextDataSource with realistic interview data implementation."""
+
+        class RealisticTextSource:
+            def __init__(self, content: str, identifier: str):
+                self.content = content
+                self.identifier = identifier
+
+            async def read_text(self) -> str:
+                # Simulate realistic async file reading
+                await asyncio.sleep(0.001)
+                return self.content
+
+            def get_identifier(self) -> str:
+                return self.identifier
+
+        # Test with realistic interview content
+        source = RealisticTextSource(realistic_interview_content, "senior_engineer_interview.txt")
+
+        # Verify protocol compliance
+        assert isinstance(source, TextDataSource)
+
+        # Test realistic data reading
+        content = await source.read_text()
+        assert content == realistic_interview_content
+        assert len(content) > 100  # Realistic content length
+        assert "software development" in content
+        assert "Python" in content
+        assert "Django" in content
+
+        # Test identifier
+        identifier = source.get_identifier()
+        assert identifier == "senior_engineer_interview.txt"
+        assert identifier.endswith(".txt")
 
 
 class TestProtocolInteroperability:

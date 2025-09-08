@@ -64,7 +64,8 @@ class TestFilesAPIIntegration:
                 {
                     "sentence_id": 2,
                     "sequence_order": 2,
-                    "sentence": "I've been working with microservices for about 3 years, primarily using Docker and Kubernetes.",
+                    "sentence": "I've been working with microservices for about 3 years, "
+                    "primarily using Docker and Kubernetes.",
                     "analysis": "Detailed response providing specific technologies and timeframe",
                     "function_type": "declarative",
                     "structure_type": "compound",

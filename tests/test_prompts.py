@@ -14,9 +14,8 @@ These tests focus on testing the real prompt system including:
 """
 
 import json
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -140,7 +139,8 @@ class TestPromptFormatting:
             "contexts": {
                 "immediate": "We are discussing the candidate's technical background and Python experience.",
                 "observer": "This is a technical interview for a senior software developer position.",
-                "broader": "The interview is part of the hiring process for a Python development role at a tech company.",
+                "broader": "The interview is part of the hiring process for a Python "
+                "development role at a tech company.",
             },
             "domain_keywords": [
                 "Python",
@@ -174,7 +174,7 @@ class TestPromptFormatting:
             ("That's amazing!", "exclamatory"),
         ]
 
-        for sentence, expected_type in test_cases:
+        for sentence, _expected_type in test_cases:
             formatted_prompt = task_prompts["sentence_function_type"]["prompt"].format(sentence=sentence)
 
             # Test that prompt contains the actual sentence

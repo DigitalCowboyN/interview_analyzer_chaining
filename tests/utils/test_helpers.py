@@ -8,7 +8,6 @@ including file I/O operations, error handling, and data integrity validation.
 """
 
 import json
-import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -17,7 +16,7 @@ import yaml
 
 # Check if openpyxl is available for Excel tests
 try:
-    import openpyxl
+    import openpyxl  # type: ignore
 
     OPENPYXL_AVAILABLE = True
 except ImportError:
