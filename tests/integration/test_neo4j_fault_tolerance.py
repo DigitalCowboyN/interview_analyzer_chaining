@@ -393,8 +393,6 @@ class TestNeo4jDataConsistencyFaultTolerance:
     @pytest.mark.asyncio
     async def test_concurrent_write_consistency(self, clean_test_database):
         """Test data consistency under concurrent write operations."""
-        project_id = str(uuid.uuid4())
-        interview_id = str(uuid.uuid4())
         filename = "concurrent_consistency_test.txt"
 
         # Create multiple writers trying to write to the same sentence
@@ -422,7 +420,7 @@ class TestNeo4jDataConsistencyFaultTolerance:
             tasks.append(task)
 
         # Wait for all concurrent writes
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*tasks, return_exceptions=True)
 
         # Verify data consistency - should have exactly one sentence
         async with await Neo4jConnectionManager.get_session() as session:

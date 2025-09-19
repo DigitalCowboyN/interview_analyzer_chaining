@@ -74,6 +74,7 @@ This project uses a Neo4j graph database (currently v4.4 via Docker) as a **seco
 The graph database stores the structured analysis results, enabling complex querying and exploration of relationships between sentences, topics, keywords, and analysis dimensions that might be difficult with flat files.
 
 **Interaction:**
+
 - During pipeline execution, the `_result_writer` function (`src/pipeline.py`) iterates through analysis results.
 - For each result, it calls `save_analysis_to_graph` (`src/persistence/graph_persistence.py`).
 - This function uses the `Neo4jConnectionManager` (`src/utils/neo4j_driver.py`) to acquire an asynchronous Neo4j session.
@@ -81,27 +82,29 @@ The graph database stores the structured analysis results, enabling complex quer
 - The operations for a single sentence analysis are grouped within an async session context.
 
 **Schema:**
-*(Based on `src/persistence/graph_persistence.py`)*
--   **Nodes:**
-    -   `:SourceFile {filename: string}`
-    -   `:Sentence {sentence_id: integer, filename: string, text: string, sequence_order: integer}`
-    -   `:FunctionType {name: string}`
-    -   `:StructureType {name: string}`
-    -   `:Purpose {name: string}`
-    -   `:Topic {name: string}`
-    -   `:Keyword {text: string}`
--   **Relationships:**
-    -   `(:Sentence)-[:PART_OF_FILE]->(:SourceFile)`
-    -   `(:Sentence)-[:HAS_FUNCTION_TYPE]->(:FunctionType)`
-    -   `(:Sentence)-[:HAS_STRUCTURE_TYPE]->(:StructureType)`
-    -   `(:Sentence)-[:HAS_PURPOSE]->(:Purpose)`
-    -   `(:Sentence)-[:HAS_TOPIC]->(:Topic)` (Connects to Level 1 and Level 3 topics)
-    -   `(:Sentence)-[:MENTIONS_OVERALL_KEYWORD]->(:Keyword)`
-    -   `(:Sentence)-[:MENTIONS_DOMAIN_KEYWORD]->(:Keyword)`
-    -   `(:Sentence)-[:FOLLOWS]->(:Sentence)` (Links to previous sentence in the same file)
+_(Based on `src/persistence/graph_persistence.py`)_
+
+- **Nodes:**
+  - `:SourceFile {filename: string}`
+  - `:Sentence {sentence_id: integer, filename: string, text: string, sequence_order: integer}`
+  - `:FunctionType {name: string}`
+  - `:StructureType {name: string}`
+  - `:Purpose {name: string}`
+  - `:Topic {name: string}`
+  - `:Keyword {text: string}`
+- **Relationships:**
+  - `(:Sentence)-[:PART_OF_FILE]->(:SourceFile)`
+  - `(:Sentence)-[:HAS_FUNCTION_TYPE]->(:FunctionType)`
+  - `(:Sentence)-[:HAS_STRUCTURE_TYPE]->(:StructureType)`
+  - `(:Sentence)-[:HAS_PURPOSE]->(:Purpose)`
+  - `(:Sentence)-[:HAS_TOPIC]->(:Topic)` (Connects to Level 1 and Level 3 topics)
+  - `(:Sentence)-[:MENTIONS_OVERALL_KEYWORD]->(:Keyword)`
+  - `(:Sentence)-[:MENTIONS_DOMAIN_KEYWORD]->(:Keyword)`
+  - `(:Sentence)-[:FOLLOWS]->(:Sentence)` (Links to previous sentence in the same file)
 
 **Utilities:**
--   The `Neo4jConnectionManager` provides asynchronous connection pooling and methods for executing Cypher queries.
+
+- The `Neo4jConnectionManager` provides asynchronous connection pooling and methods for executing Cypher queries.
 
 ## Project Structure
 
@@ -161,12 +164,14 @@ The graph database stores the structured analysis results, enabling complex quer
 ## Setup and Configuration
 
 1.  **Clone the Repository:**
+
     ```bash
     git clone https://github.com/DigitalCowboyN/interview_analyzer_chaining # Replace with your repo URL if different
     cd interview_analyzer_chaining
     ```
 
 2.  **Configure Environment Variables:**
+
     - Create a file named `.env` in the project root directory (you can copy `.env.example` if it exists and rename it).
     - This file defines **runtime secrets and configuration** needed by the services defined in `docker-compose.yml`.
     - **Important:** Add your required secrets to this `.env` file. Ensure it includes at least:
@@ -200,9 +205,9 @@ To start all services (API, Celery worker, Redis, Neo4j databases) in the backgr
 docker compose up -d
 ```
 
--   The API will be accessible at `http://localhost:8000`.
--   Interactive documentation (Swagger UI) is available at `http://localhost:8000/docs`.
--   The main Neo4j browser should be accessible at `http://localhost:7474`. Login with user `neo4j` and the password set in your `.env` file.
+- The API will be accessible at `http://localhost:8000`.
+- Interactive documentation (Swagger UI) is available at `http://localhost:8000/docs`.
+- The main Neo4j browser should be accessible at `http://localhost:7474`. Login with user `neo4j` and the password set in your `.env` file.
 
 To stop the services:
 
@@ -221,6 +226,7 @@ docker compose run --rm app python src/main.py --run-pipeline
 # Or use the Makefile:
 # make run-pipeline [ARGS="--input_dir ./custom_in"] # Pass args via ARGS
 ```
+
 This starts a temporary container based on the `app` service image, runs the command, and then removes the container. Input/output paths are relative to the container's filesystem (`/workspaces/interview_analyzer_chaining`, which maps to your project root via the volume mount).
 
 ### Development Environment (VS Code Dev Container)
@@ -251,20 +257,20 @@ Common tasks can be run using the Makefile within the Docker environment:
 
 ## API Endpoints
 
-*   **`GET /`**: Health check endpoint.
-*   **`GET /files/`**: Lists the filenames of generated analysis (`_analysis.jsonl`) files found in the configured output directory.
-*   **`GET /files/{filename}`**: Retrieves the full content of a specific analysis file.
-*   **`GET /files/{filename}/sentences/{sentence_id}`**: Retrieves the analysis result for a specific sentence ID within a given analysis file.
-*   **`POST /analysis/`**: Accepts an `input_filename` and schedules the analysis pipeline for that file using **FastAPI BackgroundTasks** (returns `202 Accepted`).
-*   _(More endpoints could be added for detailed task status, specific analysis requests without running the full pipeline, etc.)_
+- **`GET /`**: Health check endpoint.
+- **`GET /files/`**: Lists the filenames of generated analysis (`_analysis.jsonl`) files found in the configured output directory.
+- **`GET /files/{filename}`**: Retrieves the full content of a specific analysis file.
+- **`GET /files/{filename}/sentences/{sentence_id}`**: Retrieves the analysis result for a specific sentence ID within a given analysis file.
+- **`POST /analysis/`**: Accepts an `input_filename` and schedules the analysis pipeline for that file using **FastAPI BackgroundTasks** (returns `202 Accepted`).
+- _(More endpoints could be added for detailed task status, specific analysis requests without running the full pipeline, etc.)_
 
 ## Input and Output Files
 
--   **Input:** Plain text files (`.txt`) in the input directory.
--   **Output:**
-    1.  **Map Files (`*_map.jsonl`):** In the map directory. Contains `sentence_id`, `sequence_order`, `sentence` per line.
-    2.  **Analysis Files (`*_analysis.jsonl`):** In the output directory. Contains detailed analysis results per sentence (JSON object per line).
-    3.  **Log File (`pipeline.log`):** In the logs directory.
+- **Input:** Plain text files (`.txt`) in the input directory.
+- **Output:**
+  1.  **Map Files (`*_map.jsonl`):** In the map directory. Contains `sentence_id`, `sequence_order`, `sentence` per line.
+  2.  **Analysis Files (`*_analysis.jsonl`):** In the output directory. Contains detailed analysis results per sentence (JSON object per line).
+  3.  **Log File (`pipeline.log`):** In the logs directory.
 
 ## Testing
 
@@ -277,6 +283,48 @@ make test
 ```
 
 Tests utilize `pytest`, `pytest-asyncio`, `unittest.mock`, FastAPI's `TestClient`, and the separate `neo4j-test` database service.
+
+## Neo4j Setup and Testing
+
+### Environment Detection and Configuration
+
+The project includes utilities to detect the runtime environment (Docker, CI, or host) and configure Neo4j connections accordingly. This ensures reliable connections across different deployment contexts.
+
+- **Environment Detection**: The `detect_environment()` function identifies the current environment and adjusts configurations.
+- **Configuration**: The `get_available_neo4j_config()` function provides environment-specific Neo4j URIs, usernames, and passwords.
+
+### Running Neo4j Tests
+
+To ensure Neo4j connections are reliable and the database is correctly set up, integration tests are provided.
+
+1. **Start Neo4j Test Service**:
+
+   - Use Docker Compose to start the Neo4j test service:
+     ```bash
+     make db-test-up
+     ```
+   - Ensure the service is ready before running tests.
+
+2. **Run Integration Tests**:
+
+   - Execute the integration tests to verify Neo4j operations:
+     ```bash
+     make test
+     ```
+   - This will run tests that check connection reliability, data integrity, and fault tolerance.
+
+3. **Stop Neo4j Test Service**:
+   - After testing, stop the Neo4j test service:
+     ```bash
+     make db-test-down
+     ```
+
+### Troubleshooting
+
+- **Connection Issues**: Ensure the Neo4j service is running and accessible. Check environment configurations if connections fail.
+- **Data Integrity**: Run the data integrity tests to verify that all nodes and relationships are correctly persisted.
+
+This setup ensures that the Neo4j database is consistently configured and tested across different environments, providing a robust foundation for graph-based data persistence.
 
 ## Contributing
 

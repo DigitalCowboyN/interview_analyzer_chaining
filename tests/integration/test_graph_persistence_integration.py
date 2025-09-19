@@ -6,8 +6,6 @@ with an actual Neo4j database, testing the complete Cypher orchestration,
 data integrity, and relationship creation.
 """
 
-from typing import Any, Dict, List
-
 import pytest
 
 from src.persistence.graph_persistence import save_analysis_to_graph
@@ -413,7 +411,8 @@ class TestGraphPersistenceDataIntegrity:
         async with await Neo4jConnectionManager.get_session() as session:
             # Should have no keyword relationships
             result = await session.run(
-                "MATCH (s:Sentence {sentence_id: $sentence_id})-[:MENTIONS_OVERALL_KEYWORD|:MENTIONS_DOMAIN_KEYWORD]->(k) "
+                "MATCH (s:Sentence {sentence_id: $sentence_id})"
+                "-[:MENTIONS_OVERALL_KEYWORD|:MENTIONS_DOMAIN_KEYWORD]->(k) "
                 "RETURN count(k) AS keyword_count",
                 sentence_id=500,
             )
@@ -450,7 +449,8 @@ class TestGraphPersistenceDataIntegrity:
 
             # Should have no type or topic relationships
             result = await session.run(
-                "MATCH (s:Sentence {sentence_id: $sentence_id})-[r:HAS_FUNCTION|:HAS_STRUCTURE|:HAS_PURPOSE|:MENTIONS_TOPIC]->(n) "
+                "MATCH (s:Sentence {sentence_id: $sentence_id})"
+                "-[r:HAS_FUNCTION|:HAS_STRUCTURE|:HAS_PURPOSE|:MENTIONS_TOPIC]->(n) "
                 "RETURN count(r) AS relationship_count",
                 sentence_id=600,
             )

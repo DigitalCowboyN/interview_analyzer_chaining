@@ -75,7 +75,8 @@ class TestNeo4jTransactionIntegrity:
             # Check analysis node exists and is linked to sentence
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
+                MATCH (i:Interview {interview_id: $interview_id})
+                -[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
                 RETURN a, s
                 """,
@@ -98,7 +99,8 @@ class TestNeo4jTransactionIntegrity:
             for node_type, rel_type in expected_relationships:
                 result = await session.run(
                     f"""
-                    MATCH (i:Interview {{interview_id: $interview_id}})-[:HAS_SENTENCE]->(s:Sentence {{sentence_id: $sentence_id}})
+                    MATCH (i:Interview {{interview_id: $interview_id}})
+                    -[:HAS_SENTENCE]->(s:Sentence {{sentence_id: $sentence_id}})
                     MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:{rel_type}]->(n:{node_type})
                     RETURN count(n) as count
                     """,
@@ -232,7 +234,8 @@ class TestNeo4jTransactionIntegrity:
                 # Check analysis exists and is properly linked
                 result = await session.run(
                     """
-                    MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
+                    MATCH (i:Interview {interview_id: $interview_id})
+                -[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
                     MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
                     RETURN a.purpose as purpose
                     """,
@@ -288,7 +291,8 @@ class TestNeo4jRelationshipIntegrity:
             # Check Project -> Interview -> Sentence chain
             result = await session.run(
                 """
-                MATCH (p:Project {project_id: $project_id})-[:HAS_INTERVIEW]->(i:Interview {interview_id: $interview_id})
+                MATCH (p:Project {project_id: $project_id})
+                -[:HAS_INTERVIEW]->(i:Interview {interview_id: $interview_id})
                 MATCH (i)-[:HAS_SENTENCE]->(s:Sentence)
                 RETURN count(s) as sentence_count
                 """,
@@ -372,7 +376,8 @@ class TestNeo4jRelationshipIntegrity:
         async with await Neo4jConnectionManager.get_session() as session:
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
+                MATCH (i:Interview {interview_id: $interview_id})
+                -[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
                 RETURN count(a) as analysis_count
                 """,
@@ -385,7 +390,8 @@ class TestNeo4jRelationshipIntegrity:
             # Verify only one relationship to function type
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
+                MATCH (i:Interview {interview_id: $interview_id})
+                -[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:HAS_FUNCTION]->(f:FunctionType)
                 RETURN count(*) as function_rel_count
                 """,
@@ -625,7 +631,8 @@ class TestNeo4jDataConsistency:
             # Check sentence was updated
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
+                MATCH (i:Interview {interview_id: $interview_id})
+                -[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
                 RETURN s.text as text
                 """,
                 interview_id=interview_id,
@@ -637,7 +644,8 @@ class TestNeo4jDataConsistency:
             # Check analysis was updated (should have new values)
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
+                MATCH (i:Interview {interview_id: $interview_id})
+                -[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
                 MATCH (a)-[:HAS_FUNCTION]->(f:FunctionType)
                 MATCH (a)-[:HAS_STRUCTURE]->(st:StructureType)
@@ -654,7 +662,8 @@ class TestNeo4jDataConsistency:
             # Check old keywords were replaced with new ones
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
+                MATCH (i:Interview {interview_id: $interview_id})
+                -[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
                 RETURN collect(k.text) as keywords
                 """,

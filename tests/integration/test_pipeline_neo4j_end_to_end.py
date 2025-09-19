@@ -71,9 +71,9 @@ class TestPipelineNeo4jEndToEnd:
 
         What's your favorite data structure and why? I really like dictionaries because they provide O(1) lookup time.
 
-        How would you implement a binary search algorithm? First, I would ensure the array is sorted, then use divide and conquer.
+        How would you implement a binary search algorithm? First, I would ensure the array is sorted, then divide.
 
-        Can you explain the difference between a list and a tuple in Python? Lists are mutable while tuples are immutable.
+        Can you explain the difference between a list and a tuple in Python? Lists are mutable while tuples are not.
 
         What are your thoughts on code review processes? I believe code reviews are essential for maintaining quality.
 
