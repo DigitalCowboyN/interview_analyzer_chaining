@@ -89,7 +89,7 @@ class TestMetricsTrackerBasicOperations:
         assert tracker.errors == 4
 
         # Category-based errors (future enhancement)
-        tracker.increment_errors("validation_error", 2)
+        tracker.increment_errors("validation_error", count=2)
         assert tracker.errors == 6
 
 
@@ -266,7 +266,7 @@ class TestSummaryGeneration:
         # Populate with realistic data
         tracker.increment_api_calls(15)
         tracker.add_tokens(1250)
-        tracker.increment_errors(2)
+        tracker.increment_errors(count=2)  # Fix: specify count parameter explicitly
         tracker.set_metric("pipeline", "files_processed", 3)
         tracker.set_metric("file1.txt", "sentences", 45)
 
