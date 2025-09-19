@@ -1,16 +1,17 @@
 """
 src/utils/neo4j_driver.py
 
-Utility for managing the Neo4j asynchronous driver instance.
+Utility for managing the Neo4j asynchronous driver instance with environment-aware configuration.
 """
 
 import asyncio
-import os  # <---- Added os import
+import os
 from typing import Optional
 
 from neo4j import AsyncDriver, AsyncGraphDatabase
 
 from src.config import config  # Import the global config object
+from src.utils.environment import detect_environment, get_available_neo4j_config
 from src.utils.logger import get_logger
 
 logger = get_logger()
@@ -21,87 +22,137 @@ class Neo4jConnectionManager:
     _lock = asyncio.Lock()  # Lock to prevent race conditions during initialization
 
     @classmethod
-    async def get_driver(cls) -> AsyncDriver:
+    async def get_driver(cls, test_mode: bool = False) -> AsyncDriver:
         """
-        Gets the singleton Neo4j AsyncDriver instance.
+        Gets the singleton Neo4j AsyncDriver instance with environment-aware configuration.
 
-        Initializes the driver on first call using configuration first from environment
-        variables (NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD) and falling back to src.config.
-        Uses an async lock to ensure thread-safe initialization.
+        Initializes the driver on first call using intelligent environment detection
+        and connection availability testing. Supports both production and test modes.
+
+        Args:
+            test_mode: If True, use test database configuration
 
         Returns:
             AsyncDriver: The initialized Neo4j driver instance.
 
         Raises:
-            ValueError: If Neo4j configuration is missing or invalid from both env vars and src.config.
-            Exception: Propagates errors from driver initialization (e.g., connection issues).
+            ValueError: If no valid Neo4j configuration is found.
+            Exception: Propagates errors from driver initialization.
         """
         if cls._driver is None:
             async with cls._lock:
                 # Double-check if another coroutine initialized it while waiting for the lock
                 if cls._driver is None:
-                    logger.info("Initializing Neo4j Async Driver...")
-                    uri = None
-                    username = None
-                    password = None
-                    config_source = "unknown"
+                    environment = detect_environment()
+                    logger.info(f"Initializing Neo4j Async Driver in {environment} environment...")
+
+                    # Get environment-aware configuration
+                    connection_config = get_available_neo4j_config(test_mode=test_mode)
+
+                    if not connection_config:
+                        raise ValueError(
+                            f"No available Neo4j configuration found for {environment} environment. "
+                            f"Please ensure Neo4j is running and accessible."
+                        )
+
+                    uri = connection_config["uri"]
+                    username = connection_config["username"]
+                    password = connection_config["password"]
+                    config_source = connection_config["source"]
 
                     try:
-                        # Prioritize Environment Variables
-                        uri = os.getenv("NEO4J_URI")
-                        username = os.getenv("NEO4J_USER")
-                        password = os.getenv(
-                            "NEO4J_PASSWORD"
-                        )  # Returns None if not set
-
-                        if uri and username and password is not None:
-                            config_source = "environment variables"
-                            logger.info(
-                                "Using Neo4j config from environment variables."
-                            )
-                        else:
-                            # Fallback to global config object
-                            logger.info(
-                                "Attempting to use Neo4j config from global config object."
-                            )
-                            neo4j_config = config.get("neo4j")
-                            if neo4j_config:
-                                uri = neo4j_config.get("uri")
-                                username = neo4j_config.get("username")
-                                # Password should be loaded from env via config if set
-                                password = neo4j_config.get("password")
-                                config_source = "global config object"
-                            else:
-                                raise ValueError(
-                                    "Neo4j configuration not found in environment variables or global config."
-                                )
-
-                        if (
-                            not uri or not username or password is None
-                        ):  # Final check after fallback attempt
-                            raise ValueError(
-                                f"Neo4j URI, username, or password missing in configuration "
-                                f"(source: {config_source})."
-                            )
-
                         auth = (username, password)
-                        # max_connection_lifetime=3600 * 24 * 30, # Example: 30 days
-                        # max_connection_pool_size=50,
-                        # connection_acquisition_timeout=60
-                        cls._driver = AsyncGraphDatabase.driver(uri, auth=auth)
-                        logger.info(
-                            f"Neo4j Async Driver initialized for URI: {uri} (from {config_source})"
+                        cls._driver = AsyncGraphDatabase.driver(
+                            uri,
+                            auth=auth,
+                            max_connection_lifetime=3600,  # 1 hour
+                            max_connection_pool_size=10,  # Reasonable pool size
+                            connection_acquisition_timeout=30,  # 30 second timeout
                         )
-                        # Optional: Verify connectivity on initialization
-                        # await cls._driver.verify_connectivity()
-                        # logger.info("Neo4j connectivity verified.")
+
+                        logger.info(
+                            f"Neo4j Async Driver initialized for URI: {uri} "
+                            f"(source: {config_source}, environment: {environment})"
+                        )
+
+                        # Verify connectivity on initialization
+                        await cls.verify_connectivity()
+                        logger.info("Neo4j connectivity verified successfully.")
+
                     except Exception as e:
                         logger.critical(
-                            f"Failed to initialize Neo4j driver: {e}", exc_info=True
+                            f"Failed to initialize Neo4j driver for {uri}: {e}",
+                            exc_info=True,
                         )
                         cls._driver = None  # Ensure driver remains None on failure
                         raise  # Re-raise the exception
         return cls._driver
+
+    @classmethod
+    async def verify_connectivity(cls, timeout: float = 10.0) -> bool:
+        """
+        Verify Neo4j driver connectivity with a simple query.
+
+        Args:
+            timeout: Connection timeout in seconds
+
+        Returns:
+            bool: True if connection is successful
+
+        Raises:
+            Exception: If connection verification fails
+        """
+        if cls._driver is None:
+            raise ValueError("Driver not initialized. Call get_driver() first.")
+
+        try:
+            async with cls._driver.session() as session:
+                # Simple connectivity test
+                result = await session.run("RETURN 1 AS test")
+                record = await result.single()
+                if record and record["test"] == 1:
+                    return True
+                else:
+                    raise Exception("Unexpected result from connectivity test")
+        except Exception as e:
+            logger.error(f"Neo4j connectivity verification failed: {e}")
+            raise
+
+    @classmethod
+    async def wait_for_ready(cls, timeout: float = 30.0, test_mode: bool = False) -> bool:
+        """
+        Wait for Neo4j to become ready with retry logic.
+
+        Args:
+            timeout: Maximum time to wait in seconds
+            test_mode: If True, use test database configuration
+
+        Returns:
+            bool: True if Neo4j becomes ready within timeout
+        """
+        import time
+
+        start_time = time.time()
+        retry_interval = 2.0
+
+        logger.info(f"Waiting for Neo4j to become ready (timeout: {timeout}s)...")
+
+        while time.time() - start_time < timeout:
+            try:
+                # Force re-initialization to test current availability
+                if cls._driver:
+                    await cls.close_driver()
+
+                await cls.get_driver(test_mode=test_mode)
+                logger.info("Neo4j is ready!")
+                return True
+
+            except Exception as e:
+                logger.debug(f"Neo4j not ready yet: {e}")
+                await asyncio.sleep(retry_interval)
+
+        logger.error(f"Neo4j did not become ready within {timeout} seconds")
+        return False
 
     @classmethod
     async def close_driver(cls):
