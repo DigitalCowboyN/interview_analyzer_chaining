@@ -671,10 +671,10 @@ class TestTasksModuleIntegration:
         """Test that the task function has proper error handling structure."""
         import inspect
 
-        from src.tasks import run_pipeline_for_file
+        from src.tasks import _run_pipeline_for_file_core
 
-        # Get the source code of the wrapped function
-        source = inspect.getsource(run_pipeline_for_file.__wrapped__)
+        # Get the source code of the core function (where error handling is implemented)
+        source = inspect.getsource(_run_pipeline_for_file_core)
 
         # Verify error handling patterns exist in the source
         assert "try:" in source

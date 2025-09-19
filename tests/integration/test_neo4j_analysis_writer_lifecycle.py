@@ -16,6 +16,7 @@ import uuid
 import pytest
 
 from src.io.neo4j_analysis_writer import Neo4jAnalysisWriter
+from src.io.neo4j_map_storage import Neo4jMapStorage
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
 
@@ -39,11 +40,49 @@ class TestNeo4jAnalysisWriterLifecycle:
             "function_type": "declarative",
             "structure_type": "simple",
             "purpose": "testing",
-            "topic_level_1": "software_testing",
-            "topic_level_3": "integration_testing",
-            "overall_keywords": ["test", "lifecycle", "integration"],
+            "topics": ["software_testing", "integration_testing"],  # Combined topic levels
+            "keywords": ["test", "lifecycle", "integration"],  # Was overall_keywords
             "domain_keywords": ["testing", "software"],
         }
+
+    @pytest.fixture
+    async def setup_project_interview_sentence(
+        self, clean_test_database, test_project_interview_ids, sample_analysis_result
+    ):
+        """
+        Ensures Project, Interview, and a Sentence node exist before tests that
+        rely on Neo4jAnalysisWriter writing to an existing sentence.
+        """
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        project_id, interview_id = test_project_interview_ids
+        sentence_id = sample_analysis_result["sentence_id"]
+        sentence_text = sample_analysis_result["sentence"]
+        sequence_order = sample_analysis_result["sequence_order"]
+
+        # Create Project and Interview structure using Neo4jMapStorage
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()
+
+        # Create Sentence node linked to Interview
+        sentence_data = {
+            "sentence_id": sentence_id,
+            "sentence": sentence_text,
+            "sequence_order": sequence_order,
+        }
+        await map_storage.write_entry(sentence_data)
+
+        yield project_id, interview_id, sentence_id
+
+    async def create_sentence_node(self, project_id: str, interview_id: str, sentence_data: dict):
+        """
+        Helper method to create a sentence node for a given project/interview.
+        """
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()  # Ensure Project/Interview exist
+        await map_storage.write_entry(sentence_data)
 
     @pytest.mark.asyncio
     async def test_writer_initialization_and_cleanup(self, clean_test_database, test_project_interview_ids):
@@ -69,10 +108,10 @@ class TestNeo4jAnalysisWriterLifecycle:
 
     @pytest.mark.asyncio
     async def test_write_without_explicit_initialization(
-        self, clean_test_database, test_project_interview_ids, sample_analysis_result
+        self, setup_project_interview_sentence, sample_analysis_result
     ):
         """Test behavior when writing without explicit initialization."""
-        project_id, interview_id = test_project_interview_ids
+        project_id, interview_id, sentence_id = setup_project_interview_sentence
         writer = Neo4jAnalysisWriter(project_id, interview_id)
 
         # Neo4jAnalysisWriter should work without explicit initialization
@@ -87,6 +126,18 @@ class TestNeo4jAnalysisWriterLifecycle:
     async def test_multiple_writers_same_interview(self, clean_test_database, test_project_interview_ids):
         """Test behavior with multiple writers for the same interview."""
         project_id, interview_id = test_project_interview_ids
+
+        # Create sentence nodes first (use single MapStorage instance to avoid clearing)
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()
+
+        sentence_data_1 = {"sentence_id": 200, "sequence_order": 0, "sentence": "First writer sentence."}
+        sentence_data_2 = {"sentence_id": 201, "sequence_order": 1, "sentence": "Second writer sentence."}
+
+        await map_storage.write_entry(sentence_data_1)
+        await map_storage.write_entry(sentence_data_2)
 
         # Create two writers for the same interview
         writer1 = Neo4jAnalysisWriter(project_id, interview_id)
@@ -146,6 +197,14 @@ class TestNeo4jAnalysisWriterLifecycle:
         except Exception:
             pass  # Expected to fail
 
+        # Create sentence node for recovery test
+        sentence_data = {
+            "sentence_id": 300,
+            "sentence": "Recovery test sentence.",
+            "sequence_order": 0,
+        }
+        await self.create_sentence_node(project_id, interview_id, sentence_data)
+
         # Writer should still be functional after error
         valid_result = {
             "sentence_id": 300,
@@ -181,7 +240,7 @@ class TestNeo4jAnalysisWriterConcurrency:
                     "function_type": "declarative" if i % 2 == 0 else "interrogative",
                     "structure_type": "simple" if i % 3 == 0 else "complex",
                     "purpose": f"testing_concurrency_{i % 5}",
-                    "overall_keywords": [f"concurrent_{i}", f"test_{i % 10}"],
+                    "keywords": [f"concurrent_{i}", f"test_{i % 10}"],  # Fixed: was overall_keywords
                     "domain_keywords": [f"domain_{i % 7}"],
                 }
             )
@@ -195,6 +254,18 @@ class TestNeo4jAnalysisWriterConcurrency:
         writer = Neo4jAnalysisWriter(project_id, interview_id)
 
         await writer.initialize()
+
+        # Create sentence nodes for all concurrent test data
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()  # Ensure Project/Interview exist
+
+        for result in concurrent_test_data:
+            sentence_data = {
+                "sentence_id": result["sentence_id"],
+                "sentence": result["sentence"],
+                "sequence_order": result["sequence_order"],
+            }
+            await map_storage.write_entry(sentence_data)
 
         # Execute concurrent writes
         write_tasks = []
@@ -228,6 +299,21 @@ class TestNeo4jAnalysisWriterConcurrency:
             writer = Neo4jAnalysisWriter(project_id, interview_id)
             await writer.initialize()
             writers.append(writer)
+
+        # Create sentence nodes for each interview with appropriate sentence IDs
+        for i, interview_id in enumerate(interview_ids):
+            map_storage = Neo4jMapStorage(project_id, interview_id)
+            await map_storage.initialize()  # Ensure Project/Interview exist
+
+            # Each writer gets 4 results (20 total / 5 writers)
+            writer_data = concurrent_test_data[i * 4 : (i + 1) * 4]
+            for result in writer_data:
+                sentence_data = {
+                    "sentence_id": result["sentence_id"],
+                    "sentence": result["sentence"],
+                    "sequence_order": result["sequence_order"] - (i * 4),  # Adjust sequence order per interview
+                }
+                await map_storage.write_entry(sentence_data)
 
         # Each writer writes a subset of data
         write_tasks = []

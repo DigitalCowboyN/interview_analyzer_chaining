@@ -200,7 +200,7 @@ class TestNeo4jTransactionIntegrity:
                 "function_type": "declarative",
                 "structure_type": "simple",
                 "purpose": f"isolation_testing_{sentence_id}",
-                "overall_keywords": [f"concurrent_{sentence_id}", "isolation", "test"],
+                "keywords": [f"concurrent_{sentence_id}", "isolation", "test"],
             }
 
             await writer.write_result(data)
@@ -432,7 +432,7 @@ class TestNeo4jRelationshipIntegrity:
                 "function_type": "declarative",
                 "structure_type": "simple",
                 "purpose": f"cascade_testing_{i}",
-                "overall_keywords": shared_keywords + [f"unique_{i}"],
+                "keywords": shared_keywords + [f"unique_{i}"],
                 "domain_keywords": ["cascade", "testing"],
             }
             await writer.write_result(analysis_data)
@@ -602,7 +602,7 @@ class TestNeo4jDataConsistency:
             "function_type": "declarative",
             "structure_type": "simple",
             "purpose": "update_testing_original",
-            "overall_keywords": ["original", "test"],
+            "keywords": ["original", "test"],
         }
         await writer.write_result(original_analysis)
 
@@ -622,7 +622,7 @@ class TestNeo4jDataConsistency:
             "function_type": "interrogative",  # Changed
             "structure_type": "complex",  # Changed
             "purpose": "update_testing_modified",  # Changed
-            "overall_keywords": ["updated", "test", "modified"],  # Changed
+            "keywords": ["updated", "test", "modified"],  # Changed
         }
         await writer.write_result(updated_analysis)
 
@@ -694,7 +694,7 @@ class TestNeo4jDataConsistency:
             "function_type": "declarative",
             "structure_type": "simple",
             "purpose": "orphan_testing",
-            "overall_keywords": ["orphan", "detection", "test"],
+            "keywords": ["orphan", "detection", "test"],
             "domain_keywords": ["testing", "integrity"],
         }
 
@@ -796,7 +796,7 @@ class TestNeo4jDataValidation:
             "function_type": "declarative",
             "structure_type": "simple",
             "purpose": "type_consistency_testing",
-            "overall_keywords": ["type", "consistency", "test"],
+            "keywords": ["type", "consistency", "test"],  # Fixed: was overall_keywords
             "domain_keywords": ["testing", "validation"],
         }
         await writer.write_result(analysis_data)
@@ -826,7 +826,7 @@ class TestNeo4jDataValidation:
                 """
                 MATCH (s:Sentence {sentence_id: $sentence_id})-[:HAS_ANALYSIS]->(a:Analysis)
                 MATCH (a)-[:HAS_FUNCTION]->(f:FunctionType)
-                MATCH (a)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
+                MATCH (a)-[:MENTIONS_KEYWORD]->(k:Keyword)
                 RETURN f.name as function_name, collect(k.text) as keywords
                 """,
                 sentence_id=10000,
@@ -890,7 +890,8 @@ class TestNeo4jDataValidation:
             result = await session.run(
                 """
                 MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
-                RETURN collect(s.sequence_order ORDER BY s.sequence_order) as orders
+                WITH s ORDER BY s.sequence_order
+                RETURN collect(s.sequence_order) as orders
                 """,
                 interview_id=interview_id,
             )

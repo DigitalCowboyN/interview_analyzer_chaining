@@ -50,15 +50,22 @@ class Neo4jConnectionManager:
                     connection_config = get_available_neo4j_config(test_mode=test_mode)
 
                     if not connection_config:
-                        raise ValueError(
+                        error_msg = (
                             f"No available Neo4j configuration found for {environment} environment. "
                             f"Please ensure Neo4j is running and accessible."
                         )
+                        logger.critical(error_msg)
+                        raise ValueError(error_msg)
 
-                    uri = connection_config["uri"]
-                    username = connection_config["username"]
-                    password = connection_config["password"]
-                    config_source = connection_config["source"]
+                    try:
+                        uri = connection_config["uri"]
+                        username = connection_config["username"]
+                        password = connection_config["password"]
+                        config_source = connection_config["source"]
+                    except KeyError as e:
+                        error_msg = f"Incomplete Neo4j configuration: missing {e}"
+                        logger.critical(error_msg)
+                        raise ValueError(f"Neo4j driver initialization failed: {error_msg}")
 
                     try:
                         auth = (username, password)
@@ -85,7 +92,7 @@ class Neo4jConnectionManager:
                             exc_info=True,
                         )
                         cls._driver = None  # Ensure driver remains None on failure
-                        raise  # Re-raise the exception
+                        raise ValueError(f"Neo4j driver initialization failed: {e}")  # Wrap in ValueError
         return cls._driver
 
     @classmethod

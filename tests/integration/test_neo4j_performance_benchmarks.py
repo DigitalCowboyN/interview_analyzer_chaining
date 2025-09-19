@@ -63,7 +63,7 @@ class TestNeo4jSingleOperationPerformance:
                     "purpose": "performance_testing",
                     "topic_level_1": f"performance_topic_l1_{sentence_id % 10}",
                     "topic_level_3": f"performance_topic_l3_{sentence_id % 20}",
-                    "overall_keywords": [f"keyword_{i}" for i in range(sentence_id % 5 + 1)],
+                    "keywords": [f"keyword_{i}" for i in range(sentence_id % 5 + 1)],
                     "domain_keywords": [f"domain_{i}" for i in range(sentence_id % 3 + 1)],
                 }
             elif complexity == "maximum":
@@ -76,7 +76,7 @@ class TestNeo4jSingleOperationPerformance:
                     "purpose": "performance_testing",
                     "topic_level_1": f"performance_topic_l1_{sentence_id % 15}",
                     "topic_level_3": f"performance_topic_l3_{sentence_id % 30}",
-                    "overall_keywords": [f"keyword_{i}" for i in range(10)],  # Max keywords
+                    "keywords": [f"keyword_{i}" for i in range(10)],  # Max keywords
                     "domain_keywords": [f"domain_{i}" for i in range(8)],  # Max domain keywords
                 }
 
@@ -364,7 +364,7 @@ class TestNeo4jBulkOperationPerformance:
                     "structure_type": "simple" if i % 2 == 0 else "complex",
                     "purpose": "bulk_testing",
                     "topic_level_1": f"topic_{i % 5}",
-                    "overall_keywords": [f"keyword_{i}", f"bulk_{i % 10}"],
+                    "keywords": [f"keyword_{i}", f"bulk_{i % 10}"],
                     "domain_keywords": [f"domain_{i % 3}"],
                 }
                 test_data.append(data)
@@ -695,7 +695,7 @@ class TestNeo4jResourceEfficiencyBenchmarks:
                 "function_type": "declarative",
                 "structure_type": "complex",
                 "purpose": "memory_testing",
-                "overall_keywords": [f"keyword_{j}" for j in range(5)],
+                "keywords": [f"keyword_{j}" for j in range(5)],
                 "domain_keywords": [f"domain_{j}" for j in range(3)],
             }
             await writer.write_result(data)

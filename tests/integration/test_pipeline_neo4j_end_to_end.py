@@ -93,7 +93,7 @@ class TestPipelineNeo4jEndToEnd:
                 "purpose": "greeting",
                 "topic_level_1": "interview_process",
                 "topic_level_3": "interview_opening",
-                "overall_keywords": ["welcome", "technical", "interview"],
+                "keywords": ["welcome", "technical", "interview"],
                 "domain_keywords": ["interview", "technical"],
             },
             # Questions
@@ -103,7 +103,7 @@ class TestPipelineNeo4jEndToEnd:
                 "purpose": "assessment",
                 "topic_level_1": "technical_skills",
                 "topic_level_3": "programming_experience",
-                "overall_keywords": ["experience", "python", "programming"],
+                "keywords": ["experience", "python", "programming"],
                 "domain_keywords": ["python", "programming", "experience"],
             },
             # Responses
@@ -113,7 +113,7 @@ class TestPipelineNeo4jEndToEnd:
                 "purpose": "response",
                 "topic_level_1": "technical_skills",
                 "topic_level_3": "programming_experience",
-                "overall_keywords": ["working", "python", "years"],
+                "keywords": ["working", "python", "years"],
                 "domain_keywords": ["python", "experience", "years"],
             },
             # Technical questions
@@ -123,7 +123,7 @@ class TestPipelineNeo4jEndToEnd:
                 "purpose": "technical_assessment",
                 "topic_level_1": "data_structures",
                 "topic_level_3": "preference_reasoning",
-                "overall_keywords": ["favorite", "data", "structure"],
+                "keywords": ["favorite", "data", "structure"],
                 "domain_keywords": ["data_structure", "algorithms"],
             },
             # Technical responses
@@ -133,7 +133,7 @@ class TestPipelineNeo4jEndToEnd:
                 "purpose": "technical_explanation",
                 "topic_level_1": "data_structures",
                 "topic_level_3": "performance_analysis",
-                "overall_keywords": ["dictionaries", "lookup", "time"],
+                "keywords": ["dictionaries", "lookup", "time"],
                 "domain_keywords": ["dictionary", "performance", "complexity"],
             },
         }
@@ -208,7 +208,7 @@ class TestPipelineNeo4jEndToEnd:
                 "purpose": "general",
                 "topic_level_1": "conversation",
                 "topic_level_3": "general_discussion",
-                "overall_keywords": ["conversation"],
+                "keywords": ["conversation"],
                 "domain_keywords": ["general"],
             }
 
@@ -308,7 +308,7 @@ class TestPipelineNeo4jEndToEnd:
             "purpose": "interview",
             "topic_level_1": "professional",
             "topic_level_3": "interview_question",
-            "overall_keywords": ["interview", "question"],
+            "keywords": ["interview", "question"],
             "domain_keywords": ["professional"],
         }
 
@@ -393,7 +393,7 @@ class TestPipelineNeo4jEndToEnd:
                 "purpose": "test",
                 "topic_level_1": "testing",
                 "topic_level_3": "error_recovery",
-                "overall_keywords": ["test", "sentence"],
+                "keywords": ["test", "sentence"],
                 "domain_keywords": ["testing"],
             }
 
@@ -468,7 +468,7 @@ class TestPipelineNeo4jEndToEnd:
             "function_type": "declarative",
             "structure_type": "simple",
             "purpose": "test",
-            "overall_keywords": ["test"],
+            "keywords": ["test"],
             "domain_keywords": ["verification"],
         }
 
@@ -653,7 +653,7 @@ class TestPipelineNeo4jPerformance:
                 "purpose": "performance_test",
                 "topic_level_1": "testing",
                 "topic_level_3": "performance_evaluation",
-                "overall_keywords": ["performance", "test", "sentence"],
+                "keywords": ["performance", "test", "sentence"],
                 "domain_keywords": ["testing", "performance"],
             }
 
@@ -762,7 +762,7 @@ class TestPipelineNeo4jPerformance:
             "structure_type": "simple",
             "purpose": "concurrent_test",
             "topic_level_1": "testing",
-            "overall_keywords": ["concurrent", "test"],
+            "keywords": ["concurrent", "test"],
             "domain_keywords": ["performance"],
         }
 

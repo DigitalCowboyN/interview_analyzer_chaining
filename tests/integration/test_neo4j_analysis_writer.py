@@ -43,7 +43,7 @@ async def test_neo4j_analysis_writer_init_empty_ids() -> None:
         Neo4jAnalysisWriter("", "")
 
 
-async def test_neo4j_analysis_writer_initialize_finalize(clear_test_db: Any) -> None:
+async def test_neo4j_analysis_writer_initialize_finalize(clean_test_database: Any) -> None:
     """Tests basic initialize and finalize operations."""
     project_id: str = "test-project-init"
     interview_id: str = "test-interview-init"
@@ -57,7 +57,7 @@ async def test_neo4j_analysis_writer_initialize_finalize(clear_test_db: Any) -> 
     assert writer.get_identifier() == interview_id
 
 
-async def test_neo4j_analysis_writer_write_basic_result(clear_test_db: Any) -> None:
+async def test_neo4j_analysis_writer_write_basic_result(clean_test_database: Any) -> None:
     """Tests writing a basic analysis result with all dimensions."""
     project_id: str = "test-project-write"
     interview_id: str = "test-interview-write"
@@ -96,7 +96,7 @@ async def test_neo4j_analysis_writer_write_basic_result(clear_test_db: Any) -> N
     assert analysis_ids == {0}
 
 
-async def test_neo4j_analysis_writer_missing_sentence_error(clear_test_db):
+async def test_neo4j_analysis_writer_missing_sentence_error(clean_test_database):
     """Tests that writing analysis for non-existent sentence raises ValueError."""
     project_id = "test-project-missing"
     interview_id = "test-interview-missing"
@@ -114,7 +114,7 @@ async def test_neo4j_analysis_writer_missing_sentence_error(clear_test_db):
         await writer.write_result(analysis_result)
 
 
-async def test_neo4j_analysis_writer_missing_sentence_id(clear_test_db):
+async def test_neo4j_analysis_writer_missing_sentence_id(clean_test_database):
     """Tests that analysis result without sentence_id is handled gracefully."""
     project_id = "test-project-no-id"
     interview_id = "test-interview-no-id"
@@ -140,7 +140,7 @@ async def test_neo4j_analysis_writer_missing_sentence_id(clear_test_db):
 # --- Tests for Dimension Relationship Handling ---
 
 
-async def test_single_value_dimensions_basic(clear_test_db):
+async def test_single_value_dimensions_basic(clean_test_database):
     """Tests basic single-value dimension handling (function, structure, purpose)."""
     project_id = "test-project-single"
     interview_id = "test-interview-single"
@@ -203,7 +203,7 @@ async def test_single_value_dimensions_basic(clear_test_db):
         assert record["purpose_name"] == "testing"
 
 
-async def test_single_value_dimensions_overwrite(clear_test_db):
+async def test_single_value_dimensions_overwrite(clean_test_database):
     """Tests that single-value dimensions are overwritten when analysis is rerun."""
     project_id = "test-project-overwrite"
     interview_id = "test-interview-overwrite"
@@ -261,7 +261,7 @@ async def test_single_value_dimensions_overwrite(clear_test_db):
         assert record["structure_name"] == "complex"
 
 
-async def test_multi_value_dimensions_basic(clear_test_db):
+async def test_multi_value_dimensions_basic(clean_test_database):
     """Tests basic multi-value dimension handling (keywords, topics, domain_keywords)."""
     project_id = "test-project-multi"
     interview_id = "test-interview-multi"
@@ -329,7 +329,7 @@ async def test_multi_value_dimensions_basic(clear_test_db):
         assert sorted(domain_keywords) == ["database", "graph", "neo4j"]
 
 
-async def test_multi_value_dimensions_update_behavior(clear_test_db):
+async def test_multi_value_dimensions_update_behavior(clean_test_database):
     """Tests that multi-value dimensions are properly updated when analysis is rerun."""
     project_id = "test-project-update"
     interview_id = "test-interview-update"
@@ -391,7 +391,7 @@ async def test_multi_value_dimensions_update_behavior(clear_test_db):
         assert sorted(keywords) == ["analysis", "neo4j", "test"]
 
 
-async def test_empty_dimension_values(clear_test_db):
+async def test_empty_dimension_values(clean_test_database):
     """Tests handling of empty or None dimension values."""
     project_id = "test-project-empty"
     interview_id = "test-interview-empty"
@@ -486,7 +486,7 @@ async def test_empty_dimension_values(clear_test_db):
         assert record["domain_keyword_text"] == "neo4j"
 
 
-async def test_dimension_node_properties(clear_test_db):
+async def test_dimension_node_properties(clean_test_database):
     """Tests that dimension nodes are created with correct properties."""
     project_id = "test-project-props"
     interview_id = "test-interview-props"
@@ -556,7 +556,7 @@ async def test_dimension_node_properties(clear_test_db):
         assert record["is_custom"] is False
 
 
-async def test_dimension_relationship_properties(clear_test_db):
+async def test_dimension_relationship_properties(clean_test_database):
     """Tests that dimension relationships are created with correct properties."""
     project_id = "test-project-rel-props"
     interview_id = "test-interview-rel-props"
@@ -608,7 +608,7 @@ async def test_dimension_relationship_properties(clear_test_db):
 # --- Tests for Cardinality Limits Enforcement ---
 
 
-async def test_keyword_cardinality_limit_default(clear_test_db):
+async def test_keyword_cardinality_limit_default(clean_test_database):
     """Tests that keywords respect the default cardinality limit of 6."""
     project_id = "test-project-keyword-limit"
     interview_id = "test-interview-keyword-limit"
@@ -647,7 +647,7 @@ async def test_keyword_cardinality_limit_default(clear_test_db):
         assert record["keyword_count"] == 6
 
 
-async def test_topic_cardinality_unlimited(clear_test_db):
+async def test_topic_cardinality_unlimited(clean_test_database):
     """Tests that topics have unlimited cardinality (None limit)."""
     project_id = "test-project-topic-unlimited"
     interview_id = "test-interview-topic-unlimited"
@@ -687,7 +687,7 @@ async def test_topic_cardinality_unlimited(clear_test_db):
         assert record["topic_count"] == 20
 
 
-async def test_domain_keyword_cardinality_unlimited(clear_test_db):
+async def test_domain_keyword_cardinality_unlimited(clean_test_database):
     """Tests that domain keywords have unlimited cardinality (None limit)."""
     project_id = "test-project-domain-unlimited"
     interview_id = "test-interview-domain-unlimited"
@@ -727,7 +727,7 @@ async def test_domain_keyword_cardinality_unlimited(clear_test_db):
         assert record["domain_keyword_count"] == 15
 
 
-async def test_single_value_cardinality_enforcement(clear_test_db):
+async def test_single_value_cardinality_enforcement(clean_test_database):
     """Tests that single-value dimensions enforce cardinality of 1."""
     project_id = "test-project-single-cardinality"
     interview_id = "test-interview-single-cardinality"
@@ -773,7 +773,7 @@ async def test_single_value_cardinality_enforcement(clear_test_db):
         assert record["function_name"] == "interrogative"  # Should be the latest value
 
 
-async def test_cardinality_limit_with_duplicates(clear_test_db):
+async def test_cardinality_limit_with_duplicates(clean_test_database):
     """Tests that duplicate values don't count against cardinality limits."""
     project_id = "test-project-duplicates"
     interview_id = "test-interview-duplicates"
@@ -813,7 +813,7 @@ async def test_cardinality_limit_with_duplicates(clear_test_db):
         assert sorted(record["keywords"]) == ["analysis", "keyword", "neo4j", "test"]
 
 
-async def test_cardinality_limit_order_preservation(clear_test_db):
+async def test_cardinality_limit_order_preservation(clean_test_database):
     """Tests that when cardinality limits are enforced, the first N items are kept."""
     project_id = "test-project-order"
     interview_id = "test-interview-order"
@@ -856,7 +856,7 @@ async def test_cardinality_limit_order_preservation(clear_test_db):
         assert set(stored_keywords) == expected_keywords
 
 
-async def test_zero_cardinality_limit(clear_test_db):
+async def test_zero_cardinality_limit(clean_test_database):
     """Tests behavior when cardinality limit is set to 0."""
     project_id = "test-project-zero-limit"
     interview_id = "test-interview-zero-limit"
@@ -905,7 +905,7 @@ async def test_zero_cardinality_limit(clear_test_db):
 # --- Tests for Edit Flag Protection ---
 
 
-async def test_single_dimension_edit_protection(clear_test_db):
+async def test_single_dimension_edit_protection(clean_test_database):
     """Tests that single-value dimensions with is_edited=true are protected from overwriting."""
     project_id = "test-project-edit-protection"
     interview_id = "test-interview-edit-protection"
@@ -959,7 +959,7 @@ async def test_single_dimension_edit_protection(clear_test_db):
         assert record["is_edited"] is True
 
 
-async def test_multi_dimension_edit_protection(clear_test_db):
+async def test_multi_dimension_edit_protection(clean_test_database):
     """Tests that multi-value dimensions with is_edited=true are protected from removal."""
     project_id = "test-project-multi-edit"
     interview_id = "test-interview-multi-edit"
@@ -1024,7 +1024,7 @@ async def test_multi_dimension_edit_protection(clear_test_db):
         assert sorted(keywords) == expected_keywords
 
 
-async def test_mixed_edit_protection(clear_test_db):
+async def test_mixed_edit_protection(clean_test_database):
     """Tests edit protection with a mix of edited and unedited relationships."""
     project_id = "test-project-mixed-edit"
     interview_id = "test-interview-mixed-edit"
@@ -1117,7 +1117,7 @@ async def test_mixed_edit_protection(clear_test_db):
         assert record["is_edited"] is False
 
 
-async def test_edit_protection_with_cardinality_limits(clear_test_db):
+async def test_edit_protection_with_cardinality_limits(clean_test_database):
     """Tests that edit protection works correctly with cardinality limits."""
     project_id = "test-project-edit-cardinality"
     interview_id = "test-interview-edit-cardinality"
@@ -1196,7 +1196,7 @@ async def test_edit_protection_with_cardinality_limits(clear_test_db):
 # --- Tests for Error Result Handling ---
 
 
-async def test_error_result_basic_storage(clear_test_db):
+async def test_error_result_basic_storage(clean_test_database):
     """Tests that error results are properly stored in Analysis nodes without processing dimensions."""
     project_id = "test-project-error"
     interview_id = "test-interview-error"
@@ -1255,7 +1255,7 @@ async def test_error_result_basic_storage(clear_test_db):
         assert record["dimension_count"] == 0
 
 
-async def test_error_result_without_dimensions(clear_test_db):
+async def test_error_result_without_dimensions(clean_test_database):
     """Tests that error results work even without dimension data in the result."""
     project_id = "test-project-error-minimal"
     interview_id = "test-interview-error-minimal"
@@ -1309,7 +1309,7 @@ async def test_error_result_without_dimensions(clear_test_db):
         assert record["dimension_count"] == 0
 
 
-async def test_error_result_after_successful_analysis(clear_test_db):
+async def test_error_result_after_successful_analysis(clean_test_database):
     """Tests that error results can overwrite successful analysis results."""
     project_id = "test-project-error-overwrite"
     interview_id = "test-interview-error-overwrite"
@@ -1379,7 +1379,7 @@ async def test_error_result_after_successful_analysis(clear_test_db):
         # without processing dimensions.
 
 
-async def test_error_result_read_analysis_ids(clear_test_db):
+async def test_error_result_read_analysis_ids(clean_test_database):
     """Tests that error results are included in read_analysis_ids."""
     project_id = "test-project-error-read"
     interview_id = "test-interview-error-read"
@@ -1426,7 +1426,7 @@ async def test_error_result_read_analysis_ids(clear_test_db):
     assert analysis_ids == {0, 1}
 
 
-async def test_error_result_with_complex_error_data(clear_test_db):
+async def test_error_result_with_complex_error_data(clean_test_database):
     """Tests that complex error data structures are properly stored."""
     project_id = "test-project-error-complex"
     interview_id = "test-interview-error-complex"
@@ -1489,7 +1489,7 @@ async def test_error_result_with_complex_error_data(clear_test_db):
         assert stored_error_data["partial_results"]["confidence"] == 0.1
 
 
-async def test_error_result_false_flag(clear_test_db):
+async def test_error_result_false_flag(clean_test_database):
     """Tests that results with error=False are processed normally."""
     project_id = "test-project-error-false"
     interview_id = "test-interview-error-false"
@@ -1554,7 +1554,7 @@ async def test_error_result_false_flag(clear_test_db):
 # --- Tests for Database Error Handling ---
 
 
-async def test_database_connection_error_write_result(clear_test_db):
+async def test_database_connection_error_write_result(clean_test_database):
     """Tests that connection errors during write_result are properly handled."""
     project_id = "test-project-db-error"
     interview_id = "test-interview-db-error"
@@ -1595,7 +1595,7 @@ async def test_database_connection_error_write_result(clear_test_db):
             await writer.write_result(analysis_result)
 
 
-async def test_database_connection_error_read_analysis_ids(clear_test_db):
+async def test_database_connection_error_read_analysis_ids(clean_test_database):
     """Tests that connection errors during read_analysis_ids are properly handled."""
     project_id = "test-project-db-error-read"
     interview_id = "test-interview-db-error-read"
@@ -1621,7 +1621,7 @@ async def test_database_connection_error_read_analysis_ids(clear_test_db):
             await writer.read_analysis_ids()
 
 
-async def test_invalid_cypher_query_handling(clear_test_db):
+async def test_invalid_cypher_query_handling(clean_test_database):
     """Tests handling of invalid Cypher queries by patching session.run."""
     project_id = "test-project-invalid-query"
     interview_id = "test-interview-invalid-query"
@@ -1662,7 +1662,7 @@ async def test_invalid_cypher_query_handling(clear_test_db):
             await writer.write_result(analysis_result)
 
 
-async def test_constraint_violation_handling(clear_test_db):
+async def test_constraint_violation_handling(clean_test_database):
     """Tests handling of constraint violations during write operations."""
     project_id = "test-project-constraint"
     interview_id = "test-interview-constraint"
@@ -1703,7 +1703,7 @@ async def test_constraint_violation_handling(clear_test_db):
             await writer.write_result(analysis_result)
 
 
-async def test_transaction_rollback_on_error(clear_test_db):
+async def test_transaction_rollback_on_error(clean_test_database):
     """Tests that transactions are properly rolled back on errors."""
     project_id = "test-project-rollback"
     interview_id = "test-interview-rollback"
@@ -1762,7 +1762,7 @@ async def test_transaction_rollback_on_error(clear_test_db):
         assert call_count >= 3  # At least 3 calls were made before failure
 
 
-async def test_read_analysis_ids_database_error_handling(clear_test_db):
+async def test_read_analysis_ids_database_error_handling(clean_test_database):
     """Tests that database errors during read_analysis_ids are properly logged and re-raised."""
     project_id = "test-project-read-error"
     interview_id = "test-interview-read-error"
@@ -1791,7 +1791,7 @@ async def test_read_analysis_ids_database_error_handling(clear_test_db):
     # The connection will be automatically restored by the test fixture
 
 
-async def test_partial_write_failure_recovery(clear_test_db):
+async def test_partial_write_failure_recovery(clean_test_database):
     """Tests behavior when some dimension writes succeed but others fail."""
     project_id = "test-project-partial-failure"
     interview_id = "test-interview-partial-failure"
@@ -1836,7 +1836,7 @@ async def test_partial_write_failure_recovery(clear_test_db):
             await writer.write_result(analysis_result)
 
 
-async def test_session_management_error_handling(clear_test_db):
+async def test_session_management_error_handling(clean_test_database):
     """Tests that session management errors are handled properly."""
     project_id = "test-project-session-error"
     interview_id = "test-interview-session-error"
@@ -1863,7 +1863,7 @@ async def test_session_management_error_handling(clear_test_db):
             await writer.write_result(analysis_result)
 
 
-async def test_graceful_degradation_on_non_critical_errors(clear_test_db):
+async def test_graceful_degradation_on_non_critical_errors(clean_test_database):
     """Tests that the writer can continue operating when non-critical operations fail."""
     project_id = "test-project-graceful"
     interview_id = "test-interview-graceful"
@@ -1909,7 +1909,7 @@ async def test_graceful_degradation_on_non_critical_errors(clear_test_db):
 # --- Tests for Project Cardinality Overrides ---
 
 
-async def test_project_keyword_limit_override(clear_test_db):
+async def test_project_keyword_limit_override(clean_test_database):
     """Tests that project-specific keyword limits override default limits."""
     project_id = "test-project-keyword-override"
     interview_id = "test-interview-keyword-override"
@@ -1957,7 +1957,7 @@ async def test_project_keyword_limit_override(clear_test_db):
         assert record["keyword_count"] == 3  # Custom limit enforced
 
 
-async def test_project_topic_limit_override(clear_test_db):
+async def test_project_topic_limit_override(clean_test_database):
     """Tests that project-specific topic limits override default unlimited behavior."""
     project_id = "test-project-topic-override"
     interview_id = "test-interview-topic-override"
@@ -2005,7 +2005,7 @@ async def test_project_topic_limit_override(clear_test_db):
         assert record["topic_count"] == 2  # Custom limit enforced
 
 
-async def test_project_zero_limit_override(clear_test_db):
+async def test_project_zero_limit_override(clean_test_database):
     """Tests that project-specific zero limits prevent relationship creation."""
     project_id = "test-project-zero-override"
     interview_id = "test-interview-zero-override"
@@ -2053,7 +2053,7 @@ async def test_project_zero_limit_override(clear_test_db):
         assert record["domain_keyword_count"] == 0  # Zero limit enforced
 
 
-async def test_project_single_dimension_limit_override(clear_test_db):
+async def test_project_single_dimension_limit_override(clean_test_database):
     """Tests that project-specific limits work for single-value dimensions."""
     project_id = "test-project-single-override"
     interview_id = "test-interview-single-override"
@@ -2103,7 +2103,7 @@ async def test_project_single_dimension_limit_override(clear_test_db):
         assert record["structure_count"] == 1  # Default limit still applies
 
 
-async def test_project_partial_limit_overrides(clear_test_db):
+async def test_project_partial_limit_overrides(clean_test_database):
     """Tests that only specified project limits override defaults, others use defaults."""
     project_id = "test-project-partial-override"
     interview_id = "test-interview-partial-override"
@@ -2155,7 +2155,7 @@ async def test_project_partial_limit_overrides(clear_test_db):
         assert record["topic_count"] == 5    # Default unlimited behavior
 
 
-async def test_project_limits_with_null_values(clear_test_db):
+async def test_project_limits_with_null_values(clean_test_database):
     """Tests that NULL project limits fall back to defaults correctly."""
     project_id = "test-project-null-limits"
     interview_id = "test-interview-null-limits"
@@ -2214,7 +2214,7 @@ async def test_project_limits_with_null_values(clear_test_db):
         assert record["topic_count"] == 3    # Project limit applied
 
 
-async def test_project_limits_all_dimensions(clear_test_db):
+async def test_project_limits_all_dimensions(clean_test_database):
     """Tests that project limits work for all dimension types."""
     project_id = "test-project-all-limits"
     interview_id = "test-interview-all-limits"
@@ -2282,7 +2282,7 @@ async def test_project_limits_all_dimensions(clear_test_db):
         assert record["domain_keyword_count"] == 2  # Custom limit enforced
 
 
-async def test_project_limits_with_existing_relationships(clear_test_db):
+async def test_project_limits_with_existing_relationships(clean_test_database):
     """Tests that project limits work correctly when updating existing analyses."""
     project_id = "test-project-existing-limits"
     interview_id = "test-interview-existing-limits"

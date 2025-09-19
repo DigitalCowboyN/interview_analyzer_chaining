@@ -40,7 +40,7 @@ async def test_neo4j_map_storage_init_empty_ids():
         Neo4jMapStorage("", "")
 
 
-async def test_neo4j_map_storage_write_read_finalize(clear_test_db):
+async def test_neo4j_map_storage_write_read_finalize(clean_test_database):
     """Tests writing, reading (all entries and IDs), and finalizing map storage."""
     project_id = "test-project-write-read"
     interview_id = "test-interview-write-read"
@@ -75,7 +75,7 @@ async def test_neo4j_map_storage_write_read_finalize(clear_test_db):
     assert read_ids == expected_ids
 
 
-async def test_neo4j_map_storage_with_optional_fields(clear_test_db):
+async def test_neo4j_map_storage_with_optional_fields(clean_test_database):
     """Tests writing entries with optional fields like start_time, end_time, speaker."""
     project_id = "test-project-optional"
     interview_id = "test-interview-optional"
@@ -88,7 +88,7 @@ async def test_neo4j_map_storage_with_optional_fields(clear_test_db):
             "sentence": "Hello world.",
             "start_time": 0.0,
             "end_time": 2.5,
-            "speaker": "John"
+            "speaker": "John",
         },
         {
             "sentence_id": 1,
@@ -96,7 +96,7 @@ async def test_neo4j_map_storage_with_optional_fields(clear_test_db):
             "sentence": "How are you?",
             "start_time": 3.0,
             "end_time": 4.8,
-            "speaker": "Jane"
+            "speaker": "Jane",
         },
     ]
 
@@ -117,7 +117,7 @@ async def test_neo4j_map_storage_with_optional_fields(clear_test_db):
         assert read_entry["speaker"] == original_entry["speaker"]
 
 
-async def test_neo4j_map_storage_initialize_clears_old_data(clear_test_db):
+async def test_neo4j_map_storage_initialize_clears_old_data(clean_test_database):
     """Tests that initializing clears old sentences for the same interview."""
     project_id = "test-project-clear"
     interview_id = "test-interview-clear"
@@ -155,7 +155,7 @@ async def test_neo4j_map_storage_initialize_clears_old_data(clear_test_db):
     assert read_entries[0]["text"] == "New sentence 10."
 
 
-async def test_neo4j_map_storage_missing_required_keys(clear_test_db):
+async def test_neo4j_map_storage_missing_required_keys(clean_test_database):
     """Tests that write_entry raises ValueError for missing required keys."""
     project_id = "test-project-missing"
     interview_id = "test-interview-missing"
@@ -176,7 +176,7 @@ async def test_neo4j_map_storage_missing_required_keys(clear_test_db):
         await storage.write_entry({"sentence_id": 0, "sequence_order": 0})
 
 
-async def test_neo4j_map_storage_read_empty_interview(clear_test_db):
+async def test_neo4j_map_storage_read_empty_interview(clean_test_database):
     """Tests reading from an interview that has no sentences."""
     project_id = "test-project-empty"
     interview_id = "test-interview-empty"
@@ -190,7 +190,7 @@ async def test_neo4j_map_storage_read_empty_interview(clear_test_db):
     assert read_ids == set()
 
 
-async def test_neo4j_map_storage_multiple_projects(clear_test_db):
+async def test_neo4j_map_storage_multiple_projects(clean_test_database):
     """Tests that different projects/interviews are isolated."""
     # Project 1, Interview 1
     storage1 = Neo4jMapStorage("project-1", "interview-1")
@@ -223,7 +223,7 @@ async def test_neo4j_map_storage_multiple_projects(clear_test_db):
     assert read2[0]["text"] == "Project 2 sentence."
 
 
-async def test_neo4j_map_storage_sequence_ordering(clear_test_db):
+async def test_neo4j_map_storage_sequence_ordering(clean_test_database):
     """Tests that entries are returned in correct sequence order."""
     project_id = "test-project-order"
     interview_id = "test-interview-order"
@@ -252,7 +252,7 @@ async def test_neo4j_map_storage_sequence_ordering(clear_test_db):
     assert read_entries[2]["text"] == "Third sentence."
 
 
-async def test_neo4j_map_storage_non_integer_sentence_ids(clear_test_db):
+async def test_neo4j_map_storage_non_integer_sentence_ids(clean_test_database):
     """Tests handling of non-integer sentence IDs in read_sentence_ids."""
     project_id = "test-project-nonint"
     interview_id = "test-interview-nonint"

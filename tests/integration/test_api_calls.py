@@ -72,7 +72,7 @@ async def test_openai_integration():
         "purpose": "informational",
         "topic_level_1": "integration testing",
         "topic_level_3": "API evaluation",
-        "overall_keywords": ["integration", "API"],
+        "keywords": ["integration", "API"],
         "domain_keywords": ["integration"],
     }
     # Patch the create method on the agent's client using AsyncMock.
@@ -89,5 +89,5 @@ async def test_openai_integration():
     assert response.get("purpose") == "informational"
     assert response.get("topic_level_1") == "integration testing"
     assert response.get("topic_level_3") == "API evaluation"
-    assert response.get("overall_keywords") == ["integration", "API"]
+    assert response.get("keywords") == ["integration", "API"]
     assert response.get("domain_keywords") == ["integration"]

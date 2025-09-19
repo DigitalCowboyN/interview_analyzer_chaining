@@ -41,7 +41,7 @@ class TestNeo4jNetworkFaultTolerance:
             "purpose": "testing",
             "topic_level_1": "fault_tolerance",
             "topic_level_3": "network_interruption",
-            "overall_keywords": ["fault", "tolerance", "test"],
+            "keywords": ["fault", "tolerance", "test"],
             "domain_keywords": ["testing", "reliability"],
         }
 
@@ -349,7 +349,7 @@ class TestNeo4jDataConsistencyFaultTolerance:
             "purpose": "consistency_testing",
             "topic_level_1": "data_integrity",
             "topic_level_3": "consistency_validation",
-            "overall_keywords": ["consistency", "integrity", "atomic"],
+            "keywords": ["consistency", "integrity", "atomic"],
             "domain_keywords": ["testing", "validation", "data"],
         }
 
@@ -485,7 +485,7 @@ class TestNeo4jDataConsistencyFaultTolerance:
         # Create proper project/interview structure first
         map_storage = Neo4jMapStorage(project_id, interview_id)
         await map_storage.initialize()
-        await map_storage.write_sentence_mapping(
+        await map_storage.write_entry(
             {
                 "sentence_id": 8001,
                 "text": "New data after recovery test",
@@ -540,7 +540,7 @@ class TestNeo4jLongRunningFaultTolerance:
                 }
 
                 # Add sentence mapping first
-                await map_storage.write_sentence_mapping(
+                await map_storage.write_entry(
                     {
                         "sentence_id": 9000 + i,
                         "text": data["sentence"],
@@ -609,7 +609,7 @@ class TestNeo4jLongRunningFaultTolerance:
                     "function_type": "declarative",
                 }
 
-                await map_storage.write_sentence_mapping(
+                await map_storage.write_entry(
                     {
                         "sentence_id": 10000 + i,
                         "text": data["sentence"],
