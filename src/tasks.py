@@ -14,27 +14,31 @@ from src.utils.logger import get_logger
 logger = get_logger()
 
 
-@celery_app.task(bind=True)
-def run_pipeline_for_file(
-    self,
+def _run_pipeline_for_file_core(
     input_file_path_str: str,
     output_dir_str: str,
     map_dir_str: str,
     config_dict: dict,
+    task_id: str = "unknown",
 ):
     """
-    Celery task to run the analysis pipeline for a single input file.
-
-    Instantiates necessary services and calls the core run_pipeline function.
+    Core logic for running pipeline for a single file.
+    Extracted for easier testing.
 
     Args:
-        self: The task instance (available via bind=True).
         input_file_path_str (str): Path to the input file as a string.
         output_dir_str (str): Path to the output directory as a string.
         map_dir_str (str): Path to the map directory as a string.
-        config_dict (dict): Configuration dictionary (passed from API).
+        config_dict (dict): Configuration dictionary.
+        task_id (str): Task ID for logging.
+
+    Returns:
+        dict: Status result
+
+    Raises:
+        FileNotFoundError: If input file doesn't exist
+        Exception: Other pipeline errors
     """
-    task_id = self.request.id
     logger.info(f"[Task {task_id}] Received task for file: {input_file_path_str}")
 
     try:
@@ -71,3 +75,33 @@ def run_pipeline_for_file(
             exc_info=True,
         )
         raise  # Re-raise the exception so Celery marks the task as FAILED
+
+
+@celery_app.task(bind=True)
+def run_pipeline_for_file(
+    self,
+    input_file_path_str: str,
+    output_dir_str: str,
+    map_dir_str: str,
+    config_dict: dict,
+):
+    """
+    Celery task to run the analysis pipeline for a single input file.
+
+    Instantiates necessary services and calls the core run_pipeline function.
+
+    Args:
+        self: The task instance (available via bind=True).
+        input_file_path_str (str): Path to the input file as a string.
+        output_dir_str (str): Path to the output directory as a string.
+        map_dir_str (str): Path to the map directory as a string.
+        config_dict (dict): Configuration dictionary (passed from API).
+    """
+    task_id = self.request.id
+    return _run_pipeline_for_file_core(
+        input_file_path_str=input_file_path_str,
+        output_dir_str=output_dir_str,
+        map_dir_str=map_dir_str,
+        config_dict=config_dict,
+        task_id=task_id,
+    )
