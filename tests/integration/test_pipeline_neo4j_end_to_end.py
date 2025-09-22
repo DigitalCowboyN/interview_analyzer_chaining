@@ -172,7 +172,6 @@ class TestPipelineNeo4jEndToEnd:
     @pytest.mark.asyncio
     async def test_single_file_complete_pipeline(
         self,
-        clean_test_database,
         tmp_path,
         pipeline_config,
         test_project_interview_ids,
@@ -181,6 +180,15 @@ class TestPipelineNeo4jEndToEnd:
     ):
         """Test complete pipeline execution for a single file."""
         project_id, interview_id = test_project_interview_ids
+
+        # CRITICAL: Ensure Neo4j connection manager is reset and uses test mode
+        # This must be done to override any previous production mode initialization
+        await Neo4jConnectionManager.close_driver()
+        await Neo4jConnectionManager.get_driver(test_mode=True)
+
+        # Clear the test database manually
+        async with await Neo4jConnectionManager.get_session() as session:
+            await session.run("MATCH (n) DETACH DELETE n")
 
         # Setup directories
         input_dir = tmp_path / "input"
@@ -235,7 +243,7 @@ class TestPipelineNeo4jEndToEnd:
         async with await Neo4jConnectionManager.get_session() as session:
             # Check Project and Interview nodes exist
             result = await session.run(
-                "MATCH (p:Project {project_id: $project_id})-[:HAS_INTERVIEW]->"
+                "MATCH (p:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->"
                 "(i:Interview {interview_id: $interview_id}) "
                 "RETURN p, i",
                 project_id=project_id,
@@ -244,13 +252,28 @@ class TestPipelineNeo4jEndToEnd:
             project_interview = await result.single()
             assert project_interview is not None
 
-            # Check sentences were created
+            # Check sentences were created (they are linked to SourceFile, not Interview in current implementation)
             result = await session.run(
-                "MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence) "
+                "MATCH (s:Sentence)-[:PART_OF_FILE]->(f:SourceFile) "
+                "WHERE f.filename = $filename "
                 "RETURN count(s) as sentence_count",
-                interview_id=interview_id,
+                filename="interview_001.txt",
             )
             sentence_count = await result.single()
+            print(f"DEBUG: Sentences linked to SourceFile 'interview_001.txt': {sentence_count['sentence_count']}")
+
+            # Debug: Check if sentences exist at all
+            result = await session.run("MATCH (s:Sentence) RETURN count(s) as total_sentences")
+            total_sentences = await result.single()
+            print(f"DEBUG: Total Sentence nodes: {total_sentences['total_sentences']}")
+
+            # Debug: Check if SourceFile exists
+            result = await session.run("MATCH (f:SourceFile) RETURN f.filename as filename")
+            files = []
+            async for record in result:
+                files.append(record["filename"])
+            print(f"DEBUG: SourceFile nodes: {files}")
+
             assert sentence_count["sentence_count"] > 5  # Should have multiple sentences
 
             # Check analysis nodes were created

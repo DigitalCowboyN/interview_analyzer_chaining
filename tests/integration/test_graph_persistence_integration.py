@@ -29,7 +29,7 @@ class TestGraphPersistenceBasicOperations:
             "purpose": "evaluation",
             "topic_level_1": "technical_assessment",
             "topic_level_3": "problem_solving_evaluation",
-            "keywords": ["candidate", "problem-solving", "technical", "interview"],
+            "overall_keywords": ["candidate", "problem-solving", "technical", "interview"],
             "domain_keywords": ["assessment", "skills", "evaluation"],
         }
 
@@ -450,7 +450,7 @@ class TestGraphPersistenceDataIntegrity:
             # Should have no type or topic relationships
             result = await session.run(
                 "MATCH (s:Sentence {sentence_id: $sentence_id})"
-                "-[r:HAS_FUNCTION|:HAS_STRUCTURE|:HAS_PURPOSE|:MENTIONS_TOPIC]->(n) "
+                "-[r:HAS_FUNCTION|HAS_STRUCTURE|HAS_PURPOSE|MENTIONS_TOPIC]->(n) "
                 "RETURN count(r) AS relationship_count",
                 sentence_id=600,
             )

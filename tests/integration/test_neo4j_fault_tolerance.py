@@ -73,12 +73,11 @@ class TestNeo4jNetworkFaultTolerance:
         assert 999 in ids_before
 
         # Simulate connection loss by temporarily disrupting the driver
-        @asynccontextmanager
-        async def failing_session():
+        async def failing_get_session():
             raise ConnectionError("Simulated network interruption")
 
         # Patch get_session to fail
-        with patch.object(Neo4jConnectionManager, "get_session", side_effect=failing_session):
+        with patch.object(Neo4jConnectionManager, "get_session", side_effect=failing_get_session):
             # Attempt to write during connection loss
             connection_loss_data = {**test_analysis_data, "sentence_id": 1001}
 
@@ -101,6 +100,18 @@ class TestNeo4jNetworkFaultTolerance:
         """Test automatic connection recovery with retry logic."""
         project_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
+
+        # Create required sentence node first (required for Neo4jAnalysisWriter)
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()
+        sentence_data = {
+            "sentence_id": test_analysis_data["sentence_id"],
+            "sentence": test_analysis_data["sentence"],
+            "sequence_order": test_analysis_data["sequence_order"],
+        }
+        await map_storage.write_entry(sentence_data)
 
         # Track retry attempts
         retry_count = 0

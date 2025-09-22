@@ -53,14 +53,12 @@ class TestNeo4jAnalysisWriterIntegration:
                     "MENTIONS_KEYWORD": 6,
                     "MENTIONS_TOPIC": None,  # Unlimited
                     "MENTIONS_DOMAIN_KEYWORD": None,  # Unlimited
-                }
+                },
             },
-            "preprocessing": {
-                "context_windows": {"immediate": 1, "broader": 3, "observer": 5}
-            },
+            "preprocessing": {"context_windows": {"immediate": 1, "broader": 3, "observer": 5}},
             "classification": {"local": {"prompt_files": {"no_context": "dummy"}}},
             "domain_keywords": [],
-            "openai": {"model_name": "gpt-4"}
+            "openai": {"model_name": "gpt-4"},
         }
 
     @pytest.fixture
@@ -80,11 +78,7 @@ class TestNeo4jAnalysisWriterIntegration:
         return str(uuid.uuid4()), str(uuid.uuid4())
 
     async def test_pipeline_with_neo4j_analysis_writer_success(
-        self,
-        integration_dirs,
-        mock_config,
-        test_project_and_interview_ids,
-        clear_test_db
+        self, integration_dirs, mock_config, test_project_and_interview_ids, clean_test_database
     ):
         """Test complete pipeline execution using Neo4jAnalysisWriter for result storage."""
         input_dir, output_dir, map_dir = integration_dirs
@@ -106,7 +100,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 "purpose": "social_interaction",
                 "topics": ["communication", "casual_greeting"],
                 "keywords": ["hello", "greeting"],
-                "domain_keywords": ["social"]
+                "domain_keywords": ["social"],
             },
             {
                 "sentence_id": 1,
@@ -117,7 +111,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 "purpose": "inquiry",
                 "topics": ["communication", "personal_inquiry"],
                 "keywords": ["question", "wellbeing"],
-                "domain_keywords": ["personal"]
+                "domain_keywords": ["personal"],
             },
             {
                 "sentence_id": 2,
@@ -128,8 +122,8 @@ class TestNeo4jAnalysisWriterIntegration:
                 "purpose": "information",
                 "topics": ["testing", "test_data"],
                 "keywords": ["test", "sentence"],
-                "domain_keywords": ["testing"]
-            }
+                "domain_keywords": ["testing"],
+            },
         ]
 
         # Create a custom orchestrator that uses Neo4jAnalysisWriter
@@ -165,8 +159,7 @@ class TestNeo4jAnalysisWriterIntegration:
 
         # Mock the sentence analyzer to return our test data
         with patch(
-            "src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence",
-            new_callable=AsyncMock
+            "src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence", new_callable=AsyncMock
         ) as mock_classify:
             # Configure mock to return analysis results without sentence metadata
             def mock_classify_side_effect(sentence, *args, **kwargs):
@@ -174,7 +167,8 @@ class TestNeo4jAnalysisWriterIntegration:
                     if result["sentence"] == sentence:
                         # Return only the analysis fields, not the sentence metadata
                         return {
-                            k: v for k, v in result.items()
+                            k: v
+                            for k, v in result.items()
                             if k not in ["sentence_id", "sequence_order", "sentence", "filename"]
                         }
                 return {
@@ -183,7 +177,7 @@ class TestNeo4jAnalysisWriterIntegration:
                     "purpose": "unknown",
                     "topics": [],
                     "keywords": [],
-                    "domain_keywords": []
+                    "domain_keywords": [],
                 }
 
             mock_classify.side_effect = mock_classify_side_effect
@@ -194,7 +188,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 output_dir=output_dir,
                 map_dir=map_dir,
                 config_dict=mock_config,
-                task_id="test-neo4j-integration"
+                task_id="test-neo4j-integration",
             )
 
             await orchestrator.execute(specific_file=test_file.name)
@@ -203,15 +197,13 @@ class TestNeo4jAnalysisWriterIntegration:
         async with await Neo4jConnectionManager.get_session() as session:
             # Check that the project and interview nodes exist
             project_result = await session.run(
-                "MATCH (p:Project {project_id: $project_id}) RETURN p",
-                project_id=project_id
+                "MATCH (p:Project {project_id: $project_id}) RETURN p", project_id=project_id
             )
             project_record = await project_result.single()
             assert project_record is not None
 
             interview_result = await session.run(
-                "MATCH (i:Interview {interview_id: $interview_id}) RETURN i",
-                interview_id=interview_id
+                "MATCH (i:Interview {interview_id: $interview_id}) RETURN i", interview_id=interview_id
             )
             interview_record = await interview_result.single()
             assert interview_record is not None
@@ -223,16 +215,18 @@ class TestNeo4jAnalysisWriterIntegration:
                 RETURN s.sentence_id as sentence_id, s.text as text, s.sequence_order as sequence_order
                 ORDER BY s.sentence_id
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
 
             sentences = []
             async for record in sentences_result:
-                sentences.append({
-                    "sentence_id": record["sentence_id"],
-                    "text": record["text"],
-                    "sequence_order": record["sequence_order"]
-                })
+                sentences.append(
+                    {
+                        "sentence_id": record["sentence_id"],
+                        "text": record["text"],
+                        "sequence_order": record["sequence_order"],
+                    }
+                )
 
             assert len(sentences) == 3
             assert sentences[0]["text"] == "Hello world."
@@ -246,7 +240,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
                 RETURN count(a) as analysis_count
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
             analysis_record = await analysis_result.single()
             assert analysis_record is not None
@@ -262,15 +256,12 @@ class TestNeo4jAnalysisWriterIntegration:
                 RETURN f.name as function_name, s.sentence_id as sentence_id
                 ORDER BY s.sentence_id
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
 
             functions = []
             async for record in function_result:
-                functions.append({
-                    "sentence_id": record["sentence_id"],
-                    "function_name": record["function_name"]
-                })
+                functions.append({"sentence_id": record["sentence_id"], "function_name": record["function_name"]})
 
             assert len(functions) == 3
             assert functions[0]["function_name"] == "greeting"
@@ -285,15 +276,12 @@ class TestNeo4jAnalysisWriterIntegration:
                 RETURN k.text as keyword, s.sentence_id as sentence_id
                 ORDER BY s.sentence_id, k.text
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
 
             keywords = []
             async for record in keyword_result:
-                keywords.append({
-                    "sentence_id": record["sentence_id"],
-                    "keyword": record["keyword"]
-                })
+                keywords.append({"sentence_id": record["sentence_id"], "keyword": record["keyword"]})
 
             # Should have keywords for all sentences (limited by cardinality)
             assert len(keywords) > 0
@@ -308,11 +296,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 assert count <= 6, f"Sentence {sentence_id} has {count} keywords, exceeding limit of 6"
 
     async def test_pipeline_with_neo4j_analysis_writer_error_handling(
-        self,
-        integration_dirs,
-        mock_config,
-        test_project_and_interview_ids,
-        clear_test_db
+        self, integration_dirs, mock_config, test_project_and_interview_ids, clean_test_database
     ):
         """Test that analysis errors are properly handled and stored in Neo4j."""
         input_dir, output_dir, map_dir = integration_dirs
@@ -352,9 +336,9 @@ class TestNeo4jAnalysisWriterIntegration:
 
         # Mock the sentence analyzer to simulate an error for the second sentence
         with patch(
-            "src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence",
-            new_callable=AsyncMock
+            "src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence", new_callable=AsyncMock
         ) as mock_classify:
+
             def mock_classify_side_effect(sentence, *args, **kwargs):
                 if "Good sentence" in sentence:
                     return {
@@ -363,7 +347,7 @@ class TestNeo4jAnalysisWriterIntegration:
                         "purpose": "information",
                         "topics": ["testing"],
                         "keywords": ["good", "test"],
-                        "domain_keywords": ["testing"]
+                        "domain_keywords": ["testing"],
                     }
                 elif "Bad sentence" in sentence:
                     raise ValueError("Simulated analysis error")
@@ -373,7 +357,7 @@ class TestNeo4jAnalysisWriterIntegration:
                     "purpose": "unknown",
                     "topics": [],
                     "keywords": [],
-                    "domain_keywords": []
+                    "domain_keywords": [],
                 }
 
             mock_classify.side_effect = mock_classify_side_effect
@@ -384,7 +368,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 output_dir=output_dir,
                 map_dir=map_dir,
                 config_dict=mock_config,
-                task_id="test-neo4j-error-handling"
+                task_id="test-neo4j-error-handling",
             )
 
             await orchestrator.execute(specific_file=test_file.name)
@@ -397,7 +381,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
                 RETURN count(s) as sentence_count
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
             sentences_record = await sentences_result.single()
             assert sentences_record is not None
@@ -412,15 +396,12 @@ class TestNeo4jAnalysisWriterIntegration:
                 RETURN a.error_data as error_data, s.sentence_id as sentence_id
                 ORDER BY s.sentence_id
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
 
             analyses = []
             async for record in analysis_result:
-                analyses.append({
-                    "sentence_id": record["sentence_id"],
-                    "error_data": record["error_data"]
-                })
+                analyses.append({"sentence_id": record["sentence_id"], "error_data": record["error_data"]})
 
             # Should only have one successful analysis (sentence 0)
             # Error results are not stored in Neo4j by design
@@ -437,7 +418,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 OPTIONAL MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
                 RETURN s.sentence_id as sentence_id, a.sentence_id as analysis_sentence_id
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
             sentence1_record = await sentence1_analysis_result.single()
             assert sentence1_record is not None
@@ -451,7 +432,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:HAS_FUNCTION]->(f:FunctionType)
                 RETURN f.name as function_name
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
             function_record = await function_result.single()
             assert function_record is not None
@@ -460,11 +441,7 @@ class TestNeo4jAnalysisWriterIntegration:
             # Error sentences don't have analysis nodes, so no dimension relationships to check
 
     async def test_pipeline_with_neo4j_cardinality_limits(
-        self,
-        integration_dirs,
-        mock_config,
-        test_project_and_interview_ids,
-        clear_test_db
+        self, integration_dirs, mock_config, test_project_and_interview_ids, clean_test_database
     ):
         """Test that cardinality limits are properly enforced in Neo4j storage."""
         input_dir, output_dir, map_dir = integration_dirs
@@ -504,8 +481,7 @@ class TestNeo4jAnalysisWriterIntegration:
 
         # Mock the sentence analyzer to return many keywords (more than the limit)
         with patch(
-            "src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence",
-            new_callable=AsyncMock
+            "src.agents.sentence_analyzer.SentenceAnalyzer.classify_sentence", new_callable=AsyncMock
         ) as mock_classify:
             mock_classify.return_value = {
                 "function_type": "statement",
@@ -514,13 +490,27 @@ class TestNeo4jAnalysisWriterIntegration:
                 "topics": ["testing", "cardinality_testing"],
                 # Return 10 keywords (more than the limit of 6)
                 "keywords": [
-                    "keyword1", "keyword2", "keyword3", "keyword4", "keyword5",
-                    "keyword6", "keyword7", "keyword8", "keyword9", "keyword10"
+                    "keyword1",
+                    "keyword2",
+                    "keyword3",
+                    "keyword4",
+                    "keyword5",
+                    "keyword6",
+                    "keyword7",
+                    "keyword8",
+                    "keyword9",
+                    "keyword10",
                 ],
                 "domain_keywords": [
-                    "domain1", "domain2", "domain3", "domain4", "domain5",
-                    "domain6", "domain7", "domain8"  # 8 domain keywords (no limit)
-                ]
+                    "domain1",
+                    "domain2",
+                    "domain3",
+                    "domain4",
+                    "domain5",
+                    "domain6",
+                    "domain7",
+                    "domain8",  # 8 domain keywords (no limit)
+                ],
             }
 
             # Create and execute the test orchestrator
@@ -529,7 +519,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 output_dir=output_dir,
                 map_dir=map_dir,
                 config_dict=mock_config,
-                task_id="test-neo4j-cardinality"
+                task_id="test-neo4j-cardinality",
             )
 
             await orchestrator.execute(specific_file=test_file.name)
@@ -543,7 +533,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_KEYWORD]->(k:Keyword)
                 RETURN count(k) as keyword_count
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
             keyword_record = await keyword_result.single()
             assert keyword_record is not None
@@ -557,7 +547,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_DOMAIN_KEYWORD]->(dk:DomainKeyword)
                 RETURN count(dk) as domain_keyword_count
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
             domain_keyword_record = await domain_keyword_result.single()
             assert domain_keyword_record is not None
@@ -571,7 +561,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:HAS_FUNCTION]->(f:FunctionType)
                 RETURN count(f) as function_count
                 """,
-                interview_id=interview_id
+                interview_id=interview_id,
             )
             function_record = await function_result.single()
             assert function_record is not None

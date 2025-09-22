@@ -227,6 +227,16 @@ class TestNeo4jAnalysisWriterLifecycle:
 class TestNeo4jAnalysisWriterConcurrency:
     """Test concurrent operations with Neo4j Analysis Writer."""
 
+    async def create_sentence_node(self, project_id: str, interview_id: str, sentence_data: dict):
+        """
+        Helper method to create a sentence node for a given project/interview.
+        """
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()  # Ensure Project/Interview exist
+        await map_storage.write_entry(sentence_data)
+
     @pytest.fixture
     def concurrent_test_data(self):
         """Generate test data for concurrent operations."""
@@ -346,6 +356,21 @@ class TestNeo4jAnalysisWriterConcurrency:
         writer = Neo4jAnalysisWriter(project_id, interview_id)
 
         await writer.initialize()
+
+        # Create all sentence nodes first (required for Neo4jAnalysisWriter)
+        # Use a single Neo4jMapStorage instance to avoid deleting previously created sentences
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()  # Initialize once
+
+        for i in range(50):
+            sentence_data = {
+                "sentence_id": 2000 + i,
+                "sentence": f"Stress test sentence {2000 + i}.",
+                "sequence_order": 2000 + i,
+            }
+            await map_storage.write_entry(sentence_data)  # Use same instance
 
         # Rapid concurrent operations mixing reads and writes
         async def write_operation(sentence_id: int):
