@@ -53,9 +53,7 @@ async def save_analysis_to_graph(
         )
         return
 
-    logger.debug(
-        f"Saving analysis for sentence {sentence_id} from file '{filename}' to graph."
-    )
+    logger.debug(f"Saving analysis for sentence {sentence_id} from file '{filename}' to graph.")
 
     params = {
         "filename": filename,
@@ -79,22 +77,18 @@ async def save_analysis_to_graph(
         # AWAIT the coroutine to get the actual session context manager
         async with await connection_manager.get_session() as session:
             # Combine steps 1 & 2 into a single query for efficiency and atomicity
+            # IMPORTANT: Match existing sentences by sentence_id only (created by Neo4jMapStorage)
+            # and add filename property + PART_OF_FILE relationship
             query_sentence = """
             MERGE (f:SourceFile {filename: $filename})
-            MERGE (s:Sentence {sentence_id: $sentence_id, filename: $filename})
-            ON CREATE SET
-                s.text = $text,
-                s.sequence_order = $sequence_order
-            ON MATCH SET
-                s.text = $text,
-                s.sequence_order = $sequence_order
+            WITH f
+            MATCH (s:Sentence {sentence_id: $sentence_id})
+            SET s.filename = $filename
             MERGE (s)-[:PART_OF_FILE]->(f)
             """
             # Execute using the session
             await session.run(query_sentence, parameters=params)
-            logger.debug(
-                f"Merged SourceFile and Sentence nodes for sentence {sentence_id} from '{filename}'."
-            )
+            logger.debug(f"Merged SourceFile and Sentence nodes for sentence {sentence_id} from '{filename}'.")
 
             # --- 3. MERGE Type Nodes & Relationships (FunctionType, StructureType, Purpose) ---
             type_queries = []
@@ -130,9 +124,7 @@ async def save_analysis_to_graph(
             if type_queries:
                 for query in type_queries:
                     await session.run(query, parameters=params)
-                logger.debug(
-                    f"Merged type nodes/relationships for sentence {sentence_id}."
-                )
+                logger.debug(f"Merged type nodes/relationships for sentence {sentence_id}.")
 
             # --- 4. MERGE Topic Nodes & Relationships ---
             topic_query = """
@@ -152,9 +144,7 @@ async def save_analysis_to_graph(
             # Only execute if at least one topic level exists
             if params.get("topic_level_1") or params.get("topic_level_3"):
                 await session.run(topic_query, parameters=params)
-                logger.debug(
-                    f"Merged topic nodes/relationships for sentence {sentence_id}."
-                )
+                logger.debug(f"Merged topic nodes/relationships for sentence {sentence_id}.")
 
             # --- 5. MERGE Keyword Nodes & Relationships ---
             keyword_queries = []
@@ -184,9 +174,7 @@ async def save_analysis_to_graph(
             if keyword_queries:
                 for query in keyword_queries:
                     await session.run(query, parameters=params)
-                logger.debug(
-                    f"Merged keyword nodes/relationships for sentence {sentence_id}."
-                )
+                logger.debug(f"Merged keyword nodes/relationships for sentence {sentence_id}.")
 
             # --- 6. MERGE :FOLLOWS Relationship (Optional but Recommended) ---
             # Only attempt to create FOLLOWS if sequence_order > 0
@@ -205,9 +193,7 @@ async def save_analysis_to_graph(
                 # Need to handle the case where sequence_order might be 0 or None explicitly.
                 try:
                     await session.run(follows_query, parameters=params)
-                    logger.debug(
-                        f"Merged :FOLLOWS relationship for sentence {sentence_id}."
-                    )
+                    logger.debug(f"Merged :FOLLOWS relationship for sentence {sentence_id}.")
                 except Exception as follows_e:
                     # Log specifically if FOLLOWS fails, but don't necessarily fail the whole save
                     logger.warning(
@@ -216,9 +202,7 @@ async def save_analysis_to_graph(
                     )
 
         # Changed level to INFO
-        logger.info(
-            f"Successfully completed graph updates for sentence {sentence_id} from '{filename}'."
-        )
+        logger.info(f"Successfully completed graph updates for sentence {sentence_id} from '{filename}'.")
 
     except Exception as e:
         logger.error(
