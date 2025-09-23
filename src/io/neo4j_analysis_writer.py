@@ -38,12 +38,8 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         self.project_id = str(project_id)
         self.interview_id = str(interview_id)
         # Load default cardinality limits from config once during initialization
-        self.default_limits = config.get("pipeline", {}).get(
-            "default_cardinality_limits", {}
-        )
-        logger.debug(
-            f"Neo4jAnalysisWriter initialized for Project: {self.project_id}, Interview: {self.interview_id}"
-        )
+        self.default_limits = config.get("pipeline", {}).get("default_cardinality_limits", {})
+        logger.debug(f"Neo4jAnalysisWriter initialized for Project: {self.project_id}, Interview: {self.interview_id}")
 
     async def initialize(self):
         """
@@ -80,9 +76,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         # Check if the result itself is an error reported by the analysis service
         is_error_result = result.get("error", False)
 
-        logger.debug(
-            f"Writing analysis result for Sentence ID: {sentence_id} in Interview: {self.interview_id}"
-        )
+        logger.debug(f"Writing analysis result for Sentence ID: {sentence_id} in Interview: {self.interview_id}")
 
         try:
             async with await Neo4jConnectionManager.get_session() as session:
@@ -96,9 +90,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
                     is_error_result,
                     self.default_limits,
                 )
-            logger.debug(
-                f"Successfully wrote analysis result for Sentence ID: {sentence_id}"
-            )
+            logger.debug(f"Successfully wrote analysis result for Sentence ID: {sentence_id}")
         except Exception as e:
             logger.error(
                 f"Failed Neo4j write_result for Sentence ID {sentence_id} (Interview {self.interview_id}): {e}",
@@ -135,9 +127,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
                 f"Cannot write analysis."
             )
             # Raise an error or just return? Raising is safer to signal inconsistency.
-            raise ValueError(
-                f"Sentence node {sentence_id} not found for Interview {interview_id}"
-            )
+            raise ValueError(f"Sentence node {sentence_id} not found for Interview {interview_id}")
 
         # 2. MERGE the Analysis node linked to the Sentence
         #    Set properties on create.
@@ -154,9 +144,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             ),  # Store error details as JSON string if it's an error
         }
         # Filter out None values
-        analysis_props_on_create = {
-            k: v for k, v in analysis_props_on_create.items() if v is not None
-        }
+        analysis_props_on_create = {k: v for k, v in analysis_props_on_create.items() if v is not None}
 
         merge_analysis_query = """
             MATCH (s:Sentence {sentence_id: $sentence_id})<-[:HAS_SENTENCE]-(:Interview {interview_id: $interview_id})
@@ -172,9 +160,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             props=analysis_props_on_create,
         )
         analysis_node = (await analysis_node_result.single())["a"]  # Get the analysis node
-        logger.debug(
-            f"_write_result_tx: Merged Analysis node for Sentence {sentence_id}"
-        )
+        logger.debug(f"_write_result_tx: Merged Analysis node for Sentence {sentence_id}")
 
         # --- If it was an error result, stop here ---
         if is_error_result:
@@ -199,7 +185,8 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             dimension_value=result.get("function_type"),
             relationship_type="HAS_FUNCTION",
             cardinality_limit=(
-                project_limits.get("HAS_FUNCTION") if project_limits.get("HAS_FUNCTION") is not None
+                project_limits.get("HAS_FUNCTION")
+                if project_limits.get("HAS_FUNCTION") is not None
                 else default_limits.get("HAS_FUNCTION", 1)
             ),  # Default 1
             props_on_create={},
@@ -214,7 +201,8 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             dimension_value=result.get("structure_type"),
             relationship_type="HAS_STRUCTURE",
             cardinality_limit=(
-                project_limits.get("HAS_STRUCTURE") if project_limits.get("HAS_STRUCTURE") is not None
+                project_limits.get("HAS_STRUCTURE")
+                if project_limits.get("HAS_STRUCTURE") is not None
                 else default_limits.get("HAS_STRUCTURE", 1)
             ),  # Default 1
             props_on_create={},
@@ -229,7 +217,8 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             dimension_value=result.get("purpose"),
             relationship_type="HAS_PURPOSE",
             cardinality_limit=(
-                project_limits.get("HAS_PURPOSE") if project_limits.get("HAS_PURPOSE") is not None
+                project_limits.get("HAS_PURPOSE")
+                if project_limits.get("HAS_PURPOSE") is not None
                 else default_limits.get("HAS_PURPOSE", 1)
             ),  # Default 1
             props_on_create={},
@@ -241,17 +230,14 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             analysis_node_id=analysis_node.id,
             dimension_label="Topic",
             dimension_key="name",
-            dimension_values=result.get(
-                "topics", []
-            ),  # Assuming 'topics' key holds a list of topic names
+            dimension_values=result.get("topics", []),  # Assuming 'topics' key holds a list of topic names
             relationship_type="MENTIONS_TOPIC",
             cardinality_limit=(
-                project_limits.get("MENTIONS_TOPIC") if project_limits.get("MENTIONS_TOPIC") is not None
+                project_limits.get("MENTIONS_TOPIC")
+                if project_limits.get("MENTIONS_TOPIC") is not None
                 else default_limits.get("MENTIONS_TOPIC", None)
             ),  # Default unlimited
-            props_on_create=lambda v: {
-                "name": v
-            },  # Function to create props for new Topic node
+            props_on_create=lambda v: {"name": v},  # Function to create props for new Topic node
             # We might need to handle level property for Topic here too
         )
 
@@ -262,11 +248,12 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             dimension_label="Keyword",
             dimension_key="text",
             dimension_values=result.get(
-                "keywords", []
-            ),  # Assuming 'keywords' key holds a list of keyword strings
+                "overall_keywords", []
+            ),  # Fixed: Use 'overall_keywords' to match SentenceAnalyzer output
             relationship_type="MENTIONS_KEYWORD",
             cardinality_limit=(
-                project_limits.get("MENTIONS_KEYWORD") if project_limits.get("MENTIONS_KEYWORD") is not None
+                project_limits.get("MENTIONS_KEYWORD")
+                if project_limits.get("MENTIONS_KEYWORD") is not None
                 else default_limits.get("MENTIONS_KEYWORD", 6)
             ),  # Default 6
             props_on_create=lambda v: {"text": v},
@@ -278,9 +265,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             analysis_node_id=analysis_node.id,
             dimension_label="DomainKeyword",
             dimension_key="text",
-            dimension_values=result.get(
-                "domain_keywords", []
-            ),  # Assuming 'domain_keywords' key
+            dimension_values=result.get("domain_keywords", []),  # Assuming 'domain_keywords' key
             relationship_type="MENTIONS_DOMAIN_KEYWORD",
             cardinality_limit=(
                 project_limits.get("MENTIONS_DOMAIN_KEYWORD")
@@ -325,16 +310,13 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             # If value is None or empty, potentially remove existing link (if not edited)
             # For now, we just do nothing if no value provided.
             # TODO: Add logic to remove existing link if value is None and rel not edited?
-            logger.debug(
-                f"Skipping link {relationship_type} from Analysis {analysis_node_id}: No value provided."
-            )
+            logger.debug(f"Skipping link {relationship_type} from Analysis {analysis_node_id}: No value provided.")
             return
 
         # Check cardinality limit - if it's 0, don't create any relationships
         if cardinality_limit is not None and cardinality_limit == 0:
             logger.debug(
-                f"Skipping link {relationship_type} from Analysis {analysis_node_id}: "
-                f"Cardinality limit is 0."
+                f"Skipping link {relationship_type} from Analysis {analysis_node_id}: " f"Cardinality limit is 0."
             )
             return
 
@@ -394,8 +376,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
     ):
         if not dimension_values:
             logger.debug(
-                f"Skipping list link {relationship_type} from Analysis {analysis_node_id}: "
-                f"No values provided."
+                f"Skipping list link {relationship_type} from Analysis {analysis_node_id}: " f"No values provided."
             )
             # Optionally, remove all non-edited existing links if the input list is empty
             # query_delete_all_unedited = f"""
@@ -434,9 +415,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
 
         # 2. Identify changes
         target_values_set = unique_dimension_values
-        values_to_add_set = (
-            target_values_set - existing_edited_values - existing_unedited_values
-        )
+        values_to_add_set = target_values_set - existing_edited_values - existing_unedited_values
         unedited_values_to_remove_set = existing_unedited_values - target_values_set
 
         # 3. Calculate available slots for new items (considering the limit and preserved edited items)
@@ -478,9 +457,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
                     values_to_add_list.append(value)
                     seen.add(value)
             if slots_available != float("inf"):
-                values_to_add_list = values_to_add_list[
-                    : int(slots_available)
-                ]  # Take only as many as allowed
+                values_to_add_list = values_to_add_list[: int(slots_available)]  # Take only as many as allowed
 
             if values_to_add_list:
                 # Process each value individually to handle props_on_create lambda
@@ -502,8 +479,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
                         computed_props=computed_props,
                     )
                 logger.debug(
-                    f"Added {len(values_to_add_list)} new {relationship_type} links "
-                    f"for Analysis {analysis_node_id}"
+                    f"Added {len(values_to_add_list)} new {relationship_type} links " f"for Analysis {analysis_node_id}"
                 )
             else:
                 logger.debug(

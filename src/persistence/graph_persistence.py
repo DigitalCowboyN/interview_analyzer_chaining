@@ -77,12 +77,14 @@ async def save_analysis_to_graph(
         # AWAIT the coroutine to get the actual session context manager
         async with await connection_manager.get_session() as session:
             # Combine steps 1 & 2 into a single query for efficiency and atomicity
-            # IMPORTANT: Match existing sentences by sentence_id only (created by Neo4jMapStorage)
-            # and add filename property + PART_OF_FILE relationship
+            # IMPORTANT: Use MERGE to handle both cases:
+            # 1. Sentence exists (created by Neo4jMapStorage) - just add filename and PART_OF_FILE relationship
+            # 2. Sentence doesn't exist - create it with all properties
             query_sentence = """
             MERGE (f:SourceFile {filename: $filename})
             WITH f
-            MATCH (s:Sentence {sentence_id: $sentence_id})
+            MERGE (s:Sentence {sentence_id: $sentence_id})
+            ON CREATE SET s.text = $text, s.sequence_order = $sequence_order
             SET s.filename = $filename
             MERGE (s)-[:PART_OF_FILE]->(f)
             """
@@ -96,7 +98,7 @@ async def save_analysis_to_graph(
             if params.get("function_type"):
                 type_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                MATCH (s:Sentence {sentence_id: $sentence_id})
                 MERGE (t:FunctionType {name: $function_type})
                 MERGE (s)-[:HAS_FUNCTION_TYPE]->(t)
                 """
@@ -105,7 +107,7 @@ async def save_analysis_to_graph(
             if params.get("structure_type"):
                 type_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                MATCH (s:Sentence {sentence_id: $sentence_id})
                 MERGE (t:StructureType {name: $structure_type})
                 MERGE (s)-[:HAS_STRUCTURE_TYPE]->(t)
                 """
@@ -114,7 +116,7 @@ async def save_analysis_to_graph(
             if params.get("purpose"):
                 type_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                MATCH (s:Sentence {sentence_id: $sentence_id})
                 MERGE (t:Purpose {name: $purpose})
                 MERGE (s)-[:HAS_PURPOSE]->(t)
                 """
@@ -128,7 +130,7 @@ async def save_analysis_to_graph(
 
             # --- 4. MERGE Topic Nodes & Relationships ---
             topic_query = """
-            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+            MATCH (s:Sentence {sentence_id: $sentence_id})
             // Use UNWIND to process multiple topics efficiently if they are passed as a list
             // For now, handling topic_level_1 and topic_level_3 separately
             // Consider refactoring if topics become a list in analysis_data
@@ -153,7 +155,7 @@ async def save_analysis_to_graph(
                 # Use UNWIND for efficient list processing
                 keyword_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                MATCH (s:Sentence {sentence_id: $sentence_id})
                 UNWIND $overall_keywords AS keyword_text
                 MERGE (k:Keyword {text: keyword_text})
                 MERGE (s)-[:MENTIONS_OVERALL_KEYWORD]->(k)
@@ -163,7 +165,7 @@ async def save_analysis_to_graph(
             if params.get("domain_keywords"):
                 keyword_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
+                MATCH (s:Sentence {sentence_id: $sentence_id})
                 UNWIND $domain_keywords AS keyword_text
                 MERGE (k:Keyword {text: keyword_text})
                 MERGE (s)-[:MENTIONS_DOMAIN_KEYWORD]->(k)
@@ -181,9 +183,10 @@ async def save_analysis_to_graph(
             if sequence_order is not None and sequence_order > 0:
                 follows_query = """
                 // Match the current sentence (s2)
-                MATCH (s2:Sentence {sentence_id: $sentence_id, filename: $filename})
-                // Match the previous sentence (s1) in the same file
-                MATCH (s1:Sentence {sequence_order: $sequence_order - 1, filename: $filename})
+                MATCH (s2:Sentence {sentence_id: $sentence_id})
+                // Match the previous sentence (s1) in the same file with same filename
+                MATCH (s1:Sentence {sequence_order: $sequence_order - 1})
+                WHERE s1.filename = $filename
                 // Ensure the relationship doesn't already exist, then create it
                 MERGE (s1)-[r:FOLLOWS]->(s2)
                 """
