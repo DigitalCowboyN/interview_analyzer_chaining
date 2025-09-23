@@ -324,9 +324,9 @@ class TestNeo4jRelationshipIntegrity:
                 interview_id=interview_id,
             )
             sequence_count = await result.single()
-            # NOTE: Due to a bug in Neo4jMapStorage, NEXT_SENTENCE relationships are not created correctly
-            # The query uses sentence_id to match but passes sequence_order values
-            assert sequence_count["sequence_count"] == 0  # Should be 4, but bug prevents creation
+            # FIXED: Neo4jMapStorage now correctly creates NEXT_SENTENCE relationships
+            # by matching on sequence_order instead of sentence_id
+            assert sequence_count["sequence_count"] == 4  # 5 sentences = 4 NEXT_SENTENCE relationships
 
             # Verify no orphaned analysis nodes
             result = await session.run(

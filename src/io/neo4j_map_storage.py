@@ -32,9 +32,7 @@ class Neo4jMapStorage(ConversationMapStorage):
             raise ValueError("project_id and interview_id cannot be empty")
         self.project_id = str(project_id)
         self.interview_id = str(interview_id)
-        logger.debug(
-            f"Neo4jMapStorage initialized for Project: {self.project_id}, Interview: {self.interview_id}"
-        )
+        logger.debug(f"Neo4jMapStorage initialized for Project: {self.project_id}, Interview: {self.interview_id}")
 
     async def initialize(self):
         """
@@ -49,9 +47,7 @@ class Neo4jMapStorage(ConversationMapStorage):
             async with await Neo4jConnectionManager.get_session() as session:
                 # Create Project and Interview nodes, clear old data
                 await self._run_initialization_queries(session)
-            logger.info(
-                f"Neo4j initialization complete for Interview: {self.interview_id}"
-            )
+            logger.info(f"Neo4j initialization complete for Interview: {self.interview_id}")
         except Exception as e:
             logger.error(
                 f"Failed Neo4j initialization for Interview {self.interview_id}: {e}",
@@ -114,14 +110,10 @@ class Neo4jMapStorage(ConversationMapStorage):
         required_keys = ["sentence_id", "sequence_order", "sentence"]
         if not all(key in entry for key in required_keys):
             logger.error(f"write_entry missing required keys in entry: {entry}")
-            raise ValueError(
-                "Entry dict missing required keys (sentence_id, sequence_order, sentence)"
-            )
+            raise ValueError("Entry dict missing required keys (sentence_id, sequence_order, sentence)")
 
         sentence_id = entry["sentence_id"]
-        logger.debug(
-            f"Writing entry for Sentence ID: {sentence_id} in Interview: {self.interview_id}"
-        )
+        logger.debug(f"Writing entry for Sentence ID: {sentence_id} in Interview: {self.interview_id}")
 
         try:
             async with await Neo4jConnectionManager.get_session() as session:
@@ -136,9 +128,7 @@ class Neo4jMapStorage(ConversationMapStorage):
 
     async def _run_write_entry_queries(self, session, entry: Dict[str, Any]):
         """Run write entry queries directly on the session."""
-        logger.debug(
-            f"Running write_entry queries for Sentence ID: {entry.get('sentence_id')}"
-        )
+        logger.debug(f"Running write_entry queries for Sentence ID: {entry.get('sentence_id')}")
 
         # Extract data, providing defaults for optional fields
         s_id = entry["sentence_id"]
@@ -206,20 +196,20 @@ class Neo4jMapStorage(ConversationMapStorage):
             await session.run(first_sentence_query, interview_id=self.interview_id, s_id=s_id)
             logger.debug(f"Merged :FIRST_SENTENCE for Sentence {s_id}")
         else:
-            prev_s_id = s_order - 1
+            prev_sequence_order = s_order - 1
             next_sentence_query = """
                 MATCH (i:Interview {interview_id: $interview_id})
-                MATCH (prev_s:Sentence {sentence_id: $prev_s_id})<-[:HAS_SENTENCE]-(i)
+                MATCH (prev_s:Sentence {sequence_order: $prev_sequence_order})<-[:HAS_SENTENCE]-(i)
                 MATCH (s:Sentence {sentence_id: $s_id})<-[:HAS_SENTENCE]-(i)
                 MERGE (prev_s)-[:NEXT_SENTENCE]->(s)
             """
             await session.run(
                 next_sentence_query,
                 interview_id=self.interview_id,
-                prev_s_id=prev_s_id,
+                prev_sequence_order=prev_sequence_order,
                 s_id=s_id,
             )
-            logger.debug(f"Merged :NEXT_SENTENCE from {prev_s_id} to {s_id}")
+            logger.debug(f"Merged :NEXT_SENTENCE from sequence_order {prev_sequence_order} to sentence_id {s_id}")
 
     async def finalize(self):
         """
@@ -257,9 +247,7 @@ class Neo4jMapStorage(ConversationMapStorage):
                     #    continue
                     entries.append(entry_data)
 
-            logger.debug(
-                f"Successfully read {len(entries)} entries for Interview: {self.interview_id}"
-            )
+            logger.debug(f"Successfully read {len(entries)} entries for Interview: {self.interview_id}")
             return entries
         except Exception as e:
             logger.error(
