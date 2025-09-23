@@ -52,7 +52,7 @@ class PipelineConfig(BaseModel):
         "HAS_FUNCTION": 1,
         "HAS_STRUCTURE": 1,
         "HAS_PURPOSE": 1,
-        "MENTIONS_KEYWORD": 6,
+        "MENTIONS_OVERALL_KEYWORD": 6,
         "MENTIONS_TOPIC": None,  # Use None for unlimited
         "MENTIONS_DOMAIN_KEYWORD": None,
     }

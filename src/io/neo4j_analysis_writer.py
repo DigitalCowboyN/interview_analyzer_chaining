@@ -250,11 +250,11 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             dimension_values=result.get(
                 "overall_keywords", []
             ),  # Fixed: Use 'overall_keywords' to match SentenceAnalyzer output
-            relationship_type="MENTIONS_KEYWORD",
+            relationship_type="MENTIONS_OVERALL_KEYWORD",
             cardinality_limit=(
-                project_limits.get("MENTIONS_KEYWORD")
-                if project_limits.get("MENTIONS_KEYWORD") is not None
-                else default_limits.get("MENTIONS_KEYWORD", 6)
+                project_limits.get("MENTIONS_OVERALL_KEYWORD")
+                if project_limits.get("MENTIONS_OVERALL_KEYWORD") is not None
+                else default_limits.get("MENTIONS_OVERALL_KEYWORD", 6)
             ),  # Default 6
             props_on_create=lambda v: {"text": v},
         )
@@ -285,7 +285,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             RETURN p.max_functions_limit as HAS_FUNCTION,
                    p.max_structures_limit as HAS_STRUCTURE,
                    p.max_purposes_limit as HAS_PURPOSE,
-                   p.max_keywords_limit as MENTIONS_KEYWORD,
+                   p.max_keywords_limit as MENTIONS_OVERALL_KEYWORD,
                    p.max_topics_limit as MENTIONS_TOPIC,
                    p.max_domain_keywords_limit as MENTIONS_DOMAIN_KEYWORD
         """

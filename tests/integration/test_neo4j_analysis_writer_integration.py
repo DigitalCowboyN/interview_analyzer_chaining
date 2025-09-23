@@ -99,7 +99,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 "structure_type": "simple",
                 "purpose": "social_interaction",
                 "topics": ["communication", "casual_greeting"],
-                "keywords": ["hello", "greeting"],
+                "overall_keywords": ["hello", "greeting"],
                 "domain_keywords": ["social"],
             },
             {
@@ -110,7 +110,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 "structure_type": "interrogative",
                 "purpose": "inquiry",
                 "topics": ["communication", "personal_inquiry"],
-                "keywords": ["question", "wellbeing"],
+                "overall_keywords": ["question", "wellbeing"],
                 "domain_keywords": ["personal"],
             },
             {
@@ -121,7 +121,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 "structure_type": "declarative",
                 "purpose": "information",
                 "topics": ["testing", "test_data"],
-                "keywords": ["test", "sentence"],
+                "overall_keywords": ["test", "sentence"],
                 "domain_keywords": ["testing"],
             },
         ]
@@ -176,7 +176,7 @@ class TestNeo4jAnalysisWriterIntegration:
                     "structure_type": "unknown",
                     "purpose": "unknown",
                     "topics": [],
-                    "keywords": [],
+                    "overall_keywords": [],
                     "domain_keywords": [],
                 }
 
@@ -195,18 +195,17 @@ class TestNeo4jAnalysisWriterIntegration:
 
         # Verify the results were stored in Neo4j
         async with await Neo4jConnectionManager.get_session() as session:
-            # Check that the project and interview nodes exist
-            project_result = await session.run(
-                "MATCH (p:Project {project_id: $project_id}) RETURN p", project_id=project_id
-            )
+            # First, find the actual project and interview IDs that were created
+            # (since the pipeline generates its own IDs)
+            project_result = await session.run("MATCH (p:Project) RETURN p.project_id as project_id LIMIT 1")
             project_record = await project_result.single()
             assert project_record is not None
+            actual_project_id = project_record["project_id"]
 
-            interview_result = await session.run(
-                "MATCH (i:Interview {interview_id: $interview_id}) RETURN i", interview_id=interview_id
-            )
+            interview_result = await session.run("MATCH (i:Interview) RETURN i.interview_id as interview_id LIMIT 1")
             interview_record = await interview_result.single()
             assert interview_record is not None
+            actual_interview_id = interview_record["interview_id"]
 
             # Check that sentences were stored
             sentences_result = await session.run(
@@ -215,7 +214,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 RETURN s.sentence_id as sentence_id, s.text as text, s.sequence_order as sequence_order
                 ORDER BY s.sentence_id
                 """,
-                interview_id=interview_id,
+                interview_id=actual_interview_id,
             )
 
             sentences = []
@@ -240,7 +239,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
                 RETURN count(a) as analysis_count
                 """,
-                interview_id=interview_id,
+                interview_id=actual_interview_id,
             )
             analysis_record = await analysis_result.single()
             assert analysis_record is not None
@@ -256,7 +255,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 RETURN f.name as function_name, s.sentence_id as sentence_id
                 ORDER BY s.sentence_id
                 """,
-                interview_id=interview_id,
+                interview_id=actual_interview_id,
             )
 
             functions = []
@@ -272,11 +271,11 @@ class TestNeo4jAnalysisWriterIntegration:
             keyword_result = await session.run(
                 """
                 MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
-                MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_KEYWORD]->(k:Keyword)
+                MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
                 RETURN k.text as keyword, s.sentence_id as sentence_id
                 ORDER BY s.sentence_id, k.text
                 """,
-                interview_id=interview_id,
+                interview_id=actual_interview_id,
             )
 
             keywords = []
@@ -346,7 +345,7 @@ class TestNeo4jAnalysisWriterIntegration:
                         "structure_type": "simple",
                         "purpose": "information",
                         "topics": ["testing"],
-                        "keywords": ["good", "test"],
+                        "overall_keywords": ["good", "test"],
                         "domain_keywords": ["testing"],
                     }
                 elif "Bad sentence" in sentence:
@@ -356,7 +355,7 @@ class TestNeo4jAnalysisWriterIntegration:
                     "structure_type": "unknown",
                     "purpose": "unknown",
                     "topics": [],
-                    "keywords": [],
+                    "overall_keywords": [],
                     "domain_keywords": [],
                 }
 
@@ -489,7 +488,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 "purpose": "testing",
                 "topics": ["testing", "cardinality_testing"],
                 # Return 10 keywords (more than the limit of 6)
-                "keywords": [
+                "overall_keywords": [
                     "keyword1",
                     "keyword2",
                     "keyword3",
@@ -526,14 +525,26 @@ class TestNeo4jAnalysisWriterIntegration:
 
         # Verify cardinality limits are enforced
         async with await Neo4jConnectionManager.get_session() as session:
+            # First, find the actual project and interview IDs that were created
+            # (since the pipeline generates its own IDs)
+            project_result = await session.run("MATCH (p:Project) RETURN p.project_id as project_id LIMIT 1")
+            project_record = await project_result.single()
+            assert project_record is not None
+            actual_project_id = project_record["project_id"]
+
+            interview_result = await session.run("MATCH (i:Interview) RETURN i.interview_id as interview_id LIMIT 1")
+            interview_record = await interview_result.single()
+            assert interview_record is not None
+            actual_interview_id = interview_record["interview_id"]
+
             # Check that only 6 keywords were stored (cardinality limit)
             keyword_result = await session.run(
                 """
                 MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
-                MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_KEYWORD]->(k:Keyword)
+                MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
                 RETURN count(k) as keyword_count
                 """,
-                interview_id=interview_id,
+                interview_id=actual_interview_id,
             )
             keyword_record = await keyword_result.single()
             assert keyword_record is not None
@@ -547,7 +558,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_DOMAIN_KEYWORD]->(dk:DomainKeyword)
                 RETURN count(dk) as domain_keyword_count
                 """,
-                interview_id=interview_id,
+                interview_id=actual_interview_id,
             )
             domain_keyword_record = await domain_keyword_result.single()
             assert domain_keyword_record is not None
@@ -561,7 +572,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)-[:HAS_FUNCTION]->(f:FunctionType)
                 RETURN count(f) as function_count
                 """,
-                interview_id=interview_id,
+                interview_id=actual_interview_id,
             )
             function_record = await function_result.single()
             assert function_record is not None

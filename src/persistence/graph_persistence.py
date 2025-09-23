@@ -85,6 +85,7 @@ async def save_analysis_to_graph(
             WITH f
             MERGE (s:Sentence {sentence_id: $sentence_id})
             ON CREATE SET s.text = $text, s.sequence_order = $sequence_order
+            ON MATCH SET s.text = $text, s.sequence_order = $sequence_order
             SET s.filename = $filename
             MERGE (s)-[:PART_OF_FILE]->(f)
             """

@@ -422,8 +422,14 @@ class TestNeo4jAnalysisWriterPerformance:
 
         project_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
-        writer = Neo4jAnalysisWriter(project_id, interview_id)
 
+        # Create required sentence nodes first (required for Neo4jAnalysisWriter)
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()
+
+        writer = Neo4jAnalysisWriter(project_id, interview_id)
         await writer.initialize()
 
         # Generate large dataset
@@ -441,6 +447,16 @@ class TestNeo4jAnalysisWriterPerformance:
                     "topic_level_3": f"topic_l3_{i % 15}",
                     "overall_keywords": [f"perf_{i}", f"test_{i}", f"bulk_{i % 20}"],
                     "domain_keywords": [f"domain_{i % 10}", f"performance_{i % 5}"],
+                }
+            )
+
+        # Create sentence nodes first (required for Neo4jAnalysisWriter)
+        for result in bulk_data:
+            await map_storage.write_entry(
+                {
+                    "sentence_id": result["sentence_id"],
+                    "sentence": result["sentence"],
+                    "sequence_order": result["sequence_order"],
                 }
             )
 
@@ -475,13 +491,28 @@ class TestNeo4jAnalysisWriterPerformance:
 
         project_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
-        writer = Neo4jAnalysisWriter(project_id, interview_id)
 
+        # Create required sentence nodes first (required for Neo4jAnalysisWriter)
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()
+
+        writer = Neo4jAnalysisWriter(project_id, interview_id)
         await writer.initialize()
 
         # Create large dataset
         dataset_size = 200
         for i in range(dataset_size):
+            # Create sentence node first
+            await map_storage.write_entry(
+                {
+                    "sentence_id": 4000 + i,
+                    "sentence": f"Large dataset sentence {i}.",
+                    "sequence_order": i,
+                }
+            )
+
             result = {
                 "sentence_id": 4000 + i,
                 "sequence_order": i,
@@ -520,9 +551,24 @@ class TestNeo4jAnalysisWriterErrorRecovery:
         """Test writer behavior when database connection is temporarily lost."""
         project_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
-        writer = Neo4jAnalysisWriter(project_id, interview_id)
 
+        # Create required sentence nodes first (required for Neo4jAnalysisWriter)
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()
+
+        writer = Neo4jAnalysisWriter(project_id, interview_id)
         await writer.initialize()
+
+        # Create sentence nodes for the test
+        sentence_data = [
+            {"sentence_id": 5000, "sentence": "Initial sentence before connection loss.", "sequence_order": 0},
+            {"sentence_id": 5001, "sentence": "Sentence during connection loss.", "sequence_order": 1},
+            {"sentence_id": 5002, "sentence": "Sentence after connection recovery.", "sequence_order": 2},
+        ]
+        for data in sentence_data:
+            await map_storage.write_entry(data)
 
         # Write some initial data
         initial_result = {
@@ -587,9 +633,35 @@ class TestNeo4jAnalysisWriterErrorRecovery:
         """Test handling of partial write failures."""
         project_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
-        writer = Neo4jAnalysisWriter(project_id, interview_id)
 
+        # Create required sentence nodes first (required for Neo4jAnalysisWriter)
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()
+
+        writer = Neo4jAnalysisWriter(project_id, interview_id)
         await writer.initialize()
+
+        # Create sentence nodes for the test (6000-6004 and 7000)
+        sentence_data = []
+        for i in range(5):
+            sentence_data.append(
+                {
+                    "sentence_id": 6000 + i,
+                    "sentence": f"Valid sentence {i}.",
+                    "sequence_order": i,
+                }
+            )
+        sentence_data.append(
+            {
+                "sentence_id": 6010,
+                "sentence": "Post-failure recovery sentence.",
+                "sequence_order": 10,
+            }
+        )
+        for data in sentence_data:
+            await map_storage.write_entry(data)
 
         # Write valid data first
         valid_results = []

@@ -65,11 +65,7 @@ async def test_neo4j_analysis_writer_write_basic_result(clean_test_database: Any
     # First, set up the prerequisite data using map storage
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Now test the analysis writer
@@ -83,8 +79,8 @@ async def test_neo4j_analysis_writer_write_basic_result(clean_test_database: Any
         "structure_type": "simple",
         "purpose": "testing",
         "topics": ["software", "testing"],
-        "keywords": ["test", "sentence", "analysis"],
-        "domain_keywords": ["neo4j", "database"]
+        "overall_keywords": ["test", "sentence", "analysis"],
+        "domain_keywords": ["neo4j", "database"],
     }
 
     # Write the result - this is the key test of our conversion
@@ -105,10 +101,7 @@ async def test_neo4j_analysis_writer_missing_sentence_error(clean_test_database)
     await writer.initialize()
 
     # Try to write analysis for a sentence that doesn't exist
-    analysis_result = {
-        "sentence_id": 999,  # Non-existent sentence
-        "function_type": "declarative"
-    }
+    analysis_result = {"sentence_id": 999, "function_type": "declarative"}  # Non-existent sentence
 
     with pytest.raises(ValueError, match="Sentence node 999 not found"):
         await writer.write_result(analysis_result)
@@ -148,11 +141,7 @@ async def test_single_value_dimensions_basic(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Test the analysis writer with single-value dimensions
@@ -164,7 +153,7 @@ async def test_single_value_dimensions_basic(clean_test_database):
         "sentence_id": 0,
         "function_type": "declarative",
         "structure_type": "simple",
-        "purpose": "testing"
+        "purpose": "testing",
     }
 
     await writer.write_result(analysis_result)
@@ -173,31 +162,37 @@ async def test_single_value_dimensions_basic(clean_test_database):
     # Verify the relationships were created
     async with await Neo4jConnectionManager.get_session() as session:
         # Check function type relationship
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:HAS_FUNCTION]->(f:FunctionType)
             RETURN f.name as function_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["function_name"] == "declarative"
 
         # Check structure type relationship
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:HAS_STRUCTURE]->(st:StructureType)
             RETURN st.name as structure_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["structure_name"] == "simple"
 
         # Check purpose relationship
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:HAS_PURPOSE]->(p:Purpose)
             RETURN p.name as purpose_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["purpose_name"] == "testing"
@@ -211,51 +206,43 @@ async def test_single_value_dimensions_overwrite(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
     # First analysis
-    analysis_result_1 = {
-        "sentence_id": 0,
-        "function_type": "declarative",
-        "structure_type": "simple"
-    }
+    analysis_result_1 = {"sentence_id": 0, "function_type": "declarative", "structure_type": "simple"}
     await writer.write_result(analysis_result_1)
 
     # Second analysis with different values
-    analysis_result_2 = {
-        "sentence_id": 0,
-        "function_type": "interrogative",
-        "structure_type": "complex"
-    }
+    analysis_result_2 = {"sentence_id": 0, "function_type": "interrogative", "structure_type": "complex"}
     await writer.write_result(analysis_result_2)
     await writer.finalize()
 
     # Verify only the latest values are present
     async with await Neo4jConnectionManager.get_session() as session:
         # Check function type - should be updated
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:HAS_FUNCTION]->(f:FunctionType)
             RETURN f.name as function_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["function_name"] == "interrogative"
 
         # Check structure type - should be updated
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:HAS_STRUCTURE]->(st:StructureType)
             RETURN st.name as structure_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["structure_name"] == "complex"
@@ -269,11 +256,9 @@ async def test_multi_value_dimensions_basic(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence about software development."
-    })
+    await map_storage.write_entry(
+        {"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence about software development."}
+    )
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -283,8 +268,8 @@ async def test_multi_value_dimensions_basic(clean_test_database):
     analysis_result = {
         "sentence_id": 0,
         "topics": ["software", "development", "testing"],
-        "keywords": ["test", "sentence", "analysis"],
-        "domain_keywords": ["neo4j", "database", "graph"]
+        "overall_keywords": ["test", "sentence", "analysis"],  # Fixed: Use overall_keywords
+        "domain_keywords": ["neo4j", "database", "graph"],
     }
 
     await writer.write_result(analysis_result)
@@ -293,36 +278,42 @@ async def test_multi_value_dimensions_basic(clean_test_database):
     # Verify the relationships were created
     async with await Neo4jConnectionManager.get_session() as session:
         # Check topics - should be unlimited
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:MENTIONS_TOPIC]->(t:Topic)
             RETURN t.name as topic_name
             ORDER BY t.name
-        """)
+        """
+        )
         topics: List[str] = []
         async for record in result:
             topics.append(record["topic_name"])
         assert sorted(topics) == ["development", "software", "testing"]
 
         # Check keywords - should have default limit of 6
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN k.text as keyword_text
             ORDER BY k.text
-        """)
+        """
+        )
         keywords: List[str] = []
         async for record in result:
             keywords.append(record["keyword_text"])
         assert sorted(keywords) == ["analysis", "sentence", "test"]
 
         # Check domain keywords - should be unlimited
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:MENTIONS_DOMAIN_KEYWORD]->(dk:DomainKeyword)
             RETURN dk.text as domain_keyword_text
             ORDER BY dk.text
-        """)
+        """
+        )
         domain_keywords = []
         async for record in result:
             domain_keywords.append(record["domain_keyword_text"])
@@ -337,11 +328,7 @@ async def test_multi_value_dimensions_update_behavior(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -351,7 +338,7 @@ async def test_multi_value_dimensions_update_behavior(clean_test_database):
     analysis_result_1 = {
         "sentence_id": 0,
         "topics": ["software", "development"],
-        "keywords": ["test", "sentence"]
+        "overall_keywords": ["test", "sentence"],
     }
     await writer.write_result(analysis_result_1)
 
@@ -359,7 +346,7 @@ async def test_multi_value_dimensions_update_behavior(clean_test_database):
     analysis_result_2 = {
         "sentence_id": 0,
         "topics": ["testing", "automation"],  # Completely different topics
-        "keywords": ["test", "analysis", "neo4j"]  # Some overlap, some new
+        "overall_keywords": ["test", "analysis", "neo4j"],  # Some overlap, some new
     }
     await writer.write_result(analysis_result_2)
     await writer.finalize()
@@ -367,24 +354,28 @@ async def test_multi_value_dimensions_update_behavior(clean_test_database):
     # Verify only the latest values are present
     async with await Neo4jConnectionManager.get_session() as session:
         # Check topics - should be completely replaced
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:MENTIONS_TOPIC]->(t:Topic)
             RETURN t.name as topic_name
             ORDER BY t.name
-        """)
+        """
+        )
         topics = []
         async for record in result:
             topics.append(record["topic_name"])
         assert sorted(topics) == ["automation", "testing"]
 
         # Check keywords - should be completely replaced
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN k.text as keyword_text
             ORDER BY k.text
-        """)
+        """
+        )
         keywords = []
         async for record in result:
             keywords.append(record["keyword_text"])
@@ -399,11 +390,7 @@ async def test_empty_dimension_values(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -413,11 +400,11 @@ async def test_empty_dimension_values(clean_test_database):
     analysis_result = {
         "sentence_id": 0,
         "function_type": None,  # None single value
-        "structure_type": "",   # Empty single value
-        "purpose": "testing",   # Valid single value
-        "topics": [],           # Empty list
-        "keywords": None,       # None list
-        "domain_keywords": ["neo4j"]  # Valid list
+        "structure_type": "",  # Empty single value
+        "purpose": "testing",  # Valid single value
+        "topics": [],  # Empty list
+        "overall_keywords": None,  # None list
+        "domain_keywords": ["neo4j"],  # Valid list
     }
 
     await writer.write_result(analysis_result)
@@ -426,61 +413,73 @@ async def test_empty_dimension_values(clean_test_database):
     # Verify only valid values created relationships
     async with await Neo4jConnectionManager.get_session() as session:
         # Check that no function type relationship was created
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             OPTIONAL MATCH (a)-[:HAS_FUNCTION]->(f:FunctionType)
             RETURN f.name as function_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["function_name"] is None
 
         # Check that no structure type relationship was created
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             OPTIONAL MATCH (a)-[:HAS_STRUCTURE]->(st:StructureType)
             RETURN st.name as structure_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["structure_name"] is None
 
         # Check that purpose relationship was created
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:HAS_PURPOSE]->(p:Purpose)
             RETURN p.name as purpose_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["purpose_name"] == "testing"
 
         # Check that no topic relationships were created
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             OPTIONAL MATCH (a)-[:MENTIONS_TOPIC]->(t:Topic)
             RETURN count(t) as topic_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["topic_count"] == 0
 
         # Check that no keyword relationships were created
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-            OPTIONAL MATCH (a)-[:MENTIONS_KEYWORD]->(k:Keyword)
+            OPTIONAL MATCH (a)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN count(k) as keyword_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 0
 
         # Check that domain keyword relationship was created
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:MENTIONS_DOMAIN_KEYWORD]->(dk:DomainKeyword)
             RETURN dk.text as domain_keyword_text
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["domain_keyword_text"] == "neo4j"
@@ -494,11 +493,7 @@ async def test_dimension_node_properties(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -509,8 +504,8 @@ async def test_dimension_node_properties(clean_test_database):
         "sentence_id": 0,
         "function_type": "declarative",
         "topics": ["software"],
-        "keywords": ["test"],
-        "domain_keywords": ["neo4j"]
+        "overall_keywords": ["test"],
+        "domain_keywords": ["neo4j"],
     }
 
     await writer.write_result(analysis_result)
@@ -519,37 +514,45 @@ async def test_dimension_node_properties(clean_test_database):
     # Verify node properties
     async with await Neo4jConnectionManager.get_session() as session:
         # Check FunctionType node properties
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (f:FunctionType {name: "declarative"})
             RETURN f.name as name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["name"] == "declarative"
 
         # Check Topic node properties
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (t:Topic {name: "software"})
             RETURN t.name as name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["name"] == "software"
 
         # Check Keyword node properties
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (k:Keyword {text: "test"})
             RETURN k.text as text
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["text"] == "test"
 
         # Check DomainKeyword node properties
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (dk:DomainKeyword {text: "neo4j"})
             RETURN dk.text as text, dk.is_custom as is_custom
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["text"] == "neo4j"
@@ -564,22 +567,14 @@ async def test_dimension_relationship_properties(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
     # Write analysis
-    analysis_result = {
-        "sentence_id": 0,
-        "function_type": "declarative",
-        "keywords": ["test"]
-    }
+    analysis_result = {"sentence_id": 0, "function_type": "declarative", "overall_keywords": ["test"]}
 
     await writer.write_result(analysis_result)
     await writer.finalize()
@@ -587,19 +582,23 @@ async def test_dimension_relationship_properties(clean_test_database):
     # Verify relationship properties
     async with await Neo4jConnectionManager.get_session() as session:
         # Check function relationship properties
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (a:Analysis)-[r:HAS_FUNCTION]->(f:FunctionType)
             RETURN r.is_edited as is_edited
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["is_edited"] is False
 
         # Check keyword relationship properties
-        result = await session.run("""
-            MATCH (a:Analysis)-[r:MENTIONS_KEYWORD]->(k:Keyword)
+        result = await session.run(
+            """
+            MATCH (a:Analysis)-[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN r.is_edited as is_edited
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["is_edited"] is False
@@ -616,11 +615,7 @@ async def test_keyword_cardinality_limit_default(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -629,7 +624,16 @@ async def test_keyword_cardinality_limit_default(clean_test_database):
     # Write analysis with more keywords than the default limit (6)
     analysis_result: Dict[str, Any] = {
         "sentence_id": 0,
-        "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8"]
+        "overall_keywords": [
+            "keyword1",
+            "keyword2",
+            "keyword3",
+            "keyword4",
+            "keyword5",
+            "keyword6",
+            "keyword7",
+            "keyword8",
+        ],
     }
 
     await writer.write_result(analysis_result)
@@ -637,11 +641,13 @@ async def test_keyword_cardinality_limit_default(clean_test_database):
 
     # Verify only 6 keywords were stored
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN count(k) as keyword_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 6
@@ -655,11 +661,7 @@ async def test_topic_cardinality_unlimited(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -667,21 +669,20 @@ async def test_topic_cardinality_unlimited(clean_test_database):
 
     # Write analysis with many topics (more than any reasonable limit)
     many_topics: List[str] = [f"topic{i}" for i in range(20)]
-    analysis_result: Dict[str, Any] = {
-        "sentence_id": 0,
-        "topics": many_topics
-    }
+    analysis_result: Dict[str, Any] = {"sentence_id": 0, "topics": many_topics}
 
     await writer.write_result(analysis_result)
     await writer.finalize()
 
     # Verify all topics were stored
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:MENTIONS_TOPIC]->(t:Topic)
             RETURN count(t) as topic_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["topic_count"] == 20
@@ -695,11 +696,7 @@ async def test_domain_keyword_cardinality_unlimited(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -707,21 +704,20 @@ async def test_domain_keyword_cardinality_unlimited(clean_test_database):
 
     # Write analysis with many domain keywords
     many_domain_keywords = [f"domain{i}" for i in range(15)]
-    analysis_result = {
-        "sentence_id": 0,
-        "domain_keywords": many_domain_keywords
-    }
+    analysis_result = {"sentence_id": 0, "domain_keywords": many_domain_keywords}
 
     await writer.write_result(analysis_result)
     await writer.finalize()
 
     # Verify all domain keywords were stored
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:MENTIONS_DOMAIN_KEYWORD]->(dk:DomainKeyword)
             RETURN count(dk) as domain_keyword_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["domain_keyword_count"] == 15
@@ -735,38 +731,30 @@ async def test_single_value_cardinality_enforcement(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
     # First analysis
-    analysis_result_1 = {
-        "sentence_id": 0,
-        "function_type": "declarative"
-    }
+    analysis_result_1 = {"sentence_id": 0, "function_type": "declarative"}
     await writer.write_result(analysis_result_1)
 
     # Second analysis with different function type
-    analysis_result_2 = {
-        "sentence_id": 0,
-        "function_type": "interrogative"
-    }
+    analysis_result_2 = {"sentence_id": 0, "function_type": "interrogative"}
     await writer.write_result(analysis_result_2)
     await writer.finalize()
 
     # Verify only one function type relationship exists
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:HAS_FUNCTION]->(f:FunctionType)
             RETURN count(f) as function_count, f.name as function_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["function_count"] == 1
@@ -781,11 +769,7 @@ async def test_cardinality_limit_with_duplicates(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -794,7 +778,7 @@ async def test_cardinality_limit_with_duplicates(clean_test_database):
     # Write analysis with duplicate keywords (should be deduplicated)
     analysis_result = {
         "sentence_id": 0,
-        "keywords": ["test", "test", "keyword", "keyword", "analysis", "analysis", "neo4j"]
+        "overall_keywords": ["test", "test", "keyword", "keyword", "analysis", "analysis", "neo4j"],
     }
 
     await writer.write_result(analysis_result)
@@ -802,11 +786,13 @@ async def test_cardinality_limit_with_duplicates(clean_test_database):
 
     # Verify only unique keywords were stored
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN count(k) as keyword_count, collect(k.text) as keywords
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 4  # Only unique values
@@ -821,11 +807,7 @@ async def test_cardinality_limit_order_preservation(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -834,7 +816,7 @@ async def test_cardinality_limit_order_preservation(clean_test_database):
     # Write analysis with specific order of keywords
     analysis_result = {
         "sentence_id": 0,
-        "keywords": ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"]
+        "overall_keywords": ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"],
     }
 
     await writer.write_result(analysis_result)
@@ -842,11 +824,13 @@ async def test_cardinality_limit_order_preservation(clean_test_database):
 
     # Verify the first 6 keywords were stored
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN collect(k.text) as keywords
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         stored_keywords = record["keywords"]
@@ -864,39 +848,37 @@ async def test_zero_cardinality_limit(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Create a project with zero limit for keywords
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MERGE (p:Project {project_id: $project_id})
             SET p.max_keywords_limit = 0
-        """, project_id=project_id)
+        """,
+            project_id=project_id,
+        )
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
     # Write analysis with keywords
-    analysis_result = {
-        "sentence_id": 0,
-        "keywords": ["test", "keyword", "analysis"]
-    }
+    analysis_result = {"sentence_id": 0, "overall_keywords": ["test", "keyword", "analysis"]}
 
     await writer.write_result(analysis_result)
     await writer.finalize()
 
     # Verify no keywords were stored due to zero limit
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-            OPTIONAL MATCH (a)-[:MENTIONS_KEYWORD]->(k:Keyword)
+            OPTIONAL MATCH (a)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN count(k) as keyword_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 0
@@ -913,46 +895,40 @@ async def test_single_dimension_edit_protection(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
     # First analysis
-    analysis_result_1 = {
-        "sentence_id": 0,
-        "function_type": "declarative"
-    }
+    analysis_result_1 = {"sentence_id": 0, "function_type": "declarative"}
     await writer.write_result(analysis_result_1)
 
     # Manually mark the relationship as edited
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[r:HAS_FUNCTION]->(f:FunctionType)
             SET r.is_edited = true
-        """)
+        """
+        )
 
     # Second analysis with different function type
-    analysis_result_2 = {
-        "sentence_id": 0,
-        "function_type": "interrogative"
-    }
+    analysis_result_2 = {"sentence_id": 0, "function_type": "interrogative"}
     await writer.write_result(analysis_result_2)
     await writer.finalize()
 
     # Verify the original function type is preserved (not overwritten)
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[r:HAS_FUNCTION]->(f:FunctionType)
             RETURN f.name as function_name, r.is_edited as is_edited
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["function_name"] == "declarative"  # Original value preserved
@@ -967,48 +943,42 @@ async def test_multi_dimension_edit_protection(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
     # First analysis
-    analysis_result_1 = {
-        "sentence_id": 0,
-        "keywords": ["original", "keyword", "analysis"]
-    }
+    analysis_result_1 = {"sentence_id": 0, "overall_keywords": ["original", "keyword", "analysis"]}
     await writer.write_result(analysis_result_1)
 
     # Manually mark some relationships as edited
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[r:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             WHERE k.text IN ["original", "keyword"]
             SET r.is_edited = true
-        """)
+        """
+        )
 
     # Second analysis with completely different keywords
-    analysis_result_2 = {
-        "sentence_id": 0,
-        "keywords": ["new", "different", "terms"]
-    }
+    analysis_result_2 = {"sentence_id": 0, "overall_keywords": ["new", "different", "terms"]}
     await writer.write_result(analysis_result_2)
     await writer.finalize()
 
     # Verify edited keywords are preserved, unedited ones are replaced
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[r:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN k.text as keyword_text, r.is_edited as is_edited
             ORDER BY k.text
-        """)
+        """
+        )
         keywords = []
         async for record in result:
             keywords.append((record["keyword_text"], record["is_edited"]))
@@ -1019,7 +989,7 @@ async def test_multi_dimension_edit_protection(clean_test_database):
             ("keyword", True),
             ("new", False),
             ("original", True),
-            ("terms", False)
+            ("terms", False),
         ]
         assert sorted(keywords) == expected_keywords
 
@@ -1032,11 +1002,7 @@ async def test_mixed_edit_protection(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -1046,33 +1012,37 @@ async def test_mixed_edit_protection(clean_test_database):
     analysis_result_1 = {
         "sentence_id": 0,
         "function_type": "declarative",
-        "keywords": ["first", "second", "third"],
-        "topics": ["topic1", "topic2"]
+        "overall_keywords": ["first", "second", "third"],
+        "topics": ["topic1", "topic2"],
     }
     await writer.write_result(analysis_result_1)
 
     # Mark some relationships as edited
     async with await Neo4jConnectionManager.get_session() as session:
         # Mark function as edited
-        await session.run("""
+        await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[r:HAS_FUNCTION]->(f:FunctionType)
             SET r.is_edited = true
-        """)
+        """
+        )
 
         # Mark one keyword as edited
-        await session.run("""
+        await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[r:MENTIONS_KEYWORD]->(k:Keyword {text: "second"})
+                  -[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword {text: "second"})
             SET r.is_edited = true
-        """)
+        """
+        )
 
     # Second analysis with different values
     analysis_result_2 = {
         "sentence_id": 0,
         "function_type": "interrogative",  # Should be ignored (protected)
-        "keywords": ["new", "keywords"],   # Should replace unedited ones, keep edited
-        "topics": ["newtopic"]             # Should replace all (none were edited)
+        "overall_keywords": ["new", "keywords"],  # Should replace unedited ones, keep edited
+        "topics": ["newtopic"],  # Should replace all (none were edited)
     }
     await writer.write_result(analysis_result_2)
     await writer.finalize()
@@ -1080,23 +1050,27 @@ async def test_mixed_edit_protection(clean_test_database):
     # Verify mixed protection behavior
     async with await Neo4jConnectionManager.get_session() as session:
         # Check function type - should be protected
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[r:HAS_FUNCTION]->(f:FunctionType)
             RETURN f.name as function_name, r.is_edited as is_edited
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["function_name"] == "declarative"  # Original protected
         assert record["is_edited"] is True
 
         # Check keywords - should have edited one plus new ones
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[r:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN k.text as keyword_text, r.is_edited as is_edited
             ORDER BY k.text
-        """)
+        """
+        )
         keywords = []
         async for record in result:
             keywords.append((record["keyword_text"], record["is_edited"]))
@@ -1106,11 +1080,13 @@ async def test_mixed_edit_protection(clean_test_database):
         assert sorted(keywords) == expected_keywords
 
         # Check topics - should be completely replaced (none were edited)
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[r:MENTIONS_TOPIC]->(t:Topic)
             RETURN t.name as topic_name, r.is_edited as is_edited
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["topic_name"] == "newtopic"
@@ -1125,69 +1101,70 @@ async def test_edit_protection_with_cardinality_limits(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
     # First analysis with keywords up to the limit (6)
-    analysis_result_1 = {
-        "sentence_id": 0,
-        "keywords": ["k1", "k2", "k3", "k4", "k5", "k6"]
-    }
+    analysis_result_1 = {"sentence_id": 0, "overall_keywords": ["k1", "k2", "k3", "k4", "k5", "k6"]}
     await writer.write_result(analysis_result_1)
 
     # Mark some keywords as edited
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[r:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             WHERE k.text IN ["k1", "k2", "k3"]
             SET r.is_edited = true
-        """)
+        """
+        )
 
     # Second analysis with new keywords (should only fit 3 new ones due to limit)
     analysis_result_2 = {
         "sentence_id": 0,
-        "keywords": ["new1", "new2", "new3", "new4", "new5"]  # 5 new, but only 3 slots available
+        "overall_keywords": ["new1", "new2", "new3", "new4", "new5"],  # 5 new, but only 3 slots available
     }
     await writer.write_result(analysis_result_2)
     await writer.finalize()
 
     # Verify cardinality limit is respected while preserving edited relationships
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[r:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN count(k) as total_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["total_count"] == 6  # Should still be at the limit
 
         # Check that edited keywords are preserved
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[r:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             WHERE r.is_edited = true
             RETURN collect(k.text) as edited_keywords
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert sorted(record["edited_keywords"]) == ["k1", "k2", "k3"]
 
         # Check that we have exactly 3 new keywords (filling the remaining slots)
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[r:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             WHERE r.is_edited = false
             RETURN count(k) as new_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["new_count"] == 3  # Only 3 slots were available
@@ -1204,11 +1181,7 @@ async def test_error_result_basic_storage(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Test the analysis writer with error result
@@ -1223,8 +1196,8 @@ async def test_error_result_basic_storage(clean_test_database):
         "error_code": "TIMEOUT",
         "model_name": "gpt-4",
         "function_type": "declarative",  # These should be ignored
-        "keywords": ["test", "keyword"],  # These should be ignored
-        "topics": ["ignored", "topic"]  # These should be ignored
+        "overall_keywords": ["test", "keyword"],  # These should be ignored
+        "topics": ["ignored", "topic"],  # These should be ignored
     }
 
     await writer.write_result(error_result)
@@ -1233,23 +1206,27 @@ async def test_error_result_basic_storage(clean_test_database):
     # Verify the error was stored correctly
     async with await Neo4jConnectionManager.get_session() as session:
         # Check that Analysis node exists with error data
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             RETURN a.error_data as error_data, a.model_name as model_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert json.loads(record["error_data"]) == error_result
         assert record["model_name"] == "gpt-4"
 
         # Verify NO dimension relationships were created
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             OPTIONAL MATCH (a)-[r]->(d)
             WHERE type(r) IN ['HAS_FUNCTION', 'HAS_STRUCTURE', 'HAS_PURPOSE',
-                              'MENTIONS_KEYWORD', 'MENTIONS_TOPIC', 'MENTIONS_DOMAIN_KEYWORD']
+                              'MENTIONS_OVERALL_KEYWORD', 'MENTIONS_TOPIC', 'MENTIONS_DOMAIN_KEYWORD']
             RETURN count(r) as dimension_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["dimension_count"] == 0
@@ -1263,11 +1240,7 @@ async def test_error_result_without_dimensions(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Test the analysis writer with minimal error result
@@ -1275,11 +1248,7 @@ async def test_error_result_without_dimensions(clean_test_database):
     await writer.initialize()
 
     # Create a minimal error result
-    error_result = {
-        "sentence_id": 0,
-        "error": True,
-        "error_message": "Model unavailable"
-    }
+    error_result = {"sentence_id": 0, "error": True, "error_message": "Model unavailable"}
 
     await writer.write_result(error_result)
     await writer.finalize()
@@ -1287,23 +1256,27 @@ async def test_error_result_without_dimensions(clean_test_database):
     # Verify the error was stored correctly
     async with await Neo4jConnectionManager.get_session() as session:
         # Check that Analysis node exists with error data
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             RETURN a.error_data as error_data, a.is_edited as is_edited
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert json.loads(record["error_data"]) == error_result
         assert record["is_edited"] is False
 
         # Verify NO dimension relationships were created
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             OPTIONAL MATCH (a)-[r]->(d)
             WHERE type(r) IN ['HAS_FUNCTION', 'HAS_STRUCTURE', 'HAS_PURPOSE',
-                              'MENTIONS_KEYWORD', 'MENTIONS_TOPIC', 'MENTIONS_DOMAIN_KEYWORD']
+                              'MENTIONS_OVERALL_KEYWORD', 'MENTIONS_TOPIC', 'MENTIONS_DOMAIN_KEYWORD']
             RETURN count(r) as dimension_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["dimension_count"] == 0
@@ -1317,11 +1290,7 @@ async def test_error_result_after_successful_analysis(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Test the analysis writer
@@ -1334,19 +1303,21 @@ async def test_error_result_after_successful_analysis(clean_test_database):
         "function_type": "declarative",
         "structure_type": "simple",
         "purpose": "testing",
-        "keywords": ["test", "keyword"],
-        "topics": ["software", "testing"]
+        "overall_keywords": ["test", "keyword"],
+        "topics": ["software", "testing"],
     }
 
     await writer.write_result(successful_result)
 
     # Verify successful analysis was written
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-            OPTIONAL MATCH (a)-[r:MENTIONS_KEYWORD]->(k:Keyword)
+            OPTIONAL MATCH (a)-[r:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN a.error_data as error_data, count(r) as keyword_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["error_data"] is None  # No error initially
@@ -1357,7 +1328,7 @@ async def test_error_result_after_successful_analysis(clean_test_database):
         "sentence_id": 0,
         "error": True,
         "error_message": "Reanalysis failed",
-        "error_code": "REANALYSIS_FAILED"
+        "error_code": "REANALYSIS_FAILED",
     }
 
     await writer.write_result(error_result)
@@ -1365,10 +1336,12 @@ async def test_error_result_after_successful_analysis(clean_test_database):
 
     # Verify the error overwrote the successful analysis
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             RETURN a.error_data as error_data
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert json.loads(record["error_data"]) == error_result
@@ -1387,16 +1360,8 @@ async def test_error_result_read_analysis_ids(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
-    await map_storage.write_entry({
-        "sentence_id": 1,
-        "sequence_order": 1,
-        "sentence": "This is another test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
+    await map_storage.write_entry({"sentence_id": 1, "sequence_order": 1, "sentence": "This is another test sentence."})
     await map_storage.finalize()
 
     # Test the analysis writer
@@ -1404,19 +1369,11 @@ async def test_error_result_read_analysis_ids(clean_test_database):
     await writer.initialize()
 
     # Write successful analysis for sentence 0
-    successful_result = {
-        "sentence_id": 0,
-        "function_type": "declarative",
-        "keywords": ["test"]
-    }
+    successful_result = {"sentence_id": 0, "function_type": "declarative", "overall_keywords": ["test"]}
     await writer.write_result(successful_result)
 
     # Write error result for sentence 1
-    error_result = {
-        "sentence_id": 1,
-        "error": True,
-        "error_message": "Analysis failed"
-    }
+    error_result = {"sentence_id": 1, "error": True, "error_message": "Analysis failed"}
     await writer.write_result(error_result)
 
     await writer.finalize()
@@ -1434,11 +1391,7 @@ async def test_error_result_with_complex_error_data(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Test the analysis writer with complex error data
@@ -1451,21 +1404,12 @@ async def test_error_result_with_complex_error_data(clean_test_database):
         "error": True,
         "error_message": "Complex analysis failure",
         "error_details": {
-            "api_response": {
-                "status_code": 500,
-                "response_body": "Internal server error"
-            },
+            "api_response": {"status_code": 500, "response_body": "Internal server error"},
             "retry_attempts": 3,
             "timestamps": ["2023-01-01T10:00:00Z", "2023-01-01T10:01:00Z", "2023-01-01T10:02:00Z"],
-            "model_config": {
-                "temperature": 0.7,
-                "max_tokens": 1000
-            }
+            "model_config": {"temperature": 0.7, "max_tokens": 1000},
         },
-        "partial_results": {
-            "function_type": "unknown",
-            "confidence": 0.1
-        }
+        "partial_results": {"function_type": "unknown", "confidence": 0.1},
     }
 
     await writer.write_result(error_result)
@@ -1473,10 +1417,12 @@ async def test_error_result_with_complex_error_data(clean_test_database):
 
     # Verify the complex error data was stored correctly
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             RETURN a.error_data as error_data
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         stored_error_data = json.loads(record["error_data"])
@@ -1497,11 +1443,7 @@ async def test_error_result_false_flag(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Test the analysis writer with error=False
@@ -1513,7 +1455,7 @@ async def test_error_result_false_flag(clean_test_database):
         "sentence_id": 0,
         "error": False,  # Explicitly false
         "function_type": "declarative",
-        "keywords": ["test", "keyword"]
+        "overall_keywords": ["test", "keyword"],
     }
 
     await writer.write_result(normal_result)
@@ -1522,30 +1464,36 @@ async def test_error_result_false_flag(clean_test_database):
     # Verify normal processing occurred
     async with await Neo4jConnectionManager.get_session() as session:
         # Check that Analysis node exists without error data
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             RETURN a.error_data as error_data
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["error_data"] is None
 
         # Verify dimension relationships were created
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:HAS_FUNCTION]->(f:FunctionType)
             RETURN f.name as function_name
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["function_name"] == "declarative"
 
         # Verify keywords were processed
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN count(k) as keyword_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 2
@@ -1562,11 +1510,7 @@ async def test_database_connection_error_write_result(clean_test_database):
     # Set up prerequisite data first
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Create writer
@@ -1580,15 +1524,12 @@ async def test_database_connection_error_write_result(clean_test_database):
 
     mock_error = ServiceUnavailable("Database service unavailable")
 
-    with patch.object(Neo4jConnectionManager, 'get_session') as mock_get_session:
+    with patch.object(Neo4jConnectionManager, "get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_session.run.side_effect = mock_error
         mock_get_session.return_value.__aenter__.return_value = mock_session
 
-        analysis_result = {
-            "sentence_id": 0,
-            "function_type": "declarative"
-        }
+        analysis_result = {"sentence_id": 0, "function_type": "declarative"}
 
         # Should raise the ServiceUnavailable error
         with pytest.raises(ServiceUnavailable):
@@ -1611,7 +1552,7 @@ async def test_database_connection_error_read_analysis_ids(clean_test_database):
 
     mock_error = ServiceUnavailable("Database service unavailable")
 
-    with patch.object(Neo4jConnectionManager, 'get_session') as mock_get_session:
+    with patch.object(Neo4jConnectionManager, "get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_session.run.side_effect = mock_error
         mock_get_session.return_value.__aenter__.return_value = mock_session
@@ -1629,11 +1570,7 @@ async def test_invalid_cypher_query_handling(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Create writer
@@ -1647,15 +1584,12 @@ async def test_invalid_cypher_query_handling(clean_test_database):
 
     mock_error = CypherSyntaxError("Invalid syntax", "INVALID_SYNTAX", "Invalid query")
 
-    with patch.object(Neo4jConnectionManager, 'get_session') as mock_get_session:
+    with patch.object(Neo4jConnectionManager, "get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_session.run.side_effect = mock_error
         mock_get_session.return_value.__aenter__.return_value = mock_session
 
-        analysis_result = {
-            "sentence_id": 0,
-            "function_type": "declarative"
-        }
+        analysis_result = {"sentence_id": 0, "function_type": "declarative"}
 
         # Should raise the CypherSyntaxError
         with pytest.raises(CypherSyntaxError):
@@ -1670,11 +1604,7 @@ async def test_constraint_violation_handling(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Create writer
@@ -1688,15 +1618,12 @@ async def test_constraint_violation_handling(clean_test_database):
 
     mock_error = ConstraintError("Constraint violation", "CONSTRAINT_VIOLATION", "Duplicate key")
 
-    with patch.object(Neo4jConnectionManager, 'get_session') as mock_get_session:
+    with patch.object(Neo4jConnectionManager, "get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_session.run.side_effect = mock_error
         mock_get_session.return_value.__aenter__.return_value = mock_session
 
-        analysis_result = {
-            "sentence_id": 0,
-            "function_type": "declarative"
-        }
+        analysis_result = {"sentence_id": 0, "function_type": "declarative"}
 
         # Should raise the ConstraintError
         with pytest.raises(ConstraintError):
@@ -1711,11 +1638,7 @@ async def test_transaction_rollback_on_error(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Create writer
@@ -1743,16 +1666,12 @@ async def test_transaction_rollback_on_error(clean_test_database):
         else:  # Third call (dimension handling) fails
             raise TransientError("Database temporarily unavailable", "TRANSIENT_ERROR", "Try again")
 
-    with patch.object(Neo4jConnectionManager, 'get_session') as mock_get_session:
+    with patch.object(Neo4jConnectionManager, "get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_session.run.side_effect = mock_run
         mock_get_session.return_value.__aenter__.return_value = mock_session
 
-        analysis_result = {
-            "sentence_id": 0,
-            "function_type": "declarative",
-            "keywords": ["test"]
-        }
+        analysis_result = {"sentence_id": 0, "function_type": "declarative", "overall_keywords": ["test"]}
 
         # Should raise the TransientError
         with pytest.raises(TransientError):
@@ -1778,7 +1697,7 @@ async def test_read_analysis_ids_database_error_handling(clean_test_database):
 
     mock_error = ServiceUnavailable("Database service unavailable")
 
-    with patch.object(Neo4jConnectionManager, 'get_session') as mock_get_session:
+    with patch.object(Neo4jConnectionManager, "get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_session.run.side_effect = mock_error
         mock_get_session.return_value.__aenter__.return_value = mock_session
@@ -1799,11 +1718,7 @@ async def test_partial_write_failure_recovery(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Create writer
@@ -1819,17 +1734,13 @@ async def test_partial_write_failure_recovery(clean_test_database):
     original_handle_dimension_list_link = writer._handle_dimension_list_link
 
     async def mock_handle_dimension_list_link(session, *, relationship_type, **kwargs):
-        if relationship_type == "MENTIONS_KEYWORD":
+        if relationship_type == "MENTIONS_OVERALL_KEYWORD":
             raise ClientError("Property constraint violation", "CLIENT_ERROR", "Invalid property")
         else:
             return await original_handle_dimension_list_link(session, relationship_type=relationship_type, **kwargs)
 
-    with patch.object(writer, '_handle_dimension_list_link', side_effect=mock_handle_dimension_list_link):
-        analysis_result = {
-            "sentence_id": 0,
-            "function_type": "declarative",
-            "keywords": ["test", "keyword"]
-        }
+    with patch.object(writer, "_handle_dimension_list_link", side_effect=mock_handle_dimension_list_link):
+        analysis_result = {"sentence_id": 0, "function_type": "declarative", "overall_keywords": ["test", "keyword"]}
 
         # Should raise the ClientError from the keyword dimension handling
         with pytest.raises(ClientError):
@@ -1852,11 +1763,8 @@ async def test_session_management_error_handling(clean_test_database):
 
     mock_error = AuthError("Authentication failed")
 
-    with patch.object(Neo4jConnectionManager, 'get_session', side_effect=mock_error):
-        analysis_result = {
-            "sentence_id": 0,
-            "function_type": "declarative"
-        }
+    with patch.object(Neo4jConnectionManager, "get_session", side_effect=mock_error):
+        analysis_result = {"sentence_id": 0, "function_type": "declarative"}
 
         # Should raise the AuthError
         with pytest.raises(AuthError):
@@ -1871,11 +1779,7 @@ async def test_graceful_degradation_on_non_critical_errors(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Create writer
@@ -1890,12 +1794,8 @@ async def test_graceful_degradation_on_non_critical_errors(clean_test_database):
         # This simulates graceful degradation where we fall back to defaults
         return {}
 
-    with patch.object(writer, '_fetch_project_limits', side_effect=mock_fetch_project_limits):
-        analysis_result = {
-            "sentence_id": 0,
-            "function_type": "declarative",
-            "keywords": ["test"]
-        }
+    with patch.object(writer, "_fetch_project_limits", side_effect=mock_fetch_project_limits):
+        analysis_result = {"sentence_id": 0, "function_type": "declarative", "overall_keywords": ["test"]}
 
         # Should succeed despite the project limits fetch "failing"
         await writer.write_result(analysis_result)
@@ -1917,19 +1817,18 @@ async def test_project_keyword_limit_override(clean_test_database):
     # Set up prerequisite data with custom project limits
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Set custom project limits on the Project node
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MERGE (p:Project {project_id: $project_id})
             SET p.max_keywords_limit = 3
-        """, project_id=project_id)
+        """,
+            project_id=project_id,
+        )
 
     # Test the analysis writer with more keywords than the custom limit
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -1939,7 +1838,7 @@ async def test_project_keyword_limit_override(clean_test_database):
     analysis_result = {
         "sentence_id": 0,
         "function_type": "declarative",
-        "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]
+        "overall_keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
     }
 
     await writer.write_result(analysis_result)
@@ -1947,11 +1846,13 @@ async def test_project_keyword_limit_override(clean_test_database):
 
     # Verify only 3 keywords were stored (custom limit enforced)
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN count(k) as keyword_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 3  # Custom limit enforced
@@ -1965,19 +1866,18 @@ async def test_project_topic_limit_override(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Set custom project limits on the Project node (topics normally unlimited)
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MERGE (p:Project {project_id: $project_id})
             SET p.max_topics_limit = 2
-        """, project_id=project_id)
+        """,
+            project_id=project_id,
+        )
 
     # Test the analysis writer
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -1987,7 +1887,7 @@ async def test_project_topic_limit_override(clean_test_database):
     analysis_result = {
         "sentence_id": 0,
         "function_type": "declarative",
-        "topics": ["topic1", "topic2", "topic3", "topic4"]
+        "topics": ["topic1", "topic2", "topic3", "topic4"],
     }
 
     await writer.write_result(analysis_result)
@@ -1995,11 +1895,13 @@ async def test_project_topic_limit_override(clean_test_database):
 
     # Verify only 2 topics were stored (custom limit enforced)
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
                   -[:MENTIONS_TOPIC]->(t:Topic)
             RETURN count(t) as topic_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["topic_count"] == 2  # Custom limit enforced
@@ -2013,41 +1915,38 @@ async def test_project_zero_limit_override(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Set zero limit for domain keywords
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MERGE (p:Project {project_id: $project_id})
             SET p.max_domain_keywords_limit = 0
-        """, project_id=project_id)
+        """,
+            project_id=project_id,
+        )
 
     # Test the analysis writer
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
     # Write analysis with domain keywords (should be ignored due to zero limit)
-    analysis_result = {
-        "sentence_id": 0,
-        "function_type": "declarative",
-        "domain_keywords": ["domain1", "domain2"]
-    }
+    analysis_result = {"sentence_id": 0, "function_type": "declarative", "domain_keywords": ["domain1", "domain2"]}
 
     await writer.write_result(analysis_result)
     await writer.finalize()
 
     # Verify no domain keywords were stored
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             OPTIONAL MATCH (a)-[:MENTIONS_DOMAIN_KEYWORD]->(d:DomainKeyword)
             RETURN count(d) as domain_keyword_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["domain_keyword_count"] == 0  # Zero limit enforced
@@ -2061,19 +1960,18 @@ async def test_project_single_dimension_limit_override(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Set zero limit for function types (should prevent function relationships)
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MERGE (p:Project {project_id: $project_id})
             SET p.max_functions_limit = 0
-        """, project_id=project_id)
+        """,
+            project_id=project_id,
+        )
 
     # Test the analysis writer
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -2083,7 +1981,7 @@ async def test_project_single_dimension_limit_override(clean_test_database):
     analysis_result = {
         "sentence_id": 0,
         "function_type": "declarative",
-        "structure_type": "simple"  # This should still work
+        "structure_type": "simple",  # This should still work
     }
 
     await writer.write_result(analysis_result)
@@ -2091,12 +1989,14 @@ async def test_project_single_dimension_limit_override(clean_test_database):
 
     # Verify no function relationship was created but structure was
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
             OPTIONAL MATCH (a)-[:HAS_FUNCTION]->(f:FunctionType)
             OPTIONAL MATCH (a)-[:HAS_STRUCTURE]->(st:StructureType)
             RETURN count(f) as function_count, count(st) as structure_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["function_count"] == 0  # Zero limit enforced
@@ -2111,19 +2011,18 @@ async def test_project_partial_limit_overrides(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Set only keyword limit, leave others as defaults
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MERGE (p:Project {project_id: $project_id})
             SET p.max_keywords_limit = 2
-        """, project_id=project_id)
+        """,
+            project_id=project_id,
+        )
 
     # Test the analysis writer
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -2133,8 +2032,8 @@ async def test_project_partial_limit_overrides(clean_test_database):
     analysis_result = {
         "sentence_id": 0,
         "function_type": "declarative",
-        "keywords": ["k1", "k2", "k3", "k4", "k5"],  # Should be limited to 2
-        "topics": ["t1", "t2", "t3", "t4", "t5"]     # Should be unlimited (default)
+        "overall_keywords": ["k1", "k2", "k3", "k4", "k5"],  # Should be limited to 2
+        "topics": ["t1", "t2", "t3", "t4", "t5"],  # Should be unlimited (default)
     }
 
     await writer.write_result(analysis_result)
@@ -2142,17 +2041,20 @@ async def test_project_partial_limit_overrides(clean_test_database):
 
     # Verify keyword limit is enforced but topics are unlimited
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: 0})
                   -[:HAS_ANALYSIS]->(a:Analysis)
             RETURN
-                COUNT { (a)-[:MENTIONS_KEYWORD]->(:Keyword) } as keyword_count,
+                COUNT { (a)-[:MENTIONS_OVERALL_KEYWORD]->(:Keyword) } as keyword_count,
                 COUNT { (a)-[:MENTIONS_TOPIC]->(:Topic) } as topic_count
-        """, interview_id=interview_id)
+        """,
+            interview_id=interview_id,
+        )
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 2  # Custom limit enforced
-        assert record["topic_count"] == 5    # Default unlimited behavior
+        assert record["topic_count"] == 5  # Default unlimited behavior
 
 
 async def test_project_limits_with_null_values(clean_test_database):
@@ -2163,19 +2065,18 @@ async def test_project_limits_with_null_values(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Explicitly set some limits to NULL
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MERGE (p:Project {project_id: $project_id})
             SET p.max_keywords_limit = null, p.max_topics_limit = 3
-        """, project_id=project_id)
+        """,
+            project_id=project_id,
+        )
 
     # Test the analysis writer
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -2184,8 +2085,8 @@ async def test_project_limits_with_null_values(clean_test_database):
     # Write analysis with both keywords and topics
     analysis_result = {
         "sentence_id": 0,
-        "keywords": ["k1", "k2", "k3", "k4", "k5", "k6", "k7"],  # Should use default limit (6)
-        "topics": ["t1", "t2", "t3", "t4", "t5"]                 # Should use project limit (3)
+        "overall_keywords": ["k1", "k2", "k3", "k4", "k5", "k6", "k7"],  # Should use default limit (6)
+        "topics": ["t1", "t2", "t3", "t4", "t5"],  # Should use project limit (3)
     }
 
     await writer.write_result(analysis_result)
@@ -2194,24 +2095,30 @@ async def test_project_limits_with_null_values(clean_test_database):
     # Verify default limit is used for keywords, project limit for topics
     async with await Neo4jConnectionManager.get_session() as session:
         # Check keywords count
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: 0})
-                  -[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN count(k) as keyword_count
-        """, interview_id=interview_id)
+        """,
+            interview_id=interview_id,
+        )
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 6  # Default limit applied
 
         # Check topics count
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: 0})
                   -[:HAS_ANALYSIS]->(a:Analysis)-[:MENTIONS_TOPIC]->(t:Topic)
             RETURN count(t) as topic_count
-        """, interview_id=interview_id)
+        """,
+            interview_id=interview_id,
+        )
         record = await result.single()
         assert record is not None
-        assert record["topic_count"] == 3    # Project limit applied
+        assert record["topic_count"] == 3  # Project limit applied
 
 
 async def test_project_limits_all_dimensions(clean_test_database):
@@ -2222,16 +2129,13 @@ async def test_project_limits_all_dimensions(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Set custom limits for all dimension types
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MERGE (p:Project {project_id: $project_id})
             SET p.max_functions_limit = 1,
                 p.max_structures_limit = 1,
@@ -2239,7 +2143,9 @@ async def test_project_limits_all_dimensions(clean_test_database):
                 p.max_keywords_limit = 2,
                 p.max_topics_limit = 2,
                 p.max_domain_keywords_limit = 2
-        """, project_id=project_id)
+        """,
+            project_id=project_id,
+        )
 
     # Test the analysis writer
     writer = Neo4jAnalysisWriter(project_id, interview_id)
@@ -2251,9 +2157,9 @@ async def test_project_limits_all_dimensions(clean_test_database):
         "function_type": "declarative",
         "structure_type": "simple",
         "purpose": "testing",
-        "keywords": ["k1", "k2", "k3", "k4"],
+        "overall_keywords": ["k1", "k2", "k3", "k4"],
         "topics": ["t1", "t2", "t3", "t4"],
-        "domain_keywords": ["d1", "d2", "d3", "d4"]
+        "domain_keywords": ["d1", "d2", "d3", "d4"],
     }
 
     await writer.write_result(analysis_result)
@@ -2261,24 +2167,27 @@ async def test_project_limits_all_dimensions(clean_test_database):
 
     # Verify all limits are enforced
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: 0})
                     -[:HAS_ANALYSIS]->(a:Analysis)
             RETURN
                 COUNT { (a)-[:HAS_FUNCTION]->(:FunctionType) } as function_count,
                 COUNT { (a)-[:HAS_STRUCTURE]->(:StructureType) } as structure_count,
                 COUNT { (a)-[:HAS_PURPOSE]->(:Purpose) } as purpose_count,
-                COUNT { (a)-[:MENTIONS_KEYWORD]->(:Keyword) } as keyword_count,
+                COUNT { (a)-[:MENTIONS_OVERALL_KEYWORD]->(:Keyword) } as keyword_count,
                 COUNT { (a)-[:MENTIONS_TOPIC]->(:Topic) } as topic_count,
                 COUNT { (a)-[:MENTIONS_DOMAIN_KEYWORD]->(:DomainKeyword) } as domain_keyword_count
-        """, interview_id=interview_id)
+        """,
+            interview_id=interview_id,
+        )
         record = await result.single()
         assert record is not None
-        assert record["function_count"] == 1      # Single value dimension
-        assert record["structure_count"] == 1     # Single value dimension
-        assert record["purpose_count"] == 1       # Single value dimension
-        assert record["keyword_count"] == 2       # Custom limit enforced
-        assert record["topic_count"] == 2         # Custom limit enforced
+        assert record["function_count"] == 1  # Single value dimension
+        assert record["structure_count"] == 1  # Single value dimension
+        assert record["purpose_count"] == 1  # Single value dimension
+        assert record["keyword_count"] == 2  # Custom limit enforced
+        assert record["topic_count"] == 2  # Custom limit enforced
         assert record["domain_keyword_count"] == 2  # Custom limit enforced
 
 
@@ -2290,46 +2199,41 @@ async def test_project_limits_with_existing_relationships(clean_test_database):
     # Set up prerequisite data
     map_storage = Neo4jMapStorage(project_id, interview_id)
     await map_storage.initialize()
-    await map_storage.write_entry({
-        "sentence_id": 0,
-        "sequence_order": 0,
-        "sentence": "This is a test sentence."
-    })
+    await map_storage.write_entry({"sentence_id": 0, "sequence_order": 0, "sentence": "This is a test sentence."})
     await map_storage.finalize()
 
     # Set custom keyword limit
     async with await Neo4jConnectionManager.get_session() as session:
-        await session.run("""
+        await session.run(
+            """
             MERGE (p:Project {project_id: $project_id})
             SET p.max_keywords_limit = 3
-        """, project_id=project_id)
+        """,
+            project_id=project_id,
+        )
 
     # Test the analysis writer
     writer = Neo4jAnalysisWriter(project_id, interview_id)
     await writer.initialize()
 
     # First write with 2 keywords
-    analysis_result1 = {
-        "sentence_id": 0,
-        "keywords": ["keyword1", "keyword2"]
-    }
+    analysis_result1 = {"sentence_id": 0, "overall_keywords": ["keyword1", "keyword2"]}
     await writer.write_result(analysis_result1)
 
     # Second write with 4 keywords (should be limited to 3 total)
-    analysis_result2 = {
-        "sentence_id": 0,
-        "keywords": ["keyword3", "keyword4", "keyword5", "keyword6"]
-    }
+    analysis_result2 = {"sentence_id": 0, "overall_keywords": ["keyword3", "keyword4", "keyword5", "keyword6"]}
     await writer.write_result(analysis_result2)
     await writer.finalize()
 
     # Verify only 3 keywords total (limit enforced on update)
     async with await Neo4jConnectionManager.get_session() as session:
-        result = await session.run("""
+        result = await session.run(
+            """
             MATCH (s:Sentence {sentence_id: 0})-[:HAS_ANALYSIS]->(a:Analysis)
-                  -[:MENTIONS_KEYWORD]->(k:Keyword)
+                  -[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
             RETURN count(k) as keyword_count
-        """)
+        """
+        )
         record = await result.single()
         assert record is not None
         assert record["keyword_count"] == 3  # Custom limit enforced
