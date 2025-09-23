@@ -41,7 +41,7 @@ class TestNeo4jNetworkFaultTolerance:
             "purpose": "testing",
             "topic_level_1": "fault_tolerance",
             "topic_level_3": "network_interruption",
-            "keywords": ["fault", "tolerance", "test"],
+            "overall_keywords": ["fault", "tolerance", "test"],
             "domain_keywords": ["testing", "reliability"],
         }
 
@@ -294,6 +294,13 @@ class TestNeo4jConnectionPoolFaultTolerance:
         """Test that connection pool recovers from temporary exhaustion."""
         project_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
+
+        # Create required sentence nodes first (required for Neo4jAnalysisWriter)
+        from src.io.neo4j_map_storage import Neo4jMapStorage
+
+        map_storage = Neo4jMapStorage(project_id, interview_id)
+        await map_storage.initialize()
+
         writer = Neo4jAnalysisWriter(project_id, interview_id)
 
         # Simulate connection pool exhaustion scenario
@@ -315,6 +322,15 @@ class TestNeo4jConnectionPoolFaultTolerance:
 
         # Give them a moment to start
         await asyncio.sleep(0.1)
+
+        # Create sentence node for the test
+        await map_storage.write_entry(
+            {
+                "sentence_id": 5000,
+                "sentence": "Connection pool recovery test",
+                "sequence_order": 0,
+            }
+        )
 
         # Now try to do a regular write operation
         # This should either succeed or handle pool exhaustion gracefully
@@ -360,7 +376,7 @@ class TestNeo4jDataConsistencyFaultTolerance:
             "purpose": "consistency_testing",
             "topic_level_1": "data_integrity",
             "topic_level_3": "consistency_validation",
-            "keywords": ["consistency", "integrity", "atomic"],
+            "overall_keywords": ["consistency", "integrity", "atomic"],
             "domain_keywords": ["testing", "validation", "data"],
         }
 
@@ -499,7 +515,7 @@ class TestNeo4jDataConsistencyFaultTolerance:
         await map_storage.write_entry(
             {
                 "sentence_id": 8001,
-                "text": "New data after recovery test",
+                "sentence": "New data after recovery test",
                 "sequence_order": 0,
             }
         )
@@ -554,7 +570,7 @@ class TestNeo4jLongRunningFaultTolerance:
                 await map_storage.write_entry(
                     {
                         "sentence_id": 9000 + i,
-                        "text": data["sentence"],
+                        "sentence": data["sentence"],
                         "sequence_order": i,
                     }
                 )
@@ -623,7 +639,7 @@ class TestNeo4jLongRunningFaultTolerance:
                 await map_storage.write_entry(
                     {
                         "sentence_id": 10000 + i,
-                        "text": data["sentence"],
+                        "sentence": data["sentence"],
                         "sequence_order": i,
                     }
                 )

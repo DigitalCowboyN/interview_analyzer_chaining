@@ -55,7 +55,7 @@ class TestGraphPersistenceBasicOperations:
                 "purpose": "relationship_building",
                 "topic_level_1": "social_interaction",
                 "topic_level_3": "interview_opening",
-                "keywords": ["morning", "thank", "joining"],
+                "overall_keywords": ["morning", "thank", "joining"],
                 "domain_keywords": ["professional_communication"],
             },
             {
@@ -67,7 +67,7 @@ class TestGraphPersistenceBasicOperations:
                 "purpose": "technical_assessment",
                 "topic_level_1": "technical_skills",
                 "topic_level_3": "system_architecture",
-                "keywords": ["experience", "microservices", "architecture"],
+                "overall_keywords": ["experience", "microservices", "architecture"],
                 "domain_keywords": ["microservices", "technical_skills"],
             },
             {
@@ -79,7 +79,7 @@ class TestGraphPersistenceBasicOperations:
                 "purpose": "experience_sharing",
                 "topic_level_1": "technical_experience",
                 "topic_level_3": "containerization",
-                "keywords": ["worked", "microservices", "years", "Docker"],
+                "overall_keywords": ["worked", "microservices", "years", "Docker"],
                 "domain_keywords": ["microservices", "Docker", "containerization"],
             },
         ]
@@ -401,7 +401,7 @@ class TestGraphPersistenceDataIntegrity:
             "sentence_id": 500,
             "sequence_order": 0,
             "sentence": "Sentence with no keywords.",
-            "keywords": [],
+            "overall_keywords": [],
             "domain_keywords": [],
         }
         filename = "empty_keywords_test.txt"
@@ -431,7 +431,7 @@ class TestGraphPersistenceDataIntegrity:
             "purpose": None,
             "topic_level_1": None,
             "topic_level_3": None,
-            "keywords": None,
+            "overall_keywords": None,
             "domain_keywords": None,
         }
         filename = "none_values_test.txt"
@@ -479,7 +479,7 @@ class TestGraphPersistencePerformance:
                     "purpose": f"purpose_{i % 5}",  # 5 different purposes
                     "topic_level_1": f"topic_l1_{i % 7}",  # 7 different level 1 topics
                     "topic_level_3": f"topic_l3_{i % 11}",  # 11 different level 3 topics
-                    "keywords": [f"keyword_{i}", f"common_keyword_{i % 10}"],
+                    "overall_keywords": [f"keyword_{i}", f"common_keyword_{i % 10}"],
                     "domain_keywords": [f"domain_{i % 8}"],
                 }
             )

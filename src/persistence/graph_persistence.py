@@ -83,10 +83,9 @@ async def save_analysis_to_graph(
             query_sentence = """
             MERGE (f:SourceFile {filename: $filename})
             WITH f
-            MERGE (s:Sentence {sentence_id: $sentence_id})
+            MERGE (s:Sentence {sentence_id: $sentence_id, filename: $filename})
             ON CREATE SET s.text = $text, s.sequence_order = $sequence_order
             ON MATCH SET s.text = $text, s.sequence_order = $sequence_order
-            SET s.filename = $filename
             MERGE (s)-[:PART_OF_FILE]->(f)
             """
             # Execute using the session
@@ -99,7 +98,7 @@ async def save_analysis_to_graph(
             if params.get("function_type"):
                 type_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id})
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
                 MERGE (t:FunctionType {name: $function_type})
                 MERGE (s)-[:HAS_FUNCTION_TYPE]->(t)
                 """
@@ -108,7 +107,7 @@ async def save_analysis_to_graph(
             if params.get("structure_type"):
                 type_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id})
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
                 MERGE (t:StructureType {name: $structure_type})
                 MERGE (s)-[:HAS_STRUCTURE_TYPE]->(t)
                 """
@@ -117,7 +116,7 @@ async def save_analysis_to_graph(
             if params.get("purpose"):
                 type_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id})
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
                 MERGE (t:Purpose {name: $purpose})
                 MERGE (s)-[:HAS_PURPOSE]->(t)
                 """
@@ -131,7 +130,7 @@ async def save_analysis_to_graph(
 
             # --- 4. MERGE Topic Nodes & Relationships ---
             topic_query = """
-            MATCH (s:Sentence {sentence_id: $sentence_id})
+            MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
             // Use UNWIND to process multiple topics efficiently if they are passed as a list
             // For now, handling topic_level_1 and topic_level_3 separately
             // Consider refactoring if topics become a list in analysis_data
@@ -156,7 +155,7 @@ async def save_analysis_to_graph(
                 # Use UNWIND for efficient list processing
                 keyword_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id})
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
                 UNWIND $overall_keywords AS keyword_text
                 MERGE (k:Keyword {text: keyword_text})
                 MERGE (s)-[:MENTIONS_OVERALL_KEYWORD]->(k)
@@ -166,7 +165,7 @@ async def save_analysis_to_graph(
             if params.get("domain_keywords"):
                 keyword_queries.append(
                     """
-                MATCH (s:Sentence {sentence_id: $sentence_id})
+                MATCH (s:Sentence {sentence_id: $sentence_id, filename: $filename})
                 UNWIND $domain_keywords AS keyword_text
                 MERGE (k:Keyword {text: keyword_text})
                 MERGE (s)-[:MENTIONS_DOMAIN_KEYWORD]->(k)

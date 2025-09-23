@@ -16,12 +16,12 @@ import gc
 import time
 import uuid
 from statistics import mean, median, stdev
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pytest
 
 try:
-    import psutil
+    import psutil  # type: ignore[import-untyped]
 
     PSUTIL_AVAILABLE = True
 except ImportError:
@@ -57,13 +57,16 @@ class TestNeo4jSingleOperationPerformance:
                 return {
                     "sentence_id": sentence_id,
                     "sequence_order": sentence_id,
-                    "sentence": f"Complex performance test sentence {sentence_id} with extended content and multiple clauses.",
+                    "sentence": (
+                        f"Complex performance test sentence {sentence_id} with "
+                        "extended content and multiple clauses."
+                    ),
                     "function_type": "declarative",
                     "structure_type": "complex",
                     "purpose": "performance_testing",
                     "topic_level_1": f"performance_topic_l1_{sentence_id % 10}",
                     "topic_level_3": f"performance_topic_l3_{sentence_id % 20}",
-                    "keywords": [f"keyword_{i}" for i in range(sentence_id % 5 + 1)],
+                    "overall_keywords": [f"keyword_{i}" for i in range(sentence_id % 5 + 1)],
                     "domain_keywords": [f"domain_{i}" for i in range(sentence_id % 3 + 1)],
                 }
             elif complexity == "maximum":
@@ -76,7 +79,7 @@ class TestNeo4jSingleOperationPerformance:
                     "purpose": "performance_testing",
                     "topic_level_1": f"performance_topic_l1_{sentence_id % 15}",
                     "topic_level_3": f"performance_topic_l3_{sentence_id % 30}",
-                    "keywords": [f"keyword_{i}" for i in range(10)],  # Max keywords
+                    "overall_keywords": [f"keyword_{i}" for i in range(10)],  # Max keywords
                     "domain_keywords": [f"domain_{i}" for i in range(8)],  # Max domain keywords
                 }
 
@@ -125,7 +128,7 @@ class TestNeo4jSingleOperationPerformance:
         max_time = max(times)
 
         # Performance assertions and reporting
-        print(f"\n=== Single Write Performance (Simple Data) ===")
+        print("\n=== Single Write Performance (Simple Data) ===")
         print(f"Operations: {num_operations}")
         print(f"Average time: {avg_time:.4f}s")
         print(f"Median time: {median_time:.4f}s")
@@ -182,7 +185,7 @@ class TestNeo4jSingleOperationPerformance:
         max_time = max(times)
 
         # Performance reporting
-        print(f"\n=== Single Write Performance (Complex Data) ===")
+        print("\n=== Single Write Performance (Complex Data) ===")
         print(f"Operations: {num_operations}")
         print(f"Average time: {avg_time:.4f}s")
         print(f"Median time: {median_time:.4f}s")
@@ -243,7 +246,7 @@ class TestNeo4jSingleOperationPerformance:
         avg_read_time = mean(read_times)
         median_read_time = median(read_times)
 
-        print(f"\n=== Read Performance Benchmark ===")
+        print("\n=== Read Performance Benchmark ===")
         print(f"Dataset size: {num_sentences} sentences")
         print(f"Read operations: {num_reads}")
         print(f"Average read time: {avg_read_time:.4f}s")
@@ -328,7 +331,7 @@ class TestNeo4jBulkOperationPerformance:
             await map_storage.initialize()  # Reset for next test
 
         # Performance analysis
-        print(f"\n=== Bulk Write Throughput Analysis ===")
+        print("\n=== Bulk Write Throughput Analysis ===")
         for batch_size, metrics in results.items():
             print(f"Batch {batch_size}: {metrics['throughput']:.2f} ops/sec")
 
@@ -364,7 +367,7 @@ class TestNeo4jBulkOperationPerformance:
                     "structure_type": "simple" if i % 2 == 0 else "complex",
                     "purpose": "bulk_testing",
                     "topic_level_1": f"topic_{i % 5}",
-                    "keywords": [f"keyword_{i}", f"bulk_{i % 10}"],
+                    "overall_keywords": [f"keyword_{i}", f"bulk_{i % 10}"],
                     "domain_keywords": [f"domain_{i % 3}"],
                 }
                 test_data.append(data)
@@ -409,7 +412,7 @@ class TestNeo4jBulkOperationPerformance:
                 await session.run("MATCH (n) DETACH DELETE n")
 
         # Performance analysis
-        print(f"\n=== Graph Persistence Bulk Performance Analysis ===")
+        print("\n=== Graph Persistence Bulk Performance Analysis ===")
         for bulk_size, metrics in results.items():
             print(f"Bulk {bulk_size}: {metrics['throughput']:.2f} ops/sec")
 
@@ -518,7 +521,7 @@ class TestNeo4jConcurrencyPerformance:
             await map_storage.initialize()
 
         # Scaling analysis
-        print(f"\n=== Concurrent Writer Scaling Analysis ===")
+        print("\n=== Concurrent Writer Scaling Analysis ===")
         baseline_throughput = results[1]["throughput"]
 
         for concurrency, metrics in results.items():
@@ -635,7 +638,7 @@ class TestNeo4jConcurrencyPerformance:
         total_operations = write_result["count"] + read_result["count"]
         overall_throughput = total_operations / total_time
 
-        print(f"\n=== Mixed Operation Concurrency Performance ===")
+        print("\n=== Mixed Operation Concurrency Performance ===")
         print(f"Total time: {total_time:.3f}s")
         print(f"Write operations: {write_result['count']}, avg time: {write_avg:.4f}s")
         print(f"Read operations: {read_result['count']}, avg time: {read_avg:.4f}s")
@@ -670,7 +673,7 @@ class TestNeo4jResourceEfficiencyBenchmarks:
         process = psutil.Process()
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
 
-        print(f"\n=== Memory Usage Benchmark ===")
+        print("\n=== Memory Usage Benchmark ===")
         print(f"Initial memory: {initial_memory:.2f} MB")
 
         # Perform operations while monitoring memory
@@ -695,7 +698,7 @@ class TestNeo4jResourceEfficiencyBenchmarks:
                 "function_type": "declarative",
                 "structure_type": "complex",
                 "purpose": "memory_testing",
-                "keywords": [f"keyword_{j}" for j in range(5)],
+                "overall_keywords": [f"keyword_{j}" for j in range(5)],
                 "domain_keywords": [f"domain_{j}" for j in range(3)],
             }
             await writer.write_result(data)
@@ -775,7 +778,7 @@ class TestNeo4jResourceEfficiencyBenchmarks:
         median_connection_time = median(connection_times)
         connection_std = stdev(connection_times) if len(connection_times) > 1 else 0
 
-        print(f"\n=== Connection Efficiency Benchmark ===")
+        print("\n=== Connection Efficiency Benchmark ===")
         print(f"Operations: {num_operations}")
         print(f"Average operation time: {avg_connection_time:.4f}s")
         print(f"Median operation time: {median_connection_time:.4f}s")

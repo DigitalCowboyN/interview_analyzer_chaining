@@ -533,10 +533,11 @@ class TestNeo4jDataConsistency:
                 """
                 MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
                 OPTIONAL MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
+                OPTIONAL MATCH (a)-[:HAS_PURPOSE]->(p:Purpose)
                 RETURN s.sentence_id as sentence_id,
                        s.text as sentence_text,
                        s.start_time as start_time,
-                       a.purpose as analysis_purpose
+                       p.name as analysis_purpose
                 ORDER BY s.sequence_order
                 """,
                 interview_id=interview_id,
@@ -651,7 +652,8 @@ class TestNeo4jDataConsistency:
                 MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
                 MATCH (a)-[:HAS_FUNCTION]->(f:FunctionType)
                 MATCH (a)-[:HAS_STRUCTURE]->(st:StructureType)
-                RETURN a.purpose as purpose, f.name as function_type, st.name as structure_type
+                MATCH (a)-[:HAS_PURPOSE]->(p:Purpose)
+                RETURN p.name as purpose, f.name as function_type, st.name as structure_type
                 """,
                 interview_id=interview_id,
                 sentence_id=8000,
@@ -750,7 +752,7 @@ class TestNeo4jDataConsistency:
                 result = await session.run(
                     f"""
                     MATCH (d:{dim_type})
-                    WHERE NOT (d)<-[]-(:Analysis)
+                    WHERE NOT (d)<-[]-(:Analysis) AND NOT (d)<-[]-(:Sentence)
                     RETURN count(d) as orphaned_count
                     """
                 )
