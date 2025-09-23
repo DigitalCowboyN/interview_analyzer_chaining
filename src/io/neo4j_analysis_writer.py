@@ -179,7 +179,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         # Function Type (Cardinality 1)
         await self._handle_dimension_link(
             session=session,
-            analysis_node_id=analysis_node.id,  # Pass internal ID
+            analysis_node_id=analysis_node.element_id,  # Pass internal ID
             dimension_label="FunctionType",
             dimension_key="name",
             dimension_value=result.get("function_type"),
@@ -195,7 +195,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         # Structure Type (Assume Cardinality 1 for now)
         await self._handle_dimension_link(
             session=session,
-            analysis_node_id=analysis_node.id,
+            analysis_node_id=analysis_node.element_id,
             dimension_label="StructureType",
             dimension_key="name",
             dimension_value=result.get("structure_type"),
@@ -211,7 +211,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         # Purpose (Assume Cardinality 1 for now)
         await self._handle_dimension_link(
             session=session,
-            analysis_node_id=analysis_node.id,
+            analysis_node_id=analysis_node.element_id,
             dimension_label="Purpose",
             dimension_key="name",
             dimension_value=result.get("purpose"),
@@ -227,7 +227,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         # Topics (Cardinality Many)
         await self._handle_dimension_list_link(
             session=session,
-            analysis_node_id=analysis_node.id,
+            analysis_node_id=analysis_node.element_id,
             dimension_label="Topic",
             dimension_key="name",
             dimension_values=result.get("topics", []),  # Assuming 'topics' key holds a list of topic names
@@ -244,7 +244,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         # Keywords (Cardinality N)
         await self._handle_dimension_list_link(
             session=session,
-            analysis_node_id=analysis_node.id,
+            analysis_node_id=analysis_node.element_id,
             dimension_label="Keyword",
             dimension_key="text",
             dimension_values=result.get(
@@ -262,7 +262,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         # Domain Keywords (Cardinality Many)
         await self._handle_dimension_list_link(
             session=session,
-            analysis_node_id=analysis_node.id,
+            analysis_node_id=analysis_node.element_id,
             dimension_label="DomainKeyword",
             dimension_key="text",
             dimension_values=result.get("domain_keywords", []),  # Assuming 'domain_keywords' key
