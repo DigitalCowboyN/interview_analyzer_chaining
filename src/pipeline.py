@@ -109,40 +109,28 @@ class PipelineOrchestrator:
             logger.info(f"{self.prefix}Input directory set to: {self.input_dir_path}")
 
             # Use output_dir from config if not provided, default to input_dir/output
-            output_dir_str = output_dir or self.config.get("paths", {}).get(
-                "output_dir"
-            )
+            output_dir_str = output_dir or self.config.get("paths", {}).get("output_dir")
             if not output_dir_str:
                 self.output_dir_path = self.input_dir_path / "output"
-                logger.warning(
-                    f"{self.prefix}Output directory not specified, defaulting to: {self.output_dir_path}"
-                )
+                logger.warning(f"{self.prefix}Output directory not specified, defaulting to: {self.output_dir_path}")
             else:
                 self.output_dir_path = Path(output_dir_str).resolve()
-                logger.info(
-                    f"{self.prefix}Output directory set to: {self.output_dir_path}"
-                )
+                logger.info(f"{self.prefix}Output directory set to: {self.output_dir_path}")
             self.output_dir_path.mkdir(parents=True, exist_ok=True)
 
             # Use map_dir from config if not provided, default to input_dir/maps
             map_dir_str = map_dir or self.config.get("paths", {}).get("map_dir")
             if not map_dir_str:
                 self.map_dir_path = self.input_dir_path / "maps"
-                logger.warning(
-                    f"{self.prefix}Map directory not specified, defaulting to: {self.map_dir_path}"
-                )
+                logger.warning(f"{self.prefix}Map directory not specified, defaulting to: {self.map_dir_path}")
             else:
                 self.map_dir_path = Path(map_dir_str).resolve()
                 logger.info(f"{self.prefix}Map directory set to: {self.map_dir_path}")
             self.map_dir_path.mkdir(parents=True, exist_ok=True)
 
             # Get suffixes from config with defaults
-            self.map_suffix = self.config.get("paths", {}).get(
-                "map_suffix", "_map.jsonl"
-            )
-            self.analysis_suffix = self.config.get("paths", {}).get(
-                "analysis_suffix", "_analysis.jsonl"
-            )
+            self.map_suffix = self.config.get("paths", {}).get("map_suffix", "_map.jsonl")
+            self.analysis_suffix = self.config.get("paths", {}).get("analysis_suffix", "_analysis.jsonl")
 
         except FileNotFoundError as e:
             logger.critical(
@@ -172,9 +160,7 @@ class PipelineOrchestrator:
             )
             logger.info(f"{self.prefix}AnalysisService initialized.")
         except Exception as e:
-            logger.critical(
-                f"{self.prefix}Failed to initialize AnalysisService: {e}", exc_info=True
-            )
+            logger.critical(f"{self.prefix}Failed to initialize AnalysisService: {e}", exc_info=True)
             raise
 
         # --- Metrics Initialization (moved from _setup_pipeline_environment) ---
@@ -187,19 +173,13 @@ class PipelineOrchestrator:
 
         # --- Concurrency Setup (moved from _setup_pipeline_environment) ---
         try:
-            self.num_concurrent_files = int(
-                self.config.get("pipeline", {}).get("num_concurrent_files", 1)
-            )
+            self.num_concurrent_files = int(self.config.get("pipeline", {}).get("num_concurrent_files", 1))
             if self.num_concurrent_files < 1:
                 logger.warning(f"{self.prefix}num_concurrent_files < 1, setting to 1.")
                 self.num_concurrent_files = 1
-            logger.info(
-                f"{self.prefix}Concurrent file processing limit: {self.num_concurrent_files}"
-            )
+            logger.info(f"{self.prefix}Concurrent file processing limit: {self.num_concurrent_files}")
         except (ValueError, TypeError) as e:
-            logger.warning(
-                f"{self.prefix}Invalid num_concurrent_files in config, defaulting to 1. Error: {e}"
-            )
+            logger.warning(f"{self.prefix}Invalid num_concurrent_files in config, defaulting to 1. Error: {e}")
             self.num_concurrent_files = 1
 
     # --- Result Handling Methods (MOVED INSIDE CLASS) ---
@@ -216,21 +196,17 @@ class PipelineOrchestrator:
             await analysis_writer.write_result(result)
             return True  # Indicate success
         except Exception as write_e:
-            sentence_id_info = (
-                f"result {sentence_id}"
-                if sentence_id != "N/A"
-                else "result (unknown ID)"
-            )
+            sentence_id_info = f"result {sentence_id}" if sentence_id != "N/A" else "result (unknown ID)"
             logger.error(
                 f"{prefix}Writer failed writing {sentence_id_info} to {writer_id}: {write_e}",
                 exc_info=True,
             )
-            self.metrics_tracker.increment_errors(
-                f"{writer_id}_jsonl_write_error"
-            )  # Use instance tracker
+            self.metrics_tracker.increment_errors(f"{writer_id}_jsonl_write_error")  # Use instance tracker
             return False  # Indicate failure
 
-    async def _handle_graph_save(self, result: Dict[str, Any], prefix: str) -> bool:
+    async def _handle_graph_save(
+        self, result: Dict[str, Any], analysis_writer: SentenceAnalysisWriter, prefix: str
+    ) -> bool:
         """Handles saving a single result to the graph database."""
         sentence_id = result.get("sentence_id", "N/A")
         filename = result.get("filename")
@@ -242,25 +218,23 @@ class PipelineOrchestrator:
             return False  # Indicate failure (or skip)
 
         try:
+            # Extract interview_id from the analysis_writer if it's a Neo4jAnalysisWriter
+            interview_id = getattr(analysis_writer, "interview_id", None)
             await save_analysis_to_graph(
-                result, filename, connection_manager
-            )  # Use the imported singleton connection manager directly
+                result, filename, interview_id, connection_manager
+            )  # Pass interview_id to save_analysis_to_graph
             return True  # Indicate success
         except Exception as graph_e:
             logger.error(
                 f"{prefix}Writer failed saving result ID: {sentence_id} from {filename} to graph: {graph_e}",
                 exc_info=True,
             )
-            self.metrics_tracker.increment_errors(
-                f"{filename}_graph_save_error"
-            )  # Use instance tracker
+            self.metrics_tracker.increment_errors(f"{filename}_graph_save_error")  # Use instance tracker
             return False  # Indicate failure
 
     # --- End Result Handling Methods ---
 
-    def _discover_files_to_process(
-        self, specific_file: Optional[str] = None
-    ) -> List[Path]:
+    def _discover_files_to_process(self, specific_file: Optional[str] = None) -> List[Path]:
         """Discovers .txt files in the input directory. (Logic moved from _discover_files_to_process)"""
         prefix = self.prefix  # Use instance prefix
         logger.info(f"{prefix}Discovering files... Specific: {specific_file}")
@@ -281,36 +255,24 @@ class PipelineOrchestrator:
 
         # If no specific file was processed or if the specific file was invalid, process all
         if not files_to_process:
-            all_files = sorted(
-                [p for p in self.input_dir_path.glob("*.txt") if p.is_file()]
-            )
-            logger.info(
-                f"{prefix}Found {len(all_files)} total .txt files. Processing all."
-            )
+            all_files = sorted([p for p in self.input_dir_path.glob("*.txt") if p.is_file()])
+            logger.info(f"{prefix}Found {len(all_files)} total .txt files. Processing all.")
             files_to_process = all_files
 
         # Log final list
         if files_to_process:
-            logger.debug(
-                f"{prefix}Final list of files to process: {[f.name for f in files_to_process]}"
-            )
+            logger.debug(f"{prefix}Final list of files to process: {[f.name for f in files_to_process]}")
         else:
-            logger.info(
-                f"{prefix}No .txt files found to process in {self.input_dir_path}"
-            )
+            logger.info(f"{prefix}No .txt files found to process in {self.input_dir_path}")
 
         # Log metric for files discovered
-        self.metrics_tracker.set_metric(
-            "pipeline", "files_discovered", len(files_to_process)
-        )
+        self.metrics_tracker.set_metric("pipeline", "files_discovered", len(files_to_process))
         return files_to_process
 
     # --- Helper methods for _process_single_file ---
     def _setup_file_io(
         self, file_path: Path
-    ) -> Tuple[
-        TextDataSource, ConversationMapStorage, SentenceAnalysisWriter, PipelinePaths
-    ]:
+    ) -> Tuple[TextDataSource, ConversationMapStorage, SentenceAnalysisWriter, PipelinePaths]:
         """Sets up the IO handlers (DataSource, MapStorage, AnalysisWriter) for a given file."""
         prefix = self.prefix
         task_id = self.task_id
@@ -329,9 +291,7 @@ class PipelineOrchestrator:
         return data_source, map_storage, analysis_writer, paths
 
     # Renamed from _read_segment_and_map_sentences
-    async def _read_and_segment_sentences(
-        self, data_source: TextDataSource
-    ) -> Tuple[int, List[str]]:
+    async def _read_and_segment_sentences(self, data_source: TextDataSource) -> Tuple[int, List[str]]:
         """
         Reads text from data source, segments it, and returns sentences.
         (Map writing logic moved to _write_map_file)
@@ -344,9 +304,7 @@ class PipelineOrchestrator:
         try:
             text = await data_source.read_text()
         except Exception as e:
-            logger.error(
-                f"{prefix}Failed to read text from {source_id}: {e}", exc_info=True
-            )
+            logger.error(f"{prefix}Failed to read text from {source_id}: {e}", exc_info=True)
             self.metrics_tracker.increment_errors(f"{source_id}_read_error")
             raise
 
@@ -358,16 +316,12 @@ class PipelineOrchestrator:
 
         return num_sentences, sentences
 
-    async def _write_map_file(
-        self, sentences: List[str], map_storage: ConversationMapStorage, source_id: str
-    ):
+    async def _write_map_file(self, sentences: List[str], map_storage: ConversationMapStorage, source_id: str):
         """Writes the conversation map file from segmented sentences."""
         prefix = f"{self.prefix}[File: {source_id}] "  # Use file-specific prefix
         storage_id = map_storage.get_identifier()
         num_sentences = len(sentences)
-        logger.info(
-            f"{prefix}Writing conversation map with {num_sentences} sentences to '{storage_id}'..."
-        )
+        logger.info(f"{prefix}Writing conversation map with {num_sentences} sentences to '{storage_id}'...")
 
         # --- Write Map Data ---
         initialized = False
@@ -383,12 +337,8 @@ class PipelineOrchestrator:
                 await map_storage.write_entry(entry)
             await map_storage.finalize()
             initialized = False  # Prevent finalizing again in finally block on success
-            self.metrics_tracker.set_metric(
-                source_id, "sentences_in_map", num_sentences
-            )
-            logger.info(
-                f"{prefix}Conversation map successfully written to '{storage_id}'."
-            )
+            self.metrics_tracker.set_metric(source_id, "sentences_in_map", num_sentences)
+            logger.info(f"{prefix}Conversation map successfully written to '{storage_id}'.")
         except Exception as e:
             logger.error(
                 f"{prefix}Failed during map storage write operation for '{storage_id}': {e}",
@@ -406,14 +356,10 @@ class PipelineOrchestrator:
                         f"{prefix}Failed to finalize map storage '{storage_id}' after write error: {final_e}",
                         exc_info=True,
                     )
-                    self.metrics_tracker.increment_errors(
-                        f"{source_id}_map_finalize_error"
-                    )
+                    self.metrics_tracker.increment_errors(f"{source_id}_map_finalize_error")
                     # Original exception (if any) is already being raised
 
-    def _build_contexts(
-        self, sentences: List[str], file_name: str
-    ) -> List[Dict[str, str]]:
+    def _build_contexts(self, sentences: List[str], file_name: str) -> List[Dict[str, str]]:
         """Builds analysis contexts using the AnalysisService."""
         # Call the analysis service method
         return self.analysis_service.build_contexts(sentences)
@@ -431,9 +377,7 @@ class PipelineOrchestrator:
         (Logic moved from _analyze_and_save_results)
         """
         writer_id = analysis_writer.get_identifier()
-        logger.info(
-            f"{prefix}Saving {len(analysis_results)} results via {writer_id} and graph DB..."
-        )
+        logger.info(f"{prefix}Saving {len(analysis_results)} results via {writer_id} and graph DB...")
         initialized = False
         num_results_written = 0
         num_results_failed = 0
@@ -463,18 +407,14 @@ class PipelineOrchestrator:
                         )
                         num_results_failed += 1  # Count as failed save
                         # Increment a specific metric for analysis errors encountered during saving phase
-                        self.metrics_tracker.increment_errors(
-                            f"{file_name}_analysis_error_skipped_save"
-                        )
+                        self.metrics_tracker.increment_errors(f"{file_name}_analysis_error_skipped_save")
                         continue  # Skip to the next result
                     # --- End error check ---
 
                     # Call internal handlers for saving (only if not an error result)
-                    jsonl_success = await self._handle_jsonl_write(
-                        result, analysis_writer, prefix
-                    )
+                    jsonl_success = await self._handle_jsonl_write(result, analysis_writer, prefix)
                     graph_success = await self._handle_graph_save(
-                        result, prefix
+                        result, analysis_writer, prefix
                     )  # DEBUG: Re-enabled graph save
                     # graph_success = True # DEBUG: Assume graph save succeeded
 
@@ -488,18 +428,14 @@ class PipelineOrchestrator:
                             f"{prefix}Result ID {sentence_id} encountered an error during saving "
                             f"(JSONL: {jsonl_success}, Graph: {graph_success})"
                         )
-                        self.metrics_tracker.increment_errors(
-                            f"{file_name}_result_save_failure"
-                        )
+                        self.metrics_tracker.increment_errors(f"{file_name}_result_save_failure")
                 else:
                     logger.warning(
                         f"{prefix}Invalid non-dictionary item received for saving at index {i}: "
                         f"{type(result)}. Skipping save."
                     )
                     num_results_failed += 1  # Count as failed save
-                    self.metrics_tracker.increment_errors(
-                        f"{file_name}_invalid_analysis_result_type"
-                    )
+                    self.metrics_tracker.increment_errors(f"{file_name}_invalid_analysis_result_type")
 
             logger.info(
                 f"{prefix}Finished saving results. Total: {num_results_total}, "
@@ -508,9 +444,7 @@ class PipelineOrchestrator:
             self.metrics_tracker.set_metric(
                 file_name, "results_saved_successfully", num_results_written
             )  # Renamed metric key
-            self.metrics_tracker.set_metric(
-                file_name, "results_save_failures", num_results_failed
-            )
+            self.metrics_tracker.set_metric(file_name, "results_save_failures", num_results_failed)
 
         except Exception as e:
             logger.error(
@@ -523,13 +457,9 @@ class PipelineOrchestrator:
             # Ensure writer is finalized even if saving failed
             if initialized:
                 try:
-                    logger.debug(
-                        f"{prefix}>>> ATTEMPTING TO FINALIZE analysis writer {writer_id}..."
-                    )
+                    logger.debug(f"{prefix}>>> ATTEMPTING TO FINALIZE analysis writer {writer_id}...")
                     await analysis_writer.finalize()
-                    logger.debug(
-                        f"{prefix}>>> SUCCESSFULLY FINALIZED analysis writer {writer_id}."
-                    )
+                    logger.debug(f"{prefix}>>> SUCCESSFULLY FINALIZED analysis writer {writer_id}.")
                     logger.debug(f"{prefix}Analysis writer {writer_id} finalized.")
                 except Exception as final_e:
                     logger.error(
@@ -566,9 +496,7 @@ class PipelineOrchestrator:
                     result["filename"] = file_name
 
             # 2. Orchestrate Saving
-            await self._save_analysis_results(
-                analysis_results, analysis_writer, file_name, prefix
-            )
+            await self._save_analysis_results(analysis_results, analysis_writer, file_name, prefix)
 
         except Exception as e:
             # Original simple error handling
@@ -594,25 +522,17 @@ class PipelineOrchestrator:
 
         try:
             # 1. Setup IO
-            data_source, map_storage, analysis_writer, _ = self._setup_file_io(
-                file_path
-            )
+            data_source, map_storage, analysis_writer, _ = self._setup_file_io(file_path)
 
             # 2. Read and Segment Sentences
-            num_sentences, sentences = await self._read_and_segment_sentences(
-                data_source
-            )
+            num_sentences, sentences = await self._read_and_segment_sentences(data_source)
 
             # 3. Write Map File (if sentences exist)
             if num_sentences > 0:
-                await self._write_map_file(
-                    sentences, map_storage, data_source.get_identifier()
-                )
+                await self._write_map_file(sentences, map_storage, data_source.get_identifier())
             else:
                 # Handle case of 0 sentences (ensure map file is appropriately handled)
-                logger.warning(
-                    f"{prefix}Skipping map file write for source '{file_name}' as it contains no sentences."
-                )
+                logger.warning(f"{prefix}Skipping map file write for source '{file_name}' as it contains no sentences.")
                 try:
                     # Explicitly initialize/finalize to truncate/create empty map file if needed by storage impl.
                     await map_storage.initialize()
@@ -633,27 +553,19 @@ class PipelineOrchestrator:
             contexts = self._build_contexts(sentences, file_name)
 
             # 5. Run Analysis and Saving
-            await self._analyze_and_save_results(
-                sentences, contexts, analysis_writer, file_name
-            )
+            await self._analyze_and_save_results(sentences, contexts, analysis_writer, file_name)
 
             # --- Success Metrics ---
             # Metrics are now updated within _analyze_and_save_results
-            self.metrics_tracker.increment_files_processed(
-                1
-            )  # Increment file processed count
+            self.metrics_tracker.increment_files_processed(1)  # Increment file processed count
             self.metrics_tracker.set_metric(
                 file_name, "sentences_processed", num_sentences
             )  # Keep this sentence count metric
             logger.info(f"{prefix}Successfully finished processing.")
 
         except Exception as e:
-            logger.error(
-                f"{prefix}>>> CAUGHT EXCEPTION IN _process_single_file: {type(e).__name__}"
-            )
-            logger.error(
-                f"{prefix}Error processing file {file_name}: {e}", exc_info=True
-            )
+            logger.error(f"{prefix}>>> CAUGHT EXCEPTION IN _process_single_file: {type(e).__name__}")
+            logger.error(f"{prefix}Error processing file {file_name}: {e}", exc_info=True)
             self.metrics_tracker.increment_files_failed(1)
             raise
         finally:
@@ -676,9 +588,7 @@ class PipelineOrchestrator:
                 file_prefix = f"{prefix}[File: {fp.name}] "
                 logger.debug(f"{file_prefix}Acquiring semaphore...")
                 async with semaphore:
-                    logger.debug(
-                        f"{file_prefix}Semaphore acquired. Starting processing."
-                    )
+                    logger.debug(f"{file_prefix}Semaphore acquired. Starting processing.")
                     try:
                         # Call the main processing method for the single file
                         await self._process_single_file(fp)
@@ -686,28 +596,20 @@ class PipelineOrchestrator:
                         return fp  # Indicate success by returning path
                     except Exception as e:
                         # Error should have been logged within _process_single_file
-                        logger.error(
-                            f"{file_prefix}Processing failed (exception returned to gather). Error: {e}"
-                        )
+                        logger.error(f"{file_prefix}Processing failed (exception returned to gather). Error: {e}")
                         return e  # Indicate failure by returning exception
                     finally:
                         logger.debug(f"{file_prefix}Releasing semaphore.")
 
             # Create and schedule the task
-            tasks.append(
-                asyncio.create_task(
-                    process_with_semaphore(file_path), name=f"process_{file_path.name}"
-                )
-            )
+            tasks.append(asyncio.create_task(process_with_semaphore(file_path), name=f"process_{file_path.name}"))
 
         # Wait for all tasks to complete and collect results
         results = await asyncio.gather(*tasks)
         logger.info(f"{prefix}Finished concurrent processing of all scheduled files.")
         return results  # List containing file paths (success) or Exceptions (failure)
 
-    def _log_summary(
-        self, results: List[Union[Exception, Any]], files_to_process: List[Path]
-    ):
+    def _log_summary(self, results: List[Union[Exception, Any]], files_to_process: List[Path]):
         """Logs the final processing summary. (Logic moved from _log_processing_summary)"""
         prefix = self.prefix
         # Use the initial list count for total, as results might be shorter if cancelled
@@ -720,25 +622,17 @@ class PipelineOrchestrator:
         # For simplicity, we assume results list matches files_to_process length or errors indicate non-completion.
 
         # Update global metrics based on final counts
-        self.metrics_tracker.set_metric(
-            "pipeline", "files_processed_successfully", success_count
-        )
+        self.metrics_tracker.set_metric("pipeline", "files_processed_successfully", success_count)
         self.metrics_tracker.set_metric("pipeline", "files_failed", failure_count)
 
         logger.info(f"{prefix}--- Processing Summary ---")
-        logger.info(
-            f"{prefix}Total files initially discovered: {total_files_attempted}"
-        )
+        logger.info(f"{prefix}Total files initially discovered: {total_files_attempted}")
         logger.info(f"{prefix}Successfully processed files: {success_count}")
         logger.info(f"{prefix}Failed files: {failure_count}")
 
         if failure_count > 0:
             # Map results back to filenames for logging failed files
-            failed_map = {
-                res: fp.name
-                for fp, res in zip(files_to_process, results)
-                if isinstance(res, Exception)
-            }
+            failed_map = {res: fp.name for fp, res in zip(files_to_process, results) if isinstance(res, Exception)}
             failed_files_str = ", ".join(failed_map.values())
             logger.warning(f"{prefix}Failed files list: [{failed_files_str}]")
             # Optionally log the specific errors
@@ -784,9 +678,7 @@ class PipelineOrchestrator:
                 map_file = self.map_dir_path / f"{file_path.stem}{self.map_suffix}"
                 map_storage = LocalJsonlMapStorage(map_file)
 
-                analysis_file = (
-                    self.output_dir_path / f"{file_path.stem}{self.analysis_suffix}"
-                )
+                analysis_file = self.output_dir_path / f"{file_path.stem}{self.analysis_suffix}"
                 # We only need the reading capability of the writer protocol here
                 analysis_reader = LocalJsonlAnalysisWriter(analysis_file)
 
@@ -810,9 +702,7 @@ class PipelineOrchestrator:
                         f"{map_storage.get_identifier()}: {map_read_e}",
                         exc_info=True,
                     )
-                    error_msg = (
-                        f"Error reading map storage: {type(map_read_e).__name__}"
-                    )
+                    error_msg = f"Error reading map storage: {type(map_read_e).__name__}"
                     # Cannot continue verification for this file if map is unreadable
                     verification_result = {
                         "total_expected": 0,
@@ -824,9 +714,7 @@ class PipelineOrchestrator:
                     verification_errors += 1  # Count this as a verification error
                     # Skip to next file using continue
                     verification_results.append(verification_result)
-                    logger.warning(
-                        f"{file_prefix}Verification check failed: {error_msg}"
-                    )
+                    logger.warning(f"{file_prefix}Verification check failed: {error_msg}")
                     continue
 
                 # Process Analysis Storage
@@ -862,8 +750,7 @@ class PipelineOrchestrator:
 
             except Exception as e:  # Catch errors during IO instantiation
                 logger.error(
-                    f"{file_prefix}Unexpected error during verification setup for "
-                    f"{file_path.name}: {e}",
+                    f"{file_prefix}Unexpected error during verification setup for " f"{file_path.name}: {e}",
                     exc_info=True,
                 )
                 # Create a default error result if setup fails
@@ -883,9 +770,7 @@ class PipelineOrchestrator:
                 # Error already logged during exception handling for this file
                 # No need to increment verification_errors again here if already done
                 # But we need to make sure total_expected isn't counted if there was an error
-                logger.warning(
-                    f"{file_prefix}Verification check: ERROR - {verification_result['error']}"
-                )
+                logger.warning(f"{file_prefix}Verification check: ERROR - {verification_result['error']}")
             else:
                 # Only add to totals if there was no error reading map/analysis for this file
                 total_expected_overall += verification_result["total_expected"]
@@ -906,22 +791,14 @@ class PipelineOrchestrator:
         # Log overall verification summary using accumulated totals
         logger.info(f"{prefix}--- Verification Summary ---")
         logger.info(f"{prefix}Total Files Verified: {len(files_to_process)}")
-        logger.info(
-            f"{prefix}Verification Errors (file setup/read): {verification_errors}"
-        )
+        logger.info(f"{prefix}Verification Errors (file setup/read): {verification_errors}")
         # Ensure division by zero is avoided if all files had verification errors
         expected_log = total_expected_overall if total_expected_overall > 0 else "N/A"
-        logger.info(
-            f"{prefix}Total Missing Sentences (across valid files): {total_missing_overall}/{expected_log}"
-        )
+        logger.info(f"{prefix}Total Missing Sentences (across valid files): {total_missing_overall}/{expected_log}")
 
         # Update overall pipeline metrics using orchestrator tracker
-        self.metrics_tracker.set_metric(
-            "pipeline", "verification_total_missing", total_missing_overall
-        )
-        self.metrics_tracker.set_metric(
-            "pipeline", "verification_errors", verification_errors
-        )
+        self.metrics_tracker.set_metric("pipeline", "verification_total_missing", total_missing_overall)
+        self.metrics_tracker.set_metric("pipeline", "verification_errors", verification_errors)
 
     async def execute(self, specific_file: Optional[str] = None):
         """Runs the entire pipeline orchestration."""
@@ -943,9 +820,7 @@ class PipelineOrchestrator:
             # --- Run Verification Step ---
             # Only run verification if concurrent processing seems to have finished
             # (We might refine error handling later, but for now, run if no exception bubbled up)
-            logger.info(
-                f"{self.prefix}Concurrent processing finished. Proceeding to verification..."
-            )
+            logger.info(f"{self.prefix}Concurrent processing finished. Proceeding to verification...")
             await self._run_verification(files_to_process)
             logger.info(f"{self.prefix}Verification finished.")
             # --- End Verification Step ---
@@ -961,9 +836,7 @@ class PipelineOrchestrator:
             # Log summary now includes verification metrics potentially set in _run_verification
             self._log_summary(results, files_to_process)
             end_time = time.time()
-            logger.info(
-                f"{self.prefix}Pipeline execution finished in {end_time - start_time:.2f} seconds."
-            )
+            logger.info(f"{self.prefix}Pipeline execution finished in {end_time - start_time:.2f} seconds.")
 
 
 # --- End Orchestrator Class ---
@@ -1000,9 +873,7 @@ async def run_pipeline(
     Initializes the orchestrator with paths and config, then runs its execute method.
     """
     prefix = _log_prefix(task_id)
-    logger.info(
-        f"{prefix}--- Starting Pipeline Run --- Task ID: {task_id if task_id else 'N/A'}"
-    )
+    logger.info(f"{prefix}--- Starting Pipeline Run --- Task ID: {task_id if task_id else 'N/A'}")
     try:
         orchestrator = PipelineOrchestrator(
             input_dir=input_dir,
@@ -1018,9 +889,7 @@ async def run_pipeline(
         # Potentially re-raise or handle differently depending on desired top-level behavior
         raise
     finally:
-        logger.info(
-            f"{prefix}--- Pipeline Run Finished --- Task ID: {task_id if task_id else 'N/A'}"
-        )
+        logger.info(f"{prefix}--- Pipeline Run Finished --- Task ID: {task_id if task_id else 'N/A'}")
 
 
 # --- Refactoring Helpers for analyze_specific_sentences ---
@@ -1039,14 +908,10 @@ async def _prepare_data_for_specific_analysis(
     try:
         all_entries = await map_storage.read_all_entries()
         if not all_entries:
-            logger.error(
-                f"{prefix}Map storage '{map_id}' is empty or could not be read."
-            )
+            logger.error(f"{prefix}Map storage '{map_id}' is empty or could not be read.")
             raise ValueError(f"Map storage '{map_id}' is empty or unreadable.")
     except Exception as read_e:
-        logger.error(
-            f"{prefix}Error reading map entries from {map_id}: {read_e}", exc_info=True
-        )
+        logger.error(f"{prefix}Error reading map entries from {map_id}: {read_e}", exc_info=True)
         raise  # Re-raise the storage access error
 
     # --- Prepare Sentences and Check IDs ---
@@ -1061,14 +926,10 @@ async def _prepare_data_for_specific_analysis(
             all_sentences_map[s_id] = text
             max_id = max(max_id, s_id)
         else:
-            logger.warning(
-                f"{prefix}Skipping invalid/incomplete entry in map {map_id}: {str(entry)[:100]}..."
-            )
+            logger.warning(f"{prefix}Skipping invalid/incomplete entry in map {map_id}: {str(entry)[:100]}...")
 
     if max_id == -1:
-        logger.warning(
-            f"{prefix}No valid sentence entries found in map {map_id}. Cannot perform specific analysis."
-        )
+        logger.warning(f"{prefix}No valid sentence entries found in map {map_id}. Cannot perform specific analysis.")
         raise ValueError(f"No valid sentence entries found in map '{map_id}'.")
 
     full_sentence_list_for_context = ["" for _ in range(max_id + 1)]
@@ -1089,18 +950,12 @@ async def _prepare_data_for_specific_analysis(
             missing_ids.append(target_id)
 
     if missing_ids:
-        logger.error(
-            f"{prefix}Requested sentence IDs not found in map {map_id}: {sorted(missing_ids)}"
-        )
-        raise ValueError(
-            f"Sentence IDs not found in map '{map_id}': {sorted(missing_ids)}"
-        )
+        logger.error(f"{prefix}Requested sentence IDs not found in map {map_id}: {sorted(missing_ids)}")
+        raise ValueError(f"Sentence IDs not found in map '{map_id}': {sorted(missing_ids)}")
 
     if not target_sentences:
         # This case should be unlikely if missing_ids didn't raise, but check anyway
-        logger.warning(
-            f"{prefix}No target sentences identified from IDs {sentence_ids} in map {map_id}."
-        )
+        logger.warning(f"{prefix}No target sentences identified from IDs {sentence_ids} in map {map_id}.")
         raise ValueError(f"No target sentences identified for IDs in map '{map_id}'.")
 
     # Sort target_sentences and target_indices together based on original index (target_indices)
@@ -1109,9 +964,7 @@ async def _prepare_data_for_specific_analysis(
     target_indices = [pair[0] for pair in paired_sorted]
     target_sentences = [pair[1] for pair in paired_sorted]
 
-    logger.debug(
-        f"{prefix}Prepared {len(target_sentences)} target sentences with indices: {target_indices}"
-    )
+    logger.debug(f"{prefix}Prepared {len(target_sentences)} target sentences with indices: {target_indices}")
     return target_sentences, target_indices, full_sentence_list_for_context
 
 
@@ -1124,14 +977,10 @@ def _build_contexts_for_specific_analysis(
     """
     Builds contexts for all sentences and extracts contexts for target indices.
     """
-    logger.info(
-        f"{prefix}Building contexts for {len(target_indices)} specific sentences..."
-    )
+    logger.info(f"{prefix}Building contexts for {len(target_indices)} specific sentences...")
     try:
         # Build contexts for the *entire* list first
-        all_contexts_dict = analysis_service.context_builder.build_all_contexts(
-            full_sentence_list_for_context
-        )
+        all_contexts_dict = analysis_service.context_builder.build_all_contexts(full_sentence_list_for_context)
         # Extract contexts only for the target sentences using their original indices
         target_contexts = [all_contexts_dict.get(idx, {}) for idx in target_indices]
 
@@ -1142,13 +991,9 @@ def _build_contexts_for_specific_analysis(
                 f"target index count ({len(target_indices)})."
             )
             # This indicates a logic error in context building or extraction
-            raise RuntimeError(
-                "Internal error: Context and target index count mismatch."
-            )
+            raise RuntimeError("Internal error: Context and target index count mismatch.")
 
-        logger.debug(
-            f"{prefix}Successfully built {len(target_contexts)} target contexts."
-        )
+        logger.debug(f"{prefix}Successfully built {len(target_contexts)} target contexts.")
         return target_contexts
 
     except Exception as e:
@@ -1182,17 +1027,11 @@ def _post_process_specific_results(
                 result["sequence_order"] = original_sentence_id
                 final_results.append(result)
             else:
-                logger.warning(
-                    f"{prefix}Skipping post-processing for non-dict result at index {i}: {type(result)}"
-                )
+                logger.warning(f"{prefix}Skipping post-processing for non-dict result at index {i}: {type(result)}")
         else:
-            logger.warning(
-                f"{prefix}Extra result found at index {i} beyond the number of target indices. Skipping."
-            )
+            logger.warning(f"{prefix}Extra result found at index {i} beyond the number of target indices. Skipping.")
 
-    logger.info(
-        f"{prefix}Finished post-processing. Returning {len(final_results)} results."
-    )
+    logger.info(f"{prefix}Finished post-processing. Returning {len(final_results)} results.")
     return final_results
 
 
@@ -1212,14 +1051,12 @@ async def analyze_specific_sentences(
     """
     prefix = _log_prefix(task_id)
     map_id = map_storage.get_identifier()
-    logger.info(
-        f"{prefix}Starting analysis for specific sentences using map: {map_id}, IDs: {sentence_ids}"
-    )
+    logger.info(f"{prefix}Starting analysis for specific sentences using map: {map_id}, IDs: {sentence_ids}")
 
     try:
         # 1. Prepare Data (Read map, find sentences/indices, build full context list)
-        target_sentences, target_indices, full_context_list = (
-            await _prepare_data_for_specific_analysis(map_storage, sentence_ids, prefix)
+        target_sentences, target_indices, full_context_list = await _prepare_data_for_specific_analysis(
+            map_storage, sentence_ids, prefix
         )
 
         # 2. Build Contexts (For the specific target sentences)
@@ -1229,18 +1066,13 @@ async def analyze_specific_sentences(
 
         # 3. Analyze Specific Sentences
         logger.info(f"{prefix}Analyzing {len(target_sentences)} specific sentences...")
-        analysis_results = await analysis_service.analyze_sentences(
-            target_sentences, target_contexts, task_id=task_id
-        )
+        analysis_results = await analysis_service.analyze_sentences(target_sentences, target_contexts, task_id=task_id)
 
         # 4. Post-Process Results (Remap IDs)
-        final_results = _post_process_specific_results(
-            analysis_results, target_indices, prefix
-        )
+        final_results = _post_process_specific_results(analysis_results, target_indices, prefix)
 
         logger.info(
-            f"{prefix}Finished specific sentence analysis for map {map_id}. "
-            f"Returning {len(final_results)} results."
+            f"{prefix}Finished specific sentence analysis for map {map_id}. " f"Returning {len(final_results)} results."
         )
         return final_results
 

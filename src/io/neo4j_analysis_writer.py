@@ -332,7 +332,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         # 5. MERGE the dimension node (ensures uniqueness based on key property).
         # 6. CREATE the new relationship from Analysis to Dimension node, set is_edited = false.
         query = f"""
-        MATCH (a:Analysis) WHERE id(a) = $analysis_node_id
+        MATCH (a:Analysis) WHERE elementId(a) = $analysis_node_id
         OPTIONAL MATCH (a)-[r_old:{relationship_type}]->(d_old:{dimension_label})
 
         // Check if edit protection applies
@@ -381,7 +381,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
             # Optionally, remove all non-edited existing links if the input list is empty
             # query_delete_all_unedited = f"""
             # MATCH (a:Analysis)-[r:{relationship_type}]->(d:{dimension_label})
-            # WHERE id(a) = $analysis_node_id AND (r.is_edited IS NULL OR r.is_edited = false)
+            # WHERE elementId(a) = $analysis_node_id AND (r.is_edited IS NULL OR r.is_edited = false)
             # DELETE r
             # """
             # tx.run(query_delete_all_unedited, analysis_node_id=analysis_node_id)
@@ -395,7 +395,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         # 1. Get current state: existing linked values and their edit status
         query_get_existing = f"""
         MATCH (a:Analysis)-[r:{relationship_type}]->(d:{dimension_label})
-        WHERE id(a) = $analysis_node_id
+        WHERE elementId(a) = $analysis_node_id
         RETURN d.{dimension_key} AS value, COALESCE(r.is_edited, false) AS edited
         """
         existing_results = await session.run(query_get_existing, analysis_node_id=analysis_node_id)
@@ -432,7 +432,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         if unedited_values_to_remove_set:
             query_delete_unedited = f"""
             MATCH (a:Analysis)-[r:{relationship_type}]->(d:{dimension_label})
-            WHERE id(a) = $analysis_node_id
+            WHERE elementId(a) = $analysis_node_id
               AND (r.is_edited IS NULL OR r.is_edited = false)
               AND d.{dimension_key} IN $values_to_remove
             DELETE r
@@ -466,7 +466,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
                     computed_props = props_on_create(new_value)
 
                     query_add_single = f"""
-                    MATCH (a:Analysis) WHERE id(a) = $analysis_node_id
+                    MATCH (a:Analysis) WHERE elementId(a) = $analysis_node_id
                     MERGE (d:{dimension_label} {{{dimension_key}: $new_value}})
                     ON CREATE SET d += $computed_props
                     CREATE (a)-[r:{relationship_type} {{is_edited: false}}]->(d)
