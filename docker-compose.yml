@@ -25,6 +25,8 @@ services:
       # Add dependency for the test container
       neo4j-test:
         condition: service_started # Or just service_healthy if we re-add healthcheck
+      eventstore:
+        condition: service_started
     # Command to run the API server (adjust if needed)
     # command: ["make", "run-api"] # Example using Makefile target
     command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -62,6 +64,8 @@ services:
       redis:
         condition: service_healthy
       neo4j:
+        condition: service_started
+      eventstore:
         condition: service_started
     command: ["celery", "-A", "src.celery_app", "worker", "--loglevel=info"]
 
@@ -110,10 +114,32 @@ services:
     #   timeout: 10s # Increased timeout from 3s to 10s
     #   retries: 20 # Keep increased retries
 
+  # EventStoreDB service for event sourcing
+  eventstore:
+    image: eventstore/eventstore:24.2-jammy
+    container_name: interview_analyzer_eventstore
+    ports:
+      - "2113:2113" # HTTP API
+      - "1113:1113" # TCP (optional)
+    volumes:
+      - eventstore_data:/var/lib/eventstore
+    environment:
+      - EVENTSTORE_CLUSTER_SIZE=1
+      - EVENTSTORE_RUN_PROJECTIONS=All
+      - EVENTSTORE_START_STANDARD_PROJECTIONS=true
+      - EVENTSTORE_EXT_TCP_PORT=1113
+      - EVENTSTORE_HTTP_PORT=2113
+      - EVENTSTORE_INSECURE=true
+      - EVENTSTORE_ENABLE_EXTERNAL_TCP=true
+      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
+    networks:
+      - interview_net
+
 volumes:
   redis_data: # Define redis volume
   neo4j_data: # Define neo4j volume (This is the correct one)
-  neo4j_test_data: # Define volume for test database 
+  neo4j_test_data: # Define volume for test database
+  eventstore_data: # Define eventstore volume 
 
 # Define the custom network
 networks:

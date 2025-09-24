@@ -49,3 +49,4 @@ redis==6.2.0
 
 # Database
 neo4j==5.28.1
+esdbclient==1.1.0
