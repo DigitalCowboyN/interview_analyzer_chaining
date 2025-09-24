@@ -127,7 +127,7 @@ class TestSaveAnalysisToGraphOrchestration:
     async def test_complete_orchestration_query_sequence(
         self, realistic_analysis_data, mock_connection_manager, mock_session
     ):
-        """Test that all 6 orchestration steps execute the correct queries."""
+        """Test that save_analysis_to_graph executes the correct queries for file-specific relationships."""
         filename = "test_interview.txt"
 
         await save_analysis_to_graph(realistic_analysis_data, filename, mock_connection_manager)
@@ -135,43 +135,32 @@ class TestSaveAnalysisToGraphOrchestration:
         # Verify the session was acquired
         mock_connection_manager.get_session.assert_called_once()
 
-        # Verify all expected queries were executed
-        assert mock_session.run.call_count >= 5  # At least: sentence, types, topics, keywords, follows
+        # Verify expected queries were executed: sentence + follows (dimension relationships handled by Neo4jAnalysisWriter)
+        assert mock_session.run.call_count == 2  # Sentence query + FOLLOWS query
 
         # Extract all query calls
         query_calls = mock_session.run.call_args_list
 
-        # Verify Step 1 & 2: SourceFile and Sentence creation
+        # Verify Query 1: SourceFile and Sentence creation with filename property
         sentence_query = query_calls[0][0][0]
         assert "MERGE (f:SourceFile" in sentence_query
-        assert "MERGE (s:Sentence" in sentence_query
+        assert "MATCH (s:Sentence" in sentence_query  # Updated: now matches existing sentence
+        assert "SET s.filename" in sentence_query  # Updated: sets filename property
         assert "MERGE (s)-[:PART_OF_FILE]->(f)" in sentence_query
 
-        # Verify parameters were passed correctly
+        # Verify parameters were passed correctly for sentence query
         sentence_params = query_calls[0][1]["parameters"]
         assert sentence_params["sentence_id"] == realistic_analysis_data["sentence_id"]
         assert sentence_params["filename"] == filename
         assert sentence_params["text"] == realistic_analysis_data["sentence"]
 
-        # Verify Step 3: Type nodes creation (function_type, structure_type, purpose)
-        type_queries_found = 0
-        for call in query_calls[1:]:
-            query = call[0][0]
-            if "HAS_FUNCTION_TYPE" in query or "HAS_STRUCTURE_TYPE" in query or "HAS_PURPOSE" in query:
-                type_queries_found += 1
-        assert type_queries_found == 3  # Should have 3 type queries
+        # Verify Query 2: FOLLOWS relationship creation (for sequence_order > 0)
+        follows_query = query_calls[1][0][0]
+        assert "FOLLOWS" in follows_query
+        assert "sequence_order" in follows_query
 
-        # Verify Step 4: Topic nodes creation
-        topic_queries_found = any("HAS_TOPIC" in call[0][0] for call in query_calls)
-        assert topic_queries_found
-
-        # Verify Step 5: Keyword nodes creation
-        keyword_queries_found = sum(
-            1
-            for call in query_calls
-            if "MENTIONS_OVERALL_KEYWORD" in call[0][0] or "MENTIONS_DOMAIN_KEYWORD" in call[0][0]
-        )
-        assert keyword_queries_found == 2  # Should have overall and domain keyword queries
+        # Note: Dimension relationships (FunctionType, StructureType, Purpose, Topics, Keywords)
+        # are now handled by Neo4jAnalysisWriter to avoid architectural duplication
 
     @pytest.mark.asyncio
     async def test_minimal_data_orchestration(self, minimal_analysis_data, mock_connection_manager, mock_session):
@@ -180,18 +169,20 @@ class TestSaveAnalysisToGraphOrchestration:
 
         await save_analysis_to_graph(minimal_analysis_data, filename, mock_connection_manager)
 
-        # Should still create basic sentence structure
+        # Should create sentence structure and FOLLOWS (if sequence_order > 0)
         mock_connection_manager.get_session.assert_called_once()
-        assert mock_session.run.call_count >= 1
+        # Minimal data has sequence_order = 0, so no FOLLOWS relationship
+        assert mock_session.run.call_count == 1  # Only sentence query
 
-        # First query should be sentence creation
+        # First query should be sentence creation with filename property
         sentence_query = mock_session.run.call_args_list[0][0][0]
         assert "MERGE (f:SourceFile" in sentence_query
-        assert "MERGE (s:Sentence" in sentence_query
+        assert "MATCH (s:Sentence" in sentence_query  # Updated: matches existing sentence
+        assert "SET s.filename" in sentence_query  # Updated: sets filename property
 
-        # Should not have type, topic, or keyword queries
+        # Dimension relationships are handled by Neo4jAnalysisWriter, not save_analysis_to_graph
         all_queries = " ".join(call[0][0] for call in mock_session.run.call_args_list)
-        assert "HAS_FUNCTION_TYPE" not in all_queries
+        assert "HAS_FUNCTION" not in all_queries
         assert "HAS_TOPIC" not in all_queries
         assert "MENTIONS_OVERALL_KEYWORD" not in all_queries
 
@@ -230,7 +221,7 @@ class TestSaveAnalysisToGraphOrchestration:
 
     @pytest.mark.asyncio
     async def test_keyword_array_processing(self, mock_connection_manager, mock_session):
-        """Test that keyword arrays are processed with UNWIND queries."""
+        """Test that save_analysis_to_graph handles data with keywords but doesn't process them."""
         data_with_keywords = {
             "sentence_id": 10,
             "sequence_order": 0,
@@ -241,19 +232,14 @@ class TestSaveAnalysisToGraphOrchestration:
 
         await save_analysis_to_graph(data_with_keywords, "test.txt", mock_connection_manager)
 
-        # Find keyword queries
-        keyword_queries = [
-            call for call in mock_session.run.call_args_list if "UNWIND" in call[0][0] and "keyword" in call[0][0]
-        ]
+        # Should only have sentence query (no FOLLOWS since sequence_order = 0)
+        assert mock_session.run.call_count == 1
 
-        assert len(keyword_queries) == 2  # Overall and domain keywords
-
-        # Verify UNWIND syntax is used
-        overall_query = next(call for call in keyword_queries if "overall_keywords" in call[0][0])
-        assert "UNWIND $overall_keywords" in overall_query[0][0]
-
-        domain_query = next(call for call in keyword_queries if "domain_keywords" in call[0][0])
-        assert "UNWIND $domain_keywords" in domain_query[0][0]
+        # Should not process keywords (handled by Neo4jAnalysisWriter)
+        all_queries = " ".join(call[0][0] for call in mock_session.run.call_args_list)
+        assert "UNWIND" not in all_queries
+        assert "overall_keywords" not in all_queries
+        assert "MENTIONS_OVERALL_KEYWORD" not in all_queries
 
     @pytest.mark.asyncio
     async def test_parameter_binding_correctness(self, realistic_analysis_data, mock_connection_manager, mock_session):
@@ -322,9 +308,13 @@ class TestSaveAnalysisToGraphOrchestration:
             # Should not raise exception - FOLLOWS errors are handled gracefully
             await save_analysis_to_graph(data_with_follows, "follows_error_test.txt", mock_connection_manager)
 
-            # Should log a warning about FOLLOWS failure
-            mock_logger.warning.assert_called_once()
-            assert "Could not create :FOLLOWS relationship" in mock_logger.warning.call_args[0][0]
+            # Should log warnings: 1) backward compatibility, 2) FOLLOWS failure
+            assert mock_logger.warning.call_count == 2
+
+            # Check that both expected warnings were logged
+            warning_calls = [call[0][0] for call in mock_logger.warning.call_args_list]
+            assert any("old signature" in warning for warning in warning_calls)
+            assert any("Could not create :FOLLOWS relationship" in warning for warning in warning_calls)
 
 
 class TestSaveAnalysisToGraphEdgeCases:
@@ -357,13 +347,14 @@ class TestSaveAnalysisToGraphEdgeCases:
 
         await save_analysis_to_graph(data_with_nones, "none_test.txt", mock_connection_manager)
 
-        # Should only have sentence creation query, no optional queries
+        # Should only have sentence query (no FOLLOWS since sequence_order = 0)
         assert mock_session.run.call_count == 1
 
-        # Verify it's the sentence creation query
+        # Verify it's the sentence query with filename property setting
         sentence_query = mock_session.run.call_args_list[0][0][0]
         assert "MERGE (f:SourceFile" in sentence_query
-        assert "MERGE (s:Sentence" in sentence_query
+        assert "MATCH (s:Sentence" in sentence_query  # Updated: matches existing sentence
+        assert "SET s.filename" in sentence_query  # Updated: sets filename property
 
     @pytest.mark.asyncio
     async def test_empty_keyword_arrays(self):

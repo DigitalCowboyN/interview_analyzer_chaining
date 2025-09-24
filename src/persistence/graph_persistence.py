@@ -15,8 +15,8 @@ logger = get_logger()
 async def save_analysis_to_graph(
     analysis_data: Dict[str, Any],
     filename: str,
-    interview_id: Optional[str],
-    connection_manager: Neo4jConnectionManager,
+    interview_id_or_connection_manager,
+    connection_manager: Optional[Neo4jConnectionManager] = None,
 ) -> None:
     """
     Saves a single sentence's analysis data to the Neo4j graph.
@@ -54,11 +54,29 @@ async def save_analysis_to_graph(
         )
         return
 
+    # Handle backward compatibility: detect old vs new calling pattern
+    if connection_manager is None:
+        # Old calling pattern: save_analysis_to_graph(data, filename, connection_manager)
+        actual_connection_manager = interview_id_or_connection_manager
+        interview_id = None
+        logger.warning(
+            f"save_analysis_to_graph called with old signature for sentence {sentence_id} from '{filename}'. "
+            f"Using legacy behavior without interview_id disambiguation."
+        )
+    else:
+        # New calling pattern: save_analysis_to_graph(data, filename, interview_id, connection_manager)
+        interview_id = interview_id_or_connection_manager
+        actual_connection_manager = connection_manager
+
     logger.debug(f"Saving analysis for sentence {sentence_id} from file '{filename}' to graph.")
-    # Handle case where interview_id is not provided
+
+    # Handle case where interview_id is not provided (legacy mode)
     if not interview_id:
-        logger.warning(f"No interview_id provided for sentence {sentence_id} from '{filename}', skipping graph save.")
-        return
+        logger.debug(
+            f"No interview_id provided for sentence {sentence_id} from '{filename}', using legacy sentence matching."
+        )
+    else:
+        logger.debug(f"Using interview_id '{interview_id}' for precise sentence matching.")
 
     params = {
         "filename": filename,
@@ -81,19 +99,32 @@ async def save_analysis_to_graph(
     try:
         # Use the imported singleton instance, assuming driver is pre-initialized
         # AWAIT the coroutine to get the actual session context manager
-        async with await connection_manager.get_session() as session:
+        async with await actual_connection_manager.get_session() as session:
             # ARCHITECTURAL FIX: Reuse existing sentences created by Neo4jMapStorage/Neo4jAnalysisWriter
             # instead of creating duplicate sentences with filename properties.
             # This ensures Analysis nodes are linked to sentences that have filename properties.
-            query_sentence = """
-            MERGE (f:SourceFile {filename: $filename})
-            WITH f
-            // Find the sentence by matching via specific Interview and sentence_id
-            // This handles sentence ID collisions between different files/interviews
-            MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
-            SET s.filename = $filename
-            MERGE (s)-[:PART_OF_FILE]->(f)
-            """
+
+            if interview_id:
+                # New behavior: Use interview_id for precise sentence matching (prevents ID collisions)
+                query_sentence = """
+                MERGE (f:SourceFile {filename: $filename})
+                WITH f
+                // Find the sentence by matching via specific Interview and sentence_id
+                // This handles sentence ID collisions between different files/interviews
+                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->
+                      (s:Sentence {sentence_id: $sentence_id})
+                SET s.filename = $filename
+                MERGE (s)-[:PART_OF_FILE]->(f)
+                """
+            else:
+                # Legacy behavior: Match any sentence with the given sentence_id (may have collisions)
+                query_sentence = """
+                MERGE (f:SourceFile {filename: $filename})
+                WITH f
+                MATCH (s:Sentence {sentence_id: $sentence_id})
+                SET s.filename = $filename
+                MERGE (s)-[:PART_OF_FILE]->(f)
+                """
             # Execute using the session
             await session.run(query_sentence, parameters=params)
             logger.debug(f"Merged SourceFile and Sentence nodes for sentence {sentence_id} from '{filename}'.")
