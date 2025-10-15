@@ -104,7 +104,10 @@ class AggregateRoot(ABC):
         else:
             raise ValueError(f"Unknown aggregate type: {type(self)}")
 
-        new_version = len(self._uncommitted_events)  # 0-based versioning: 0, 1, 2, ...
+        # Calculate next version: current version + 1
+        # For new aggregates (version == -1), this gives version 0
+        # For existing aggregates, this increments from the last committed version
+        new_version = self.version + 1
 
         event = EventEnvelope(
             event_type=event_type,
