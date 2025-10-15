@@ -243,7 +243,9 @@ class EventStoreClient:
         try:
             async with self.get_client() as client:
                 recorded_events = client.read_stream(
-                    stream_name=stream_name, stream_position=from_version, count=max_count
+                    stream_name=stream_name,
+                    stream_position=from_version,
+                    limit=max_count if max_count is not None else 9223372036854775807
                 )
 
                 for recorded_event in recorded_events:
