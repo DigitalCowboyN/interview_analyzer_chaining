@@ -20,18 +20,22 @@ class Neo4jMapStorage(ConversationMapStorage):
     in a Neo4j graph database.
     """
 
-    def __init__(self, project_id: str, interview_id: str):
+    def __init__(self, project_id: str, interview_id: str, event_emitter=None, correlation_id=None):
         """
         Initializes the storage manager for a specific project and interview.
 
         Args:
             project_id (str): The unique ID (UUID ideally) of the project.
             interview_id (str): The unique ID (UUID ideally) of the interview.
+            event_emitter: Optional PipelineEventEmitter for dual-write phase.
+            correlation_id: Optional correlation ID for event tracking.
         """
         if not project_id or not interview_id:
             raise ValueError("project_id and interview_id cannot be empty")
         self.project_id = str(project_id)
         self.interview_id = str(interview_id)
+        self.event_emitter = event_emitter
+        self.correlation_id = correlation_id
         logger.debug(f"Neo4jMapStorage initialized for Project: {self.project_id}, Interview: {self.interview_id}")
 
     async def initialize(self):
@@ -119,6 +123,27 @@ class Neo4jMapStorage(ConversationMapStorage):
             async with await Neo4jConnectionManager.get_session() as session:
                 await self._run_write_entry_queries(session, entry)
             logger.debug(f"Successfully wrote entry for Sentence ID: {sentence_id}")
+
+            # Emit SentenceCreated event (if event sourcing enabled)
+            if self.event_emitter:
+                try:
+                    await self.event_emitter.emit_sentence_created(
+                        interview_id=self.interview_id,
+                        index=entry["sequence_order"],
+                        text=entry["sentence"],
+                        speaker=entry.get("speaker"),
+                        start_ms=entry.get("start_time"),
+                        end_ms=entry.get("end_time"),
+                        correlation_id=self.correlation_id,
+                    )
+                    logger.debug(f"Emitted SentenceCreated event for sentence {sentence_id}.")
+                except Exception as emit_e:
+                    # Event emission is non-blocking - log but don't raise
+                    logger.error(
+                        f"Failed to emit SentenceCreated event for sentence {sentence_id}: {emit_e}",
+                        exc_info=True,
+                    )
+
         except Exception as e:
             logger.error(
                 f"Failed Neo4j write_entry for Sentence ID {sentence_id} (Interview {self.interview_id}): {e}",
