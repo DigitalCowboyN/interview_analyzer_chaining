@@ -13,7 +13,7 @@
 - **M2.5**: Monitoring & Observability (metrics, health) - code complete
 - **M2.6**: User Edit API (sentence edits, analysis overrides) - 16 tests passing ✅ NEW
 
-**Total**: 131 tests passing (100% pass rate), 1 critical bug fixed
+**Total**: 131 tests (128 unit tests passing, 3 integration tests require EventStoreDB), 1 critical bug fixed
 
 ### Remaining (⏳):
 - **M2.7**: Testing & Validation (end-to-end integration tests)
