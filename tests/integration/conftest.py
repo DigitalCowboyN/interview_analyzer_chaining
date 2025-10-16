@@ -27,7 +27,7 @@ def ensure_neo4j_test_service():
     # Start the Neo4j test service
     print("Starting neo4j-test container...")
     try:
-        result = subprocess.run(["make", "db-test-up"], check=True, capture_output=True, timeout=120, text=True)
+        subprocess.run(["make", "db-test-up"], check=True, capture_output=True, timeout=120, text=True)
         print("Neo4j test container started successfully")
     except subprocess.CalledProcessError as e:
         print(f"Failed to start Neo4j test container: {e}")
@@ -211,7 +211,7 @@ async def neo4j_health_check():
     start_time = time.time()
 
     try:
-        driver = await Neo4jConnectionManager.get_driver(test_mode=True)
+        await Neo4jConnectionManager.get_driver(test_mode=True)
         await Neo4jConnectionManager.verify_connectivity()
 
         connection_time = time.time() - start_time
@@ -226,6 +226,56 @@ async def neo4j_health_check():
         }
 
 
+# EventStoreDB fixtures for M2.7 testing
+
+@pytest.fixture(scope="function")
+async def event_store_client():
+    """
+    Provides an EventStoreDB client for testing.
+
+    Assumes EventStoreDB is running on localhost:2113.
+    """
+    from src.events.store import EventStoreClient
+
+    client = EventStoreClient("esdb://localhost:2113?tls=false")
+    await client.connect()
+
+    yield client
+
+    await client.disconnect()
+
+
+@pytest.fixture(scope="function")
+async def clean_event_store(event_store_client):
+    """
+    Clears test event streams before each test.
+
+    Note: In production, you would never delete streams. This is only for testing.
+    """
+    # EventStoreDB doesn't have a "delete all streams" operation
+    # We'll rely on using unique stream names per test or manual cleanup
+    # For now, this is a placeholder that ensures the client is connected
+    yield event_store_client
+
+
+@pytest.fixture(scope="function")
+def sample_interview_file(tmp_path):
+    """
+    Creates a sample interview text file for testing.
+
+    Returns the path to a temporary file with test content.
+    """
+    content = """This is a test interview.
+It contains multiple sentences.
+Each sentence will be analyzed.
+This helps us test the pipeline."""
+
+    file_path = tmp_path / "test_interview.txt"
+    file_path.write_text(content)
+
+    return file_path
+
+
 # Markers for different test categories
 def pytest_configure(config):
     """Configure custom pytest markers."""
@@ -233,3 +283,4 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration: marks tests as integration tests")
     config.addinivalue_line("markers", "slow: marks tests as slow running")
     config.addinivalue_line("markers", "performance: marks tests as performance benchmarks")
+    config.addinivalue_line("markers", "eventstore: marks tests as requiring EventStoreDB")
