@@ -163,6 +163,30 @@ class PipelineOrchestrator:
             logger.critical(f"{self.prefix}Failed to initialize AnalysisService: {e}", exc_info=True)
             raise
 
+        # --- Event Emitter Initialization (for dual-write phase) ---
+        self.event_emitter = None
+        if self.config.get("event_sourcing", {}).get("enabled", False):
+            try:
+                from src.events.store import EventStoreClient
+                from src.pipeline_event_emitter import PipelineEventEmitter
+
+                connection_string = self.config.get("event_sourcing", {}).get(
+                    "connection_string", "esdb://localhost:2113?tls=false"
+                )
+                event_store = EventStoreClient(connection_string)
+                self.event_emitter = PipelineEventEmitter(event_store)
+                logger.info(f"{self.prefix}PipelineEventEmitter initialized (event sourcing enabled).")
+            except Exception as e:
+                logger.error(
+                    f"{self.prefix}Failed to initialize event emitter: {e}. "
+                    f"Continuing without event sourcing.",
+                    exc_info=True,
+                )
+                # Continue without event emitter - dual-write is optional
+                self.event_emitter = None
+        else:
+            logger.info(f"{self.prefix}Event sourcing disabled (event_emitter=None).")
+
         # --- Metrics Initialization (moved from _setup_pipeline_environment) ---
         # REMOVED - Moved up before AnalysisService init
         # # Use the imported singleton instance
@@ -520,9 +544,47 @@ class PipelineOrchestrator:
         logger.info(f"{prefix}Starting processing...")
         self.metrics_tracker.start_file_timer(file_name)
 
+        # Generate correlation_id for this file (tracks all events for this file)
+        import uuid
+        correlation_id = str(uuid.uuid4())
+        logger.debug(f"{prefix}Generated correlation_id: {correlation_id}")
+
         try:
             # 1. Setup IO
             data_source, map_storage, analysis_writer, _ = self._setup_file_io(file_path)
+
+            # Extract project_id and interview_id if using Neo4j storage (for event emission)
+            project_id = getattr(analysis_writer, "project_id", None)
+            interview_id = getattr(analysis_writer, "interview_id", None)
+
+            # If not using Neo4j storage, generate interview_id from filename
+            if not interview_id:
+                interview_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{file_path.name}"))
+                logger.debug(f"{prefix}Generated interview_id: {interview_id}")
+
+            # If not using Neo4j storage, use default project_id
+            if not project_id:
+                project_id = self.config.get("project", {}).get("default_project_id", "default-project")
+                logger.debug(f"{prefix}Using default project_id: {project_id}")
+
+            # Emit InterviewCreated event (if event sourcing enabled)
+            if self.event_emitter and interview_id and project_id:
+                try:
+                    await self.event_emitter.emit_interview_created(
+                        interview_id=interview_id,
+                        project_id=project_id,
+                        title=file_name,
+                        source=str(file_path),
+                        language=self.config.get("project", {}).get("default_language", "en"),
+                        correlation_id=correlation_id,
+                    )
+                    logger.debug(f"{prefix}Emitted InterviewCreated event.")
+                except Exception as emit_e:
+                    # Event emission is non-blocking - log but continue
+                    logger.error(
+                        f"{prefix}Failed to emit InterviewCreated event: {emit_e}",
+                        exc_info=True,
+                    )
 
             # 2. Read and Segment Sentences
             num_sentences, sentences = await self._read_and_segment_sentences(data_source)
