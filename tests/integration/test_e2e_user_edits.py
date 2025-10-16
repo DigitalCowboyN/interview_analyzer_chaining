@@ -14,7 +14,7 @@ This focuses on the command/event flow.
 import uuid
 
 import pytest
-from httpx import ASyncClient
+from httpx import AsyncClient
 
 from src.api.app import app
 from src.config import config
@@ -68,7 +68,7 @@ class TestE2EUserEditWorkflow:
         )
 
         # === Step 1: User edits sentence via API ===
-        async with ASyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(app=app, base_url="http://test") as client:
             response = await client.put(
                 f"/api/v1/edits/{interview_id}/sentences/{sentence_index}",
                 json={"new_text": "Edited sentence text."},
@@ -94,7 +94,7 @@ class TestE2EUserEditWorkflow:
         assert edited_event.data["new_text"] == "Edited sentence text."
 
         # === Step 3: Verify edit history accessible via API ===
-        async with ASyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(app=app, base_url="http://test") as client:
             history_response = await client.get(
                 f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/history"
             )
@@ -171,7 +171,7 @@ class TestE2EUserEditWorkflow:
         )
 
         # === Step 1: User overrides analysis via API ===
-        async with ASyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(app=app, base_url="http://test") as client:
             response = await client.post(
                 f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/analysis",
                 json={
@@ -254,7 +254,7 @@ class TestE2EUserEditWorkflow:
             "Third edit.",
         ]
 
-        async with ASyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(app=app, base_url="http://test") as client:
             for i, new_text in enumerate(edits, start=1):
                 response = await client.put(
                     f"/api/v1/edits/{interview_id}/sentences/{sentence_index}",
@@ -274,7 +274,7 @@ class TestE2EUserEditWorkflow:
             assert event.version == i, f"Event {i} has incorrect version: {event.version}"
 
         # === Verify history API returns all events ===
-        async with ASyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(app=app, base_url="http://test") as client:
             history_response = await client.get(
                 f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/history"
             )
