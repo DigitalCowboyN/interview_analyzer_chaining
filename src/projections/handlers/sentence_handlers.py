@@ -67,10 +67,7 @@ class SentenceCreatedHandler(BaseProjectionHandler):
             event_version=event.version,
         )
 
-        logger.info(
-            f"Created Sentence node {event.aggregate_id} for interview "
-            f"{data.get('interview_id')}"
-        )
+        logger.info(f"Created Sentence node {event.aggregate_id} for interview " f"{data.get('interview_id')}")
 
 
 class SentenceEditedHandler(BaseProjectionHandler):
@@ -155,15 +152,11 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
 
         # Link keywords
         keywords = data.get("keywords", [])
-        await self._link_dimension_list(
-            tx, event.aggregate_id, "Keyword", "MENTIONS_OVERALL_KEYWORD", keywords
-        )
+        await self._link_dimension_list(tx, event.aggregate_id, "Keyword", "MENTIONS_OVERALL_KEYWORD", keywords)
 
         # Link topics
         topics = data.get("topics", [])
-        await self._link_dimension_list(
-            tx, event.aggregate_id, "Topic", "MENTIONS_TOPIC", topics
-        )
+        await self._link_dimension_list(tx, event.aggregate_id, "Topic", "MENTIONS_TOPIC", topics)
 
         # Link domain keywords
         domain_keywords = data.get("domain_keywords", [])
@@ -205,9 +198,7 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
             """
             await tx.run(query, sentence_id=sentence_id, name=purpose)
 
-    async def _link_dimension_list(
-        self, tx, sentence_id: str, node_label: str, rel_type: str, values: List[str]
-    ):
+    async def _link_dimension_list(self, tx, sentence_id: str, node_label: str, rel_type: str, values: List[str]):
         """Link a list of dimension nodes."""
         if not values:
             return
@@ -258,7 +249,4 @@ class AnalysisOverriddenHandler(BaseProjectionHandler):
         # For simplicity, we'll store the override data as JSON
         # In a real implementation, you'd update the specific dimension relationships
 
-        logger.info(
-            f"Overrode analysis for Sentence {event.aggregate_id} "
-            f"(by: {actor_info})"
-        )
+        logger.info(f"Overrode analysis for Sentence {event.aggregate_id} " f"(by: {actor_info})")

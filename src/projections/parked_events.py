@@ -150,10 +150,7 @@ class ParkedEventsManager:
             )
 
         except Exception as e:
-            logger.error(
-                f"Failed to park event {event.event_id}: {e}",
-                exc_info=True
-            )
+            logger.error(f"Failed to park event {event.event_id}: {e}", exc_info=True)
 
     async def get_parked_events(
         self,
@@ -173,9 +170,7 @@ class ParkedEventsManager:
         stream_name = get_parked_stream_name(aggregate_type)
 
         try:
-            events = await self.event_store.read_stream(
-                stream_name, from_version=0, max_count=max_count
-            )
+            events = await self.event_store.read_stream(stream_name, from_version=0, max_count=max_count)
 
             parked_events = []
             for envelope in events:
@@ -212,10 +207,7 @@ class ParkedEventsManager:
             return parked_events
 
         except Exception as e:
-            logger.error(
-                f"Failed to retrieve parked events for {aggregate_type}: {e}",
-                exc_info=True
-            )
+            logger.error(f"Failed to retrieve parked events for {aggregate_type}: {e}", exc_info=True)
             return []
 
     async def get_parked_count(self, aggregate_type: str) -> int:

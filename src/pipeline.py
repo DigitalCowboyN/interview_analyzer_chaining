@@ -178,8 +178,7 @@ class PipelineOrchestrator:
                 logger.info(f"{self.prefix}PipelineEventEmitter initialized (event sourcing enabled).")
             except Exception as e:
                 logger.error(
-                    f"{self.prefix}Failed to initialize event emitter: {e}. "
-                    f"Continuing without event sourcing.",
+                    f"{self.prefix}Failed to initialize event emitter: {e}. " f"Continuing without event sourcing.",
                     exc_info=True,
                 )
                 # Continue without event emitter - dual-write is optional
@@ -546,6 +545,7 @@ class PipelineOrchestrator:
 
         # Generate correlation_id for this file (tracks all events for this file)
         import uuid
+
         correlation_id = str(uuid.uuid4())
         logger.debug(f"{prefix}Generated correlation_id: {correlation_id}")
 

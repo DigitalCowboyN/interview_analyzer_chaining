@@ -348,4 +348,3 @@ class TestSentenceCommandHandlerUnit:
                 await handler.handle(command)
 
             assert "Invalid editor type" in str(exc_info.value)
-

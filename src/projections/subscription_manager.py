@@ -55,13 +55,10 @@ class SubscriptionManager:
         logger.info("Starting subscriptions...")
 
         for sub_name, config in SUBSCRIPTION_CONFIG.items():
-            task = asyncio.create_task(
-                self._run_subscription(sub_name, config)
-            )
+            task = asyncio.create_task(self._run_subscription(sub_name, config))
             self.subscriptions[sub_name] = task
             logger.info(
-                f"Started subscription '{sub_name}' to stream '{config['stream']}' "
-                f"with group '{config['group']}'"
+                f"Started subscription '{sub_name}' to stream '{config['stream']}' " f"with group '{config['group']}'"
             )
 
         logger.info(f"All {len(self.subscriptions)} subscriptions started")
@@ -98,10 +95,7 @@ class SubscriptionManager:
 
         while self.is_running:
             try:
-                logger.info(
-                    f"Connecting to subscription '{sub_name}' "
-                    f"(stream: {stream_name}, group: {group_name})"
-                )
+                logger.info(f"Connecting to subscription '{sub_name}' " f"(stream: {stream_name}, group: {group_name})")
 
                 # Ensure subscription exists (create if not)
                 await self._ensure_subscription_exists(stream_name, group_name)
@@ -132,8 +126,7 @@ class SubscriptionManager:
                         # Route to lane manager
                         if self.lane_manager:
                             await self.lane_manager.route_event(
-                                envelope,
-                                checkpoint_callback=lambda: subscription.ack(event.id)
+                                envelope, checkpoint_callback=lambda: subscription.ack(event.id)
                             )
                         else:
                             # No lane manager, just ack
@@ -143,10 +136,7 @@ class SubscriptionManager:
                 logger.info(f"Subscription '{sub_name}' cancelled")
                 break
             except Exception as e:
-                logger.error(
-                    f"Error in subscription '{sub_name}': {e}",
-                    exc_info=True
-                )
+                logger.error(f"Error in subscription '{sub_name}': {e}", exc_info=True)
                 if self.is_running:
                     logger.info(f"Reconnecting subscription '{sub_name}' in 5 seconds...")
                     await asyncio.sleep(5.0)
@@ -169,27 +159,18 @@ class SubscriptionManager:
                         group_name=group_name,
                         stream_name=stream_name,
                     )
-                    logger.debug(
-                        f"Subscription '{group_name}' to '{stream_name}' already exists"
-                    )
+                    logger.debug(f"Subscription '{group_name}' to '{stream_name}' already exists")
                 except NotFound:
                     # Subscription doesn't exist, create it
-                    logger.info(
-                        f"Creating subscription '{group_name}' to '{stream_name}'"
-                    )
+                    logger.info(f"Creating subscription '{group_name}' to '{stream_name}'")
                     client.create_subscription_to_stream(
                         group_name=group_name,
                         stream_name=stream_name,
                         from_end=False,  # Start from beginning
                     )
-                    logger.info(
-                        f"Created subscription '{group_name}' to '{stream_name}'"
-                    )
+                    logger.info(f"Created subscription '{group_name}' to '{stream_name}'")
         except Exception as e:
-            logger.error(
-                f"Failed to ensure subscription '{group_name}' exists: {e}",
-                exc_info=True
-            )
+            logger.error(f"Failed to ensure subscription '{group_name}' exists: {e}", exc_info=True)
             raise
 
     def get_status(self) -> Dict:

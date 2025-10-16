@@ -15,7 +15,12 @@ from src.events.repository import RepositoryFactory
 from src.events.sentence_events import EditorType
 from src.events.store import EventStoreClient, get_event_store_client
 
-from . import CommandExecutionError, CommandHandler, CommandResult, CommandValidationError
+from . import (
+    CommandExecutionError,
+    CommandHandler,
+    CommandResult,
+    CommandValidationError,
+)
 from .interview_commands import (
     ChangeInterviewStatusCommand,
     CreateInterviewCommand,
@@ -71,9 +76,7 @@ class InterviewCommandHandler(CommandHandler):
             # Check if interview already exists
             existing = await repo.load(command.interview_id)
             if existing is not None:
-                raise CommandValidationError(
-                    f"Interview {command.interview_id} already exists", field="interview_id"
-                )
+                raise CommandValidationError(f"Interview {command.interview_id} already exists", field="interview_id")
 
             # Create new interview aggregate
             interview = Interview(command.interview_id)
@@ -117,9 +120,7 @@ class InterviewCommandHandler(CommandHandler):
             # Load existing interview
             interview = await repo.load(command.interview_id)
             if interview is None:
-                raise CommandValidationError(
-                    f"Interview {command.interview_id} not found", field="interview_id"
-                )
+                raise CommandValidationError(f"Interview {command.interview_id} not found", field="interview_id")
 
             # Execute command
             interview.update(
@@ -156,17 +157,13 @@ class InterviewCommandHandler(CommandHandler):
             # Load existing interview
             interview = await repo.load(command.interview_id)
             if interview is None:
-                raise CommandValidationError(
-                    f"Interview {command.interview_id} not found", field="interview_id"
-                )
+                raise CommandValidationError(f"Interview {command.interview_id} not found", field="interview_id")
 
             # Validate status
             try:
                 new_status = InterviewStatus(command.new_status)
             except ValueError:
-                raise CommandValidationError(
-                    f"Invalid status: {command.new_status}", field="new_status"
-                )
+                raise CommandValidationError(f"Invalid status: {command.new_status}", field="new_status")
 
             # Execute command
             interview.change_status(
@@ -237,9 +234,7 @@ class SentenceCommandHandler(CommandHandler):
             # Check if sentence already exists
             existing = await repo.load(command.sentence_id)
             if existing is not None:
-                raise CommandValidationError(
-                    f"Sentence {command.sentence_id} already exists", field="sentence_id"
-                )
+                raise CommandValidationError(f"Sentence {command.sentence_id} already exists", field="sentence_id")
 
             # Create new sentence aggregate
             sentence = Sentence(command.sentence_id)
@@ -282,17 +277,13 @@ class SentenceCommandHandler(CommandHandler):
             # Load existing sentence
             sentence = await repo.load(command.sentence_id)
             if sentence is None:
-                raise CommandValidationError(
-                    f"Sentence {command.sentence_id} not found", field="sentence_id"
-                )
+                raise CommandValidationError(f"Sentence {command.sentence_id} not found", field="sentence_id")
 
             # Validate editor type
             try:
                 editor_type = EditorType(command.editor_type.lower())
             except ValueError:
-                raise CommandValidationError(
-                    f"Invalid editor type: {command.editor_type}", field="editor_type"
-                )
+                raise CommandValidationError(f"Invalid editor type: {command.editor_type}", field="editor_type")
 
             # Execute command
             sentence.edit(
@@ -328,9 +319,7 @@ class SentenceCommandHandler(CommandHandler):
             # Load existing sentence
             sentence = await repo.load(command.sentence_id)
             if sentence is None:
-                raise CommandValidationError(
-                    f"Sentence {command.sentence_id} not found", field="sentence_id"
-                )
+                raise CommandValidationError(f"Sentence {command.sentence_id} not found", field="sentence_id")
 
             # Execute command
             sentence.generate_analysis(
@@ -372,9 +361,7 @@ class SentenceCommandHandler(CommandHandler):
             # Load existing sentence
             sentence = await repo.load(command.sentence_id)
             if sentence is None:
-                raise CommandValidationError(
-                    f"Sentence {command.sentence_id} not found", field="sentence_id"
-                )
+                raise CommandValidationError(f"Sentence {command.sentence_id} not found", field="sentence_id")
 
             # Execute command
             sentence.override_analysis(

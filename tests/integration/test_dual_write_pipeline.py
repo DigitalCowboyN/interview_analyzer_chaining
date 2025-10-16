@@ -13,16 +13,17 @@ These tests validate:
 6. Non-blocking error handling (Neo4j succeeds even if events fail)
 """
 
-import pytest
 import uuid
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.io.neo4j_map_storage import Neo4jMapStorage
-from src.io.neo4j_analysis_writer import Neo4jAnalysisWriter
-from src.pipeline_event_emitter import PipelineEventEmitter
+import pytest
+
 from src.events.store import EventStoreClient
+from src.io.neo4j_analysis_writer import Neo4jAnalysisWriter
+from src.io.neo4j_map_storage import Neo4jMapStorage
+from src.pipeline_event_emitter import PipelineEventEmitter
 
 
 @pytest.mark.asyncio
@@ -97,9 +98,7 @@ class TestDualWritePipelineEventEmission:
         assert event.actor.actor_type == "system"
         assert event.actor.user_id == "pipeline"
 
-    async def test_sentence_created_event_emission(
-        self, event_emitter, mock_event_store, correlation_id, interview_id
-    ):
+    async def test_sentence_created_event_emission(self, event_emitter, mock_event_store, correlation_id, interview_id):
         """Test that SentenceCreated event is emitted with correct data."""
         # Arrange
         index = 0
@@ -173,9 +172,7 @@ class TestDualWritePipelineEventEmission:
         events = call_args[0][1]
 
         # Verify deterministic UUID for sentence
-        expected_sentence_id = str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}")
-        )
+        expected_sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
         assert stream_name == f"Sentence-{expected_sentence_id}"
         assert len(events) == 1
 

@@ -3,10 +3,12 @@
 ## Completed Milestones
 
 ### ✅ M2.1: Command Layer & API Integration
+
 **Status:** Complete  
 **Commit:** d77f890
 
 **Implemented:**
+
 - Command base classes (`Command`, `CommandResult`, `CommandHandler`)
 - Interview commands (`CreateInterviewCommand`, `UpdateInterviewCommand`, `ChangeInterviewStatusCommand`)
 - Sentence commands (`CreateSentenceCommand`, `EditSentenceCommand`, `GenerateAnalysisCommand`, `OverrideAnalysisCommand`, `RegenerateAnalysisCommand`)
@@ -16,6 +18,7 @@
 - Fixed EventStoreDB client API (use `limit` instead of `count`)
 
 **Files Created:**
+
 - `src/commands/__init__.py`
 - `src/commands/interview_commands.py`
 - `src/commands/sentence_commands.py`
@@ -26,10 +29,12 @@
 ---
 
 ### ✅ M2.3: Projection Service Infrastructure
+
 **Status:** Complete  
 **Commit:** 66097a5
 
 **Implemented:**
+
 - Configuration for lanes, subscriptions, retry policies
 - Lane Manager with 12 configurable lanes
 - Partitioned processing by `interview_id` using consistent hashing
@@ -41,6 +46,7 @@
 - Retry-to-park error handling with exponential backoff
 
 **Files Created:**
+
 - `src/projections/__init__.py`
 - `src/projections/config.py`
 - `src/projections/lane_manager.py`
@@ -49,6 +55,7 @@
 - `src/projections/projection_service.py`
 
 **Key Features:**
+
 - 12 lanes (configurable via `PROJECTION_LANE_COUNT`)
 - In-order processing per interview within each lane
 - Parallel processing across lanes
@@ -59,10 +66,12 @@
 ---
 
 ### ✅ M2.4: Projection Handlers Implementation
+
 **Status:** Complete  
 **Commit:** 3b7e8e8
 
 **Implemented:**
+
 - Base handler with version checking and retry logic
 - Handler registry for event routing
 - Interview event handlers:
@@ -76,6 +85,7 @@
   - `AnalysisOverriddenHandler` - Marks analysis as overridden
 
 **Files Created:**
+
 - `src/projections/handlers/__init__.py`
 - `src/projections/handlers/base_handler.py`
 - `src/projections/handlers/registry.py`
@@ -83,6 +93,7 @@
 - `src/projections/handlers/sentence_handlers.py`
 
 **Key Features:**
+
 - Idempotent handlers with version guards
 - Automatic retry with exponential backoff
 - Failed events parked to DLQ
@@ -92,20 +103,24 @@
 ---
 
 ### ✅ M2.5: Monitoring & Observability
+
 **Status:** Complete  
 **Commit:** 0fb22f1
 
 **Implemented:**
+
 - Health check endpoint with detailed component status
 - Metrics tracking (counters, gauges, histograms)
 - Formatted health status output
 - MetricsTimer context manager for operation timing
 
 **Files Created:**
+
 - `src/projections/health.py`
 - `src/projections/metrics.py`
 
 **Metrics Tracked:**
+
 - Events processed, failed, parked, skipped
 - Processing latency (p50, p95, p99)
 - Queue depth per lane
@@ -113,6 +128,7 @@
 - Uptime and lane status
 
 **Health Status Includes:**
+
 - Overall service status (healthy/unhealthy)
 - Lane status (running, queue depth, events processed/failed)
 - Subscription status (running/stopped per subscription)
@@ -124,8 +140,10 @@
 ## Remaining Milestones
 
 ### ⏳ M2.2: Dual-Write Integration
+
 **Status:** Not Started  
 **Next Steps:**
+
 1. Modify `src/pipeline.py` to emit events during file processing
 2. Update `src/io/neo4j_map_storage.py` to emit `SentenceCreated` events
 3. Update `src/io/neo4j_analysis_writer.py` to emit `AnalysisGenerated` events
@@ -135,8 +153,10 @@
 ---
 
 ### ⏳ M2.6: User Edit API Integration
+
 **Status:** Not Started  
 **Next Steps:**
+
 1. Create `src/api/routers/edits.py` with edit endpoints
 2. Implement `PUT /interviews/{interview_id}/sentences/{sentence_id}` for sentence edits
 3. Implement `PUT /interviews/{interview_id}/sentences/{sentence_id}/analysis` for analysis overrides
@@ -146,8 +166,10 @@
 ---
 
 ### ⏳ M2.7: Testing & Validation
+
 **Status:** Not Started  
 **Next Steps:**
+
 1. Create integration tests for event-sourced file processing
 2. Test projection replay (clear Neo4j, replay events)
 3. Test user edit workflows
@@ -159,8 +181,10 @@
 ---
 
 ### ⏳ M2.8: Remove Dual-Write
+
 **Status:** Not Started (After 1-2 weeks validation)  
 **Next Steps:**
+
 1. Deploy projection service to production
 2. Monitor dual-write for 1-2 weeks
 3. Compare Neo4j state from both paths
@@ -173,6 +197,7 @@
 ## Architecture Summary
 
 ### Current State
+
 - **M1 (Core Plumbing):** ✅ Complete
   - Event envelope, domain events, EventStoreDB client, repository pattern, aggregates
 - **M2.1 (Commands):** ✅ Complete
@@ -181,6 +206,7 @@
 - **M2.5 (Monitoring):** ✅ Complete
 
 ### Data Flow (Once M2.2 Complete)
+
 1. **File Upload** → `CreateInterviewCommand` → `InterviewCreated` event → ESDB
 2. **Pipeline Processing:**
    - Segments text → `CreateSentenceCommand` → `SentenceCreated` events → ESDB
@@ -193,6 +219,7 @@
    - Failed events parked to DLQ
 
 ### Key Design Decisions
+
 - **12 lanes** (configurable) for partitioned processing
 - **Category streams** (`$ce-Interview`, `$ce-Sentence`) for subscriptions
 - **Event type allowlists** for filtering (not ESDB filters)
@@ -205,20 +232,24 @@
 ## Next Actions
 
 1. **Implement M2.2 (Dual-Write Integration)**
+
    - This connects the existing pipeline to the event-sourced architecture
    - Allows testing the full flow end-to-end
 
 2. **Test End-to-End**
+
    - Upload a file
    - Verify events in ESDB
    - Verify Neo4j updated by projection service
    - Check health endpoint
 
 3. **Implement M2.6 (User Edit API)**
+
    - Add edit endpoints
    - Test user edits flow through events to Neo4j
 
 4. **Comprehensive Testing (M2.7)**
+
    - Integration tests
    - Performance validation
    - Idempotency verification
@@ -246,9 +277,11 @@
 ## Questions / Decisions Needed
 
 1. **Docker Integration:** Should we add a `projection-service` container to `docker-compose.yml` now or wait until M2.2?
+
    - **Recommendation:** Add now for easier testing
 
 2. **EventStoreDB Setup:** Do we need to update `docker-compose.yml` to ensure EventStoreDB is properly configured?
+
    - **Current:** EventStoreDB service exists but may need configuration tweaks
 
 3. **Testing Strategy:** Should we test M2.1-M2.5 in isolation before M2.2, or proceed directly to M2.2?
@@ -268,4 +301,3 @@ d77f890 feat(commands): Implement command layer with handlers for Interview and 
 **Total Lines Added:** ~2,700 lines of production code
 **Total Files Created:** 21 new files
 **Test Coverage:** Command layer has basic tests; projection service needs integration tests (M2.7)
-

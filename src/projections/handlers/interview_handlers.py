@@ -63,10 +63,7 @@ class InterviewCreatedHandler(BaseProjectionHandler):
             event_version=event.version,
         )
 
-        logger.info(
-            f"Created Interview node for {event.aggregate_id} "
-            f"(title: {data.get('title')})"
-        )
+        logger.info(f"Created Interview node for {event.aggregate_id} " f"(title: {data.get('title')})")
 
 
 class InterviewMetadataUpdatedHandler(BaseProjectionHandler):
@@ -146,7 +143,4 @@ class InterviewStatusChangedHandler(BaseProjectionHandler):
             updated_at=event.occurred_at.isoformat(),
         )
 
-        logger.info(
-            f"Changed Interview {event.aggregate_id} status to "
-            f"{data.get('new_status')}"
-        )
+        logger.info(f"Changed Interview {event.aggregate_id} status to " f"{data.get('new_status')}")

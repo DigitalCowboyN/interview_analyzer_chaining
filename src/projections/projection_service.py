@@ -143,18 +143,10 @@ class ProjectionService:
             uptime_seconds = (datetime.now(timezone.utc) - self.started_at).total_seconds()
 
         # Determine overall health
-        all_lanes_running = all(
-            lane["is_running"] for lane in lane_status["lanes"]
-        )
-        all_subscriptions_running = all(
-            sub["running"] for sub in subscription_status["subscriptions"].values()
-        )
+        all_lanes_running = all(lane["is_running"] for lane in lane_status["lanes"])
+        all_subscriptions_running = all(sub["running"] for sub in subscription_status["subscriptions"].values())
 
-        is_healthy = (
-            self.is_running
-            and all_lanes_running
-            and all_subscriptions_running
-        )
+        is_healthy = self.is_running and all_lanes_running and all_subscriptions_running
 
         return {
             "status": "healthy" if is_healthy else "unhealthy",

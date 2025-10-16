@@ -1,2 +1,1 @@
 """Projection service tests."""
-

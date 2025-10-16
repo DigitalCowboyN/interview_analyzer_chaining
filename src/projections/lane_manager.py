@@ -78,8 +78,7 @@ class Lane:
         queue_depth = self.queue.qsize()
         if queue_depth > QUEUE_DEPTH_ALERT_THRESHOLD:
             logger.warning(
-                f"Lane {self.lane_id} queue depth ({queue_depth}) exceeds threshold "
-                f"({QUEUE_DEPTH_ALERT_THRESHOLD})"
+                f"Lane {self.lane_id} queue depth ({queue_depth}) exceeds threshold " f"({QUEUE_DEPTH_ALERT_THRESHOLD})"
             )
 
         await self.queue.put((event, checkpoint_callback))
@@ -92,9 +91,7 @@ class Lane:
             try:
                 # Get next event from queue (with timeout to allow graceful shutdown)
                 try:
-                    event, checkpoint_callback = await asyncio.wait_for(
-                        self.queue.get(), timeout=1.0
-                    )
+                    event, checkpoint_callback = await asyncio.wait_for(self.queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
                     continue
 
@@ -105,10 +102,7 @@ class Lane:
                 logger.info(f"Lane {self.lane_id} processing loop cancelled")
                 break
             except Exception as e:
-                logger.error(
-                    f"Unexpected error in lane {self.lane_id} processing loop: {e}",
-                    exc_info=True
-                )
+                logger.error(f"Unexpected error in lane {self.lane_id} processing loop: {e}", exc_info=True)
                 # Continue processing despite error
                 await asyncio.sleep(1.0)
 
@@ -126,9 +120,7 @@ class Lane:
             # Get handler for this event type
             handler = self.handler_registry.get_handler(event.event_type)
             if handler is None:
-                logger.warning(
-                    f"No handler found for event type {event.event_type}, skipping"
-                )
+                logger.warning(f"No handler found for event type {event.event_type}, skipping")
                 await checkpoint_callback()
                 return
 
@@ -150,10 +142,7 @@ class Lane:
         except Exception as e:
             # Event was parked or failed permanently
             self.events_failed += 1
-            logger.error(
-                f"Lane {self.lane_id} failed to process event {event.event_id}: {e}",
-                exc_info=True
-            )
+            logger.error(f"Lane {self.lane_id} failed to process event {event.event_id}: {e}", exc_info=True)
             # Still checkpoint to move past this event
             await checkpoint_callback()
 
@@ -187,10 +176,7 @@ class LaneManager:
         """
         self.lane_count = lane_count
         self.handler_registry = handler_registry
-        self.lanes: List[Lane] = [
-            Lane(lane_id=i, handler_registry=handler_registry)
-            for i in range(lane_count)
-        ]
+        self.lanes: List[Lane] = [Lane(lane_id=i, handler_registry=handler_registry) for i in range(lane_count)]
         logger.info(f"LaneManager initialized with {lane_count} lanes")
 
     async def start(self):
@@ -236,10 +222,7 @@ class LaneManager:
         # Extract interview_id from event data
         interview_id = self._extract_interview_id(event)
         if not interview_id:
-            logger.error(
-                f"Could not extract interview_id from event {event.event_id}, "
-                f"type: {event.event_type}"
-            )
+            logger.error(f"Could not extract interview_id from event {event.event_id}, " f"type: {event.event_type}")
             # Checkpoint anyway to avoid blocking
             await checkpoint_callback()
             return
@@ -268,9 +251,7 @@ class LaneManager:
         if event.aggregate_type == "Sentence":
             return event.data.get("interview_id")
 
-        logger.warning(
-            f"Unknown aggregate type {event.aggregate_type} for event {event.event_id}"
-        )
+        logger.warning(f"Unknown aggregate type {event.aggregate_type} for event {event.event_id}")
         return None
 
     def get_status(self) -> Dict:

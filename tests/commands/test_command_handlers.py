@@ -108,4 +108,3 @@ class TestSentenceCommandHandler:
         assert result.aggregate_id == sentence_id
         assert result.version == 1  # Second event
         assert result.event_count == 1  # Only the edit event
-

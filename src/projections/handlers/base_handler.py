@@ -89,7 +89,7 @@ class BaseProjectionHandler(ABC):
         Returns:
             float: Delay in seconds
         """
-        delay = RETRY_INITIAL_DELAY * (RETRY_EXPONENTIAL_BASE ** attempt)
+        delay = RETRY_INITIAL_DELAY * (RETRY_EXPONENTIAL_BASE**attempt)
         return min(delay, RETRY_MAX_DELAY)
 
     async def handle(self, event: EventEnvelope):
@@ -123,10 +123,7 @@ class BaseProjectionHandler(ABC):
 
                 except Exception as e:
                     await tx.rollback()
-                    logger.error(
-                        f"Failed to apply event {event.event_id}: {e}",
-                        exc_info=True
-                    )
+                    logger.error(f"Failed to apply event {event.event_id}: {e}", exc_info=True)
                     raise
 
     async def _get_version(self, session, event: EventEnvelope) -> Optional[int]:
@@ -146,10 +143,7 @@ class BaseProjectionHandler(ABC):
         RETURN n.event_version as version
         """
 
-        result = await session.run(
-            query,
-            aggregate_id=event.aggregate_id
-        )
+        result = await session.run(query, aggregate_id=event.aggregate_id)
 
         record = await result.single()
         if record:
@@ -170,11 +164,7 @@ class BaseProjectionHandler(ABC):
         SET n.event_version = $version
         """
 
-        await tx.run(
-            query,
-            aggregate_id=event.aggregate_id,
-            version=event.version
-        )
+        await tx.run(query, aggregate_id=event.aggregate_id, version=event.version)
 
     @abstractmethod
     async def apply(self, tx, event: EventEnvelope):

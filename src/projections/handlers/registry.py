@@ -34,9 +34,7 @@ class HandlerRegistry:
             handler: Handler instance
         """
         if event_type in self._handlers:
-            logger.warning(
-                f"Overwriting existing handler for event type '{event_type}'"
-            )
+            logger.warning(f"Overwriting existing handler for event type '{event_type}'")
 
         self._handlers[event_type] = handler
         logger.debug(f"Registered handler for event type '{event_type}'")

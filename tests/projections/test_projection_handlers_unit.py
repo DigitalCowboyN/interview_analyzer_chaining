@@ -30,6 +30,7 @@ class TestBaseHandlerVersionChecking:
 
     async def test_skips_already_applied_event(self):
         """Test that handler skips event if version already applied."""
+
         # Create a concrete handler for testing
         class TestHandler(BaseProjectionHandler):
             async def apply(self, tx, event):
@@ -460,4 +461,3 @@ class TestSentenceHandlers:
         query = first_call[0][0]
         assert "CREATE (a:Analysis" in query
         assert "HAS_ANALYSIS" in query
-

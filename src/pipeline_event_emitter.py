@@ -103,8 +103,7 @@ class PipelineEventEmitter:
             stream_name = f"Interview-{interview_id}"
             await self.client.append_events(stream_name, [event], expected_version=-1)
             self.logger.debug(
-                f"Emitted InterviewCreated event for interview {interview_id} "
-                f"(correlation_id={correlation_id})"
+                f"Emitted InterviewCreated event for interview {interview_id} " f"(correlation_id={correlation_id})"
             )
 
         except Exception as e:

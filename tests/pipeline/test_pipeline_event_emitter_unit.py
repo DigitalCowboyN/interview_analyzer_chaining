@@ -80,9 +80,7 @@ class TestPipelineEventEmitter:
         expected_version = call_args[1]["expected_version"]
         assert expected_version == -1  # Allow any version
 
-    async def test_emit_interview_created_handles_exception(
-        self, emitter, mock_event_store, caplog
-    ):
+    async def test_emit_interview_created_handles_exception(self, emitter, mock_event_store, caplog):
         """Test that InterviewCreated emission logs errors but doesn't raise."""
         mock_event_store.append_events.side_effect = Exception("ESDB connection failed")
 
@@ -194,9 +192,7 @@ class TestPipelineEventEmitter:
 
         assert event1.aggregate_id == event2.aggregate_id
 
-    async def test_emit_sentence_created_handles_exception(
-        self, emitter, mock_event_store, caplog
-    ):
+    async def test_emit_sentence_created_handles_exception(self, emitter, mock_event_store, caplog):
         """Test that SentenceCreated emission logs errors but doesn't raise."""
         mock_event_store.append_events.side_effect = Exception("ESDB connection failed")
 
@@ -264,9 +260,7 @@ class TestPipelineEventEmitter:
         expected_sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:0"))
         assert sentence_id == expected_sentence_id
 
-    async def test_emit_analysis_generated_handles_exception(
-        self, emitter, mock_event_store, caplog
-    ):
+    async def test_emit_analysis_generated_handles_exception(self, emitter, mock_event_store, caplog):
         """Test that AnalysisGenerated emission logs errors but doesn't raise."""
         mock_event_store.append_events.side_effect = Exception("ESDB connection failed")
 
@@ -324,4 +318,3 @@ class TestPipelineEventEmitter:
             sentence_ids.add(event.aggregate_id)
 
         assert len(sentence_ids) == 3
-

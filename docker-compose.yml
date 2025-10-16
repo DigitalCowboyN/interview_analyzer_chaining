@@ -25,8 +25,9 @@ services:
       # Add dependency for the test container
       neo4j-test:
         condition: service_started # Or just service_healthy if we re-add healthcheck
-      eventstore:
-        condition: service_started
+      # eventstore dependency commented out due to ARM64 compatibility issues
+      # eventstore:
+      #   condition: service_started
     # Command to run the API server (adjust if needed)
     # command: ["make", "run-api"] # Example using Makefile target
     command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -65,8 +66,9 @@ services:
         condition: service_healthy
       neo4j:
         condition: service_started
-      eventstore:
-        condition: service_started
+      # eventstore dependency commented out due to ARM64 compatibility issues
+      # eventstore:
+      #   condition: service_started
     command: ["celery", "-A", "src.celery_app", "worker", "--loglevel=info"]
 
   # Add Neo4j service
@@ -78,12 +80,9 @@ services:
     volumes:
       - neo4j_data:/data
     environment:
-      # Use Neo4j 5 format, sourced from .env (no default)
-      NEO4J_INITIAL_PASSWORD: ${NEO4J_PASSWORD}
-      # Keep license agreement env var
+      # Use Neo4j 5.x authentication format (hardcoded for now)
+      NEO4J_AUTH: "neo4j/aB3cD4eF5gH6iJ7kL8m"
       NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
-    env_file:
-      - .env # Ensure it reads the .env file for NEO4J_PASSWORD
     # healthcheck: # Temporarily remove healthcheck
     #   test: ["CMD-SHELL", "tcpconnect localhost:7687 || exit 1"]
     #   interval: 5s
@@ -116,7 +115,8 @@ services:
 
   # EventStoreDB service for event sourcing
   eventstore:
-    image: eventstore/eventstore:24.2-jammy
+    image: eventstore/eventstore:24.2.0-jammy
+    platform: linux/amd64  # Run in emulation on ARM64/Apple Silicon
     container_name: interview_analyzer_eventstore
     ports:
       - "2113:2113" # HTTP API
@@ -127,10 +127,9 @@ services:
       - EVENTSTORE_CLUSTER_SIZE=1
       - EVENTSTORE_RUN_PROJECTIONS=All
       - EVENTSTORE_START_STANDARD_PROJECTIONS=true
-      - EVENTSTORE_EXT_TCP_PORT=1113
+      - EVENTSTORE_INT_TCP_PORT=1113
       - EVENTSTORE_HTTP_PORT=2113
       - EVENTSTORE_INSECURE=true
-      - EVENTSTORE_ENABLE_EXTERNAL_TCP=true
       - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
     networks:
       - interview_net

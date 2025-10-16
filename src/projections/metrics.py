@@ -112,10 +112,7 @@ class ProjectionMetrics:
             "uptime_seconds": uptime,
             "counters": dict(self.counters),
             "gauges": dict(self.gauges),
-            "histograms": {
-                name: self.get_histogram_stats(name)
-                for name in self.histograms.keys()
-            },
+            "histograms": {name: self.get_histogram_stats(name) for name in self.histograms.keys()},
         }
 
     def reset(self):

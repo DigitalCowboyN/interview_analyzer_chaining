@@ -385,4 +385,3 @@ class TestLane:
 
         finally:
             await lane.stop()
-
