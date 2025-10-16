@@ -25,18 +25,22 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
     Handles cardinality constraints and edit flags based on configuration and graph state.
     """
 
-    def __init__(self, project_id: str, interview_id: str):
+    def __init__(self, project_id: str, interview_id: str, event_emitter=None, correlation_id=None):
         """
         Initializes the writer for a specific project and interview context.
 
         Args:
             project_id (str): The unique ID (UUID ideally) of the project.
             interview_id (str): The unique ID (UUID ideally) of the interview.
+            event_emitter: Optional PipelineEventEmitter for dual-write phase.
+            correlation_id: Optional correlation ID for event tracking.
         """
         if not project_id or not interview_id:
             raise ValueError("project_id and interview_id cannot be empty")
         self.project_id = str(project_id)
         self.interview_id = str(interview_id)
+        self.event_emitter = event_emitter
+        self.correlation_id = correlation_id
         # Load default cardinality limits from config once during initialization
         self.default_limits = config.get("pipeline", {}).get("default_cardinality_limits", {})
         logger.debug(f"Neo4jAnalysisWriter initialized for Project: {self.project_id}, Interview: {self.interview_id}")
@@ -91,6 +95,24 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
                     self.default_limits,
                 )
             logger.debug(f"Successfully wrote analysis result for Sentence ID: {sentence_id}")
+
+            # Emit AnalysisGenerated event (if event sourcing enabled and not an error result)
+            if self.event_emitter and not is_error_result:
+                try:
+                    await self.event_emitter.emit_analysis_generated(
+                        interview_id=self.interview_id,
+                        sentence_index=sentence_id,  # Using sentence_id as index
+                        analysis_data=result,
+                        correlation_id=self.correlation_id,
+                    )
+                    logger.debug(f"Emitted AnalysisGenerated event for sentence {sentence_id}.")
+                except Exception as emit_e:
+                    # Event emission is non-blocking - log but don't raise
+                    logger.error(
+                        f"Failed to emit AnalysisGenerated event for sentence {sentence_id}: {emit_e}",
+                        exc_info=True,
+                    )
+
         except Exception as e:
             logger.error(
                 f"Failed Neo4j write_result for Sentence ID {sentence_id} (Interview {self.interview_id}): {e}",
