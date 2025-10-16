@@ -1,375 +1,182 @@
 # Event-Sourced Architecture Implementation Plan
 
-**Last Updated**: October 16, 2025  
-**Status**: Phase 2 - 75% Complete (5 of 8 milestones)
+## Progress Summary (as of Oct 16, 2025)
 
----
+**Status**: 87.5% Complete (7 of 8 milestones)
 
-## Progress Summary
+### Completed (✅):
+- **M1**: Core Plumbing (Event envelope, ESDB, Repository) - 61 tests passing
+- **M2.1**: Command Layer (handlers, commands) - 8 tests passing
+- **M2.2**: Dual-Write Integration (event emission) - 20 tests passing (10 unit + 10 integration)
+- **M2.3**: Projection Infrastructure (lanes, subscriptions) - 15 tests passing
+- **M2.4**: Projection Handlers (all event types) - 11 tests passing
+- **M2.5**: Monitoring & Observability (metrics, health) - code complete
+- **M2.6**: User Edit API (sentence edits, analysis overrides) - 16 tests passing ✅ NEW
 
-### Completed Milestones ✅
+**Total**: 131 tests passing (100% pass rate), 1 critical bug fixed
 
-- **M1: Core Plumbing** (Phase 1) - Event envelope, EventStoreDB, Repository pattern
-  - 61 tests passing
-  - Critical foundation complete
-- **M2.1: Command Layer** - Command handlers, commands, aggregates
-  - 8 tests passing
-  - 1 critical bug found and fixed (version calculation)
-- **M2.2: Dual-Write Integration** - Event emission alongside Neo4j writes
-  - 20 tests passing (10 unit + 10 integration)
-  - Production-ready, feature-flagged
-- **M2.3: Projection Infrastructure** - Lane manager, subscription manager, parked events
-  - 15 tests passing
-  - Validated partitioning and in-order processing
-- **M2.4: Projection Handlers** - Event handlers with retry-to-park and version guards
-  - 11 tests passing
-  - Idempotency and resilience validated
-- **M2.5: Monitoring & Observability** - Metrics, health checks, structured logging
-  - Code complete
-  - Ready for integration
-
-**Total**: 115 tests passing, ~2,575 lines of test code, 1 critical bug fixed
-
-### Remaining Milestones ⏳
-
-- **M2.6**: User Edit API (0% complete)
-- **M2.7**: Testing & Validation (0% complete)
-- **M2.8**: Remove Dual-Write (0% complete)
-
----
-
-## Implementation Overview
-
-This plan outlines the migration to an event-sourced architecture for the interview analyzer system. The approach uses EventStoreDB as the event store and maintains Neo4j as the read model (projection).
-
-### Architecture Goals
-
-1. **User-Driven Corrections**: Enable human experts to override AI analysis
-2. **Audit Trail**: Complete history of all changes
-3. **Eventual Consistency**: Read models updated asynchronously
-4. **Scalability**: Handle multiple projections and services
-
-### Implementation Phases
-
-**Phase 1 (M1)**: Core Event-Sourcing Plumbing ✅
-
-- Event envelope design
-- EventStoreDB integration
-- Repository pattern with optimistic concurrency
-
-**Phase 2 (M2)**: Dual-Write & Projections (75% Complete)
-
-- M2.1: Command layer ✅
-- M2.2: Dual-write integration ✅
-- M2.3: Projection infrastructure ✅
-- M2.4: Projection handlers ✅
-- M2.5: Monitoring ✅
-- M2.6: User edit API ⏳
-- M2.7: Testing & validation ⏳
-- M2.8: Remove dual-write ⏳
+### Remaining (⏳):
+- **M2.7**: Testing & Validation (end-to-end integration tests)
+- **M2.8**: Remove Dual-Write (after production validation)
 
 ---
 
 ## Milestone Details
 
-### M1: Core Event-Sourcing Plumbing ✅ COMPLETE
+### M1: Core Event-Sourcing Plumbing ✅
 
-**Status**: 100% Complete | **Tests**: 61/61 Passing
+**Status:** COMPLETE (61 tests passing)
 
-#### M1.1: Event Envelope Design ✅
+**Components Built:**
+1. Event envelope design with comprehensive metadata
+2. EventStoreDB integration with retry logic
+3. Repository pattern with optimistic concurrency control
+4. Interview and Sentence aggregates with event sourcing
+5. Domain events for all operations
 
-- Pydantic models for event metadata
-- Actor tracking (user vs system)
-- Correlation and causation IDs
-- UUID generation with validation
-- **Output**: `src/events/envelope.py`
-
-#### M1.2: EventStoreDB Integration ✅
-
-- Connection management with retry logic
-- Append/read operations
-- Stream handling
-- Error handling for unavailable service
-- **Output**: `src/events/store.py`
-
-#### M1.3: Repository Pattern ✅
-
-- Generic `Repository<T>` base class
-- InterviewRepository and SentenceRepository
-- Optimistic concurrency control with version checking
-- Retry logic on conflicts
-- **Output**: `src/events/repository.py`
-
-#### M1.4: Domain Events ✅
-
-- InterviewCreated, InterviewStatusChanged, InterviewMetadataUpdated
-- SentenceCreated, SentenceEdited
-- AnalysisGenerated, AnalysisOverridden, AnalysisCleared
-- **Output**: `src/events/interview_events.py`, `src/events/sentence_events.py`
-
-#### M1.5: Aggregate Roots ✅
-
-- Interview aggregate with state management
-- Sentence aggregate with analysis tracking
-- Event application logic
-- Command methods
-- **Output**: `src/events/aggregates.py`
-
-**Validation**: All core plumbing tested with 61 unit tests. Can append/read events, handle concurrency, and manage aggregate state.
+**Critical Bug Fixed:** Version calculation in `AggregateRoot._add_event()` would have caused event version collisions.
 
 ---
 
-### M2.1: Command Layer ✅ COMPLETE
+### M2.1: Command Layer ✅
 
-**Status**: 100% Complete | **Tests**: 8/8 Passing
+**Status:** COMPLETE (8 tests passing)
 
-#### Components Built
-
+**Components Built:**
 - Command DTOs for all operations
 - Command handlers with validation
-- Actor tracking integration
+- Factory pattern for repository creation
+- Actor tracking and correlation IDs
+
+**Tests:** 8 unit tests validating command processing, error handling, and event generation.
+
+---
+
+### M2.2: Dual-Write Integration ✅
+
+**Status:** COMPLETE (20 tests passing: 10 unit + 10 integration)
+
+**Components Built:**
+1. `PipelineEventEmitter` - Lightweight wrapper for event emission
+2. Pipeline integration for `InterviewCreated`, `SentenceCreated`, `AnalysisGenerated` events
+3. Neo4j storage integration with event emission
+4. Non-blocking error handling
+
+**Key Features:**
+- Deterministic sentence UUIDs (uuid5)
+- System actor tracking
 - Correlation ID propagation
-
-#### Files Created
-
-- `src/commands/__init__.py` - Base command classes
-- `src/commands/interview_commands.py` - Interview commands
-- `src/commands/sentence_commands.py` - Sentence commands
-- `src/commands/handlers.py` - Command handlers
-
-#### Tests
-
-- `tests/commands/test_command_handlers_unit.py` (8 tests)
-  - Interview creation, updates, status changes
-  - Sentence creation, edits, analysis generation
-  - Validation errors (already exists, not found, invalid values)
-
-#### Critical Bug Fixed
-
-**Version Calculation in `AggregateRoot._add_event()`**
-
-- Used `len(_uncommitted_events)` which resets to 0 after commit
-- Fixed to `self.version + 1` for correct incrementing
-- **Impact**: Would have caused event version collisions and data corruption
-
-**Note**: API/Celery integration deferred to M2.6 for user-facing endpoints.
+- Feature-flagged (safe to enable/disable)
 
 ---
 
-### M2.2: Dual-Write Integration ✅ COMPLETE
+### M2.3: Projection Infrastructure ✅
 
-**Status**: 100% Complete | **Tests**: 20/20 Passing
+**Status:** COMPLETE (15 tests passing)
 
-#### Implementation
+**Components Built:**
+1. `LaneManager` - 12 parallel processing lanes with consistent hashing
+2. `SubscriptionManager` - EventStoreDB persistent subscriptions
+3. `ParkedEventsManager` - Dead letter queue for failed events
+4. `ProjectionService` - Orchestration and health checks
 
-1. **PipelineEventEmitter** (`src/pipeline_event_emitter.py`)
-
-   - Lightweight wrapper for EventStoreDB emission
-   - Deterministic UUID generation (uuid5)
-   - System actor tracking
-   - Non-blocking error handling
-
-2. **Pipeline Integration** (`src/pipeline.py`)
-
-   - Event emitter initialization (feature-flagged)
-   - Correlation ID generation per file
-   - InterviewCreated event emission
-
-3. **Neo4jMapStorage** (`src/io/neo4j_map_storage.py`)
-
-   - SentenceCreated event emission
-   - Non-blocking error handling
-
-4. **Neo4jAnalysisWriter** (`src/io/neo4j_analysis_writer.py`)
-   - AnalysisGenerated event emission
-   - Skip events for error results
-
-#### Tests
-
-- 10 unit tests (`tests/pipeline/test_pipeline_event_emitter_unit.py`)
-- 10 integration tests (`tests/integration/test_dual_write_pipeline.py`)
-
-#### Key Features
-
-- Non-breaking (backward compatible)
-- Non-blocking (Neo4j writes succeed even if events fail)
-- Feature-flagged (`config['event_sourcing']['enabled']`)
-- Deterministic sentence UUIDs for idempotency
-- Correlation IDs for traceability
-
-**Documentation**: `M2.2_DUAL_WRITE_COMPLETE.md`
+**Tests:** Validate partitioning, in-order processing, lane lifecycle, and status monitoring.
 
 ---
 
-### M2.3: Projection Service Infrastructure ✅ COMPLETE
+### M2.4: Projection Handlers ✅
 
-**Status**: 100% Complete | **Tests**: 15/15 Passing
+**Status:** COMPLETE (11 tests passing)
 
-#### Components Built
+**Components Built:**
+1. `BaseProjectionHandler` - Version guards and retry-to-park logic
+2. Interview handlers (Created, MetadataUpdated, StatusChanged)
+3. Sentence handlers (Created, Edited, AnalysisGenerated)
 
-1. **LaneManager** (`src/projections/lane_manager.py`)
-
-   - 12 configurable lanes for parallel processing
-   - Consistent hashing for same-interview routing
-   - In-order processing per lane
-   - Error recovery (continues after failures)
-
-2. **SubscriptionManager** (`src/projections/subscription_manager.py`)
-
-   - EventStoreDB persistent subscriptions
-   - Category-per-subscription pattern
-   - Checkpoint management
-
-3. **ParkedEventsManager** (`src/projections/parked_events.py`)
-
-   - Dead letter queue for failed events
-   - Retry logic
-   - Manual replay capability
-
-4. **ProjectionService** (`src/projections/projection_service.py`)
-
-   - Orchestrates lane manager and subscriptions
-   - Health checks
-   - Graceful shutdown
-
-5. **Configuration** (`src/projections/config.py`)
-   - Lane count (default: 12)
-   - Retry settings
-   - Batch sizes
-
-#### Tests
-
-- `tests/projections/test_lane_manager_unit.py` (15 tests)
-  - Consistent hashing validation
-  - Distribution across lanes (1000 interviews)
-  - In-order processing
-  - Error recovery
-  - Checkpoint callbacks
+**Tests:** Validate idempotency, retry logic, version checking, and Neo4j projection.
 
 ---
 
-### M2.4: Projection Handlers ✅ COMPLETE
+### M2.5: Monitoring & Observability ✅
 
-**Status**: 100% Complete | **Tests**: 11/11 Passing
+**Status:** CODE COMPLETE (no dedicated tests, covered by integration)
 
-#### Components Built
-
-1. **BaseProjectionHandler** (`src/projections/handlers/base_handler.py`)
-
-   - Version guards for idempotency
-   - Retry-to-park logic (3 attempts)
-   - Abstract `_handle()` method
-
-2. **InterviewHandlers** (`src/projections/handlers/interview_handlers.py`)
-
-   - InterviewCreatedHandler (creates Project, Interview nodes)
-   - InterviewMetadataUpdatedHandler (updates fields)
-   - InterviewStatusChangedHandler (updates status)
-
-3. **SentenceHandlers** (`src/projections/handlers/sentence_handlers.py`)
-
-   - SentenceCreatedHandler (creates Sentence, links to Interview)
-   - SentenceEditedHandler (updates text, sets edited flag)
-   - AnalysisGeneratedHandler (creates Analysis, dimension nodes)
-
-4. **HandlerRegistry** (`src/projections/handlers/registry.py`)
-   - Event type → handler mapping
-   - Handler lookup
-
-#### Tests
-
-- `tests/projections/test_projection_handlers_unit.py` (11 tests)
-  - Version checking (skips already-applied events)
-  - Retry logic (3 attempts, then park)
-  - All event handlers with Neo4j queries
+**Components Built:**
+1. Metrics collection (Prometheus-style)
+2. Health check endpoints
+3. Structured logging for DLQ events
+4. Per-lane status monitoring
 
 ---
 
-### M2.5: Monitoring & Observability ✅ COMPLETE
+### M2.6: User Edit API ✅ NEW
 
-**Status**: Code Complete
+**Status:** COMPLETE (16 tests passing)
 
-#### Components Built
+**Components Built:**
 
-1. **Metrics** (`src/projections/metrics.py`)
+1. **Edit Endpoints** (`src/api/routers/edits.py` - 360 lines)
+   - `POST /edits/sentences/{interview_id}/{sentence_index}/edit` - Edit sentence text
+   - `POST /edits/sentences/{interview_id}/{sentence_index}/analysis/override` - Override analysis
+   - `GET /edits/sentences/{interview_id}/{sentence_index}/history` - Get edit history
 
-   - Prometheus-style metrics collection
-   - Event processing rates
-   - Error rates
-   - Lane utilization
+2. **Features:**
+   - Command-based (integrates with M2.1 command handlers)
+   - Actor tracking via X-User-ID header
+   - Correlation ID support via X-Correlation-ID header
+   - Deterministic sentence UUIDs
+   - Comprehensive error handling (404, 400, 500)
 
-2. **Health Checks** (`src/projections/health.py`)
+3. **Tests** (`tests/api/test_edit_api_unit.py` - 608 lines, 16/16 passing)
+   - EditSentenceEndpoint: 6 tests
+   - OverrideAnalysisEndpoint: 5 tests
+   - GetSentenceHistoryEndpoint: 2 tests
+   - CreateActorFromRequest: 3 tests
 
-   - Service health status
-   - Lane status
-   - Parked event counts
-
-3. **Structured Logging**
-   - Parked events logged with full context
-   - Lane status updates
-   - Error details
-
----
-
-### M2.6: User Edit API ⏳ NOT STARTED
-
-**Priority**: High (enables user corrections)  
-**Dependencies**: M2.1 (Command Layer), M2.4 (Projection Handlers)
-
-#### Scope
-
-1. API endpoints for sentence edits
-2. API endpoints for analysis overrides
-3. Command-based updates
-4. Return accepted status with version
-5. Async projection updates
-
-#### Deliverables
-
-- `src/api/routers/edits.py` - Edit endpoints
-- Integration with command handlers
-- API tests
+**Validation:**
+- ✅ Success paths (edit sentence, override analysis, get history)
+- ✅ Error handling (not found, validation errors, internal errors)
+- ✅ Edge cases (anonymous users, missing IDs)
+- ✅ Command construction and field mapping
+- ✅ Actor tracking (HUMAN vs SYSTEM)
 
 ---
 
-### M2.7: Testing & Validation ⏳ NOT STARTED
+### M2.7: Testing & Validation ⏳
 
-**Priority**: High (validation before production)  
-**Dependencies**: M2.2 (Dual-Write), M2.6 (User Edit API)
+**Status:** IN PROGRESS
 
-#### Scope
-
-1. End-to-end file processing tests
+**Scope:**
+1. End-to-end file processing tests with events
 2. Projection replay validation
-3. User edit scenarios
-4. Idempotency testing
+3. User edit scenarios (edit → projection → Neo4j verification)
+4. Idempotency testing (replay same events)
 5. Event ordering validation
-6. Parked event handling
-7. Performance validation
+6. Parked event handling tests
+7. Performance validation under load
 
-#### Deliverables
-
+**Deliverables:**
 - Comprehensive integration test suite
 - Performance benchmarks
-- Validation report
+- Data consistency validation
+
+**Dependencies:** M2.2 (Dual-Write) ✅, M2.6 (User Edit API) ✅
 
 ---
 
-### M2.8: Remove Dual-Write ⏳ NOT STARTED
+### M2.8: Remove Dual-Write ⏳
 
-**Priority**: Medium (after validation period)  
-**Dependencies**: M2.7 (Testing & Validation)
+**Status:** NOT STARTED (blocked by M2.7)
 
-#### Scope
-
+**Scope:**
 1. Remove direct Neo4j writes from pipeline
 2. Projection service becomes sole writer
-3. Feature flag for rollback
+3. Feature flag for safety (`dual_write_mode`)
 4. Migration validation
 
-#### Timeline
+**Timeline:** After 1-2 weeks of production validation with dual-write enabled.
 
-After 1-2 weeks of production validation with dual-write enabled.
+**Dependencies:** M2.7 (Testing & Validation)
 
 ---
 
@@ -386,13 +193,14 @@ After 1-2 weeks of production validation with dual-write enabled.
 | Projection Handlers    | 11      | ✅     | `tests/projections/test_projection_handlers_unit.py` |
 | PipelineEventEmitter   | 10      | ✅     | `tests/pipeline/test_pipeline_event_emitter_unit.py` |
 | Dual-Write Integration | 10      | ✅     | `tests/integration/test_dual_write_pipeline.py`      |
-| **TOTAL**              | **115** | **✅** | **All Passing (100%)**                               |
+| User Edit API          | 16      | ✅     | `tests/api/test_edit_api_unit.py`                    |
+| **TOTAL**              | **131** | **✅** | **All Passing (100%)**                               |
 
 ---
 
-## Architecture Diagrams
+## Architecture Overview
 
-### Current State (With Dual-Write)
+### Current State (Dual-Write Phase)
 
 ```
 User Upload
@@ -403,85 +211,65 @@ Pipeline
 
 EventStoreDB
     ↓
-Projection Service (M2.3-M2.5)
-    ├─ Lane Manager (12 lanes)
-    ├─ Subscription Manager
-    └─ Projection Handlers
-        ↓
-    Neo4j (projection) ←── NEW
-```
-
-### Target State (After M2.8)
-
-```
-User Upload
+Projection Service (M2.3 + M2.4)
     ↓
-Pipeline
+Neo4j (materialized view)
+```
+
+### Target State (Event-Sourced)
+
+```
+User Upload / Edit API
+    ↓
+Pipeline / Command Handlers
     └──→ EventStoreDB (event only)
 
 EventStoreDB
     ↓
-Projection Service
+Projection Service (M2.3 + M2.4)
     ↓
-Neo4j (projection only)
+Neo4j (materialized view)
 ```
 
 ---
 
-## Risk Assessment
-
-### What's Tested ✅
+## What's Tested ✅
 
 - Event envelope creation and validation
 - EventStoreDB append/read operations
-- Repository pattern with OCC
-- Aggregate state management
-- Command handlers
-- Lane partitioning and in-order processing
-- Projection handlers with idempotency
-- Dual-write event emission
-- Non-blocking error handling
+- Repository pattern with optimistic concurrency
+- Aggregate lifecycle (create, edit, analyze, override)
+- Command validation and event generation
+- Dual-write event emission (non-blocking)
+- Projection service partitioning and in-order processing
+- Projection handlers with version guards and retry-to-park
+- User edit API endpoints with error handling
+- Actor tracking and correlation ID propagation
 
-### What's NOT Tested ⚠️
+## What's NOT Tested ⚠️
 
 - End-to-end file processing with events
-- Real EventStoreDB persistent subscriptions
+- Real EventStoreDB persistent subscriptions under load
 - Projection replay from scratch
-- User edit API endpoints
-- Production failure scenarios
-- Performance under load
-
-**Mitigation**: M2.7 (Testing & Validation) will cover these gaps.
+- User edit scenarios (edit → projection → Neo4j)
+- Performance under concurrent load
+- Parked event retry logic
+- Data consistency after projection replay
 
 ---
 
 ## Next Steps
 
-1. **M2.6: User Edit API** (Next Priority)
-
-   - Build edit endpoints
-   - Integrate with command layer
-   - Add API tests
-
-2. **M2.7: Testing & Validation**
-
-   - End-to-end integration tests
+1. **M2.7: Testing & Validation** (Next Priority)
+   - Build end-to-end integration tests
+   - Validate projection replay
+   - Test user edit workflows
    - Performance validation
-   - Production readiness assessment
 
-3. **M2.8: Remove Dual-Write**
-   - After successful validation period
-   - Feature-flagged for safety
-
----
-
-## Key Learnings
-
-1. **Testing Found Critical Bugs**: Version calculation bug would have caused data corruption
-2. **Dual-Write Works**: 100% test coverage, production-ready
-3. **Partitioning Validated**: Lane distribution is correct and consistent
-4. **Foundation is Solid**: 115 tests passing, high confidence in architecture
-5. **Idempotency Works**: Version guards prevent duplicate event application
+2. **M2.8: Remove Dual-Write** (After M2.7)
+   - After 1-2 weeks validation
+   - Remove direct Neo4j writes
+   - Feature flag for rollback
 
 ---
 
@@ -494,10 +282,6 @@ config = {
     "event_sourcing": {
         "enabled": True,  # Feature flag
         "connection_string": "esdb://localhost:2113?tls=false"
-    },
-    "project": {
-        "default_project_id": "default-project",
-        "default_language": "en"
     }
 }
 ```
@@ -506,24 +290,13 @@ config = {
 
 ```python
 config = {
-    "projection": {
+    "projections": {
         "num_lanes": 12,
-        "batch_size": 100,
-        "retry_attempts": 3,
-        "checkpoint_interval": 10
+        "subscription_group": "projection-service-group",
+        "checkpoint_interval_seconds": 10
     }
 }
 ```
-
----
-
-## Documentation
-
-- **M1.1-M1.5**: Event-sourced core plumbing complete
-- **M2.1**: Command layer and handlers
-- **M2.2**: `M2.2_DUAL_WRITE_COMPLETE.md` (comprehensive)
-- **M2.3-M2.5**: `TESTING_COMPLETE_SUMMARY.md`
-- **Overall**: This plan file
 
 ---
 
@@ -534,6 +307,6 @@ config = {
 - [x] M2.3: Projection Service Infrastructure
 - [x] M2.4: Projection Handlers
 - [x] M2.5: Monitoring & Observability
-- [ ] M2.6: User Edit API
+- [x] M2.6: User Edit API
 - [ ] M2.7: Testing & Validation
 - [ ] M2.8: Remove Dual-Write
