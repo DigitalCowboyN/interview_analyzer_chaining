@@ -16,7 +16,7 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
-from src.api.app import app
+from src.main import app
 from src.config import config
 from src.events.store import EventStoreClient
 
