@@ -95,13 +95,13 @@ def create_actor_from_request(
         x_user_id: User ID from X-User-ID header
 
     Returns:
-        Actor instance with USER actor type
+        Actor instance with HUMAN actor type
     """
     # Use provided user_id first, then header, then default
     actual_user_id = user_id or x_user_id or "anonymous"
 
     return Actor(
-        actor_type=ActorType.USER,
+        actor_type=ActorType.HUMAN,
         user_id=actual_user_id,
     )
 
@@ -152,9 +152,9 @@ async def edit_sentence(
         # Create command
         command = EditSentenceCommand(
             sentence_id=sentence_id,
-            text=request.text,
+            interview_id=interview_id,
+            new_text=request.text,
             editor_type=request.editor_type,
-            note=request.note,
             actor=actor,
             correlation_id=correlation_id,
         )
@@ -250,7 +250,8 @@ async def override_analysis(
         # Create command
         command = OverrideAnalysisCommand(
             sentence_id=sentence_id,
-            overrides=overrides,
+            interview_id=interview_id,
+            fields_overridden=overrides,
             note=request.note,
             actor=actor,
             correlation_id=correlation_id,
@@ -274,6 +275,9 @@ async def override_analysis(
             message=f"Analysis override accepted. {result.event_count} event(s) generated.",
         )
 
+    except HTTPException:
+        # Re-raise HTTPExceptions (e.g., 400 for validation)
+        raise
     except ValueError as e:
         # Sentence not found or validation error
         logger.warning(f"Override analysis validation error: {e}")
