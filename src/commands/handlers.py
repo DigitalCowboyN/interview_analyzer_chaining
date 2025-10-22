@@ -92,17 +92,18 @@ class InterviewCommandHandler(CommandHandler):
                 correlation_id=command.correlation_id or generate_correlation_id(),
             )
 
+            # Capture event count before saving (save clears uncommitted events)
+            event_count = len(interview.get_uncommitted_events())
+
             # Persist events
             await repo.save(interview)
 
-            logger.info(
-                f"Created interview {command.interview_id} with {len(interview.get_uncommitted_events())} events"
-            )
+            logger.info(f"Created interview {command.interview_id} with {event_count} events")
 
             return CommandResult(
                 aggregate_id=command.interview_id,
                 version=interview.version,
-                event_count=len(interview.get_uncommitted_events()),
+                event_count=event_count,
                 message=f"Interview '{command.title}' created successfully",
             )
 
@@ -251,6 +252,9 @@ class SentenceCommandHandler(CommandHandler):
                 correlation_id=command.correlation_id or generate_correlation_id(),
             )
 
+            # Capture event count before saving (save clears uncommitted events)
+            event_count = len(sentence.get_uncommitted_events())
+
             # Persist events
             await repo.save(sentence)
 
@@ -259,7 +263,7 @@ class SentenceCommandHandler(CommandHandler):
             return CommandResult(
                 aggregate_id=command.sentence_id,
                 version=sentence.version,
-                event_count=len(sentence.get_uncommitted_events()),
+                event_count=event_count,
                 message="Sentence created successfully",
             )
 
@@ -293,6 +297,9 @@ class SentenceCommandHandler(CommandHandler):
                 correlation_id=command.correlation_id or generate_correlation_id(),
             )
 
+            # Capture event count before saving (save clears uncommitted events)
+            event_count = len(sentence.get_uncommitted_events())
+
             # Persist events
             await repo.save(sentence)
 
@@ -301,7 +308,7 @@ class SentenceCommandHandler(CommandHandler):
             return CommandResult(
                 aggregate_id=command.sentence_id,
                 version=sentence.version,
-                event_count=len(sentence.get_uncommitted_events()),
+                event_count=event_count,
                 message="Sentence edited successfully",
             )
 

@@ -6,7 +6,7 @@ openai:
   max_tokens: 256
   temperature: 0.2
 
-google: 
+google:
   api_key: ${GEMINI_API_KEY}
   model_name: gemini-2.0-flash
   location: "us-central1"
@@ -79,6 +79,16 @@ neo4j:
 # Logging configuration
 logging:
   # ... (existing settings) ...
+
+# Event Sourcing Configuration
+event_sourcing:
+  enabled: true
+  connection_string: "esdb://eventstore:2113?tls=false"
+
+# Project Configuration
+project:
+  default_project_id: "default-project"
+  default_language: "en"
 
 # API specific settings (if any)
 api:

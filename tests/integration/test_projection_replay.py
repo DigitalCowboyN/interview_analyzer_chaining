@@ -15,15 +15,15 @@ import pytest
 from src.events.envelope import Actor, ActorType
 from src.events.interview_events import create_interview_created_event
 from src.events.sentence_events import (
-    create_sentence_created_event,
     create_analysis_generated_event,
+    create_sentence_created_event,
 )
 from src.projections.handlers.interview_handlers import (
     InterviewCreatedHandler,
 )
 from src.projections.handlers.sentence_handlers import (
-    SentenceCreatedHandler,
     AnalysisGeneratedHandler,
+    SentenceCreatedHandler,
 )
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
@@ -31,7 +31,6 @@ from src.utils.neo4j_driver import Neo4jConnectionManager
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.eventstore
-@pytest.mark.skip(reason="Projection service not yet fully integrated for testing")
 class TestProjectionReplay:
     """Test projection replay scenarios."""
 
@@ -385,4 +384,3 @@ class TestProjectionReplay:
         print("  - Only targeted interview processed")
         print("  - Other interviews not affected")
         print("  - No side effects observed")
-

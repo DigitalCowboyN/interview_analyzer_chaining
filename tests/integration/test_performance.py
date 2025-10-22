@@ -24,7 +24,8 @@ from src.utils.neo4j_driver import Neo4jConnectionManager
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.performance
-@pytest.mark.skip(reason="Performance tests not critical for initial validation")
+@pytest.mark.eventstore
+@pytest.mark.slow
 class TestEventEmissionPerformance:
     """Test event emission throughput and latency."""
 
@@ -71,8 +72,9 @@ class TestEventEmissionPerformance:
 
         # === Validate performance ===
         avg_time_per_event = (elapsed_time / 100) * 1000  # Convert to ms
-        assert avg_time_per_event < 10, \
-            f"Event emission too slow: {avg_time_per_event:.2f}ms per event (target: < 10ms)"
+        assert (
+            avg_time_per_event < 10
+        ), f"Event emission too slow: {avg_time_per_event:.2f}ms per event (target: < 10ms)"
 
         print(f"\n✓ Event emission performance:")
         print("  - 100 events emitted in {elapsed_time:.2f}s")
@@ -133,7 +135,8 @@ class TestEventEmissionPerformance:
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.performance
-@pytest.mark.skip(reason="Performance tests not critical for initial validation")
+@pytest.mark.eventstore
+@pytest.mark.slow
 class TestProjectionPerformance:
     """Test projection processing performance and lag."""
 
@@ -188,8 +191,7 @@ class TestProjectionPerformance:
         projection_lag = processing_complete_time - emission_complete_time
 
         # === Validate performance ===
-        assert projection_lag < 1.0, \
-            f"Projection lag too high: {projection_lag:.2f}s (target: < 1s)"
+        assert projection_lag < 1.0, f"Projection lag too high: {projection_lag:.2f}s (target: < 1s)"
 
         print(f"\n✓ Projection processing performance:")
         print("  - 100 events processed in {projection_lag:.2f}s")
@@ -272,7 +274,8 @@ class TestProjectionPerformance:
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.performance
-@pytest.mark.skip(reason="Performance tests not critical for initial validation")
+@pytest.mark.eventstore
+@pytest.mark.slow
 class TestLoadTesting:
     """Test system behavior under load."""
 
@@ -349,10 +352,7 @@ class TestLoadTesting:
 
         # Enable event sourcing
         test_config = config.copy()
-        test_config["event_sourcing"] = {
-            "enabled": True,
-            "connection_string": "esdb://localhost:2113?tls=false"
-        }
+        test_config["event_sourcing"] = {"enabled": True, "connection_string": "esdb://localhost:2113?tls=false"}
 
         output_dir = tmp_path / "output"
         output_dir.mkdir()
@@ -393,4 +393,3 @@ class TestLoadTesting:
 
         print("  - All 10 interviews in Neo4j")
         print("  - All 30 sentences in Neo4j")
-

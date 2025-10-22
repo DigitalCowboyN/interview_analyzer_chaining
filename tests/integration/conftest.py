@@ -9,8 +9,15 @@ import time
 from typing import AsyncGenerator
 
 import pytest
+import requests
 
-from src.utils.environment import detect_environment, get_available_neo4j_config
+from src.events.store import EventStoreClient
+from src.utils.environment import (
+    check_neo4j_test_ready,
+    detect_environment,
+    get_available_neo4j_config,
+    is_service_externally_managed,
+)
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
 
@@ -19,58 +26,87 @@ def ensure_neo4j_test_service():
     """
     Session-scoped fixture to ensure Neo4j test service is available.
 
-    This fixture handles the Docker service lifecycle and waits for readiness.
+    This fixture is environment-aware:
+    - In Docker/CI: Assumes service is externally managed (e.g., by docker-compose)
+    - On Host: Starts and stops the service using Makefile targets
+
+    This prevents "docker command not found" errors inside containers.
     """
     environment = detect_environment()
-    print(f"\n=== Setting up Neo4j test environment (detected: {environment}) ===")
+    externally_managed = is_service_externally_managed("neo4j-test", 7687)
 
-    # Start the Neo4j test service
-    print("Starting neo4j-test container...")
-    try:
-        subprocess.run(["make", "db-test-up"], check=True, capture_output=True, timeout=120, text=True)
-        print("Neo4j test container started successfully")
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to start Neo4j test container: {e}")
-        print(f"Stdout: {e.stdout}")
-        print(f"Stderr: {e.stderr}")
-        raise
-    except subprocess.TimeoutExpired:
-        print("Timeout starting Neo4j test container")
-        raise
+    print(f"\n=== Setting up Neo4j test environment ===")
+    print(f"Environment: {environment}")
+    print(f"Externally managed: {externally_managed}")
 
-    # Wait for Neo4j to become ready using our new connection manager
-    print("Waiting for Neo4j test service to become ready...")
-    ready = asyncio.run(Neo4jConnectionManager.wait_for_ready(timeout=60.0, test_mode=True))
+    service_started_by_fixture = False
 
-    if not ready:
-        # Attempt to get logs for debugging
-        try:
-            logs_result = subprocess.run(
-                ["docker", "logs", "interview_analyzer_neo4j_test"],
-                capture_output=True,
-                text=True,
-                timeout=10,
+    if externally_managed:
+        # Service is managed externally (e.g., by docker-compose)
+        print("Service is externally managed - verifying availability...")
+
+        # Just verify the service is accessible
+        if not check_neo4j_test_ready(timeout=10.0):
+            pytest.fail(
+                "Neo4j test service is not accessible. "
+                "Ensure docker-compose services are running (make db-test-up from host)."
             )
-            print("=== NEO4J TEST CONTAINER LOGS ===")
-            print(logs_result.stdout)
-            print(logs_result.stderr)
-            print("================================")
-        except Exception as log_e:
-            print(f"Could not capture logs: {log_e}")
+        print("Neo4j test service verified and ready!")
 
-        pytest.fail("Neo4j test service did not become ready within timeout")
+    else:
+        # We need to start the service ourselves (host environment)
+        print("Starting neo4j-test container...")
+        try:
+            subprocess.run(["make", "db-test-up"], check=True, capture_output=True, timeout=120, text=True)
+            print("Neo4j test container started successfully")
+            service_started_by_fixture = True
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to start Neo4j test container: {e}")
+            print(f"Stdout: {e.stdout}")
+            print(f"Stderr: {e.stderr}")
+            raise
+        except subprocess.TimeoutExpired:
+            print("Timeout starting Neo4j test container")
+            raise
+        except FileNotFoundError:
+            pytest.fail("Could not run 'make db-test-up'. " "Ensure you have make and docker installed.")
 
-    print("Neo4j test service is ready for testing!")
+        # Wait for Neo4j to become ready
+        print("Waiting for Neo4j test service to become ready...")
+        ready = asyncio.run(Neo4jConnectionManager.wait_for_ready(timeout=60.0, test_mode=True))
+
+        if not ready:
+            # Attempt to get logs for debugging
+            try:
+                logs_result = subprocess.run(
+                    ["docker", "logs", "interview_analyzer_neo4j_test"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                print("=== NEO4J TEST CONTAINER LOGS ===")
+                print(logs_result.stdout)
+                print(logs_result.stderr)
+                print("================================")
+            except Exception as log_e:
+                print(f"Could not capture logs: {log_e}")
+
+            pytest.fail("Neo4j test service did not become ready within timeout")
+
+        print("Neo4j test service is ready for testing!")
 
     yield  # Tests run here
 
-    # Cleanup
-    print("\n=== Cleaning up Neo4j test environment ===")
-    try:
-        subprocess.run(["make", "db-test-down"], check=True, capture_output=True, timeout=30)
-        print("Neo4j test container stopped successfully")
-    except Exception as e:
-        print(f"Warning: Failed to clean up Neo4j test container: {e}")
+    # Cleanup - only if we started the service
+    if service_started_by_fixture:
+        print("\n=== Cleaning up Neo4j test environment ===")
+        try:
+            subprocess.run(["make", "db-test-down"], check=True, capture_output=True, timeout=30)
+            print("Neo4j test container stopped successfully")
+        except Exception as e:
+            print(f"Warning: Failed to clean up Neo4j test container: {e}")
+    else:
+        print("\n=== Neo4j test service is externally managed - skipping cleanup ===")
 
 
 @pytest.fixture(scope="function")
@@ -228,8 +264,39 @@ async def neo4j_health_check():
 
 # EventStoreDB fixtures for M2.7 testing
 
+
+@pytest.fixture(scope="session")
+def ensure_eventstore_service():
+    """
+    Session-scoped fixture to ensure EventStoreDB service is available.
+
+    Since EventStoreDB is managed by docker-compose with healthcheck,
+    we verify it's accessible before running tests.
+    """
+    print("\n=== Verifying EventStoreDB availability ===")
+
+    max_retries = 30
+    retry_delay = 2
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.get("http://localhost:2113/health/live", timeout=3)
+            if response.status_code == 204:
+                print("EventStoreDB is healthy and ready!")
+                yield
+                return
+        except requests.exceptions.RequestException:
+            pass
+
+        if attempt < max_retries - 1:
+            print(f"Waiting for EventStoreDB... (attempt {attempt + 1}/{max_retries})")
+            time.sleep(retry_delay)
+
+    pytest.fail("EventStoreDB did not become healthy within timeout")
+
+
 @pytest.fixture(scope="function")
-async def event_store_client():
+async def event_store_client(ensure_eventstore_service):
     """
     Provides an EventStoreDB client for testing.
 

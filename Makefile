@@ -238,4 +238,127 @@ db-test-clear:
 	docker compose exec neo4j-test cypher-shell -u neo4j -p testpassword -d neo4j "MATCH (n) DETACH DELETE n;"
 	@echo "TEST Neo4j database cleared."
 
-# --- End Test Database Management --- # 
+# --- End Test Database Management --- #
+
+# --- EventStoreDB Management --- #
+
+.PHONY: eventstore-up
+eventstore-up:
+	@echo "Starting EventStoreDB service..."
+	docker compose up -d eventstore
+	@echo "Waiting for EventStoreDB to be healthy (this may take 60+ seconds)..."
+	@sleep 5
+
+.PHONY: eventstore-down
+eventstore-down:
+	@echo "Stopping EventStoreDB service..."
+	docker compose stop eventstore
+
+.PHONY: eventstore-health
+eventstore-health:
+	@echo "Checking EventStoreDB health..."
+	@docker compose exec eventstore curl -f http://localhost:2113/health/live 2>/dev/null || echo "EventStoreDB not healthy yet. Try: make eventstore-logs"
+
+.PHONY: eventstore-logs
+eventstore-logs:
+	@echo "Tailing EventStoreDB logs..."
+	@docker logs -f interview_analyzer_eventstore
+
+.PHONY: eventstore-restart
+eventstore-restart: eventstore-down eventstore-up
+	@echo "EventStoreDB restarted"
+
+.PHONY: eventstore-clear
+eventstore-clear:
+	@echo "WARNING: This will delete all EventStoreDB data!"
+	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	docker compose down eventstore
+	docker volume rm interview_analyzer_chaining_eventstore_data || true
+	@echo "EventStoreDB data cleared. Run 'make eventstore-up' to start fresh."
+
+# --- End EventStoreDB Management --- #
+
+# --- Projection Service Management --- #
+
+.PHONY: run-projection
+run-projection:
+	@echo "Starting projection service (standalone)..."
+	$(PYTHON) -m src.run_projection_service
+
+.PHONY: projection-up
+projection-up:
+	@echo "Starting projection service via docker-compose..."
+	docker compose up -d projection-service
+
+.PHONY: projection-down
+projection-down:
+	@echo "Stopping projection service..."
+	docker compose stop projection-service
+
+.PHONY: projection-logs
+projection-logs:
+	@echo "Tailing projection service logs..."
+	@docker logs -f interview_analyzer_projection_service
+
+.PHONY: projection-restart
+projection-restart: projection-down projection-up
+	@echo "Projection service restarted"
+
+.PHONY: projection-status
+projection-status:
+	@echo "Checking projection service status..."
+	@docker ps --filter name=interview_analyzer_projection_service --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+# --- End Projection Service Management --- #
+
+# --- Event Sourcing System Management --- #
+
+.PHONY: es-up
+es-up: eventstore-up projection-up
+	@echo "Event sourcing system (EventStore + Projection Service) started"
+
+.PHONY: es-down
+es-down: projection-down eventstore-down
+	@echo "Event sourcing system stopped"
+
+.PHONY: es-status
+es-status:
+	@echo "=== Event Sourcing System Status ==="
+	@echo ""
+	@echo "EventStoreDB:"
+	@docker ps --filter name=interview_analyzer_eventstore --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || echo "  Not running"
+	@echo ""
+	@echo "Projection Service:"
+	@docker ps --filter name=interview_analyzer_projection_service --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || echo "  Not running"
+	@echo ""
+
+.PHONY: es-logs
+es-logs:
+	@echo "=== Tailing Event Sourcing Logs ==="
+	@docker compose logs -f eventstore projection-service
+
+# --- End Event Sourcing System Management --- #
+
+# --- Testing with EventStore --- #
+
+.PHONY: test-eventstore
+test-eventstore:
+	@echo "Running EventStoreDB-dependent tests..."
+	$(PYTHON) -m pytest tests/commands/test_command_handlers.py -v
+
+.PHONY: test-e2e
+test-e2e:
+	@echo "Running end-to-end integration tests..."
+	$(PYTHON) -m pytest tests/integration/test_e2e_file_processing.py tests/integration/test_e2e_user_edits.py -v -m eventstore
+
+.PHONY: test-projections
+test-projections:
+	@echo "Running projection-related tests..."
+	$(PYTHON) -m pytest tests/projections/ -v
+
+.PHONY: test-full-system
+test-full-system:
+	@echo "Running full system test suite..."
+	$(PYTHON) -m pytest tests/ -v --ignore=tests/integration/test_projection_replay.py --ignore=tests/integration/test_idempotency.py --ignore=tests/integration/test_performance.py
+
+# --- End Testing --- # 

@@ -99,7 +99,20 @@ class Repository(ABC, Generic[T]):
             return
 
         stream_name = self._get_stream_name(aggregate.aggregate_id)
-        current_expected_version = expected_version if expected_version is not None else aggregate.version
+        # For new aggregates, the stream doesn't exist yet
+        # EventStoreDB requires expected_version=-1 for new streams
+        if expected_version is not None:
+            current_expected_version = expected_version
+        else:
+            # Calculate the version before uncommitted events were added
+            # If version before was -1, this is a new stream
+            version_before_uncommitted = aggregate.version - len(uncommitted_events)
+            if version_before_uncommitted < 0:
+                # New stream - use -1 to indicate stream doesn't exist
+                current_expected_version = -1
+            else:
+                # Existing stream - use current version minus uncommitted events
+                current_expected_version = version_before_uncommitted
 
         for attempt in range(max_retries + 1):
             try:

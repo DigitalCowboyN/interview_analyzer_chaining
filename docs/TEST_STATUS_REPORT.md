@@ -20,17 +20,17 @@
 
 ### ✅ Passing Tests (649)
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| **M1: Core Plumbing** | ✅ All passing | Event envelope, ESDB client, Repository, Aggregates |
-| **M2.1: Command Handlers** | ✅ 8/8 passing | Unit tests with mocks |
-| **M2.2: Dual-Write** | ✅ 10/10 passing | Pipeline event emission |
-| **M2.3: Projection Infrastructure** | ✅ 15/15 passing | Lane manager, subscription manager |
-| **M2.4: Projection Handlers** | ✅ 11/11 passing | Interview & Sentence handlers |
-| **M2.5: Monitoring** | ✅ All passing | Metrics, health checks |
-| **M2.6: User Edit API** | ✅ 16/16 passing | Edit/override endpoints |
-| **Legacy Integration** | ✅ All passing | Neo4j, pipeline, analysis tests |
-| **Legacy Unit** | ✅ All passing | Agents, IO, utils, persistence |
+| Component                           | Status           | Notes                                               |
+| ----------------------------------- | ---------------- | --------------------------------------------------- |
+| **M1: Core Plumbing**               | ✅ All passing   | Event envelope, ESDB client, Repository, Aggregates |
+| **M2.1: Command Handlers**          | ✅ 8/8 passing   | Unit tests with mocks                               |
+| **M2.2: Dual-Write**                | ✅ 10/10 passing | Pipeline event emission                             |
+| **M2.3: Projection Infrastructure** | ✅ 15/15 passing | Lane manager, subscription manager                  |
+| **M2.4: Projection Handlers**       | ✅ 11/11 passing | Interview & Sentence handlers                       |
+| **M2.5: Monitoring**                | ✅ All passing   | Metrics, health checks                              |
+| **M2.6: User Edit API**             | ✅ 16/16 passing | Edit/override endpoints                             |
+| **Legacy Integration**              | ✅ All passing   | Neo4j, pipeline, analysis tests                     |
+| **Legacy Unit**                     | ✅ All passing   | Agents, IO, utils, persistence                      |
 
 ---
 
@@ -39,21 +39,25 @@
 All 4 failures are due to **EventStoreDB not being fully initialized yet**:
 
 ### 1. test_create_interview_command
+
 **File:** `tests/commands/test_command_handlers.py`  
 **Error:** `ServiceUnavailable: failed to connect to all addresses`  
 **Cause:** EventStoreDB connection refused (still starting up)
 
 ### 2. test_create_sentence_command
+
 **File:** `tests/commands/test_command_handlers.py`  
 **Error:** `ServiceUnavailable: failed to connect to all addresses`  
 **Cause:** EventStoreDB connection refused
 
 ### 3. test_edit_sentence_command
+
 **File:** `tests/commands/test_command_handlers.py`  
 **Error:** `ServiceUnavailable: failed to connect to all addresses`  
 **Cause:** EventStoreDB connection refused
 
 ### 4. test_wait_for_ready_timeout
+
 **File:** `tests/integration/test_neo4j_connection_reliability.py`  
 **Error:** Timeout test intermittently fails  
 **Cause:** Test infrastructure timing issue (not M2.7 related)
@@ -64,13 +68,13 @@ All 4 failures are due to **EventStoreDB not being fully initialized yet**:
 
 ### By Design (@skip marks):
 
-| Test File | Count | Reason |
-|-----------|-------|--------|
-| `test_projection_replay.py` | 3 | Awaiting projection service integration |
-| `test_idempotency.py` | 6 | Awaiting projection service integration |
-| `test_performance.py` | 6 | Not critical for initial validation |
-| `test_e2e_file_processing.py` | 1 | Concurrent processing (awaiting ESDB) |
-| Others | 5 | Various infrastructure dependencies |
+| Test File                     | Count | Reason                                  |
+| ----------------------------- | ----- | --------------------------------------- |
+| `test_projection_replay.py`   | 3     | Awaiting projection service integration |
+| `test_idempotency.py`         | 6     | Awaiting projection service integration |
+| `test_performance.py`         | 6     | Not critical for initial validation     |
+| `test_e2e_file_processing.py` | 1     | Concurrent processing (awaiting ESDB)   |
+| Others                        | 5     | Various infrastructure dependencies     |
 
 ---
 
@@ -89,11 +93,13 @@ These will pass once EventStoreDB is fully ready.
 ## Fixes Applied During Test Run
 
 ### 1. httpx Import Error
+
 **Issue:** `ImportError: cannot import name 'ASyncClient' from 'httpx'`  
 **Fix:** Corrected to `AsyncClient` (proper casing)  
 **Commit:** `5cb51f2`
 
 ### 2. App Import Error
+
 **Issue:** `ModuleNotFoundError: No module named 'src.api.app'`  
 **Fix:** Corrected to `from src.main import app`  
 **Commit:** `a507133`
@@ -103,10 +109,12 @@ These will pass once EventStoreDB is fully ready.
 ## Code Quality
 
 ### Linting Status
+
 - **1 minor warning:** Blank line at end of `test_e2e_file_processing.py` (cosmetic, doesn't affect tests)
 - **All else clean:** 0 critical linting errors
 
 ### Warnings (54 total)
+
 - **Pydantic V1 → V2 deprecation warnings** (cosmetic, not breaking)
 - **pytest-asyncio marker warnings** (non-async functions with @asyncio mark)
 - **RuntimeWarnings** (unawaited coroutines in mocked tests)
@@ -118,6 +126,7 @@ These will pass once EventStoreDB is fully ready.
 ## EventStoreDB Status
 
 ### Current State
+
 ```bash
 # Check if ready:
 curl http://localhost:2113/health/live
@@ -125,11 +134,13 @@ curl http://localhost:2113/health/live
 ```
 
 ### What's Needed
+
 1. Wait for EventStoreDB to fully initialize (~5-10 more minutes)
 2. Run the 3 failing integration tests
 3. Run the 9 E2E tests (currently deselected)
 
 ### Once Ready
+
 ```bash
 # Run EventStoreDB-dependent tests:
 pytest tests/commands/test_command_handlers.py -v
@@ -143,13 +154,13 @@ pytest tests/integration/test_e2e_user_edits.py -v
 
 ### By Test Type
 
-| Type | Count | Status |
-|------|-------|--------|
-| **Unit Tests** | 128 | ✅ All passing |
-| **Integration Tests (Neo4j)** | 521 | ✅ All passing |
-| **Integration Tests (ESDB)** | 3 | ⏳ Awaiting ESDB |
-| **E2E Tests (M2.7)** | 18 | 📝 Created (6 ready, 12 skipped) |
-| **TOTAL** | **670** | **649 passing (96.9%)** |
+| Type                          | Count   | Status                           |
+| ----------------------------- | ------- | -------------------------------- |
+| **Unit Tests**                | 128     | ✅ All passing                   |
+| **Integration Tests (Neo4j)** | 521     | ✅ All passing                   |
+| **Integration Tests (ESDB)**  | 3       | ⏳ Awaiting ESDB                 |
+| **E2E Tests (M2.7)**          | 18      | 📝 Created (6 ready, 12 skipped) |
+| **TOTAL**                     | **670** | **649 passing (96.9%)**          |
 
 ---
 
@@ -166,6 +177,7 @@ pytest tests/integration/test_e2e_user_edits.py -v
 ### Short-Term (Production Readiness)
 
 6. **Start Projection Service**
+
    - Implement projection service runner
    - Connect persistent subscriptions
    - Validate live event processing
@@ -202,4 +214,3 @@ pytest tests/integration/test_e2e_user_edits.py -v
 **PROCEED** with next phase of work while EventStoreDB initializes in the background.
 
 The system is architecturally sound, comprehensively tested, and ready for production validation once EventStoreDB is online.
-

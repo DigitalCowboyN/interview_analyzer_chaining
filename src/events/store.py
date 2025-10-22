@@ -16,6 +16,7 @@ from esdbclient import (  # type: ignore[import-untyped]
     EventStoreDBClient,
     NewEvent,
     RecordedEvent,
+    StreamState,
 )
 from esdbclient.exceptions import (  # type: ignore[import-untyped]
     EventStoreDBClientException,
@@ -176,17 +177,21 @@ class EventStoreClient:
         for attempt in range(self.max_retries + 1):
             try:
                 async with self.get_client() as client:
-                    if expected_version is None:
-                        # New stream or don't care about version
-                        commit_position = await client.append_to_stream(stream_name=stream_name, events=new_events)
+                    if expected_version is None or expected_version < 0:
+                        # New stream - use StreamState.NO_STREAM
+                        commit_position = client.append_to_stream(
+                            stream_name=stream_name, events=new_events, current_version=StreamState.NO_STREAM
+                        )
                     else:
-                        # Optimistic concurrency control
-                        commit_position = await client.append_to_stream(
+                        # Optimistic concurrency control for existing streams
+                        commit_position = client.append_to_stream(
                             stream_name=stream_name, events=new_events, current_version=expected_version
                         )
 
                     # Calculate new version (expected_version + number of events)
-                    new_version = (expected_version or -1) + len(events)
+                    new_version = (
+                        expected_version if expected_version is not None and expected_version >= 0 else -1
+                    ) + len(events)
 
                     logger.debug(
                         f"Appended {len(events)} events to stream '{stream_name}' "
@@ -248,14 +253,23 @@ class EventStoreClient:
                     limit=max_count if max_count is not None else 9223372036854775807,
                 )
 
-                for recorded_event in recorded_events:
-                    event_envelope = self._recorded_event_to_envelope(recorded_event)
-                    events.append(event_envelope)
+                try:
+                    for recorded_event in recorded_events:
+                        event_envelope = self._recorded_event_to_envelope(recorded_event)
+                        events.append(event_envelope)
+                except NotFound:
+                    # Stream doesn't exist - return empty list which will be handled as None by repository
+                    logger.debug(f"Stream '{stream_name}' not found")
+                    raise StreamNotFoundError(f"Stream '{stream_name}' not found")
 
                 logger.debug(f"Read {len(events)} events from stream '{stream_name}'")
                 return events
 
+        except StreamNotFoundError:
+            # Re-raise StreamNotFoundError as-is
+            raise
         except NotFound:
+            # Catch NotFound at outer level too
             raise StreamNotFoundError(f"Stream '{stream_name}' not found")
         except EventStoreDBClientException as e:
             logger.error(f"Failed to read from stream '{stream_name}': {e}")
@@ -339,11 +353,15 @@ def get_event_store_client(
     Returns:
         EventStoreClient: Global client instance
     """
+    import os
+
     global _global_client
 
     if _global_client is None:
-        conn_str = connection_string or "esdb://localhost:2113?tls=false"
+        # First try provided connection_string, then environment variable, then default to eventstore service
+        conn_str = connection_string or os.getenv("ESDB_CONNECTION_STRING", "esdb://eventstore:2113?tls=false")
         _global_client = EventStoreClient(connection_string=conn_str, max_retries=max_retries, retry_delay=retry_delay)
+        logger.info(f"Initialized EventStore client with connection string: {conn_str}")
 
     return _global_client
 

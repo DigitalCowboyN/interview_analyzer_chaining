@@ -1,0 +1,913 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.14, pytest-8.3.3, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: .pytest_cache
+rootdir: /workspaces/interview_analyzer_chaining
+configfile: pytest.ini
+plugins: asyncio-1.2.0, cov-6.0.0, mock-3.12.0, anyio-4.11.0
+asyncio: mode=auto, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 683 items
+
+tests/agents/test_context_builder.py::test_init_success PASSED           [  0%]
+tests/agents/test_context_builder.py::test_init_missing_preprocessing PASSED [  0%]
+tests/agents/test_context_builder.py::test_init_missing_windows PASSED   [  0%]
+tests/agents/test_context_builder.py::test_build_context_middle PASSED   [  0%]
+tests/agents/test_context_builder.py::test_build_context_start PASSED    [  0%]
+tests/agents/test_context_builder.py::test_build_context_end PASSED      [  0%]
+tests/agents/test_context_builder.py::test_build_context_window_zero PASSED [  1%]
+tests/agents/test_context_builder.py::test_build_context_large_window PASSED [  1%]
+tests/agents/test_context_builder.py::test_build_context_invalid_index PASSED [  1%]
+tests/agents/test_context_builder.py::test_build_context_empty_list PASSED [  1%]
+tests/agents/test_context_builder.py::test_build_all_contexts_success PASSED [  1%]
+tests/agents/test_context_builder.py::test_build_all_contexts_empty_input PASSED [  1%]
+tests/agents/test_context_builder.py::test_build_all_contexts_uses_config_windows PASSED [  1%]
+tests/agents/test_sentence_analyzer.py::TestSentenceAnalyzerInitialization::test_initialization_with_config_dict PASSED [  2%]
+tests/agents/test_sentence_analyzer.py::TestSentenceAnalyzerInitialization::test_initialization_with_invalid_prompt_file PASSED [  2%]
+tests/agents/test_sentence_analyzer.py::TestSentenceAnalyzerClassification::test_classify_realistic_interview_question PASSED [  2%]
+tests/agents/test_sentence_analyzer.py::TestSentenceAnalyzerClassification::test_classify_realistic_interview_response PASSED [  2%]
+tests/agents/test_sentence_analyzer.py::TestSentenceAnalyzerClassification::test_error_handling_with_realistic_scenarios PASSED [  2%]
+tests/agents/test_sentence_analyzer.py::TestSentenceAnalyzerClassification::test_prompt_formatting_with_realistic_data PASSED [  2%]
+tests/agents/test_sentence_analyzer.py::TestSentenceAnalyzerIntegration::test_multiple_sentence_classification PASSED [  2%]
+tests/api/test_analysis_api.py::test_trigger_analysis_with_realistic_interview_file PASSED [  3%]
+tests/api/test_analysis_api.py::test_trigger_analysis_invalid_filename PASSED [  3%]
+tests/api/test_analysis_api.py::test_trigger_analysis_missing_filename PASSED [  3%]
+tests/api/test_analysis_api.py::test_trigger_analysis_pipeline_error_still_accepts PASSED [  3%]
+tests/api/test_analysis_api.py::test_trigger_analysis_interview_file_not_found PASSED [  3%]
+tests/api/test_analysis_api.py::test_trigger_analysis_with_security_validation PASSED [  3%]
+tests/api/test_analysis_api.py::test_trigger_analysis_with_multiple_interview_scenarios PASSED [  3%]
+tests/api/test_edit_api_unit.py::TestEditSentenceEndpoint::test_edit_sentence_success PASSED [  4%]
+tests/api/test_edit_api_unit.py::TestEditSentenceEndpoint::test_edit_sentence_generates_deterministic_uuid PASSED [  4%]
+tests/api/test_edit_api_unit.py::TestEditSentenceEndpoint::test_edit_sentence_uses_anonymous_when_no_user_id PASSED [  4%]
+tests/api/test_edit_api_unit.py::TestEditSentenceEndpoint::test_edit_sentence_generates_correlation_id_if_not_provided PASSED [  4%]
+tests/api/test_edit_api_unit.py::TestEditSentenceEndpoint::test_edit_sentence_sentence_not_found PASSED [  4%]
+tests/api/test_edit_api_unit.py::TestEditSentenceEndpoint::test_edit_sentence_internal_error PASSED [  4%]
+tests/api/test_edit_api_unit.py::TestOverrideAnalysisEndpoint::test_override_analysis_success PASSED [  4%]
+tests/api/test_edit_api_unit.py::TestOverrideAnalysisEndpoint::test_override_analysis_partial_override PASSED [  5%]
+tests/api/test_edit_api_unit.py::TestOverrideAnalysisEndpoint::test_override_analysis_no_fields_provided PASSED [  5%]
+tests/api/test_edit_api_unit.py::TestOverrideAnalysisEndpoint::test_override_analysis_sentence_not_found PASSED [  5%]
+tests/api/test_edit_api_unit.py::TestOverrideAnalysisEndpoint::test_override_analysis_generates_deterministic_uuid PASSED [  5%]
+tests/api/test_edit_api_unit.py::TestGetSentenceHistoryEndpoint::test_get_sentence_history_success PASSED [  5%]
+tests/api/test_edit_api_unit.py::TestGetSentenceHistoryEndpoint::test_get_sentence_history_sentence_not_found PASSED [  5%]
+tests/api/test_edit_api_unit.py::TestCreateActorFromRequest::test_uses_provided_user_id PASSED [  6%]
+tests/api/test_edit_api_unit.py::TestCreateActorFromRequest::test_uses_header_user_id PASSED [  6%]
+tests/api/test_edit_api_unit.py::TestCreateActorFromRequest::test_uses_anonymous_when_no_user_id PASSED [  6%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_list_analysis_files_empty_directory PASSED [  6%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_list_analysis_files_with_multiple_files PASSED [  6%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_list_analysis_files_nonexistent_directory PASSED [  6%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_list_analysis_files_permission_error PASSED [  6%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_file_content_success PASSED [  7%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_file_content_with_mixed_quality_data PASSED [  7%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_file_content_file_not_found PASSED [  7%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_file_content_permission_error PASSED [  7%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_specific_sentence_success PASSED [  7%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_specific_sentence_file_not_found PASSED [  7%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_specific_sentence_id_not_found PASSED [  7%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_specific_sentence_with_invalid_data_in_file PASSED [  8%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_specific_sentence_permission_error PASSED [  8%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_get_specific_sentence_validation_error PASSED [  8%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_api_handles_unicode_content PASSED [  8%]
+tests/api/test_files_api.py::TestFilesAPIIntegration::test_api_with_realistic_file_sizes PASSED [  8%]
+tests/api/test_files_api.py::TestFilesAPIErrorHandling::test_config_error_handling PASSED [  8%]
+tests/api/test_files_api.py::TestFilesAPIErrorHandling::test_malformed_config_handling PASSED [  8%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_list_analysis_files_success PASSED [  9%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_list_analysis_files_empty_directory PASSED [  9%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_list_analysis_files_nonexistent_directory PASSED [  9%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_get_file_content_success PASSED [  9%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_get_file_content_with_malformed_json PASSED [  9%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_get_file_content_not_found PASSED [  9%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_get_specific_sentence_success PASSED [  9%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_get_specific_sentence_file_not_found PASSED [ 10%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_get_specific_sentence_id_not_found PASSED [ 10%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_get_specific_sentence_skips_malformed_json PASSED [ 10%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_unicode_content_handling PASSED [ 10%]
+tests/api/test_files_api_core.py::TestFilesAPI::test_large_file_handling PASSED [ 10%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_config_missing_get_method PASSED [ 10%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_config_get_raises_exception PASSED [ 10%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_list_files_unexpected_error PASSED [ 11%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_get_file_content_json_decode_error PASSED [ 11%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_get_file_content_pydantic_validation_error PASSED [ 11%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_get_file_content_os_error_via_permissions SKIPPED [ 11%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_get_file_content_handles_processing_errors_gracefully PASSED [ 11%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_get_specific_sentence_json_decode_error PASSED [ 11%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_get_specific_sentence_pydantic_validation_error_for_target PASSED [ 12%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_get_specific_sentence_os_error_via_permissions SKIPPED [ 12%]
+tests/api/test_files_api_edge_cases.py::TestFilesAPIEdgeCases::test_get_specific_sentence_handles_processing_errors_gracefully PASSED [ 12%]
+tests/api/test_main.py::test_read_root PASSED                            [ 12%]
+tests/commands/test_command_handlers.py::TestInterviewCommandHandler::test_create_interview_command FAILED [ 12%]
+tests/commands/test_command_handlers.py::TestSentenceCommandHandler::test_create_sentence_command FAILED [ 12%]
+tests/commands/test_command_handlers.py::TestSentenceCommandHandler::test_edit_sentence_command FAILED [ 12%]
+tests/commands/test_command_handlers_unit.py::TestInterviewCommandHandlerUnit::test_create_interview_success PASSED [ 13%]
+tests/commands/test_command_handlers_unit.py::TestInterviewCommandHandlerUnit::test_create_interview_already_exists PASSED [ 13%]
+tests/commands/test_command_handlers_unit.py::TestInterviewCommandHandlerUnit::test_update_interview_not_found PASSED [ 13%]
+tests/commands/test_command_handlers_unit.py::TestInterviewCommandHandlerUnit::test_change_status_invalid_status PASSED [ 13%]
+tests/commands/test_command_handlers_unit.py::TestSentenceCommandHandlerUnit::test_create_sentence_success PASSED [ 13%]
+tests/commands/test_command_handlers_unit.py::TestSentenceCommandHandlerUnit::test_edit_sentence_success PASSED [ 13%]
+tests/commands/test_command_handlers_unit.py::TestSentenceCommandHandlerUnit::test_generate_analysis_success PASSED [ 13%]
+tests/commands/test_command_handlers_unit.py::TestSentenceCommandHandlerUnit::test_edit_sentence_invalid_editor_type PASSED [ 14%]
+tests/events/test_core_plumbing_validation.py::TestEventEnvelope::test_create_event_envelope PASSED [ 14%]
+tests/events/test_core_plumbing_validation.py::TestEventEnvelope::test_event_envelope_with_actor PASSED [ 14%]
+tests/events/test_core_plumbing_validation.py::TestEventEnvelope::test_event_envelope_validation PASSED [ 14%]
+tests/events/test_core_plumbing_validation.py::TestInterviewEvents::test_create_interview_created_event PASSED [ 14%]
+tests/events/test_core_plumbing_validation.py::TestSentenceEvents::test_create_sentence_created_event PASSED [ 14%]
+tests/events/test_core_plumbing_validation.py::TestInterviewAggregate::test_create_new_interview PASSED [ 14%]
+tests/events/test_core_plumbing_validation.py::TestInterviewAggregate::test_interview_create_command PASSED [ 15%]
+tests/events/test_core_plumbing_validation.py::TestInterviewAggregate::test_interview_status_change PASSED [ 15%]
+tests/events/test_core_plumbing_validation.py::TestInterviewAggregate::test_interview_load_from_history PASSED [ 15%]
+tests/events/test_core_plumbing_validation.py::TestSentenceAggregate::test_create_new_sentence PASSED [ 15%]
+tests/events/test_core_plumbing_validation.py::TestSentenceAggregate::test_sentence_create_command PASSED [ 15%]
+tests/events/test_core_plumbing_validation.py::TestSentenceAggregate::test_sentence_edit_command PASSED [ 15%]
+tests/events/test_core_plumbing_validation.py::TestSentenceAggregate::test_sentence_generate_analysis PASSED [ 15%]
+tests/events/test_core_plumbing_validation.py::TestRepositoryPattern::test_interview_repository_stream_naming PASSED [ 16%]
+tests/events/test_core_plumbing_validation.py::TestRepositoryPattern::test_sentence_repository_stream_naming PASSED [ 16%]
+tests/events/test_core_plumbing_validation.py::TestRepositoryPattern::test_repository_load_not_found PASSED [ 16%]
+tests/events/test_core_plumbing_validation.py::TestRepositoryPattern::test_repository_save_no_events PASSED [ 16%]
+tests/events/test_core_plumbing_validation.py::TestM1ValidationComplete::test_all_components_importable PASSED [ 16%]
+tests/events/test_core_plumbing_validation.py::TestM1ValidationComplete::test_end_to_end_aggregate_lifecycle PASSED [ 16%]
+tests/events/test_core_plumbing_validation.py::TestM1ValidationComplete::test_sentence_analysis_workflow PASSED [ 16%]
+tests/integration/test_api_calls.py::test_openai_integration PASSED      [ 17%]
+tests/integration/test_dual_write_pipeline.py::TestDualWritePipelineEventEmission::test_interview_created_event_emission PASSED [ 17%]
+tests/integration/test_dual_write_pipeline.py::TestDualWritePipelineEventEmission::test_sentence_created_event_emission PASSED [ 17%]
+tests/integration/test_dual_write_pipeline.py::TestDualWritePipelineEventEmission::test_analysis_generated_event_emission PASSED [ 17%]
+tests/integration/test_dual_write_pipeline.py::TestDualWritePipelineEventEmission::test_correlation_id_propagation PASSED [ 17%]
+tests/integration/test_dual_write_pipeline.py::TestDualWritePipelineEventEmission::test_deterministic_sentence_uuid_generation PASSED [ 17%]
+tests/integration/test_dual_write_pipeline.py::TestNeo4jMapStorageEventIntegration::test_map_storage_emits_sentence_created_event PASSED [ 18%]
+tests/integration/test_dual_write_pipeline.py::TestNeo4jMapStorageEventIntegration::test_map_storage_neo4j_succeeds_even_if_event_fails PASSED [ 18%]
+tests/integration/test_dual_write_pipeline.py::TestNeo4jAnalysisWriterEventIntegration::test_analysis_writer_emits_analysis_generated_event PASSED [ 18%]
+tests/integration/test_dual_write_pipeline.py::TestNeo4jAnalysisWriterEventIntegration::test_analysis_writer_skips_event_for_error_results PASSED [ 18%]
+tests/integration/test_dual_write_pipeline.py::TestNeo4jAnalysisWriterEventIntegration::test_analysis_writer_neo4j_succeeds_even_if_event_fails PASSED [ 18%]
+tests/integration/test_e2e_file_processing.py::TestE2EFileProcessingWithDualWrite::test_single_file_upload_with_dual_write FAILED [ 18%]
+tests/integration/test_e2e_file_processing.py::TestE2EFileProcessingWithDualWrite::test_deterministic_sentence_uuids FAILED [ 18%]
+tests/integration/test_e2e_file_processing.py::TestE2EFileProcessingWithDualWrite::test_multiple_files_concurrent_processing SKIPPED [ 19%]
+tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_edit_sentence_workflow FAILED [ 19%]
+tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_override_analysis_workflow FAILED [ 19%]
+tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_multiple_edits_on_same_sentence FAILED [ 19%]
+tests/integration/test_graph_persistence_integration.py::TestGraphPersistenceSequenceRelationships::test_no_follows_for_first_sentence PASSED [ 19%]
+tests/integration/test_graph_persistence_integration.py::TestGraphPersistenceDataIntegrity::test_empty_keyword_arrays_handling PASSED [ 19%]
+tests/integration/test_idempotency.py::TestIdempotency::test_replay_same_event_multiple_times SKIPPED [ 19%]
+tests/integration/test_idempotency.py::TestIdempotency::test_version_guard_prevents_old_events SKIPPED [ 20%]
+tests/integration/test_idempotency.py::TestIdempotency::test_multiple_event_types_idempotency SKIPPED [ 20%]
+tests/integration/test_idempotency.py::TestResilience::test_handler_retry_on_transient_error SKIPPED [ 20%]
+tests/integration/test_idempotency.py::TestResilience::test_event_parked_after_max_retries SKIPPED [ 20%]
+tests/integration/test_idempotency.py::TestResilience::test_replay_parked_event SKIPPED [ 20%]
+tests/integration/test_metrics_integration_comprehensive.py::TestMetricsIntegrationWithRealComponents::test_analysis_service_metrics_integration PASSED [ 20%]
+tests/integration/test_metrics_integration_comprehensive.py::TestMetricsIntegrationWithRealComponents::test_pipeline_orchestrator_metrics_integration PASSED [ 20%]
+tests/integration/test_metrics_integration_comprehensive.py::TestMetricsIntegrationWithRealComponents::test_error_accumulation_across_components PASSED [ 21%]
+tests/integration/test_metrics_integration_comprehensive.py::TestMetricsWithRealPipelineScenarios::test_mixed_success_failure_scenario PASSED [ 21%]
+tests/integration/test_metrics_integration_comprehensive.py::TestMetricsWithRealPipelineScenarios::test_verification_failure_scenario PASSED [ 21%]
+tests/integration/test_metrics_integration_comprehensive.py::TestMetricsWithRealPipelineScenarios::test_concurrent_processing_metrics PASSED [ 21%]
+tests/integration/test_neo4j_analysis_writer.py::test_neo4j_analysis_writer_init PASSED [ 21%]
+tests/integration/test_neo4j_analysis_writer.py::test_neo4j_analysis_writer_init_empty_ids PASSED [ 21%]
+tests/integration/test_neo4j_analysis_writer.py::test_neo4j_analysis_writer_initialize_finalize PASSED [ 21%]
+tests/integration/test_neo4j_analysis_writer.py::test_neo4j_analysis_writer_write_basic_result PASSED [ 22%]
+tests/integration/test_neo4j_analysis_writer.py::test_neo4j_analysis_writer_missing_sentence_error PASSED [ 22%]
+tests/integration/test_neo4j_analysis_writer.py::test_neo4j_analysis_writer_missing_sentence_id PASSED [ 22%]
+tests/integration/test_neo4j_analysis_writer.py::test_single_value_dimensions_basic PASSED [ 22%]
+tests/integration/test_neo4j_analysis_writer.py::test_single_value_dimensions_overwrite PASSED [ 22%]
+tests/integration/test_neo4j_analysis_writer.py::test_multi_value_dimensions_basic PASSED [ 22%]
+tests/integration/test_neo4j_analysis_writer.py::test_multi_value_dimensions_update_behavior PASSED [ 22%]
+tests/integration/test_neo4j_analysis_writer.py::test_empty_dimension_values PASSED [ 23%]
+tests/integration/test_neo4j_analysis_writer.py::test_dimension_node_properties PASSED [ 23%]
+tests/integration/test_neo4j_analysis_writer.py::test_dimension_relationship_properties PASSED [ 23%]
+tests/integration/test_neo4j_analysis_writer.py::test_keyword_cardinality_limit_default PASSED [ 23%]
+tests/integration/test_neo4j_analysis_writer.py::test_topic_cardinality_unlimited PASSED [ 23%]
+tests/integration/test_neo4j_analysis_writer.py::test_domain_keyword_cardinality_unlimited PASSED [ 23%]
+tests/integration/test_neo4j_analysis_writer.py::test_single_value_cardinality_enforcement PASSED [ 24%]
+tests/integration/test_neo4j_analysis_writer.py::test_cardinality_limit_with_duplicates PASSED [ 24%]
+tests/integration/test_neo4j_analysis_writer.py::test_cardinality_limit_order_preservation PASSED [ 24%]
+tests/integration/test_neo4j_analysis_writer.py::test_zero_cardinality_limit PASSED [ 24%]
+tests/integration/test_neo4j_analysis_writer.py::test_single_dimension_edit_protection PASSED [ 24%]
+tests/integration/test_neo4j_analysis_writer.py::test_multi_dimension_edit_protection PASSED [ 24%]
+tests/integration/test_neo4j_analysis_writer.py::test_mixed_edit_protection PASSED [ 24%]
+tests/integration/test_neo4j_analysis_writer.py::test_edit_protection_with_cardinality_limits PASSED [ 25%]
+tests/integration/test_neo4j_analysis_writer.py::test_error_result_basic_storage PASSED [ 25%]
+tests/integration/test_neo4j_analysis_writer.py::test_error_result_without_dimensions PASSED [ 25%]
+tests/integration/test_neo4j_analysis_writer.py::test_error_result_after_successful_analysis PASSED [ 25%]
+tests/integration/test_neo4j_analysis_writer.py::test_error_result_read_analysis_ids PASSED [ 25%]
+tests/integration/test_neo4j_analysis_writer.py::test_error_result_with_complex_error_data PASSED [ 25%]
+tests/integration/test_neo4j_analysis_writer.py::test_error_result_false_flag PASSED [ 25%]
+tests/integration/test_neo4j_analysis_writer.py::test_database_connection_error_write_result PASSED [ 26%]
+tests/integration/test_neo4j_analysis_writer.py::test_database_connection_error_read_analysis_ids PASSED [ 26%]
+tests/integration/test_neo4j_analysis_writer.py::test_invalid_cypher_query_handling PASSED [ 26%]
+tests/integration/test_neo4j_analysis_writer.py::test_constraint_violation_handling PASSED [ 26%]
+tests/integration/test_neo4j_analysis_writer.py::test_transaction_rollback_on_error PASSED [ 26%]
+tests/integration/test_neo4j_analysis_writer.py::test_read_analysis_ids_database_error_handling PASSED [ 26%]
+tests/integration/test_neo4j_analysis_writer.py::test_partial_write_failure_recovery PASSED [ 26%]
+tests/integration/test_neo4j_analysis_writer.py::test_session_management_error_handling PASSED [ 27%]
+tests/integration/test_neo4j_analysis_writer.py::test_graceful_degradation_on_non_critical_errors PASSED [ 27%]
+tests/integration/test_neo4j_analysis_writer.py::test_project_keyword_limit_override PASSED [ 27%]
+tests/integration/test_neo4j_analysis_writer.py::test_project_topic_limit_override PASSED [ 27%]
+tests/integration/test_neo4j_analysis_writer.py::test_project_zero_limit_override PASSED [ 27%]
+tests/integration/test_neo4j_analysis_writer.py::test_project_single_dimension_limit_override PASSED [ 27%]
+tests/integration/test_neo4j_analysis_writer.py::test_project_partial_limit_overrides PASSED [ 27%]
+tests/integration/test_neo4j_analysis_writer.py::test_project_limits_with_null_values PASSED [ 28%]
+tests/integration/test_neo4j_analysis_writer.py::test_project_limits_all_dimensions PASSED [ 28%]
+tests/integration/test_neo4j_analysis_writer.py::test_project_limits_with_existing_relationships PASSED [ 28%]
+tests/integration/test_neo4j_analysis_writer_integration.py::TestNeo4jAnalysisWriterIntegration::test_pipeline_with_neo4j_analysis_writer_success PASSED [ 28%]
+tests/integration/test_neo4j_analysis_writer_integration.py::TestNeo4jAnalysisWriterIntegration::test_pipeline_with_neo4j_analysis_writer_error_handling PASSED [ 28%]
+tests/integration/test_neo4j_analysis_writer_integration.py::TestNeo4jAnalysisWriterIntegration::test_pipeline_with_neo4j_cardinality_limits PASSED [ 28%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterLifecycle::test_writer_initialization_and_cleanup PASSED [ 28%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterLifecycle::test_write_without_explicit_initialization PASSED [ 29%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterLifecycle::test_multiple_writers_same_interview PASSED [ 29%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterLifecycle::test_writer_resource_cleanup_on_error PASSED [ 29%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterConcurrency::test_concurrent_writes_same_writer PASSED [ 29%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterConcurrency::test_concurrent_writers_different_interviews PASSED [ 29%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterConcurrency::test_writer_thread_safety_stress PASSED [ 29%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterPerformance::test_bulk_write_performance PASSED [ 30%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterPerformance::test_read_performance_large_dataset PASSED [ 30%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterErrorRecovery::test_database_connection_loss_recovery PASSED [ 30%]
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterErrorRecovery::test_partial_write_failure_handling PASSED [ 30%]
+tests/integration/test_neo4j_connection_reliability.py::TestEnvironmentAwareConnection::test_environment_detection PASSED [ 30%]
+tests/integration/test_neo4j_connection_reliability.py::TestEnvironmentAwareConnection::test_connection_config_structure PASSED [ 30%]
+tests/integration/test_neo4j_connection_reliability.py::TestEnvironmentAwareConnection::test_test_connection_config_structure PASSED [ 30%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionManagerReliability::test_driver_initialization_with_test_mode PASSED [ 31%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionManagerReliability::test_connectivity_verification PASSED [ 31%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionManagerReliability::test_session_context_manager PASSED [ 31%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionManagerReliability::test_wait_for_ready_success PASSED [ 31%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionManagerReliability::test_wait_for_ready_timeout FAILED [ 31%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionManagerReliability::test_driver_cleanup PASSED [ 31%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionAvailabilityDetection::test_availability_detection_with_running_service PASSED [ 31%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionAvailabilityDetection::test_availability_detection_with_invalid_uri PASSED [ 32%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionAvailabilityDetection::test_get_available_config_fallback PASSED [ 32%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionStressScenarios::test_concurrent_driver_initialization PASSED [ 32%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionStressScenarios::test_rapid_close_and_reinitialize PASSED [ 32%]
+tests/integration/test_neo4j_connection_reliability.py::TestConnectionStressScenarios::test_session_usage_patterns PASSED [ 32%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jTransactionIntegrity::test_transaction_atomicity_success PASSED [ 32%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jTransactionIntegrity::test_transaction_rollback_on_failure PASSED [ 32%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jTransactionIntegrity::test_concurrent_transaction_isolation PASSED [ 33%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jRelationshipIntegrity::test_relationship_consistency PASSED [ 33%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jRelationshipIntegrity::test_relationship_uniqueness PASSED [ 33%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jRelationshipIntegrity::test_cascade_relationship_integrity PASSED [ 33%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jDataConsistency::test_cross_component_data_sync PASSED [ 33%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jDataConsistency::test_data_update_consistency PASSED [ 33%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jDataConsistency::test_orphaned_node_detection PASSED [ 33%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jDataValidation::test_data_type_consistency PASSED [ 34%]
+tests/integration/test_neo4j_data_integrity.py::TestNeo4jDataValidation::test_constraint_validation PASSED [ 34%]
+tests/integration/test_neo4j_fault_tolerance.py::TestNeo4jNetworkFaultTolerance::test_connection_loss_during_write PASSED [ 34%]
+tests/integration/test_neo4j_fault_tolerance.py::TestNeo4jNetworkFaultTolerance::test_connection_recovery_with_retry PASSED [ 34%]
+tests/integration/test_neo4j_fault_tolerance.py::TestNeo4jNetworkFaultTolerance::test_transaction_failure_rollback PASSED [ 34%]
+tests/integration/test_neo4j_fault_tolerance.py::TestNeo4jConnectionPoolFaultTolerance::test_connection_pool_recovery PASSED [ 34%]
+tests/integration/test_neo4j_fault_tolerance.py::TestNeo4jDataConsistencyFaultTolerance::test_recovery_from_corrupted_state PASSED [ 34%]
+tests/integration/test_neo4j_fault_tolerance.py::TestNeo4jLongRunningFaultTolerance::test_long_running_operation_stability PASSED [ 35%]
+tests/integration/test_neo4j_fault_tolerance.py::TestNeo4jLongRunningFaultTolerance::test_memory_leak_prevention PASSED [ 35%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_init PASSED [ 35%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_init_empty_ids PASSED [ 35%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_write_read_finalize PASSED [ 35%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_with_optional_fields PASSED [ 35%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_initialize_clears_old_data PASSED [ 36%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_missing_required_keys PASSED [ 36%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_read_empty_interview PASSED [ 36%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_multiple_projects PASSED [ 36%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_sequence_ordering PASSED [ 36%]
+tests/integration/test_neo4j_map_storage.py::test_neo4j_map_storage_non_integer_sentence_ids PASSED [ 36%]
+tests/integration/test_neo4j_performance_benchmarks.py::TestNeo4jSingleOperationPerformance::test_single_write_performance_simple PASSED [ 36%]
+tests/integration/test_neo4j_performance_benchmarks.py::TestNeo4jSingleOperationPerformance::test_single_write_performance_complex PASSED [ 37%]
+tests/integration/test_neo4j_performance_benchmarks.py::TestNeo4jSingleOperationPerformance::test_read_performance_benchmark PASSED [ 37%]
+tests/integration/test_neo4j_performance_benchmarks.py::TestNeo4jBulkOperationPerformance::test_bulk_write_throughput PASSED [ 37%]
+tests/integration/test_neo4j_performance_benchmarks.py::TestNeo4jConcurrencyPerformance::test_mixed_operation_concurrency PASSED [ 37%]
+tests/integration/test_neo4j_performance_benchmarks.py::TestNeo4jResourceEfficiencyBenchmarks::test_memory_usage_benchmark SKIPPED [ 37%]
+tests/integration/test_neo4j_performance_benchmarks.py::TestNeo4jResourceEfficiencyBenchmarks::test_connection_efficiency_benchmark PASSED [ 37%]
+tests/integration/test_openai_api_responses.py::test_responses_create_structured_json PASSED [ 37%]
+tests/integration/test_openai_api_responses.py::test_responses_create_malformed_json PASSED [ 38%]
+tests/integration/test_performance.py::TestEventEmissionPerformance::test_event_emission_throughput SKIPPED [ 38%]
+tests/integration/test_performance.py::TestEventEmissionPerformance::test_batch_event_emission SKIPPED [ 38%]
+tests/integration/test_performance.py::TestProjectionPerformance::test_projection_processing_lag SKIPPED [ 38%]
+tests/integration/test_performance.py::TestProjectionPerformance::test_concurrent_projection_processing SKIPPED [ 38%]
+tests/integration/test_performance.py::TestLoadTesting::test_high_volume_event_processing SKIPPED [ 38%]
+tests/integration/test_performance.py::TestLoadTesting::test_concurrent_file_processing SKIPPED [ 38%]
+tests/integration/test_pipeline_neo4j_end_to_end.py::TestPipelineNeo4jEndToEnd::test_single_file_complete_pipeline PASSED [ 39%]
+tests/integration/test_pipeline_neo4j_end_to_end.py::TestPipelineNeo4jEndToEnd::test_multiple_files_concurrent_processing PASSED [ 39%]
+tests/integration/test_pipeline_neo4j_end_to_end.py::TestPipelineNeo4jEndToEnd::test_pipeline_error_recovery PASSED [ 39%]
+tests/integration/test_pipeline_neo4j_end_to_end.py::TestPipelineNeo4jEndToEnd::test_pipeline_data_integrity_verification PASSED [ 39%]
+tests/integration/test_pipeline_neo4j_end_to_end.py::TestPipelineNeo4jEndToEnd::test_run_pipeline_function_integration PASSED [ 39%]
+tests/integration/test_pipeline_neo4j_end_to_end.py::TestPipelineNeo4jPerformance::test_large_file_processing_performance PASSED [ 39%]
+tests/integration/test_projection_replay.py::TestProjectionReplay::test_full_interview_replay SKIPPED [ 39%]
+tests/integration/test_projection_replay.py::TestProjectionReplay::test_replay_after_neo4j_wipe SKIPPED [ 40%]
+tests/integration/test_projection_replay.py::TestProjectionReplay::test_partial_stream_replay SKIPPED [ 40%]
+tests/io/test_local_storage.py::test_local_text_data_source_read_success PASSED [ 40%]
+tests/io/test_local_storage.py::test_local_text_data_source_read_file_not_found PASSED [ 40%]
+tests/io/test_local_storage.py::test_local_analysis_writer_write_and_finalize PASSED [ 40%]
+tests/io/test_local_storage.py::test_local_analysis_writer_write_uninitialized PASSED [ 40%]
+tests/io/test_local_storage.py::test_local_analysis_writer_read_ids PASSED [ 40%]
+tests/io/test_local_storage.py::test_local_analysis_writer_read_ids_file_not_found PASSED [ 41%]
+tests/io/test_local_storage.py::test_local_map_storage_write_read_finalize PASSED [ 41%]
+tests/io/test_local_storage.py::test_local_map_storage_overwrite_on_initialize PASSED [ 41%]
+tests/io/test_local_storage.py::test_local_map_storage_read_file_not_found PASSED [ 41%]
+tests/io/test_local_storage.py::test_local_map_storage_write_uninitialized PASSED [ 41%]
+tests/io/test_local_storage.py::test_local_text_data_source_constructor_validation PASSED [ 41%]
+tests/io/test_local_storage.py::test_local_analysis_writer_constructor_validation PASSED [ 42%]
+tests/io/test_local_storage.py::test_local_map_storage_constructor_validation PASSED [ 42%]
+tests/io/test_local_storage.py::test_local_text_data_source_os_error SKIPPED [ 42%]
+tests/io/test_local_storage.py::test_local_text_data_source_empty_file PASSED [ 42%]
+tests/io/test_local_storage.py::test_local_analysis_writer_os_error_during_initialize SKIPPED [ 42%]
+tests/io/test_local_storage.py::test_local_analysis_writer_write_error_simulation PASSED [ 42%]
+tests/io/test_local_storage.py::test_local_analysis_writer_finalize_without_initialize PASSED [ 42%]
+tests/io/test_local_storage.py::test_local_analysis_writer_multiple_initialize PASSED [ 43%]
+tests/io/test_local_storage.py::test_local_map_storage_os_error_during_initialize SKIPPED [ 43%]
+tests/io/test_local_storage.py::test_local_map_storage_write_error_simulation PASSED [ 43%]
+tests/io/test_local_storage.py::test_local_map_storage_finalize_without_initialize PASSED [ 43%]
+tests/io/test_local_storage.py::test_local_map_storage_multiple_initialize PASSED [ 43%]
+tests/io/test_local_storage.py::test_local_analysis_writer_read_ids_malformed_json PASSED [ 43%]
+tests/io/test_local_storage.py::test_local_analysis_writer_read_ids_missing_sentence_id PASSED [ 43%]
+tests/io/test_local_storage.py::test_local_analysis_writer_read_ids_empty_lines PASSED [ 44%]
+tests/io/test_local_storage.py::test_local_map_storage_read_entries_malformed_json PASSED [ 44%]
+tests/io/test_local_storage.py::test_local_map_storage_read_sentence_ids_invalid_types PASSED [ 44%]
+tests/io/test_local_storage.py::test_local_map_storage_read_entries_empty_lines PASSED [ 44%]
+tests/io/test_local_storage.py::test_local_analysis_writer_error_during_finalize PASSED [ 44%]
+tests/io/test_local_storage.py::test_local_map_storage_error_during_finalize PASSED [ 44%]
+tests/io/test_local_storage.py::test_local_analysis_writer_write_after_finalize PASSED [ 44%]
+tests/io/test_local_storage.py::test_local_map_storage_write_after_finalize PASSED [ 45%]
+tests/io/test_local_storage.py::test_local_analysis_writer_read_from_empty_file PASSED [ 45%]
+tests/io/test_local_storage.py::test_local_map_storage_read_from_empty_file PASSED [ 45%]
+tests/io/test_local_storage.py::test_local_text_data_source_unicode_content PASSED [ 45%]
+tests/io/test_local_storage.py::test_local_analysis_writer_unicode_json PASSED [ 45%]
+tests/io/test_local_storage.py::test_local_text_data_source_generic_exception PASSED [ 45%]
+tests/io/test_local_storage.py::test_local_analysis_writer_initialization_os_error PASSED [ 45%]
+tests/io/test_local_storage.py::test_local_analysis_writer_finalize_error_propagation PASSED [ 46%]
+tests/io/test_local_storage.py::test_local_map_storage_initialization_os_error PASSED [ 46%]
+tests/io/test_local_storage.py::test_local_map_storage_finalize_error_propagation PASSED [ 46%]
+tests/io/test_local_storage.py::test_local_analysis_writer_read_ids_unexpected_error PASSED [ 46%]
+tests/io/test_local_storage.py::test_local_map_storage_read_all_entries_unexpected_error PASSED [ 46%]
+tests/io/test_local_storage.py::test_local_map_storage_read_sentence_ids_unexpected_error PASSED [ 46%]
+tests/io/test_local_storage.py::test_local_analysis_writer_read_ids_json_decode_error_coverage PASSED [ 46%]
+tests/io/test_local_storage.py::test_local_map_storage_json_decode_error_coverage PASSED [ 47%]
+tests/io/test_local_storage.py::test_local_map_storage_missing_sentence_id_warning PASSED [ 47%]
+tests/io/test_protocols.py::TestTextDataSourceProtocol::test_protocol_is_runtime_checkable PASSED [ 47%]
+tests/io/test_protocols.py::TestTextDataSourceProtocol::test_protocol_method_signatures PASSED [ 47%]
+tests/io/test_protocols.py::TestTextDataSourceProtocol::test_protocol_compliance_check PASSED [ 47%]
+tests/io/test_protocols.py::TestTextDataSourceProtocol::test_protocol_with_mock_implementation PASSED [ 47%]
+tests/io/test_protocols.py::TestTextDataSourceProtocol::test_protocol_async_method_behavior PASSED [ 48%]
+tests/io/test_protocols.py::TestSentenceAnalysisWriterProtocol::test_protocol_method_signatures PASSED [ 48%]
+tests/io/test_protocols.py::TestSentenceAnalysisWriterProtocol::test_protocol_structure PASSED [ 48%]
+tests/io/test_protocols.py::TestSentenceAnalysisWriterProtocol::test_protocol_lifecycle_methods PASSED [ 48%]
+tests/io/test_protocols.py::TestSentenceAnalysisWriterProtocol::test_protocol_method_contracts PASSED [ 48%]
+tests/io/test_protocols.py::TestSentenceAnalysisWriterProtocol::test_protocol_error_handling PASSED [ 48%]
+tests/io/test_protocols.py::TestConversationMapStorageProtocol::test_protocol_method_signatures PASSED [ 48%]
+tests/io/test_protocols.py::TestConversationMapStorageProtocol::test_protocol_structure PASSED [ 49%]
+tests/io/test_protocols.py::TestConversationMapStorageProtocol::test_protocol_data_operations PASSED [ 49%]
+tests/io/test_protocols.py::TestConversationMapStorageProtocol::test_protocol_method_contracts PASSED [ 49%]
+tests/io/test_protocols.py::TestConversationMapStorageProtocol::test_protocol_edge_cases PASSED [ 49%]
+tests/io/test_protocols.py::TestProtocolRealisticImplementations::test_text_data_source_realistic_implementation PASSED [ 49%]
+tests/io/test_protocols.py::TestProtocolInteroperability::test_all_protocols_are_importable PASSED [ 49%]
+tests/io/test_protocols.py::TestProtocolInteroperability::test_protocol_type_checking_with_text_data_source PASSED [ 49%]
+tests/io/test_protocols.py::TestProtocolInteroperability::test_protocol_integration_patterns PASSED [ 50%]
+tests/io/test_protocols.py::TestProtocolInteroperability::test_protocol_documentation_and_contracts PASSED [ 50%]
+tests/io/test_protocols.py::TestProtocolInteroperability::test_protocol_method_inspection PASSED [ 50%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentInitialization::test_initialization_with_valid_config PASSED [ 50%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentInitialization::test_initialization_fails_with_missing_api_key PASSED [ 50%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentInitialization::test_initialization_with_default_retry_settings PASSED [ 50%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentAPIInteraction::test_successful_api_call_with_realistic_interview_prompt PASSED [ 50%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentAPIInteraction::test_successful_api_call_with_different_sentence_types PASSED [ 51%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentAPIInteraction::test_json_parsing_with_realistic_malformed_responses PASSED [ 51%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentAPIInteraction::test_api_error_handling_with_realistic_scenarios PASSED [ 51%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentAPIInteraction::test_retry_logic_with_transient_errors PASSED [ 51%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentIntegration::test_concurrent_api_calls_simulation PASSED [ 51%]
+tests/persistence/test_graph_persistence.py::TestOpenAIAgentIntegration::test_prompt_formatting_and_response_processing PASSED [ 51%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphValidation::test_missing_sentence_id_handling PASSED [ 51%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphValidation::test_missing_sequence_order_handling PASSED [ 52%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphValidation::test_missing_sentence_text_handling PASSED [ 52%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphValidation::test_empty_data_handling PASSED [ 52%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphOrchestration::test_complete_orchestration_query_sequence PASSED [ 52%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphOrchestration::test_minimal_data_orchestration PASSED [ 52%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphOrchestration::test_follows_relationship_logic PASSED [ 52%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphOrchestration::test_keyword_array_processing PASSED [ 53%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphOrchestration::test_parameter_binding_correctness PASSED [ 53%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphOrchestration::test_database_error_propagation PASSED [ 53%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphOrchestration::test_follows_relationship_error_handling PASSED [ 53%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphEdgeCases::test_none_values_in_optional_fields PASSED [ 53%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphEdgeCases::test_empty_keyword_arrays PASSED [ 53%]
+tests/persistence/test_save_analysis_to_graph_unit.py::TestSaveAnalysisToGraphEdgeCases::test_special_characters_in_parameters PASSED [ 53%]
+tests/pipeline/test_analyze_specific_sentences.py::TestAnalyzeSpecificSentences::test_analyze_specific_sentences_with_realistic_data PASSED [ 54%]
+tests/pipeline/test_analyze_specific_sentences.py::TestAnalyzeSpecificSentences::test_analyze_specific_sentences_with_empty_map PASSED [ 54%]
+tests/pipeline/test_analyze_specific_sentences.py::TestAnalyzeSpecificSentences::test_analyze_specific_sentences_with_missing_ids PASSED [ 54%]
+tests/pipeline/test_analyze_specific_sentences.py::TestAnalyzeSpecificSentences::test_analyze_specific_sentences_with_invalid_map_entries PASSED [ 54%]
+tests/pipeline/test_analyze_specific_sentences.py::TestAnalyzeSpecificSentences::test_analyze_specific_sentences_preserves_original_order PASSED [ 54%]
+tests/pipeline/test_analyze_specific_sentences.py::TestAnalyzeSpecificSentences::test_analyze_specific_sentences_with_single_sentence PASSED [ 54%]
+tests/pipeline/test_analyze_specific_sentences.py::TestAnalyzeSpecificSentences::test_analyze_specific_sentences_context_building_integration PASSED [ 54%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_interview_created_success PASSED [ 55%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_interview_created_handles_exception PASSED [ 55%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_interview_status_changed_success PASSED [ 55%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_sentence_created_success PASSED [ 55%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_sentence_created_deterministic_uuid PASSED [ 55%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_sentence_created_handles_exception PASSED [ 55%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_analysis_generated_success PASSED [ 55%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_analysis_generated_handles_exception PASSED [ 56%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_generate_sentence_uuid_consistency PASSED [ 56%]
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_multiple_sentences_in_same_interview PASSED [ 56%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_orchestrator_initialization_with_real_paths PASSED [ 56%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_file_discovery_with_real_files PASSED [ 56%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_file_discovery_with_specific_file PASSED [ 56%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_text_reading_and_segmentation_integration PASSED [ 56%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_map_file_writing_integration PASSED [ 57%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_context_building_with_real_analysis_service PASSED [ 57%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_analysis_with_real_service_integration PASSED [ 57%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_error_handling_with_nonexistent_input_directory PASSED [ 57%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_empty_directory_handling PASSED [ 57%]
+tests/pipeline/test_pipeline_integration.py::TestPipelineIntegration::test_empty_file_handling PASSED [ 57%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestLogPrefix::test_log_prefix_functionality PASSED [ 57%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorInitialization::test_orchestrator_initialization_with_realistic_config PASSED [ 58%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorInitialization::test_orchestrator_with_default_paths PASSED [ 58%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorInitialization::test_orchestrator_error_with_invalid_input_path PASSED [ 58%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorFileOperations::test_file_discovery_with_mixed_file_types PASSED [ 58%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorFileOperations::test_file_discovery_specific_file_targeting PASSED [ 58%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorFileOperations::test_file_io_setup_creates_proper_components PASSED [ 58%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorTextProcessing::test_text_reading_and_segmentation_integration PASSED [ 59%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorTextProcessing::test_map_file_writing_with_real_sentences PASSED [ 59%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorTextProcessing::test_context_building_with_real_analysis_service PASSED [ 59%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestSpecificAnalysisHelperFunctions::test_prepare_data_with_realistic_map_entries PASSED [ 59%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestSpecificAnalysisHelperFunctions::test_context_building_for_specific_analysis PASSED [ 59%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestSpecificAnalysisHelperFunctions::test_post_processing_with_realistic_results PASSED [ 59%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorErrorHandling::test_empty_file_handling PASSED [ 59%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorErrorHandling::test_file_read_error_handling PASSED [ 60%]
+tests/pipeline/test_pipeline_orchestrator_unit.py::TestPipelineOrchestratorErrorHandling::test_invalid_map_entries_handling PASSED [ 60%]
+tests/pipeline/test_run_pipeline.py::TestRunPipeline::test_run_pipeline_creates_and_executes_orchestrator PASSED [ 60%]
+tests/pipeline/test_run_pipeline.py::TestRunPipeline::test_run_pipeline_handles_orchestrator_initialization_error PASSED [ 60%]
+tests/pipeline/test_run_pipeline.py::TestRunPipeline::test_run_pipeline_with_minimal_parameters PASSED [ 60%]
+tests/pipeline/test_run_pipeline.py::TestRunPipeline::test_run_pipeline_logs_start_and_finish PASSED [ 60%]
+tests/pipeline/test_run_pipeline.py::TestRunPipeline::test_run_pipeline_with_string_paths PASSED [ 60%]
+tests/projections/test_lane_manager_unit.py::TestLanePartitioning::test_consistent_hashing PASSED [ 61%]
+tests/projections/test_lane_manager_unit.py::TestLanePartitioning::test_different_interviews_can_map_to_different_lanes PASSED [ 61%]
+tests/projections/test_lane_manager_unit.py::TestLanePartitioning::test_lane_distribution PASSED [ 61%]
+tests/projections/test_lane_manager_unit.py::TestLanePartitioning::test_hash_matches_expected_algorithm PASSED [ 61%]
+tests/projections/test_lane_manager_unit.py::TestLaneManager::test_start_all_lanes PASSED [ 61%]
+tests/projections/test_lane_manager_unit.py::TestLaneManager::test_stop_all_lanes PASSED [ 61%]
+tests/projections/test_lane_manager_unit.py::TestLaneManager::test_route_event_to_correct_lane PASSED [ 61%]
+tests/projections/test_lane_manager_unit.py::TestLaneManager::test_extract_interview_id_from_sentence_event PASSED [ 62%]
+tests/projections/test_lane_manager_unit.py::TestLaneManager::test_extract_interview_id_from_interview_event PASSED [ 62%]
+tests/projections/test_lane_manager_unit.py::TestLaneManager::test_get_status PASSED [ 62%]
+tests/projections/test_lane_manager_unit.py::TestLane::test_lane_processes_events_in_order PASSED [ 62%]
+tests/projections/test_lane_manager_unit.py::TestLane::test_lane_continues_after_handler_error PASSED [ 62%]
+tests/projections/test_lane_manager_unit.py::TestLane::test_lane_status PASSED [ 62%]
+tests/projections/test_lane_manager_unit.py::TestLane::test_checkpoint_called_after_successful_processing PASSED [ 62%]
+tests/projections/test_lane_manager_unit.py::TestLane::test_checkpoint_called_even_after_handler_failure PASSED [ 63%]
+tests/projections/test_projection_handlers_unit.py::TestBaseHandlerVersionChecking::test_skips_already_applied_event PASSED [ 63%]
+tests/projections/test_projection_handlers_unit.py::TestBaseHandlerVersionChecking::test_applies_new_event PASSED [ 63%]
+tests/projections/test_projection_handlers_unit.py::TestBaseHandlerVersionChecking::test_handles_new_aggregate PASSED [ 63%]
+tests/projections/test_projection_handlers_unit.py::TestBaseHandlerRetryLogic::test_retries_on_transient_error PASSED [ 63%]
+tests/projections/test_projection_handlers_unit.py::TestBaseHandlerRetryLogic::test_parks_event_after_max_retries PASSED [ 63%]
+tests/projections/test_projection_handlers_unit.py::TestInterviewHandlers::test_interview_created_handler PASSED [ 63%]
+tests/projections/test_projection_handlers_unit.py::TestInterviewHandlers::test_interview_metadata_updated_handler PASSED [ 64%]
+tests/projections/test_projection_handlers_unit.py::TestInterviewHandlers::test_interview_status_changed_handler PASSED [ 64%]
+tests/projections/test_projection_handlers_unit.py::TestSentenceHandlers::test_sentence_created_handler PASSED [ 64%]
+tests/projections/test_projection_handlers_unit.py::TestSentenceHandlers::test_sentence_edited_handler PASSED [ 64%]
+tests/projections/test_projection_handlers_unit.py::TestSentenceHandlers::test_analysis_generated_handler_creates_nodes PASSED [ 64%]
+tests/services/test_analysis_service.py::test_build_contexts_with_realistic_interview_data PASSED [ 64%]
+tests/services/test_analysis_service.py::test_build_contexts_empty PASSED [ 65%]
+tests/services/test_analysis_service.py::test_build_contexts_exception PASSED [ 65%]
+tests/services/test_analysis_service.py::test_analyze_sentences_with_realistic_interview_content PASSED [ 65%]
+tests/services/test_analysis_service.py::test_analyze_sentences_empty_input PASSED [ 65%]
+tests/services/test_analysis_service.py::test_analyze_sentences_context_mismatch PASSED [ 65%]
+tests/services/test_analysis_service.py::test_analyze_sentences_classify_error PASSED [ 65%]
+tests/services/test_analysis_service.py::test_analyze_sentences_concurrency PASSED [ 65%]
+tests/test_agent.py::test_initialization_missing_api_key PASSED          [ 66%]
+tests/test_agent.py::test_initialization_none_api_key PASSED             [ 66%]
+tests/test_agent.py::test_initialization_success PASSED                  [ 66%]
+tests/test_agent.py::test_successful_call_with_realistic_interview_response PASSED [ 66%]
+tests/test_agent.py::test_successful_call_with_token_usage_realistic_scenario PASSED [ 66%]
+tests/test_agent.py::test_successful_call_without_token_usage PASSED     [ 66%]
+tests/test_agent.py::test_successful_call_with_incomplete_token_usage PASSED [ 66%]
+tests/test_agent.py::test_retry_on_rate_limit_with_realistic_interview_scenario PASSED [ 67%]
+tests/test_agent.py::test_retry_on_api_error PASSED                      [ 67%]
+tests/test_agent.py::test_max_retry_exceeded PASSED                      [ 67%]
+tests/test_agent.py::test_retry_on_unexpected_exception PASSED           [ 67%]
+tests/test_agent.py::test_empty_output 
+=== Cleaning up Neo4j test environment ===
+Neo4j test container stopped successfully
+
+
+=================================== FAILURES ===================================
+__________ TestInterviewCommandHandler.test_create_interview_command ___________
+src/events/store.py:120: in get_client
+    yield self._client
+src/events/store.py:251: in read_stream
+    for recorded_event in recorded_events:
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:253: in __next__
+    read_resp = self._get_next_read_resp()
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:270: in _get_next_read_resp
+    raise self._handle_stream_read_rpc_error(e) from None
+E   esdbclient.exceptions.ServiceUnavailable: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+
+During handling of the above exception, another exception occurred:
+src/commands/handlers.py:77: in _handle_create
+    existing = await repo.load(command.interview_id)
+src/events/repository.py:63: in load
+    events = await self.event_store.read_stream(stream_name)
+src/events/store.py:244: in read_stream
+    async with self.get_client() as client:
+/usr/local/lib/python3.10/contextlib.py:217: in __aexit__
+    await self.gen.athrow(typ, value, traceback)
+src/events/store.py:123: in get_client
+    raise EventStoreError(f"Client operation failed: {e}")
+E   src.events.store.EventStoreError: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+
+During handling of the above exception, another exception occurred:
+tests/commands/test_command_handlers.py:40: in test_create_interview_command
+    result = await handler.handle(command)
+src/commands/handlers.py:63: in handle
+    return await self._handle_create(command)
+src/commands/handlers.py:113: in _handle_create
+    raise CommandExecutionError(f"Failed to create interview: {e}", original_error=e)
+E   src.commands.CommandExecutionError: Failed to create interview: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+------------------------------ Captured log call -------------------------------
+ERROR    src.events.store:store.py:122 EventStoreDB client error: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+ERROR    src.commands.handlers:handlers.py:112 Failed to create interview 013b3bac-44f4-45c2-9cf9-e4e850b10a65: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+Traceback (most recent call last):
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 120, in get_client
+    yield self._client
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 251, in read_stream
+    for recorded_event in recorded_events:
+  File "/usr/local/lib/python3.10/site-packages/esdbclient/streams.py", line 253, in __next__
+    read_resp = self._get_next_read_resp()
+  File "/usr/local/lib/python3.10/site-packages/esdbclient/streams.py", line 270, in _get_next_read_resp
+    raise self._handle_stream_read_rpc_error(e) from None
+esdbclient.exceptions.ServiceUnavailable: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspaces/interview_analyzer_chaining/src/commands/handlers.py", line 77, in _handle_create
+    existing = await repo.load(command.interview_id)
+  File "/workspaces/interview_analyzer_chaining/src/events/repository.py", line 63, in load
+    events = await self.event_store.read_stream(stream_name)
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 244, in read_stream
+    async with self.get_client() as client:
+  File "/usr/local/lib/python3.10/contextlib.py", line 217, in __aexit__
+    await self.gen.athrow(typ, value, traceback)
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 123, in get_client
+    raise EventStoreError(f"Client operation failed: {e}")
+src.events.store.EventStoreError: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+___________ TestSentenceCommandHandler.test_create_sentence_command ____________
+src/events/store.py:120: in get_client
+    yield self._client
+src/events/store.py:251: in read_stream
+    for recorded_event in recorded_events:
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:253: in __next__
+    read_resp = self._get_next_read_resp()
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:270: in _get_next_read_resp
+    raise self._handle_stream_read_rpc_error(e) from None
+E   esdbclient.exceptions.ServiceUnavailable: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+
+During handling of the above exception, another exception occurred:
+src/commands/handlers.py:235: in _handle_create
+    existing = await repo.load(command.sentence_id)
+src/events/repository.py:63: in load
+    events = await self.event_store.read_stream(stream_name)
+src/events/store.py:244: in read_stream
+    async with self.get_client() as client:
+/usr/local/lib/python3.10/contextlib.py:217: in __aexit__
+    await self.gen.athrow(typ, value, traceback)
+src/events/store.py:123: in get_client
+    raise EventStoreError(f"Client operation failed: {e}")
+E   src.events.store.EventStoreError: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+
+During handling of the above exception, another exception occurred:
+tests/commands/test_command_handlers.py:71: in test_create_sentence_command
+    result = await handler.handle(command)
+src/commands/handlers.py:219: in handle
+    return await self._handle_create(command)
+src/commands/handlers.py:270: in _handle_create
+    raise CommandExecutionError(f"Failed to create sentence: {e}", original_error=e)
+E   src.commands.CommandExecutionError: Failed to create sentence: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+------------------------------ Captured log call -------------------------------
+ERROR    src.events.store:store.py:122 EventStoreDB client error: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+ERROR    src.commands.handlers:handlers.py:269 Failed to create sentence d1ea1943-2ffd-4609-876c-266eecc86f41: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+Traceback (most recent call last):
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 120, in get_client
+    yield self._client
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 251, in read_stream
+    for recorded_event in recorded_events:
+  File "/usr/local/lib/python3.10/site-packages/esdbclient/streams.py", line 253, in __next__
+    read_resp = self._get_next_read_resp()
+  File "/usr/local/lib/python3.10/site-packages/esdbclient/streams.py", line 270, in _get_next_read_resp
+    raise self._handle_stream_read_rpc_error(e) from None
+esdbclient.exceptions.ServiceUnavailable: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspaces/interview_analyzer_chaining/src/commands/handlers.py", line 235, in _handle_create
+    existing = await repo.load(command.sentence_id)
+  File "/workspaces/interview_analyzer_chaining/src/events/repository.py", line 63, in load
+    events = await self.event_store.read_stream(stream_name)
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 244, in read_stream
+    async with self.get_client() as client:
+  File "/usr/local/lib/python3.10/contextlib.py", line 217, in __aexit__
+    await self.gen.athrow(typ, value, traceback)
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 123, in get_client
+    raise EventStoreError(f"Client operation failed: {e}")
+src.events.store.EventStoreError: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+____________ TestSentenceCommandHandler.test_edit_sentence_command _____________
+src/events/store.py:120: in get_client
+    yield self._client
+src/events/store.py:251: in read_stream
+    for recorded_event in recorded_events:
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:253: in __next__
+    read_resp = self._get_next_read_resp()
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:270: in _get_next_read_resp
+    raise self._handle_stream_read_rpc_error(e) from None
+E   esdbclient.exceptions.ServiceUnavailable: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+
+During handling of the above exception, another exception occurred:
+src/commands/handlers.py:235: in _handle_create
+    existing = await repo.load(command.sentence_id)
+src/events/repository.py:63: in load
+    events = await self.event_store.read_stream(stream_name)
+src/events/store.py:244: in read_stream
+    async with self.get_client() as client:
+/usr/local/lib/python3.10/contextlib.py:217: in __aexit__
+    await self.gen.athrow(typ, value, traceback)
+src/events/store.py:123: in get_client
+    raise EventStoreError(f"Client operation failed: {e}")
+E   src.events.store.EventStoreError: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+
+During handling of the above exception, another exception occurred:
+tests/commands/test_command_handlers.py:94: in test_edit_sentence_command
+    await handler.handle(create_command)
+src/commands/handlers.py:219: in handle
+    return await self._handle_create(command)
+src/commands/handlers.py:270: in _handle_create
+    raise CommandExecutionError(f"Failed to create sentence: {e}", original_error=e)
+E   src.commands.CommandExecutionError: Failed to create sentence: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+------------------------------ Captured log call -------------------------------
+ERROR    src.events.store:store.py:122 EventStoreDB client error: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+ERROR    src.commands.handlers:handlers.py:269 Failed to create sentence e7dcabe9-f51d-44d7-989d-9d590664c01e: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+Traceback (most recent call last):
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 120, in get_client
+    yield self._client
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 251, in read_stream
+    for recorded_event in recorded_events:
+  File "/usr/local/lib/python3.10/site-packages/esdbclient/streams.py", line 253, in __next__
+    read_resp = self._get_next_read_resp()
+  File "/usr/local/lib/python3.10/site-packages/esdbclient/streams.py", line 270, in _get_next_read_resp
+    raise self._handle_stream_read_rpc_error(e) from None
+esdbclient.exceptions.ServiceUnavailable: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspaces/interview_analyzer_chaining/src/commands/handlers.py", line 235, in _handle_create
+    existing = await repo.load(command.sentence_id)
+  File "/workspaces/interview_analyzer_chaining/src/events/repository.py", line 63, in load
+    events = await self.event_store.read_stream(stream_name)
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 244, in read_stream
+    async with self.get_client() as client:
+  File "/usr/local/lib/python3.10/contextlib.py", line 217, in __aexit__
+    await self.gen.athrow(typ, value, traceback)
+  File "/workspaces/interview_analyzer_chaining/src/events/store.py", line 123, in get_client
+    raise EventStoreError(f"Client operation failed: {e}")
+src.events.store.EventStoreError: Client operation failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:2113: Failed to connect to remote host: Connection refused
+__ TestE2EFileProcessingWithDualWrite.test_single_file_upload_with_dual_write __
+tests/integration/test_e2e_file_processing.py:55: in test_single_file_upload_with_dual_write
+    pipeline = PipelineOrchestrator(config=test_config)
+E   TypeError: PipelineOrchestrator.__init__() got an unexpected keyword argument 'config'
+---------------------------- Captured stdout setup -----------------------------
+
+=== Setting up Neo4j test environment (detected: docker) ===
+Starting neo4j-test container...
+Neo4j test container started successfully
+Waiting for Neo4j test service to become ready...
+05:03:40 | INFO     | Waiting for Neo4j to become ready (timeout: 60.0s)...
+05:03:40 | INFO     | Initializing Neo4j Async Driver in docker environment...
+05:03:40 | INFO     | Neo4j Async Driver initialized for URI: bolt://neo4j-test:7687 (source: docker_test_defaults, environment: docker)
+05:03:40 | INFO     | Neo4j connectivity verified successfully.
+05:03:40 | INFO     | Neo4j is ready!
+Neo4j test service is ready for testing!
+Test environment configured for docker context
+
+--- Setting up clean test database ---
+05:03:40 | INFO     | Initializing Neo4j Async Driver in docker environment...
+05:03:40 | INFO     | Neo4j Async Driver initialized for URI: bolt://neo4j-test:7687 (source: test_environment_variables_docker, environment: docker)
+05:03:40 | INFO     | Neo4j connectivity verified successfully.
+Test database cleared successfully
+------------------------------ Captured log setup ------------------------------
+INFO     pipeline:neo4j_driver.py:145 Waiting for Neo4j to become ready (timeout: 60.0s)...
+INFO     pipeline:neo4j_driver.py:47 Initializing Neo4j Async Driver in docker environment...
+INFO     pipeline:neo4j_driver.py:80 Neo4j Async Driver initialized for URI: bolt://neo4j-test:7687 (source: docker_test_defaults, environment: docker)
+INFO     pipeline:neo4j_driver.py:87 Neo4j connectivity verified successfully.
+INFO     pipeline:neo4j_driver.py:154 Neo4j is ready!
+INFO     pipeline:neo4j_driver.py:47 Initializing Neo4j Async Driver in docker environment...
+INFO     pipeline:neo4j_driver.py:80 Neo4j Async Driver initialized for URI: bolt://neo4j-test:7687 (source: test_environment_variables_docker, environment: docker)
+INFO     pipeline:neo4j_driver.py:87 Neo4j connectivity verified successfully.
+--------------------------- Captured stdout teardown ---------------------------
+Test completed. Final node count: 0
+_____ TestE2EFileProcessingWithDualWrite.test_deterministic_sentence_uuids _____
+tests/integration/test_e2e_file_processing.py:163: in test_deterministic_sentence_uuids
+    pipeline = PipelineOrchestrator(config=test_config)
+E   TypeError: PipelineOrchestrator.__init__() got an unexpected keyword argument 'config'
+---------------------------- Captured stdout setup -----------------------------
+Test environment configured for docker context
+
+--- Setting up clean test database ---
+05:03:40 | INFO     | Initializing Neo4j Async Driver in docker environment...
+05:03:40 | INFO     | Neo4j Async Driver initialized for URI: bolt://neo4j-test:7687 (source: test_environment_variables_docker, environment: docker)
+05:03:40 | INFO     | Neo4j connectivity verified successfully.
+Test database cleared successfully
+------------------------------ Captured log setup ------------------------------
+INFO     pipeline:neo4j_driver.py:47 Initializing Neo4j Async Driver in docker environment...
+INFO     pipeline:neo4j_driver.py:80 Neo4j Async Driver initialized for URI: bolt://neo4j-test:7687 (source: test_environment_variables_docker, environment: docker)
+INFO     pipeline:neo4j_driver.py:87 Neo4j connectivity verified successfully.
+--------------------------- Captured stdout teardown ---------------------------
+Test completed. Final node count: 0
+_____________ TestE2EUserEditWorkflow.test_edit_sentence_workflow ______________
+tests/integration/test_e2e_user_edits.py:64: in test_edit_sentence_workflow
+    await event_store_client.append_events(
+src/events/store.py:184: in append_events
+    commit_position = await client.append_to_stream(
+/usr/local/lib/python3.10/site-packages/esdbclient/client.py:145: in retrygrpc_decorator
+    return f(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/esdbclient/client.py:108: in autoreconnect_decorator
+    return f(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/esdbclient/client.py:536: in append_to_stream
+    return self.streams.batch_append(
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:1302: in batch_append
+    req = self._construct_batch_append_req(
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:483: in _construct_batch_append_req
+    assert current_version >= 0
+E   AssertionError
+---------------------------- Captured stdout setup -----------------------------
+Test environment configured for docker context
+___________ TestE2EUserEditWorkflow.test_override_analysis_workflow ____________
+tests/integration/test_e2e_user_edits.py:165: in test_override_analysis_workflow
+    await event_store_client.append_events(
+src/events/store.py:184: in append_events
+    commit_position = await client.append_to_stream(
+/usr/local/lib/python3.10/site-packages/esdbclient/client.py:145: in retrygrpc_decorator
+    return f(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/esdbclient/client.py:108: in autoreconnect_decorator
+    return f(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/esdbclient/client.py:536: in append_to_stream
+    return self.streams.batch_append(
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:1302: in batch_append
+    req = self._construct_batch_append_req(
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:483: in _construct_batch_append_req
+    assert current_version >= 0
+E   AssertionError
+---------------------------- Captured stdout setup -----------------------------
+Test environment configured for docker context
+_________ TestE2EUserEditWorkflow.test_multiple_edits_on_same_sentence _________
+tests/integration/test_e2e_user_edits.py:242: in test_multiple_edits_on_same_sentence
+    await event_store_client.append_events(
+src/events/store.py:184: in append_events
+    commit_position = await client.append_to_stream(
+/usr/local/lib/python3.10/site-packages/esdbclient/client.py:145: in retrygrpc_decorator
+    return f(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/esdbclient/client.py:108: in autoreconnect_decorator
+    return f(*args, **kwargs)
+/usr/local/lib/python3.10/site-packages/esdbclient/client.py:536: in append_to_stream
+    return self.streams.batch_append(
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:1302: in batch_append
+    req = self._construct_batch_append_req(
+/usr/local/lib/python3.10/site-packages/esdbclient/streams.py:483: in _construct_batch_append_req
+    assert current_version >= 0
+E   AssertionError
+---------------------------- Captured stdout setup -----------------------------
+Test environment configured for docker context
+_________ TestConnectionManagerReliability.test_wait_for_ready_timeout _________
+tests/integration/test_neo4j_connection_reliability.py:124: in test_wait_for_ready_timeout
+    assert is_ready is False
+E   assert True is False
+---------------------------- Captured stdout setup -----------------------------
+Test environment configured for docker context
+----------------------------- Captured stdout call -----------------------------
+05:03:46 | INFO     | Waiting for Neo4j to become ready (timeout: 2.0s)...
+05:03:46 | INFO     | Initializing Neo4j Async Driver in docker environment...
+05:03:46 | INFO     | Neo4j Async Driver initialized for URI: bolt://neo4j:7687 (source: docker_defaults, environment: docker)
+05:03:46 | INFO     | Neo4j connectivity verified successfully.
+05:03:46 | INFO     | Neo4j is ready!
+------------------------------ Captured log call -------------------------------
+INFO     pipeline:neo4j_driver.py:145 Waiting for Neo4j to become ready (timeout: 2.0s)...
+INFO     pipeline:neo4j_driver.py:47 Initializing Neo4j Async Driver in docker environment...
+INFO     pipeline:neo4j_driver.py:80 Neo4j Async Driver initialized for URI: bolt://neo4j:7687 (source: docker_defaults, environment: docker)
+INFO     pipeline:neo4j_driver.py:87 Neo4j connectivity verified successfully.
+INFO     pipeline:neo4j_driver.py:154 Neo4j is ready!
+=============================== warnings summary ===============================
+../../usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:323
+../../usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:323
+../../usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:323
+../../usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:323
+../../usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:323
+  /usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../../usr/local/lib/python3.10/site-packages/spacy/cli/_util.py:23
+  /usr/local/lib/python3.10/site-packages/spacy/cli/_util.py:23: DeprecationWarning: Importing 'parser.split_arg_string' is deprecated, it will only be available in 'shell_completion' in Click 9.0.
+    from click.parser import split_arg_string
+
+../../usr/local/lib/python3.10/site-packages/weasel/util/config.py:8
+  /usr/local/lib/python3.10/site-packages/weasel/util/config.py:8: DeprecationWarning: Importing 'parser.split_arg_string' is deprecated, it will only be available in 'shell_completion' in Click 9.0.
+    from click.parser import split_arg_string
+
+src/events/envelope.py:75
+  /workspaces/interview_analyzer_chaining/src/events/envelope.py:75: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator("occurred_at")
+
+src/events/envelope.py:84
+  /workspaces/interview_analyzer_chaining/src/events/envelope.py:84: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator("event_id")
+
+src/events/envelope.py:93
+  /workspaces/interview_analyzer_chaining/src/events/envelope.py:93: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator("aggregate_id")
+
+../../usr/local/lib/python3.10/site-packages/pydantic/_internal/_generate_schema.py:298
+../../usr/local/lib/python3.10/site-packages/pydantic/_internal/_generate_schema.py:298
+  /usr/local/lib/python3.10/site-packages/pydantic/_internal/_generate_schema.py:298: PydanticDeprecatedSince20: `json_encoders` is deprecated. See https://docs.pydantic.dev/2.11/concepts/serialization/#custom-serializers for alternatives. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(
+
+tests/events/test_core_plumbing_validation.py::TestInterviewEvents::test_create_interview_created_event
+tests/events/test_core_plumbing_validation.py::TestInterviewAggregate::test_interview_load_from_history
+tests/integration/test_dual_write_pipeline.py::TestDualWritePipelineEventEmission::test_interview_created_event_emission
+tests/integration/test_dual_write_pipeline.py::TestDualWritePipelineEventEmission::test_correlation_id_propagation
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_interview_created_success
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_interview_created_handles_exception
+  /workspaces/interview_analyzer_chaining/src/events/interview_events.py:100: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    data=data.dict(),
+
+tests/events/test_core_plumbing_validation.py: 1 warning
+tests/integration/test_dual_write_pipeline.py: 4 warnings
+tests/integration/test_e2e_user_edits.py: 3 warnings
+tests/pipeline/test_pipeline_event_emitter_unit.py: 7 warnings
+  /workspaces/interview_analyzer_chaining/src/events/sentence_events.py:171: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    data=data.dict(),
+
+tests/events/test_core_plumbing_validation.py::TestRepositoryPattern::test_interview_repository_stream_naming
+  tests/events/test_core_plumbing_validation.py:278: PytestWarning: The test <Function test_interview_repository_stream_naming> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_interview_repository_stream_naming(self):
+
+tests/events/test_core_plumbing_validation.py::TestRepositoryPattern::test_sentence_repository_stream_naming
+  tests/events/test_core_plumbing_validation.py:288: PytestWarning: The test <Function test_sentence_repository_stream_naming> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_sentence_repository_stream_naming(self):
+
+tests/integration/test_dual_write_pipeline.py::TestDualWritePipelineEventEmission::test_analysis_generated_event_emission
+tests/integration/test_dual_write_pipeline.py::TestDualWritePipelineEventEmission::test_correlation_id_propagation
+tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_override_analysis_workflow
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_analysis_generated_success
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_analysis_generated_handles_exception
+  /workspaces/interview_analyzer_chaining/src/events/sentence_events.py:253: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    data=data.dict(),
+
+tests/integration/test_dual_write_pipeline.py::TestNeo4jAnalysisWriterEventIntegration::test_analysis_writer_emits_analysis_generated_event
+tests/integration/test_dual_write_pipeline.py::TestNeo4jAnalysisWriterEventIntegration::test_analysis_writer_neo4j_succeeds_even_if_event_fails
+  /workspaces/interview_analyzer_chaining/src/io/neo4j_analysis_writer.py:316: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    return dict(record) if record else {}
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_edit_sentence_workflow
+tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_override_analysis_workflow
+tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_override_analysis_workflow
+tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_multiple_edits_on_same_sentence
+  /workspaces/interview_analyzer_chaining/src/events/store.py:163: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    "actor": event.actor.dict() if event.actor else None,
+
+tests/integration/test_neo4j_analysis_writer_lifecycle.py::TestNeo4jAnalysisWriterConcurrency::test_concurrent_writers_different_interviews
+  /usr/local/lib/python3.10/site-packages/neo4j/_codec/hydration/_common.py:104: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    Structure: self._hydrate_structure,
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/io/test_local_storage.py::test_local_text_data_source_constructor_validation
+  tests/io/test_local_storage.py:192: PytestWarning: The test <Function test_local_text_data_source_constructor_validation> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_local_text_data_source_constructor_validation():
+
+tests/io/test_local_storage.py::test_local_analysis_writer_constructor_validation
+  tests/io/test_local_storage.py:210: PytestWarning: The test <Function test_local_analysis_writer_constructor_validation> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_local_analysis_writer_constructor_validation():
+
+tests/io/test_local_storage.py::test_local_map_storage_constructor_validation
+  tests/io/test_local_storage.py:228: PytestWarning: The test <Function test_local_map_storage_constructor_validation> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_local_map_storage_constructor_validation():
+
+tests/pipeline/test_pipeline_event_emitter_unit.py::TestPipelineEventEmitter::test_emit_interview_status_changed_success
+  /workspaces/interview_analyzer_chaining/src/events/interview_events.py:168: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    data=data.dict(),
+
+tests/projections/test_lane_manager_unit.py::TestLanePartitioning::test_consistent_hashing
+  tests/projections/test_lane_manager_unit.py:23: PytestWarning: The test <Function test_consistent_hashing> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_consistent_hashing(self):
+
+tests/projections/test_lane_manager_unit.py::TestLanePartitioning::test_different_interviews_can_map_to_different_lanes
+  tests/projections/test_lane_manager_unit.py:36: PytestWarning: The test <Function test_different_interviews_can_map_to_different_lanes> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_different_interviews_can_map_to_different_lanes(self):
+
+tests/projections/test_lane_manager_unit.py::TestLanePartitioning::test_lane_distribution
+  tests/projections/test_lane_manager_unit.py:51: PytestWarning: The test <Function test_lane_distribution> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_lane_distribution(self):
+
+tests/projections/test_lane_manager_unit.py::TestLanePartitioning::test_hash_matches_expected_algorithm
+  tests/projections/test_lane_manager_unit.py:74: PytestWarning: The test <Function test_hash_matches_expected_algorithm> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_hash_matches_expected_algorithm(self):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/commands/test_command_handlers.py::TestInterviewCommandHandler::test_create_interview_command
+FAILED tests/commands/test_command_handlers.py::TestSentenceCommandHandler::test_create_sentence_command
+FAILED tests/commands/test_command_handlers.py::TestSentenceCommandHandler::test_edit_sentence_command
+FAILED tests/integration/test_e2e_file_processing.py::TestE2EFileProcessingWithDualWrite::test_single_file_upload_with_dual_write
+FAILED tests/integration/test_e2e_file_processing.py::TestE2EFileProcessingWithDualWrite::test_deterministic_sentence_uuids
+FAILED tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_edit_sentence_workflow
+FAILED tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_override_analysis_workflow
+FAILED tests/integration/test_e2e_user_edits.py::TestE2EUserEditWorkflow::test_multiple_edits_on_same_sentence
+FAILED tests/integration/test_neo4j_connection_reliability.py::TestConnectionManagerReliability::test_wait_for_ready_timeout
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/usr/local/lib/python3.10/site-packages/backports/asyncio/runner/runner.py:180: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+====== 9 failed, 430 passed, 22 skipped, 55 warnings in 126.19s (0:02:06) ======

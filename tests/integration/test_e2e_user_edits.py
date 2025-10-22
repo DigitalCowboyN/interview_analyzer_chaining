@@ -16,9 +16,9 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
-from src.main import app
 from src.config import config
 from src.events.store import EventStoreClient
+from src.main import app
 
 
 @pytest.mark.asyncio
@@ -45,8 +45,8 @@ class TestE2EUserEditWorkflow:
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
 
         # Create initial sentence via event (simulating pipeline)
-        from src.events.sentence_events import create_sentence_created_event
         from src.events.envelope import Actor, ActorType
+        from src.events.sentence_events import create_sentence_created_event
 
         system_actor = Actor(actor_type=ActorType.SYSTEM, user_id="pipeline")
         initial_event = create_sentence_created_event(
@@ -95,9 +95,7 @@ class TestE2EUserEditWorkflow:
 
         # === Step 3: Verify edit history accessible via API ===
         async with AsyncClient(app=app, base_url="http://test") as client:
-            history_response = await client.get(
-                f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/history"
-            )
+            history_response = await client.get(f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/history")
 
         assert history_response.status_code == 200
         history = history_response.json()
@@ -129,11 +127,11 @@ class TestE2EUserEditWorkflow:
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
 
         # Create initial sentence and analysis via events (simulating pipeline)
-        from src.events.sentence_events import (
-            create_sentence_created_event,
-            create_analysis_generated_event,
-        )
         from src.events.envelope import Actor, ActorType
+        from src.events.sentence_events import (
+            create_analysis_generated_event,
+            create_sentence_created_event,
+        )
 
         system_actor = Actor(actor_type=ActorType.SYSTEM, user_id="pipeline")
         correlation_id = str(uuid.uuid4())
@@ -226,8 +224,8 @@ class TestE2EUserEditWorkflow:
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
 
         # Create initial sentence
-        from src.events.sentence_events import create_sentence_created_event
         from src.events.envelope import Actor, ActorType
+        from src.events.sentence_events import create_sentence_created_event
 
         system_actor = Actor(actor_type=ActorType.SYSTEM, user_id="pipeline")
         initial_event = create_sentence_created_event(
@@ -275,9 +273,7 @@ class TestE2EUserEditWorkflow:
 
         # === Verify history API returns all events ===
         async with AsyncClient(app=app, base_url="http://test") as client:
-            history_response = await client.get(
-                f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/history"
-            )
+            history_response = await client.get(f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/history")
 
         assert history_response.status_code == 200
         history = history_response.json()
@@ -288,4 +284,3 @@ class TestE2EUserEditWorkflow:
         print("  - Version numbers increment correctly (0 → 1 → 2 → 3)")
         print("  - All events persisted in EventStoreDB")
         print("  - History API returns all 4 events")
-

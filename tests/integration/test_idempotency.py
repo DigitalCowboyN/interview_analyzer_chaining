@@ -28,7 +28,7 @@ from src.utils.neo4j_driver import Neo4jConnectionManager
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-@pytest.mark.skip(reason="Projection service not yet fully integrated for testing")
+@pytest.mark.eventstore
 class TestIdempotency:
     """Test idempotent behavior of projection handlers."""
 
@@ -286,7 +286,7 @@ class TestIdempotency:
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-@pytest.mark.skip(reason="Parked events/DLQ not yet implemented")
+@pytest.mark.eventstore
 class TestResilience:
     """Test resilience features: retries, parked events, error handling."""
 
@@ -339,4 +339,3 @@ class TestResilience:
         """
         # This test would verify parked event replay functionality
         pass
-

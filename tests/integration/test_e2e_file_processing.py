@@ -41,10 +41,7 @@ class TestE2EFileProcessingWithDualWrite:
         """
         # Enable event sourcing for this test
         test_config = config.copy()
-        test_config["event_sourcing"] = {
-            "enabled": True,
-            "connection_string": "esdb://localhost:2113?tls=false"
-        }
+        test_config["event_sourcing"] = {"enabled": True, "connection_string": "esdb://localhost:2113?tls=false"}
 
         # Create output directory for the test
         output_dir = tmp_path / "output"
@@ -101,8 +98,7 @@ class TestE2EFileProcessingWithDualWrite:
         async with driver.session() as session:
             # Check for Interview node
             result = await session.run(
-                "MATCH (i:Interview {interview_id: $interview_id}) RETURN i",
-                interview_id=interview_id
+                "MATCH (i:Interview {interview_id: $interview_id}) RETURN i", interview_id=interview_id
             )
             interview_node = await result.single()
             assert interview_node is not None, "Interview node not found in Neo4j"
@@ -111,16 +107,16 @@ class TestE2EFileProcessingWithDualWrite:
             result = await session.run(
                 "MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence) "
                 "RETURN count(s) as sentence_count",
-                interview_id=interview_id
+                interview_id=interview_id,
             )
             record = await result.single()
-            assert record["sentence_count"] == expected_sentence_count, \
-                f"Expected {expected_sentence_count} sentences in Neo4j, got {record['sentence_count']}"
+            assert (
+                record["sentence_count"] == expected_sentence_count
+            ), f"Expected {expected_sentence_count} sentences in Neo4j, got {record['sentence_count']}"
 
             # Check for SourceFile node
             result = await session.run(
-                "MATCH (f:SourceFile {filename: $filename}) RETURN f",
-                filename=sample_interview_file.name
+                "MATCH (f:SourceFile {filename: $filename}) RETURN f", filename=sample_interview_file.name
             )
             file_node = await result.single()
             assert file_node is not None, "SourceFile node not found in Neo4j"
@@ -150,10 +146,7 @@ class TestE2EFileProcessingWithDualWrite:
         """
         # Enable event sourcing
         test_config = config.copy()
-        test_config["event_sourcing"] = {
-            "enabled": True,
-            "connection_string": "esdb://localhost:2113?tls=false"
-        }
+        test_config["event_sourcing"] = {"enabled": True, "connection_string": "esdb://localhost:2113?tls=false"}
 
         output_dir = tmp_path / "output"
         output_dir.mkdir()
@@ -165,6 +158,7 @@ class TestE2EFileProcessingWithDualWrite:
 
         # Clear Neo4j but keep EventStoreDB
         from src.utils.neo4j_driver import Neo4jConnectionManager
+
         driver = await Neo4jConnectionManager.get_driver(test_mode=True)
         async with driver.session() as session:
             await session.run("MATCH (n) DETACH DELETE n")
@@ -185,14 +179,14 @@ class TestE2EFileProcessingWithDualWrite:
 
         # All events should have the same sentence_id
         for event in sentence_events:
-            assert event.aggregate_id == expected_sentence_id, \
-                "Sentence UUID is not deterministic across processings"
+            assert event.aggregate_id == expected_sentence_id, "Sentence UUID is not deterministic across processings"
 
         print("\n✓ Deterministic UUID validation passed:")
         print("  - Sentence UUIDs are consistent across re-processing")
         print("  - Using uuid5(interview_id:index) generation strategy")
 
-    @pytest.mark.skip(reason="EventStoreDB may not be fully ready yet")
+    @pytest.mark.eventstore
+    @pytest.mark.integration
     async def test_multiple_files_concurrent_processing(
         self,
         clean_test_database,
@@ -210,10 +204,7 @@ class TestE2EFileProcessingWithDualWrite:
         """
         # Enable event sourcing
         test_config = config.copy()
-        test_config["event_sourcing"] = {
-            "enabled": True,
-            "connection_string": "esdb://localhost:2113?tls=false"
-        }
+        test_config["event_sourcing"] = {"enabled": True, "connection_string": "esdb://localhost:2113?tls=false"}
 
         output_dir = tmp_path / "output"
         output_dir.mkdir()
@@ -233,11 +224,13 @@ File {i} sentence 3."""
         pipeline = PipelineOrchestrator(config=test_config)
 
         import asyncio
+
         tasks = [pipeline._process_single_file(Path(fp)) for fp in file_paths]
         await asyncio.gather(*tasks)
 
         # === Validation: Check each file's events and Neo4j data ===
         from src.utils.neo4j_driver import Neo4jConnectionManager
+
         driver = await Neo4jConnectionManager.get_driver(test_mode=True)
 
         for i, file_path in enumerate(file_paths):
@@ -253,7 +246,7 @@ File {i} sentence 3."""
                 result = await session.run(
                     "MATCH (i:Interview {interview_id: $interview_id}) "
                     "RETURN i, [(i)-[:HAS_SENTENCE]->(s:Sentence) | s] as sentences",
-                    interview_id=interview_id
+                    interview_id=interview_id,
                 )
                 record = await result.single()
                 assert record is not None, f"Interview not found in Neo4j for file {i}"
@@ -263,4 +256,3 @@ File {i} sentence 3."""
         print("  - 3 files processed simultaneously")
         print("  - Events correctly partitioned by interview_id")
         print("  - All data present in Neo4j")
-
