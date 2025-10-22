@@ -8,6 +8,7 @@ Tests the complete workflow:
 4. Event metadata validation
 """
 
+import os
 import uuid
 from pathlib import Path
 
@@ -15,6 +16,7 @@ import pytest
 
 from src.config import config
 from src.pipeline import PipelineOrchestrator
+from src.utils.environment import detect_environment
 
 
 @pytest.mark.asyncio
@@ -41,7 +43,14 @@ class TestE2EFileProcessingWithDualWrite:
         """
         # Enable event sourcing for this test
         test_config = config.copy()
-        test_config["event_sourcing"] = {"enabled": True, "connection_string": "esdb://localhost:2113?tls=false"}
+        # Use environment-aware connection string with configurable host/port
+        esdb_connection = os.getenv("EVENTSTORE_TEST_CONNECTION_STRING")
+        if not esdb_connection:
+            environment = detect_environment()
+            host = os.getenv("EVENTSTORE_HOST", "eventstore" if environment in ("docker", "ci") else "localhost")
+            port = os.getenv("EVENTSTORE_PORT", "2113")
+            esdb_connection = f"esdb://{host}:{port}?tls=false"
+        test_config["event_sourcing"] = {"enabled": True, "connection_string": esdb_connection}
 
         # Create output directory for the test
         output_dir = tmp_path / "output"
@@ -49,7 +58,10 @@ class TestE2EFileProcessingWithDualWrite:
         test_config["paths"]["output_dir"] = str(output_dir)
 
         # Create pipeline orchestrator
-        pipeline = PipelineOrchestrator(config=test_config)
+        # Use the sample file's parent directory as input_dir
+        pipeline = PipelineOrchestrator(
+            input_dir=sample_interview_file.parent, output_dir=output_dir, config_dict=test_config
+        )
 
         # Process the file
         await pipeline._process_single_file(Path(sample_interview_file))
@@ -146,14 +158,22 @@ class TestE2EFileProcessingWithDualWrite:
         """
         # Enable event sourcing
         test_config = config.copy()
-        test_config["event_sourcing"] = {"enabled": True, "connection_string": "esdb://localhost:2113?tls=false"}
+        # Use environment-aware connection string
+        environment = detect_environment()
+        if environment in ("docker", "ci"):
+            esdb_connection = "esdb://eventstore:2113?tls=false"
+        else:
+            esdb_connection = "esdb://localhost:2113?tls=false"
+        test_config["event_sourcing"] = {"enabled": True, "connection_string": esdb_connection}
 
         output_dir = tmp_path / "output"
         output_dir.mkdir()
         test_config["paths"]["output_dir"] = str(output_dir)
 
         # Process the file TWICE (simulating re-processing)
-        pipeline = PipelineOrchestrator(config=test_config)
+        pipeline = PipelineOrchestrator(
+            input_dir=sample_interview_file.parent, output_dir=output_dir, config_dict=test_config
+        )
         await pipeline._process_single_file(Path(sample_interview_file))
 
         # Clear Neo4j but keep EventStoreDB
@@ -204,7 +224,13 @@ class TestE2EFileProcessingWithDualWrite:
         """
         # Enable event sourcing
         test_config = config.copy()
-        test_config["event_sourcing"] = {"enabled": True, "connection_string": "esdb://localhost:2113?tls=false"}
+        # Use environment-aware connection string
+        environment = detect_environment()
+        if environment in ("docker", "ci"):
+            esdb_connection = "esdb://eventstore:2113?tls=false"
+        else:
+            esdb_connection = "esdb://localhost:2113?tls=false"
+        test_config["event_sourcing"] = {"enabled": True, "connection_string": esdb_connection}
 
         output_dir = tmp_path / "output"
         output_dir.mkdir()
@@ -221,7 +247,7 @@ File {i} sentence 3."""
             file_paths.append(file_path)
 
         # Process all files concurrently
-        pipeline = PipelineOrchestrator(config=test_config)
+        pipeline = PipelineOrchestrator(input_dir=tmp_path, output_dir=output_dir, config_dict=test_config)
 
         import asyncio
 

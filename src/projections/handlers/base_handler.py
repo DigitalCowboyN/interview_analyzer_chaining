@@ -38,7 +38,7 @@ class BaseProjectionHandler(ABC):
         Args:
             parked_events_manager: Manager for parking failed events
         """
-        self.neo4j_manager = Neo4jConnectionManager()
+        # Note: Neo4jConnectionManager.get_session() is a classmethod, use the class directly
         self.parked_events_manager = parked_events_manager or ParkedEventsManager()
 
     async def handle_with_retry(self, event: EventEnvelope, lane_id: int):
@@ -99,7 +99,7 @@ class BaseProjectionHandler(ABC):
         Args:
             event: Event to handle
         """
-        async with self.neo4j_manager.get_session() as session:
+        async with await Neo4jConnectionManager.get_session() as session:
             # Check version (idempotency guard)
             current_version = await self._get_version(session, event)
             if current_version is not None and event.version <= current_version:
@@ -110,21 +110,22 @@ class BaseProjectionHandler(ABC):
                 return
 
             # Apply event in transaction
-            async with session.begin_transaction() as tx:
-                try:
-                    await self.apply(tx, event)
-                    await self._set_version(tx, event)
-                    await tx.commit()
+            # Note: begin_transaction() is NOT a context manager in neo4j 5.x
+            tx = await session.begin_transaction()
+            try:
+                await self.apply(tx, event)
+                await self._set_version(tx, event)
+                await tx.commit()
 
-                    logger.debug(
-                        f"Applied event {event.event_id} (type: {event.event_type}, "
-                        f"version: {event.version}) to {event.aggregate_id}"
-                    )
+                logger.debug(
+                    f"Applied event {event.event_id} (type: {event.event_type}, "
+                    f"version: {event.version}) to {event.aggregate_id}"
+                )
 
-                except Exception as e:
-                    await tx.rollback()
-                    logger.error(f"Failed to apply event {event.event_id}: {e}", exc_info=True)
-                    raise
+            except Exception as e:
+                await tx.rollback()
+                logger.error(f"Failed to apply event {event.event_id}: {e}", exc_info=True)
+                raise
 
     async def _get_version(self, session, event: EventEnvelope) -> Optional[int]:
         """

@@ -67,7 +67,7 @@ class TestIdempotency:
         handler = InterviewCreatedHandler()
 
         # First processing
-        await handler.handle(event, driver)
+        await handler.handle(event)
 
         # Capture state after first processing
         async with driver.session() as session:
@@ -79,10 +79,10 @@ class TestIdempotency:
             assert count_after_first == 1, "Interview node not created on first processing"
 
         # Second processing (replay)
-        await handler.handle(event, driver)
+        await handler.handle(event)
 
         # Third processing (replay)
-        await handler.handle(event, driver)
+        await handler.handle(event)
 
         # === Verify state unchanged after replays ===
         async with driver.session() as session:
@@ -142,27 +142,41 @@ class TestIdempotency:
         edited_event = create_sentence_edited_event(
             aggregate_id=sentence_id,
             version=1,
+            old_text="Original text",
             new_text="Edited text",
             editor_type="human",
             actor=human_actor,
             correlation_id=correlation_id,
         )
 
+        # === First create the Interview node (required parent) ===
+        interview_handler = InterviewCreatedHandler()
+        interview_event = create_interview_created_event(
+            aggregate_id=interview_id,
+            version=0,
+            title="Version Guard Test Interview",
+            source="test.txt",
+            language="en",
+            actor=system_actor,
+            project_id="test-project",
+            correlation_id=correlation_id,
+        )
+        await interview_handler.handle(interview_event)
+
         # === Process in correct order ===
-        driver = await Neo4jConnectionManager.get_driver(test_mode=True)
         created_handler = SentenceCreatedHandler()
         edited_handler = SentenceEditedHandler()
 
         # Process version 0 (created)
-        await created_handler.handle(created_event, driver)
+        await created_handler.handle(created_event)
 
         # Process version 1 (edited)
-        await edited_handler.handle(edited_event, driver)
+        await edited_handler.handle(edited_event)
 
         # Verify text is "Edited text"
-        async with driver.session() as session:
+        async with await Neo4jConnectionManager.get_session(database="neo4j") as session:
             result = await session.run(
-                "MATCH (s:Sentence {sentence_id: $sentence_id}) RETURN s.text as text, s.version as version",
+                "MATCH (s:Sentence {sentence_id: $sentence_id}) RETURN s.text as text, s.event_version as version",
                 sentence_id=sentence_id,
             )
             record = await result.single()
@@ -170,12 +184,12 @@ class TestIdempotency:
             assert record["version"] == 1, f"Expected version 1, got {record['version']}"
 
         # === Attempt to replay version 0 (should be skipped) ===
-        await created_handler.handle(created_event, driver)
+        await created_handler.handle(created_event)
 
         # === Verify state unchanged (version guard worked) ===
-        async with driver.session() as session:
+        async with await Neo4jConnectionManager.get_session(database="neo4j") as session:
             result = await session.run(
-                "MATCH (s:Sentence {sentence_id: $sentence_id}) RETURN s.text as text, s.version as version",
+                "MATCH (s:Sentence {sentence_id: $sentence_id}) RETURN s.text as text, s.event_version as version",
                 sentence_id=sentence_id,
             )
             record = await result.single()
@@ -222,6 +236,7 @@ class TestIdempotency:
         edited_event_1 = create_sentence_edited_event(
             aggregate_id=sentence_id,
             version=1,
+            old_text="Original text",
             new_text="First edit",
             editor_type="human",
             actor=human_actor,
@@ -231,26 +246,40 @@ class TestIdempotency:
         edited_event_2 = create_sentence_edited_event(
             aggregate_id=sentence_id,
             version=2,
+            old_text="First edit",
             new_text="Second edit",
             editor_type="human",
             actor=human_actor,
             correlation_id=correlation_id,
         )
 
+        # === First create the Interview node (required parent) ===
+        interview_handler = InterviewCreatedHandler()
+        interview_event = create_interview_created_event(
+            aggregate_id=interview_id,
+            version=0,
+            title="Multiple Events Test Interview",
+            source="test.txt",
+            language="en",
+            actor=system_actor,
+            project_id="test-project",
+            correlation_id=correlation_id,
+        )
+        await interview_handler.handle(interview_event)
+
         # === Process events in order ===
-        driver = await Neo4jConnectionManager.get_driver(test_mode=True)
         created_handler = SentenceCreatedHandler()
         edited_handler = SentenceEditedHandler()
 
-        await created_handler.handle(created_event, driver)
-        await edited_handler.handle(edited_event_1, driver)
-        await edited_handler.handle(edited_event_2, driver)
+        await created_handler.handle(created_event)
+        await edited_handler.handle(edited_event_1)
+        await edited_handler.handle(edited_event_2)
 
         # Capture final state
-        async with driver.session() as session:
+        async with await Neo4jConnectionManager.get_session(database="neo4j") as session:
             result = await session.run(
                 "MATCH (s:Sentence {sentence_id: $sentence_id}) "
-                "RETURN s.text as text, s.version as version, s.is_edited as is_edited",
+                "RETURN s.text as text, s.event_version as version, s.is_edited as is_edited",
                 sentence_id=sentence_id,
             )
             final_state = await result.single()
@@ -259,15 +288,15 @@ class TestIdempotency:
             expected_is_edited = final_state["is_edited"]
 
         # === Replay all events (simulate full replay) ===
-        await created_handler.handle(created_event, driver)
-        await edited_handler.handle(edited_event_1, driver)
-        await edited_handler.handle(edited_event_2, driver)
+        await created_handler.handle(created_event)
+        await edited_handler.handle(edited_event_1)
+        await edited_handler.handle(edited_event_2)
 
         # === Verify state unchanged ===
-        async with driver.session() as session:
+        async with await Neo4jConnectionManager.get_session(database="neo4j") as session:
             result = await session.run(
                 "MATCH (s:Sentence {sentence_id: $sentence_id}) "
-                "RETURN s.text as text, s.version as version, s.is_edited as is_edited",
+                "RETURN s.text as text, s.event_version as version, s.is_edited as is_edited",
                 sentence_id=sentence_id,
             )
             replayed_state = await result.single()

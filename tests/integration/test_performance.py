@@ -9,6 +9,7 @@ Tests:
 """
 
 import asyncio
+import os
 import time
 import uuid
 
@@ -16,8 +17,8 @@ import pytest
 
 from src.events.envelope import Actor, ActorType
 from src.events.sentence_events import create_sentence_created_event
-from src.events.store import EventStoreClient
 from src.projections.handlers.sentence_handlers import SentenceCreatedHandler
+from src.utils.environment import detect_environment
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
 
@@ -76,10 +77,10 @@ class TestEventEmissionPerformance:
             avg_time_per_event < 10
         ), f"Event emission too slow: {avg_time_per_event:.2f}ms per event (target: < 10ms)"
 
-        print(f"\n✓ Event emission performance:")
-        print("  - 100 events emitted in {elapsed_time:.2f}s")
-        print("  - Average: {avg_time_per_event:.2f}ms per event")
-        print("  - Throughput: {100 / elapsed_time:.2f} events/sec")
+        print("\n✓ Event emission performance:")
+        print(f"  - 100 events emitted in {elapsed_time:.2f}s")
+        print(f"  - Average: {avg_time_per_event:.2f}ms per event")
+        print(f"  - Throughput: {100 / elapsed_time:.2f} events/sec")
 
     async def test_batch_event_emission(
         self,
@@ -126,10 +127,10 @@ class TestEventEmissionPerformance:
 
         # === Validate performance ===
         avg_time_per_event = (elapsed_time / 100) * 1000  # Convert to ms
-        print(f"\n✓ Batch event emission performance:")
-        print("  - 100 events to same stream in {elapsed_time:.2f}s")
-        print("  - Average: {avg_time_per_event:.2f}ms per event")
-        print("  - Throughput: {100 / elapsed_time:.2f} events/sec")
+        print("\n✓ Batch event emission performance:")
+        print(f"  - 100 events to same stream in {elapsed_time:.2f}s")
+        print(f"  - Average: {avg_time_per_event:.2f}ms per event")
+        print(f"  - Throughput: {100 / elapsed_time:.2f} events/sec")
 
 
 @pytest.mark.asyncio
@@ -179,11 +180,10 @@ class TestProjectionPerformance:
         emission_complete_time = time.time()
 
         # === Step 2: Process events through projection handler ===
-        driver = await Neo4jConnectionManager.get_driver(test_mode=True)
         handler = SentenceCreatedHandler()
 
         for sentence_id, event in events:
-            await handler.handle(event, driver)
+            await handler.handle(event)
 
         processing_complete_time = time.time()
 
@@ -193,10 +193,10 @@ class TestProjectionPerformance:
         # === Validate performance ===
         assert projection_lag < 1.0, f"Projection lag too high: {projection_lag:.2f}s (target: < 1s)"
 
-        print(f"\n✓ Projection processing performance:")
-        print("  - 100 events processed in {projection_lag:.2f}s")
-        print("  - Average: {(projection_lag / 100) * 1000:.2f}ms per event")
-        print("  - Throughput: {100 / projection_lag:.2f} events/sec")
+        print("\n✓ Projection processing performance:")
+        print(f"  - 100 events processed in {projection_lag:.2f}s")
+        print(f"  - Average: {(projection_lag / 100) * 1000:.2f}ms per event")
+        print(f"  - Throughput: {100 / projection_lag:.2f} events/sec")
 
     async def test_concurrent_projection_processing(
         self,
@@ -246,7 +246,7 @@ class TestProjectionPerformance:
 
         sequential_start = time.time()
         for event in events:
-            await handler.handle(event, driver)
+            await handler.handle(event)
         sequential_time = time.time() - sequential_start
 
         # === Step 3: Process concurrently ===
@@ -255,17 +255,17 @@ class TestProjectionPerformance:
             await session.run("MATCH (n) DETACH DELETE n")
 
         concurrent_start = time.time()
-        tasks = [handler.handle(event, driver) for event in events]
+        tasks = [handler.handle(event) for event in events]
         await asyncio.gather(*tasks)
         concurrent_time = time.time() - concurrent_start
 
         # === Validate performance ===
         # Concurrent should be faster (or at least not much slower)
         speedup = sequential_time / concurrent_time
-        print(f"\n✓ Concurrent projection processing:")
-        print("  - Sequential: {sequential_time:.2f}s")
-        print("  - Concurrent: {concurrent_time:.2f}s")
-        print("  - Speedup: {speedup:.2f}x")
+        print("\n✓ Concurrent projection processing:")
+        print(f"  - Sequential: {sequential_time:.2f}s")
+        print(f"  - Concurrent: {concurrent_time:.2f}s")
+        print(f"  - Speedup: {speedup:.2f}x")
 
         # We expect at least some benefit from concurrency, but Neo4j may serialize writes
         assert speedup >= 0.8, "Concurrent processing significantly slower than sequential"
@@ -322,9 +322,9 @@ class TestLoadTesting:
 
         # === Validate ===
         throughput = 1000 / elapsed_time
-        print(f"\n✓ High volume event processing:")
-        print("  - 1000 events emitted in {elapsed_time:.2f}s")
-        print("  - Throughput: {throughput:.2f} events/sec")
+        print("\n✓ High volume event processing:")
+        print(f"  - 1000 events emitted in {elapsed_time:.2f}s")
+        print(f"  - Throughput: {throughput:.2f} events/sec")
 
         # Verify we can read back all events (no loss)
         # This would require reading all 1000 streams, which is expensive
@@ -352,7 +352,14 @@ class TestLoadTesting:
 
         # Enable event sourcing
         test_config = config.copy()
-        test_config["event_sourcing"] = {"enabled": True, "connection_string": "esdb://localhost:2113?tls=false"}
+        # Use environment-aware connection string with configurable host/port
+        esdb_connection = os.getenv("EVENTSTORE_TEST_CONNECTION_STRING")
+        if not esdb_connection:
+            environment = detect_environment()
+            host = os.getenv("EVENTSTORE_HOST", "eventstore" if environment in ("docker", "ci") else "localhost")
+            port = os.getenv("EVENTSTORE_PORT", "2113")
+            esdb_connection = f"esdb://{host}:{port}?tls=false"
+        test_config["event_sourcing"] = {"enabled": True, "connection_string": esdb_connection}
 
         output_dir = tmp_path / "output"
         output_dir.mkdir()
@@ -367,7 +374,7 @@ class TestLoadTesting:
             file_paths.append(file_path)
 
         # === Process concurrently ===
-        pipeline = PipelineOrchestrator(config=test_config)
+        pipeline = PipelineOrchestrator(config_dict=test_config)
 
         start_time = time.time()
         tasks = [pipeline._process_single_file(Path(fp)) for fp in file_paths]
@@ -375,9 +382,9 @@ class TestLoadTesting:
         elapsed_time = time.time() - start_time
 
         # === Validate ===
-        print(f"\n✓ Concurrent file processing:")
-        print("  - 10 files processed in {elapsed_time:.2f}s")
-        print("  - Average: {elapsed_time / 10:.2f}s per file")
+        print("\n✓ Concurrent file processing:")
+        print(f"  - 10 files processed in {elapsed_time:.2f}s")
+        print(f"  - Average: {elapsed_time / 10:.2f}s per file")
 
         # Verify data in Neo4j (spot check)
         driver = await Neo4jConnectionManager.get_driver(test_mode=True)

@@ -120,15 +120,15 @@ class TestProjectionReplay:
 
         # Process InterviewCreated
         interview_handler = InterviewCreatedHandler()
-        await interview_handler.handle(interview_event, driver)
+        await interview_handler.handle(interview_event)
 
         # Process SentenceCreated and AnalysisGenerated for each sentence
         sentence_handler = SentenceCreatedHandler()
         analysis_handler = AnalysisGeneratedHandler()
 
         for sentence_id, created_event, analysis_event in sentence_events:
-            await sentence_handler.handle(created_event, driver)
-            await analysis_handler.handle(analysis_event, driver)
+            await sentence_handler.handle(created_event)
+            await analysis_handler.handle(analysis_event)
 
         # === Step 3: Verify Neo4j state ===
         async with driver.session() as session:
@@ -247,9 +247,9 @@ class TestProjectionReplay:
         interview_handler = InterviewCreatedHandler()
         sentence_handler = SentenceCreatedHandler()
 
-        await interview_handler.handle(interview_event, driver)
-        await sentence_handler.handle(sentence_0_created, driver)
-        await sentence_handler.handle(sentence_1_created, driver)
+        await interview_handler.handle(interview_event)
+        await sentence_handler.handle(sentence_0_created)
+        await sentence_handler.handle(sentence_1_created)
 
         # === Step 2: Capture Neo4j state ===
         async with driver.session() as session:
@@ -275,9 +275,9 @@ class TestProjectionReplay:
             assert (await result.single())["count"] == 0, "Neo4j not empty after wipe"
 
         # === Step 4: Replay all events ===
-        await interview_handler.handle(interview_event, driver)
-        await sentence_handler.handle(sentence_0_created, driver)
-        await sentence_handler.handle(sentence_1_created, driver)
+        await interview_handler.handle(interview_event)
+        await sentence_handler.handle(sentence_0_created)
+        await sentence_handler.handle(sentence_1_created)
 
         # === Step 5: Verify Neo4j state matches original ===
         async with driver.session() as session:
@@ -360,7 +360,7 @@ class TestProjectionReplay:
         driver = await Neo4jConnectionManager.get_driver(test_mode=True)
         interview_handler = InterviewCreatedHandler()
 
-        await interview_handler.handle(interview_1_event, driver)
+        await interview_handler.handle(interview_1_event)
 
         # === Verify only Interview 1 in Neo4j ===
         async with driver.session() as session:

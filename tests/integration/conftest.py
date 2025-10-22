@@ -13,9 +13,11 @@ import requests
 
 from src.events.store import EventStoreClient
 from src.utils.environment import (
+    check_eventstore_ready,
     check_neo4j_test_ready,
     detect_environment,
     get_available_neo4j_config,
+    is_eventstore_externally_managed,
     is_service_externally_managed,
 )
 from src.utils.neo4j_driver import Neo4jConnectionManager
@@ -35,7 +37,7 @@ def ensure_neo4j_test_service():
     environment = detect_environment()
     externally_managed = is_service_externally_managed("neo4j-test", 7687)
 
-    print(f"\n=== Setting up Neo4j test environment ===")
+    print("\n=== Setting up Neo4j test environment ===")
     print(f"Environment: {environment}")
     print(f"Externally managed: {externally_managed}")
 
@@ -192,21 +194,36 @@ def setup_test_environment(monkeypatch):
 
     This ensures that our environment-aware connection logic
     can find the test database configuration.
+
+    Environment variables can be overridden:
+    - NEO4J_TEST_URI (full URI)
+    - NEO4J_TEST_HOST, NEO4J_TEST_PORT (for URI construction)
+    - NEO4J_TEST_USER
+    - NEO4J_TEST_PASSWORD
+    - EVENTSTORE_HOST, EVENTSTORE_PORT (for connection string)
     """
     environment = detect_environment()
 
-    # Set test-specific environment variables based on detected environment
-    if environment == "docker":
-        # Inside Docker container - use service names
-        monkeypatch.setenv("NEO4J_TEST_URI", "bolt://neo4j-test:7687")
-    else:
-        # Host or CI - use localhost with exposed port
-        monkeypatch.setenv("NEO4J_TEST_URI", "bolt://localhost:7688")
+    # Neo4j Test Configuration
+    # Allow override of test URI, otherwise construct from host/port
+    neo4j_test_uri = os.getenv("NEO4J_TEST_URI")
+    if not neo4j_test_uri:
+        if environment == "docker":
+            # Inside Docker container - use service names
+            neo4j_host = os.getenv("NEO4J_TEST_HOST", "neo4j-test")
+            neo4j_port = os.getenv("NEO4J_TEST_PORT", "7687")
+        else:
+            # Host or CI - use localhost with exposed port (from docker-compose.yml)
+            neo4j_host = os.getenv("NEO4J_TEST_HOST", "localhost")
+            neo4j_port = os.getenv("NEO4J_TEST_PORT", "7688")
+        neo4j_test_uri = f"bolt://{neo4j_host}:{neo4j_port}"
 
-    monkeypatch.setenv("NEO4J_TEST_USER", "neo4j")
-    monkeypatch.setenv("NEO4J_TEST_PASSWORD", "testpassword")
+    monkeypatch.setenv("NEO4J_TEST_URI", neo4j_test_uri)
+    monkeypatch.setenv("NEO4J_TEST_USER", os.getenv("NEO4J_TEST_USER", "neo4j"))
+    monkeypatch.setenv("NEO4J_TEST_PASSWORD", os.getenv("NEO4J_TEST_PASSWORD", "testpassword"))
 
     print(f"Test environment configured for {environment} context")
+    print(f"  Neo4j Test URI: {neo4j_test_uri}")
 
     # Force connection manager to reinitialize with new environment
     # We'll let the connection manager handle this naturally rather than forcing it
@@ -270,29 +287,94 @@ def ensure_eventstore_service():
     """
     Session-scoped fixture to ensure EventStoreDB service is available.
 
-    Since EventStoreDB is managed by docker-compose with healthcheck,
-    we verify it's accessible before running tests.
+    This fixture is environment-aware:
+    - In Docker/CI: Assumes service is externally managed (e.g., by docker-compose)
+    - On Host: Starts and stops the service using Makefile targets
+
+    This prevents "docker command not found" errors inside containers.
     """
-    print("\n=== Verifying EventStoreDB availability ===")
+    environment = detect_environment()
+    externally_managed = is_eventstore_externally_managed("eventstore", 2113)
 
-    max_retries = 30
-    retry_delay = 2
+    print("\n=== Setting up EventStoreDB environment ===")
+    print(f"Environment: {environment}")
+    print(f"Externally managed: {externally_managed}")
 
-    for attempt in range(max_retries):
+    service_started_by_fixture = False
+
+    if externally_managed:
+        # Service is managed externally (e.g., by docker-compose)
+        print("Service is externally managed - verifying availability...")
+
+        # Just verify the service is accessible
+        if not check_eventstore_ready(timeout=10.0):
+            pytest.fail(
+                "EventStoreDB service is not accessible. "
+                "Ensure docker-compose services are running (make eventstore-up from host)."
+            )
+        print("EventStoreDB service verified and ready!")
+
+    else:
+        # We need to start the service ourselves (host environment)
+        print("Starting EventStoreDB container...")
         try:
-            response = requests.get("http://localhost:2113/health/live", timeout=3)
-            if response.status_code == 204:
-                print("EventStoreDB is healthy and ready!")
-                yield
-                return
-        except requests.exceptions.RequestException:
-            pass
+            subprocess.run(["make", "eventstore-up"], check=True, capture_output=True, timeout=120, text=True)
+            print("EventStoreDB container started successfully")
+            service_started_by_fixture = True
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to start EventStoreDB container: {e}")
+            print(f"Stdout: {e.stdout}")
+            print(f"Stderr: {e.stderr}")
+            raise
+        except subprocess.TimeoutExpired:
+            print("Timeout starting EventStoreDB container")
+            raise
+        except FileNotFoundError:
+            pytest.fail("Could not run 'make eventstore-up'. " "Ensure you have make and docker installed.")
 
-        if attempt < max_retries - 1:
-            print(f"Waiting for EventStoreDB... (attempt {attempt + 1}/{max_retries})")
-            time.sleep(retry_delay)
+        # Wait for EventStoreDB to become ready
+        print("Waiting for EventStoreDB to become ready...")
+        max_retries = 30
+        retry_delay = 2
 
-    pytest.fail("EventStoreDB did not become healthy within timeout")
+        for attempt in range(max_retries):
+            if check_eventstore_ready(timeout=3.0):
+                print("EventStoreDB service is ready for testing!")
+                break
+
+            if attempt < max_retries - 1:
+                print(f"Waiting for EventStoreDB... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(retry_delay)
+        else:
+            # Attempt to get logs for debugging
+            try:
+                logs_result = subprocess.run(
+                    ["docker", "logs", "interview_analyzer_eventstore"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                print("=== EVENTSTORE CONTAINER LOGS ===")
+                print(logs_result.stdout)
+                print(logs_result.stderr)
+                print("================================")
+            except Exception as log_e:
+                print(f"Could not capture logs: {log_e}")
+
+            pytest.fail("EventStoreDB did not become healthy within timeout")
+
+    yield  # Tests run here
+
+    # Cleanup - only if we started the service
+    if service_started_by_fixture:
+        print("\n=== Cleaning up EventStoreDB environment ===")
+        try:
+            subprocess.run(["make", "eventstore-down"], check=True, capture_output=True, timeout=30)
+            print("EventStoreDB container stopped successfully")
+        except Exception as e:
+            print(f"Warning: Failed to clean up EventStoreDB container: {e}")
+    else:
+        print("\n=== EventStoreDB service is externally managed - skipping cleanup ===")
 
 
 @pytest.fixture(scope="function")
@@ -300,11 +382,29 @@ async def event_store_client(ensure_eventstore_service):
     """
     Provides an EventStoreDB client for testing.
 
-    Assumes EventStoreDB is running on localhost:2113.
+    Connection string is environment-aware (eventstore in Docker, localhost on host).
+    Can be overridden with EVENTSTORE_TEST_CONNECTION_STRING, or constructed from:
+    - EVENTSTORE_HOST
+    - EVENTSTORE_PORT
     """
-    from src.events.store import EventStoreClient
+    from src.events.store import EventStoreClient as ESClient
 
-    client = EventStoreClient("esdb://localhost:2113?tls=false")
+    # Check for explicit connection string override
+    connection_string = os.getenv("EVENTSTORE_TEST_CONNECTION_STRING")
+
+    if not connection_string:
+        # Use environment-aware defaults, but allow port/host override
+        environment = detect_environment()
+        if environment in ("docker", "ci"):
+            host = os.getenv("EVENTSTORE_HOST", "eventstore")
+            port = os.getenv("EVENTSTORE_PORT", "2113")
+        else:
+            host = os.getenv("EVENTSTORE_HOST", "localhost")
+            port = os.getenv("EVENTSTORE_PORT", "2113")
+
+        connection_string = f"esdb://{host}:{port}?tls=false"
+
+    client = ESClient(connection_string)
     await client.connect()
 
     yield client

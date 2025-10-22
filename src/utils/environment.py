@@ -9,6 +9,8 @@ import os
 import socket
 from typing import Dict, Optional
 
+import requests  # noqa: E402
+
 
 def detect_environment() -> str:
     """
@@ -341,6 +343,97 @@ def check_neo4j_test_ready(timeout: float = 5.0) -> bool:
         sock.close()
 
         return result == 0
-    except:
+    except Exception:  # noqa: E722
         # If HTTP check fails, but Bolt works, that's still OK
+        return True
+
+
+def is_eventstore_externally_managed(service_name: str = "eventstore", port: int = 2113) -> bool:
+    """
+    Check if EventStoreDB service is externally managed (e.g., by docker-compose).
+
+    This is determined by checking if:
+    1. We're running inside a container
+    2. The service is already accessible on the network
+
+    Args:
+        service_name: Name of the service to check (default: eventstore)
+        port: Port to check (default: 2113 for EventStoreDB HTTP)
+
+    Returns:
+        bool: True if service is externally managed, False otherwise
+    """
+    environment = detect_environment()
+
+    # If we're not in a container, services are NOT externally managed
+    # (they need to be started by the test runner)
+    if environment not in ("docker", "ci"):
+        return False
+
+    # Check if explicitly overridden
+    manage_services = os.getenv("MANAGE_TEST_SERVICES")
+    if manage_services is not None:
+        # "false", "0", "no" = externally managed (don't start)
+        # "true", "1", "yes" = NOT externally managed (do start)
+        return manage_services.lower() in ("false", "0", "no")
+
+    # In container: Check if service is accessible
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2.0)
+        result = sock.connect_ex((service_name, port))
+        sock.close()
+
+        # If we can connect, it's externally managed
+        return result == 0
+    except (socket.error, socket.gaierror):
+        # If we can't even resolve the name or connect, it's not managed
+        return False
+
+
+def check_eventstore_ready(timeout: float = 5.0) -> bool:
+    """
+    Check if EventStoreDB service is ready to accept connections.
+
+    This checks the HTTP health endpoint to verify the service is operational.
+
+    Args:
+        timeout: Maximum time to wait in seconds
+
+    Returns:
+        bool: True if service is ready, False otherwise
+    """
+    environment = detect_environment()
+
+    # Determine the correct host based on environment
+    if environment == "docker":
+        http_host = "eventstore"
+        http_port = 2113
+    else:
+        http_host = "localhost"
+        http_port = 2113
+
+    # First check basic network connectivity
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((http_host, http_port))
+        sock.close()
+
+        if result != 0:
+            return False
+    except (socket.error, socket.gaierror):
+        return False
+
+    # Additional check: Try to access the health endpoint
+    # EventStoreDB exposes /health/live for liveness checks
+    try:
+        url = f"http://{http_host}:{http_port}/health/live"
+        response = requests.get(url, timeout=timeout)
+
+        # EventStoreDB returns 204 No Content when healthy
+        return response.status_code == 204
+    except Exception:  # noqa: E722
+        # If HTTP check fails, but TCP works, assume it's ready enough
+        # (some versions might not have health endpoint)
         return True

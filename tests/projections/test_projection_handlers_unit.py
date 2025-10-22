@@ -47,24 +47,27 @@ class TestBaseHandlerVersionChecking:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        handler.neo4j_manager = MagicMock()
-        handler.neo4j_manager.get_session = MagicMock(return_value=mock_session)
+        # Mock Neo4jConnectionManager.get_session at module level
+        from unittest.mock import patch
 
-        # Event with version 3 (older than current version 5)
-        event = EventEnvelope(
-            event_type="TestEvent",
-            aggregate_type=AggregateType.INTERVIEW,
-            aggregate_id=str(uuid.uuid4()),
-            version=3,
-            data={},
-        )
+        with patch(
+            "src.projections.handlers.base_handler.Neo4jConnectionManager.get_session", return_value=mock_session
+        ):
+            # Event with version 3 (older than current version 5)
+            event = EventEnvelope(
+                event_type="TestEvent",
+                aggregate_type=AggregateType.INTERVIEW,
+                aggregate_id=str(uuid.uuid4()),
+                version=3,
+                data={},
+            )
 
-        # Handle event
-        await handler.handle(event)
+            # Handle event
+            await handler.handle(event)
 
-        # Should have checked version but not started transaction
-        assert mock_session.run.called
-        assert not mock_session.begin_transaction.called
+            # Should have checked version but not started transaction
+            assert mock_session.run.called
+            assert not mock_session.begin_transaction.called
 
     async def test_applies_new_event(self):
         """Test that handler applies event if version is new."""
@@ -93,20 +96,23 @@ class TestBaseHandlerVersionChecking:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        handler.neo4j_manager = MagicMock()
-        handler.neo4j_manager.get_session = MagicMock(return_value=mock_session)
+        # Mock Neo4jConnectionManager.get_session at module level
+        from unittest.mock import patch
 
-        # Event with version 4 (newer than current version 3)
-        event = EventEnvelope(
-            event_type="TestEvent",
-            aggregate_type=AggregateType.INTERVIEW,
-            aggregate_id=str(uuid.uuid4()),
-            version=4,
-            data={},
-        )
+        with patch(
+            "src.projections.handlers.base_handler.Neo4jConnectionManager.get_session", return_value=mock_session
+        ):
+            # Event with version 4 (newer than current version 3)
+            event = EventEnvelope(
+                event_type="TestEvent",
+                aggregate_type=AggregateType.INTERVIEW,
+                aggregate_id=str(uuid.uuid4()),
+                version=4,
+                data={},
+            )
 
-        # Handle event
-        await handler.handle(event)
+            # Handle event
+            await handler.handle(event)
 
         # Should have applied event and committed
         assert apply_called
@@ -138,24 +144,27 @@ class TestBaseHandlerVersionChecking:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        handler.neo4j_manager = MagicMock()
-        handler.neo4j_manager.get_session = MagicMock(return_value=mock_session)
+        # Mock Neo4jConnectionManager.get_session at module level
+        from unittest.mock import patch
 
-        # Event with version 0 (first event)
-        event = EventEnvelope(
-            event_type="TestEvent",
-            aggregate_type=AggregateType.INTERVIEW,
-            aggregate_id=str(uuid.uuid4()),
-            version=0,
-            data={},
-        )
+        with patch(
+            "src.projections.handlers.base_handler.Neo4jConnectionManager.get_session", return_value=mock_session
+        ):
+            # Event with version 0 (first event)
+            event = EventEnvelope(
+                event_type="TestEvent",
+                aggregate_type=AggregateType.INTERVIEW,
+                aggregate_id=str(uuid.uuid4()),
+                version=0,
+                data={},
+            )
 
-        # Handle event
-        await handler.handle(event)
+            # Handle event
+            await handler.handle(event)
 
-        # Should have applied event
-        assert apply_called
-        mock_tx.commit.assert_called_once()
+            # Should have applied event
+            assert apply_called
+            mock_tx.commit.assert_called_once()
 
 
 @pytest.mark.asyncio

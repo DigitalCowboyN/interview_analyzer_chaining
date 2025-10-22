@@ -294,7 +294,7 @@ class PipelineOrchestrator:
 
     # --- Helper methods for _process_single_file ---
     def _setup_file_io(
-        self, file_path: Path
+        self, file_path: Path, interview_id: str = None, project_id: str = None, correlation_id: str = None
     ) -> Tuple[TextDataSource, ConversationMapStorage, SentenceAnalysisWriter, PipelinePaths]:
         """Sets up the IO handlers (DataSource, MapStorage, AnalysisWriter) for a given file."""
         prefix = self.prefix
@@ -309,7 +309,22 @@ class PipelineOrchestrator:
             task_id=task_id,
         )
         data_source = LocalTextDataSource(file_path)
-        map_storage = LocalJsonlMapStorage(paths.map_file)
+
+        # Use Neo4jMapStorage if event sourcing is enabled, otherwise use local storage
+        if self.event_emitter and interview_id and project_id:
+            from src.io.neo4j_map_storage import Neo4jMapStorage
+
+            map_storage = Neo4jMapStorage(
+                project_id=project_id,
+                interview_id=interview_id,
+                event_emitter=self.event_emitter,
+                correlation_id=correlation_id,
+            )
+            logger.debug(f"{prefix}Using Neo4jMapStorage for dual-write (interview_id={interview_id})")
+        else:
+            map_storage = LocalJsonlMapStorage(paths.map_file)
+            logger.debug(f"{prefix}Using LocalJsonlMapStorage")
+
         analysis_writer = LocalJsonlAnalysisWriter(paths.analysis_file)
         return data_source, map_storage, analysis_writer, paths
 
@@ -549,23 +564,17 @@ class PipelineOrchestrator:
         correlation_id = str(uuid.uuid4())
         logger.debug(f"{prefix}Generated correlation_id: {correlation_id}")
 
+        # Generate interview_id and project_id early (needed for dual-write setup)
+        interview_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{file_path.name}"))
+        project_id = self.config.get("project", {}).get("default_project_id", "default-project")
+        logger.debug(f"{prefix}Generated interview_id: {interview_id}")
+        logger.debug(f"{prefix}Using project_id: {project_id}")
+
         try:
-            # 1. Setup IO
-            data_source, map_storage, analysis_writer, _ = self._setup_file_io(file_path)
-
-            # Extract project_id and interview_id if using Neo4j storage (for event emission)
-            project_id = getattr(analysis_writer, "project_id", None)
-            interview_id = getattr(analysis_writer, "interview_id", None)
-
-            # If not using Neo4j storage, generate interview_id from filename
-            if not interview_id:
-                interview_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{file_path.name}"))
-                logger.debug(f"{prefix}Generated interview_id: {interview_id}")
-
-            # If not using Neo4j storage, use default project_id
-            if not project_id:
-                project_id = self.config.get("project", {}).get("default_project_id", "default-project")
-                logger.debug(f"{prefix}Using default project_id: {project_id}")
+            # 1. Setup IO (passing IDs for potential Neo4jMapStorage setup)
+            data_source, map_storage, analysis_writer, _ = self._setup_file_io(
+                file_path, interview_id=interview_id, project_id=project_id, correlation_id=correlation_id
+            )
 
             # Emit InterviewCreated event (if event sourcing enabled)
             if self.event_emitter and interview_id and project_id:

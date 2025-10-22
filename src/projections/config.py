@@ -20,8 +20,20 @@ RETRY_EXPONENTIAL_BASE = float(os.getenv("PROJECTION_RETRY_EXPONENTIAL_BASE", "2
 # Checkpoint configuration
 CHECKPOINT_INTERVAL = int(os.getenv("PROJECTION_CHECKPOINT_INTERVAL", "100"))
 
-# EventStoreDB configuration
-ESDB_CONNECTION_STRING = os.getenv("ESDB_CONNECTION_STRING", "esdb://localhost:2113?tls=false")
+
+# EventStoreDB configuration - environment-aware defaults
+def _get_default_esdb_connection() -> str:
+    """Get environment-aware default EventStoreDB connection string."""
+    from src.utils.environment import detect_environment
+
+    env = detect_environment()
+    if env in ("docker", "ci"):
+        return "esdb://eventstore:2113?tls=false"
+    else:
+        return "esdb://localhost:2113?tls=false"
+
+
+ESDB_CONNECTION_STRING = os.getenv("ESDB_CONNECTION_STRING", _get_default_esdb_connection())
 
 # Feature flags
 ENABLE_PROJECTION_SERVICE = os.getenv("ENABLE_PROJECTION_SERVICE", "true").lower() == "true"
