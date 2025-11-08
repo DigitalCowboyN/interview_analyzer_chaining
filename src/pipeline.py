@@ -408,6 +408,8 @@ class PipelineOrchestrator:
         analysis_writer: SentenceAnalysisWriter,
         file_name: str,
         prefix: str,  # Pass prefix for logging consistency
+        interview_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
     ):
         """
         Saves analysis results via JSONL and Graph DB.
@@ -460,6 +462,23 @@ class PipelineOrchestrator:
                         num_results_written += 1
                         # Increment results_processed metric only on successful save to both targets
                         self.metrics_tracker.increment_results_processed(file_name)
+                        
+                        # Emit AnalysisGenerated event (if event sourcing enabled)
+                        if self.event_emitter and interview_id and correlation_id:
+                            try:
+                                await self.event_emitter.emit_analysis_generated(
+                                    interview_id=interview_id,
+                                    sentence_index=sentence_id,  # sentence_id is the index
+                                    analysis_data=result,
+                                    correlation_id=correlation_id,
+                                )
+                                logger.debug(f"{prefix}Emitted AnalysisGenerated event for sentence {sentence_id}.")
+                            except Exception as emit_e:
+                                # Event emission is non-blocking - log but don't raise
+                                logger.error(
+                                    f"{prefix}Failed to emit AnalysisGenerated event for sentence {sentence_id}: {emit_e}",
+                                    exc_info=True,
+                                )
                     else:
                         num_results_failed += 1
                         logger.warning(
@@ -512,6 +531,8 @@ class PipelineOrchestrator:
         contexts: List[Dict[str, str]],
         analysis_writer: SentenceAnalysisWriter,
         file_name: str,  # Renamed from input_file_name
+        interview_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
     ):
         """
         Analyzes sentences and orchestrates the saving of results.
@@ -534,7 +555,10 @@ class PipelineOrchestrator:
                     result["filename"] = file_name
 
             # 2. Orchestrate Saving
-            await self._save_analysis_results(analysis_results, analysis_writer, file_name, prefix)
+            await self._save_analysis_results(
+                analysis_results, analysis_writer, file_name, prefix,
+                interview_id=interview_id, correlation_id=correlation_id
+            )
 
         except Exception as e:
             # Original simple error handling
@@ -565,9 +589,10 @@ class PipelineOrchestrator:
         logger.debug(f"{prefix}Generated correlation_id: {correlation_id}")
 
         # Generate interview_id and project_id early (needed for dual-write setup)
-        interview_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{file_path.name}"))
-        project_id = self.config.get("project", {}).get("default_project_id", "default-project")
-        logger.debug(f"{prefix}Generated interview_id: {interview_id}")
+        # Check if subclass provides these IDs (e.g., for testing)
+        interview_id = getattr(self, "interview_id", None) or str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{file_path.name}"))
+        project_id = getattr(self, "project_id", None) or self.config.get("project", {}).get("default_project_id", "default-project")
+        logger.debug(f"{prefix}Using interview_id: {interview_id}")
         logger.debug(f"{prefix}Using project_id: {project_id}")
 
         try:
@@ -624,7 +649,10 @@ class PipelineOrchestrator:
             contexts = self._build_contexts(sentences, file_name)
 
             # 5. Run Analysis and Saving
-            await self._analyze_and_save_results(sentences, contexts, analysis_writer, file_name)
+            await self._analyze_and_save_results(
+                sentences, contexts, analysis_writer, file_name,
+                interview_id=interview_id, correlation_id=correlation_id
+            )
 
             # --- Success Metrics ---
             # Metrics are now updated within _analyze_and_save_results

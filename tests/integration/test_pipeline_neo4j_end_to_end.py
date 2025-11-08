@@ -150,7 +150,7 @@ class TestPipelineNeo4jEndToEnd:
                 self.interview_id = interview_id
                 super().__init__(*args, **kwargs)
 
-            def _setup_file_io(self, file_path: Path):
+            def _setup_file_io(self, file_path: Path, interview_id: str = None, project_id: str = None, correlation_id: str = None):
                 """Override to use Neo4j storage components."""
                 from src.io.local_storage import LocalTextDataSource
                 from src.utils.path_helpers import generate_pipeline_paths
@@ -166,16 +166,19 @@ class TestPipelineNeo4jEndToEnd:
 
                 data_source = LocalTextDataSource(file_path)
 
-                # Generate unique interview_id per file if None was passed
-                actual_interview_id = self.interview_id
+                # Use provided interview_id or fall back to test's interview_id
+                actual_interview_id = interview_id or self.interview_id
                 if actual_interview_id is None:
                     import uuid
 
                     actual_interview_id = str(uuid.uuid4())
                     logger.debug(f"Generated unique interview_id for {file_path.name}: {actual_interview_id}")
 
-                map_storage = Neo4jMapStorage(self.project_id, actual_interview_id)
-                analysis_writer = Neo4jAnalysisWriter(self.project_id, actual_interview_id)
+                # Use provided project_id or fall back to test's project_id
+                actual_project_id = project_id or self.project_id
+
+                map_storage = Neo4jMapStorage(actual_project_id, actual_interview_id, event_emitter=self.event_emitter, correlation_id=correlation_id)
+                analysis_writer = Neo4jAnalysisWriter(actual_project_id, actual_interview_id)
 
                 return data_source, map_storage, analysis_writer, paths
 

@@ -92,7 +92,7 @@ class TestBaseHandlerVersionChecking:
         mock_result = AsyncMock()
         mock_result.single = AsyncMock(return_value={"version": 3})
         mock_session.run = AsyncMock(return_value=mock_result)
-        mock_session.begin_transaction = MagicMock(return_value=mock_tx)
+        mock_session.begin_transaction = AsyncMock(return_value=mock_tx)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -140,7 +140,7 @@ class TestBaseHandlerVersionChecking:
         mock_result = AsyncMock()
         mock_result.single = AsyncMock(return_value=None)
         mock_session.run = AsyncMock(return_value=mock_result)
-        mock_session.begin_transaction = MagicMock(return_value=mock_tx)
+        mock_session.begin_transaction = AsyncMock(return_value=mock_tx)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -194,7 +194,7 @@ class TestBaseHandlerRetryLogic:
         mock_result = AsyncMock()
         mock_result.single = AsyncMock(return_value=None)
         mock_session.run = AsyncMock(return_value=mock_result)
-        mock_session.begin_transaction = MagicMock(return_value=mock_tx)
+        mock_session.begin_transaction = AsyncMock(return_value=mock_tx)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -234,7 +234,7 @@ class TestBaseHandlerRetryLogic:
         mock_result = AsyncMock()
         mock_result.single = AsyncMock(return_value=None)
         mock_session.run = AsyncMock(return_value=mock_result)
-        mock_session.begin_transaction = MagicMock(return_value=mock_tx)
+        mock_session.begin_transaction = AsyncMock(return_value=mock_tx)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 

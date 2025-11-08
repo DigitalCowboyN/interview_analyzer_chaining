@@ -133,7 +133,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 self.interview_id = interview_id
                 super().__init__(*args, **kwargs)
 
-            def _setup_file_io(self, file_path: Path):
+            def _setup_file_io(self, file_path: Path, interview_id: str = None, project_id: str = None, correlation_id: str = None):
                 """Override to use Neo4jAnalysisWriter instead of LocalJsonlAnalysisWriter."""
                 from src.io.local_storage import LocalTextDataSource
                 from src.utils.path_helpers import generate_pipeline_paths
@@ -148,12 +148,16 @@ class TestNeo4jAnalysisWriterIntegration:
                     task_id=self.task_id,
                 )
 
+                # Use provided IDs or fall back to test's IDs
+                actual_interview_id = interview_id or self.interview_id
+                actual_project_id = project_id or self.project_id
+
                 # Use local storage for data source and map storage
                 data_source = LocalTextDataSource(file_path)
-                map_storage = Neo4jMapStorage(self.project_id, self.interview_id)
+                map_storage = Neo4jMapStorage(actual_project_id, actual_interview_id, event_emitter=self.event_emitter, correlation_id=correlation_id)
 
                 # Use Neo4jAnalysisWriter instead of LocalJsonlAnalysisWriter
-                analysis_writer = Neo4jAnalysisWriter(self.project_id, self.interview_id)
+                analysis_writer = Neo4jAnalysisWriter(actual_project_id, actual_interview_id)
 
                 return data_source, map_storage, analysis_writer, paths
 
@@ -313,7 +317,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 self.interview_id = interview_id
                 super().__init__(*args, **kwargs)
 
-            def _setup_file_io(self, file_path: Path):
+            def _setup_file_io(self, file_path: Path, interview_id: str = None, project_id: str = None, correlation_id: str = None):
                 """Override to use Neo4jAnalysisWriter instead of LocalJsonlAnalysisWriter."""
                 from src.io.local_storage import LocalTextDataSource
                 from src.utils.path_helpers import generate_pipeline_paths
@@ -327,9 +331,13 @@ class TestNeo4jAnalysisWriterIntegration:
                     task_id=self.task_id,
                 )
 
+                # Use provided IDs or fall back to test's IDs
+                actual_interview_id = interview_id or self.interview_id
+                actual_project_id = project_id or self.project_id
+
                 data_source = LocalTextDataSource(file_path)
-                map_storage = Neo4jMapStorage(self.project_id, self.interview_id)
-                analysis_writer = Neo4jAnalysisWriter(self.project_id, self.interview_id)
+                map_storage = Neo4jMapStorage(actual_project_id, actual_interview_id, event_emitter=self.event_emitter, correlation_id=correlation_id)
+                analysis_writer = Neo4jAnalysisWriter(actual_project_id, actual_interview_id)
 
                 return data_source, map_storage, analysis_writer, paths
 
@@ -458,7 +466,7 @@ class TestNeo4jAnalysisWriterIntegration:
                 self.interview_id = interview_id
                 super().__init__(*args, **kwargs)
 
-            def _setup_file_io(self, file_path: Path):
+            def _setup_file_io(self, file_path: Path, interview_id: str = None, project_id: str = None, correlation_id: str = None):
                 """Override to use Neo4jAnalysisWriter instead of LocalJsonlAnalysisWriter."""
                 from src.io.local_storage import LocalTextDataSource
                 from src.utils.path_helpers import generate_pipeline_paths
@@ -472,9 +480,13 @@ class TestNeo4jAnalysisWriterIntegration:
                     task_id=self.task_id,
                 )
 
+                # Use provided IDs or fall back to test's IDs
+                actual_interview_id = interview_id or self.interview_id
+                actual_project_id = project_id or self.project_id
+
                 data_source = LocalTextDataSource(file_path)
-                map_storage = Neo4jMapStorage(self.project_id, self.interview_id)
-                analysis_writer = Neo4jAnalysisWriter(self.project_id, self.interview_id)
+                map_storage = Neo4jMapStorage(actual_project_id, actual_interview_id, event_emitter=self.event_emitter, correlation_id=correlation_id)
+                analysis_writer = Neo4jAnalysisWriter(actual_project_id, actual_interview_id)
 
                 return data_source, map_storage, analysis_writer, paths
 
