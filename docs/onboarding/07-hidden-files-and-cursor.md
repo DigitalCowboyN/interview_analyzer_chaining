@@ -72,12 +72,14 @@ PROJECTION_LANE_COUNT=12
 ### Security Best Practices
 
 ✓ **DO:**
+
 - Keep `.env` local only (never commit to Git)
 - Store API keys in a password manager (1Password, LastPass, Bitwarden)
 - Use separate keys for each developer
 - Rotate keys if they're exposed
 
 ✗ **DON'T:**
+
 - Share your `.env` file in Slack/email
 - Commit `.env` to Git (it's gitignored for a reason)
 - Use production keys for local development
@@ -98,6 +100,7 @@ head -20 .env
 ```
 
 **Expected output:**
+
 ```
 -rw-r--r--  1 yourname  staff  1234 Nov  9 14:30 .env
 ```
@@ -166,6 +169,7 @@ cp docs/onboarding/cursorrules.example .cursorrules
 ```
 
 **Expected output:**
+
 ```
 -rw-r--r--  1 yourname  staff  7890 Nov  9 14:35 .cursorrules
 ```
@@ -209,6 +213,7 @@ When you use Cursor's AI features (`Cmd+K` for inline edits, `Cmd+L` for chat), 
 **Example: Without `.cursorrules`**
 
 AI suggests:
+
 ```python
 # Generic, wrong for this project
 def get_data():
@@ -218,6 +223,7 @@ def get_data():
 **With `.cursorrules`**
 
 AI suggests:
+
 ```python
 # Correct for event-sourced architecture
 async def get_interview_projection(interview_id: str, session: AsyncSession) -> Interview:
@@ -264,56 +270,84 @@ The `.gitignore` file tells Git which files to **never** track. This prevents ac
 ### File Location
 
 ```bash
+# Actual file
 /workspaces/interview_analyzer_chaining/.gitignore
+
+# Template (for reference)
+docs/onboarding/gitignore.example
 ```
 
-### Viewing It
+### Purpose
 
-```bash
-cd ~/Developer/interview_analyzer_chaining
-cat .gitignore
+Prevents Git from tracking:
+
+- **Secrets** (`.env`, API keys)
+- **Generated files** (`__pycache__`, `*.pyc`, `htmlcov/`)
+- **OS files** (`.DS_Store`, `Thumbs.db`)
+- **IDE files** (`.idea/`, `.vscode/*`)
+- **Dependencies** (`venv/`, `node_modules/`)
+
+### Key Patterns Explained
+
+**Critical (Security):**
+
+```gitignore
+.env                            # Environment variables with API keys
+.devcontainer/devcontainer.env  # DevContainer secrets
+*.key                           # Private keys
+*.pem                           # SSL certificates
 ```
 
-**Key entries:**
-```
-# Environment variables (contains API keys!)
-.env
-.devcontainer/devcontainer.env
+**Python artifacts:**
 
-# Python artifacts
-__pycache__/
+```gitignore
+__pycache__/                    # Compiled Python files
+*.pyc, *.pyo, *.pyd             # Bytecode files
+.pytest_cache/                  # Test cache
+htmlcov/                        # Coverage reports
+*.egg-info/                     # Package metadata
+```
+
+**IDE/Editor:**
+
+```gitignore
+.vscode/*                       # VS Code settings
+!.vscode/settings.json          # EXCEPT this one (allow it)
+.idea/                          # PyCharm settings
+.DS_Store                       # macOS Finder info
+```
+
+**Virtual environments:**
+
+```gitignore
+venv/                           # Virtual environment
+.venv/                          # Alternative venv name
+env/                            # Another common name
+```
+
+### Pattern Syntax
+
+```gitignore
+# Ignore specific file
+secret.txt
+
+# Ignore all files with extension
 *.pyc
-.pytest_cache/
 
-# Coverage reports
-htmlcov/
-.coverage
+# Ignore directory
+build/
 
-# IDE settings
-.vscode/
-.idea/
+# Ignore files anywhere in tree
+**/.DS_Store
 
-# OS files
-.DS_Store
-```
+# DON'T ignore (exception to previous rule)
+!important.txt
 
-### Why It Matters
+# Ignore only in root
+/config.json
 
-**Without `.gitignore`:**
-```bash
-git status
-# Shows:
-#   .env                  <-- DANGER: Contains API keys!
-#   __pycache__/
-#   htmlcov/
-#   .DS_Store
-```
-
-**With `.gitignore`:**
-```bash
-git status
-# Shows:
-#   src/pipeline.py       <-- Only your code changes
+# Ignore in any subdirectory
+**/logs/
 ```
 
 ### Verifying `.gitignore` Works
@@ -331,51 +365,162 @@ git status
 ```
 
 **Expected output:**
+
 ```
 On branch main
 nothing to commit, working tree clean
 ```
 
-If you see `.env` in `git status`, your `.gitignore` is not working. Fix it:
+**If `.env` appears in git status:**
 
 ```bash
-# Add .env to .gitignore
-echo ".env" >> .gitignore
-
-# Remove from git tracking (keeps local file)
+# It might already be tracked. Remove from tracking:
 git rm --cached .env
+
+# Verify .env is in .gitignore
+grep "^\.env$" .gitignore
+
+# If not there, add it
+echo ".env" >> .gitignore
 
 # Commit the change
 git add .gitignore
-git commit -m "Add .env to .gitignore"
+git commit -m "Ensure .env is gitignored"
 ```
 
 ### Common `.gitignore` Mistakes
 
-❌ **Mistake 1: Committing `.env` before adding to `.gitignore`**
+❌ **Mistake 1: File already committed**
 
-If you already committed `.env`:
+If you committed `.env` before adding to `.gitignore`:
 
 ```bash
-# Remove from git history (keeps local copy)
+# Remove from tracking (keeps local file)
 git rm --cached .env
 git commit -m "Remove .env from tracking"
 git push
 ```
 
-But this **doesn't remove from history**. See `SECURITY-WARNING.md` for full remediation.
+⚠️ **This doesn't remove from history!** See `SECURITY-WARNING.md` for history cleaning.
 
-❌ **Mistake 2: Using wrong syntax**
+❌ **Mistake 2: Wrong directory patterns**
 
-```bash
-# WRONG (ignores only in root)
-.env
+```gitignore
+# WRONG - Only ignores venv/ in root
+/venv/
 
-# RIGHT (ignores everywhere)
-**/.env
+# RIGHT - Ignores venv/ anywhere
+venv/
+# Or explicitly:
+**/venv/
 ```
 
-For this project, `.env` is only in the root, so both work. But be aware of the difference.
+❌ **Mistake 3: Trailing whitespace**
+
+```gitignore
+.env      # WRONG - has trailing spaces
+.env      # RIGHT - no trailing spaces
+```
+
+Git won't match patterns with extra whitespace.
+
+❌ **Mistake 4: Ignoring too much**
+
+```gitignore
+# BAD - Ignores ALL json files (including config templates)
+*.json
+
+# BETTER - Be specific
+config.local.json
+secrets.json
+```
+
+### Customizing for Your Needs
+
+**To ignore project-specific files:**
+
+```bash
+# Edit .gitignore
+cursor .gitignore
+
+# Add at bottom:
+# My project files
+/my_experiments/
+temp_*.py
+scratch/
+```
+
+**To check what's being ignored:**
+
+```bash
+# List all ignored files
+git status --ignored
+
+# Check if specific file is ignored
+git check-ignore -v .env
+# Output: .gitignore:80:.env    .env
+```
+
+**To force-add ignored file (rare):**
+
+```bash
+# If you really need to commit an ignored file
+git add -f special_config.json
+```
+
+### Project-Specific Ignores
+
+This project ignores:
+
+```gitignore
+# Data directories (may want to track samples)
+data/
+output/
+
+# AI assistant files
+.aider*
+repomix-output.xml
+
+# DevContainer secrets (but not devcontainer.json!)
+.devcontainer/devcontainer.env
+```
+
+### Verification Commands
+
+```bash
+# Test .env is ignored
+echo "test" > .env
+git status | grep .env  # Should show nothing
+
+# Test .pyc is ignored
+touch test.pyc
+git status | grep test.pyc  # Should show nothing
+
+# Clean up
+rm test.pyc
+
+# See all ignored files
+git status --ignored --short
+
+# Check why file is ignored
+git check-ignore -v htmlcov/index.html
+# Shows which .gitignore rule matched
+```
+
+### When to Update `.gitignore`
+
+Update when:
+
+- ✅ Adding new tools (e.g., adding Poetry → ignore `poetry.lock`)
+- ✅ New generated files appear (e.g., `.mypy_cache/`)
+- ✅ New IDE (e.g., adding Sublime Text → ignore `*.sublime-*`)
+- ✅ New OS (e.g., adding Linux → ignore `*~`)
+
+Don't update when:
+
+- ❌ Files should be tracked (code, configs without secrets)
+- ❌ Already covered by existing patterns
+- ❌ One-off temporary files (just delete them)
 
 ---
 
@@ -411,6 +556,7 @@ EOF
 ```
 
 **What this does:**
+
 - Enables Flake8 linting (shows style errors in real-time)
 - Auto-formats code with Black on save (120 char line length)
 - Shows a ruler at 120 characters
@@ -434,9 +580,11 @@ Cursor should auto-install the Python extension. Verify:
 3. Confirm "Python" extension is installed (by Microsoft)
 
 If not installed:
+
 ```
 ms-python.python
 ```
+
 Paste this ID in Extensions search, click Install.
 
 ---
@@ -450,12 +598,14 @@ Defines all services (Neo4j, EventStore, Redis, API, etc.).
 **Location:** `/workspaces/interview_analyzer_chaining/docker-compose.yml`
 
 **View it:**
+
 ```bash
 cd ~/Developer/interview_analyzer_chaining
 cat docker-compose.yml | head -50
 ```
 
 **Key sections:**
+
 - **neo4j**: Graph database (port 7687 for driver, 7474 for browser)
 - **eventstore**: Event store (port 2113)
 - **redis**: Message broker (port 6379)
@@ -471,21 +621,24 @@ cursor docker-compose.yml
 ```
 
 Find the `neo4j` service:
+
 ```yaml
 neo4j:
   # ...
   environment:
-    NEO4J_dbms_memory_heap_initial__size: 512M  # Default: 512M
-    NEO4J_dbms_memory_heap_max__size: 2G        # Default: 2G
+    NEO4J_dbms_memory_heap_initial__size: 512M # Default: 512M
+    NEO4J_dbms_memory_heap_max__size: 2G # Default: 2G
 ```
 
 For a Mac with 8GB RAM, reduce to:
+
 ```yaml
-    NEO4J_dbms_memory_heap_initial__size: 256M
-    NEO4J_dbms_memory_heap_max__size: 1G
+NEO4J_dbms_memory_heap_initial__size: 256M
+NEO4J_dbms_memory_heap_max__size: 1G
 ```
 
 Then rebuild:
+
 ```bash
 make db-down
 make build
@@ -499,6 +652,7 @@ Defines the Python app container.
 **Location:** `/workspaces/interview_analyzer_chaining/Dockerfile`
 
 **View it:**
+
 ```bash
 cat Dockerfile
 ```
@@ -513,6 +667,7 @@ RUN apt-get install -y imagemagick
 ```
 
 Then rebuild:
+
 ```bash
 make build
 ```
@@ -528,11 +683,13 @@ Provides convenient commands like `make test`, `make lint`, etc.
 **Location:** `/workspaces/interview_analyzer_chaining/Makefile`
 
 **View all commands:**
+
 ```bash
 make help
 ```
 
 **Example output:**
+
 ```
 Available targets:
   build      Build Docker images
@@ -547,6 +704,7 @@ Available targets:
 ```
 
 **How to use:**
+
 ```bash
 make test    # Runs: docker compose run --rm app pytest -v
 make lint    # Runs: docker compose run --rm app flake8 src tests
@@ -559,6 +717,7 @@ Lists all Python dependencies.
 **Location:** `/workspaces/interview_analyzer_chaining/requirements.txt`
 
 **View it:**
+
 ```bash
 cat requirements.txt | head -20
 ```
@@ -570,12 +729,14 @@ cursor requirements.txt
 ```
 
 Add at the bottom:
+
 ```
 # New dependency
 requests==2.31.0
 ```
 
 Then rebuild:
+
 ```bash
 make build
 ```
@@ -593,11 +754,13 @@ Configures pytest behavior.
 **Location:** `/workspaces/interview_analyzer_chaining/pytest.ini`
 
 **View it:**
+
 ```bash
 cat pytest.ini
 ```
 
 **Example content:**
+
 ```ini
 [pytest]
 testpaths = tests
@@ -611,6 +774,7 @@ markers =
 ```
 
 **Running specific markers:**
+
 ```bash
 # Only unit tests
 pytest -m unit
@@ -624,6 +788,7 @@ pytest -m integration
 Configures Flake8 linter for Python code quality checks.
 
 **Location:**
+
 ```bash
 # Actual file
 /workspaces/interview_analyzer_chaining/.flake8
@@ -643,6 +808,7 @@ ignore = E203,W503,F401    # Ignore specific error codes
 ```
 
 **Ignored errors explained:**
+
 - **E203:** Whitespace before ':' (conflicts with Black formatter)
 - **W503:** Line break before binary operator (deprecated warning)
 - **F401:** Module imported but unused (needed for `__init__.py` exports)
@@ -660,6 +826,7 @@ flake8 src/pipeline.py
 ```
 
 **Common Flake8 errors:**
+
 - **E501:** Line too long (>120 characters)
 - **F841:** Local variable assigned but never used
 - **E302:** Expected 2 blank lines, found 1
@@ -668,6 +835,7 @@ flake8 src/pipeline.py
 **Customizing:**
 
 To ignore errors in specific lines:
+
 ```python
 # Ignore specific error on this line
 some_long_url = "https://..."  # noqa: E501
@@ -680,7 +848,8 @@ debug_code = True  # noqa
 
 Configures code coverage measurement with coverage.py.
 
-**Location:** 
+**Location:**
+
 ```bash
 # Actual file
 /workspaces/interview_analyzer_chaining/.coveragerc
@@ -694,6 +863,7 @@ docs/onboarding/coveragerc.example
 **Key settings:**
 
 **[run] section:**
+
 ```ini
 branch = True          # Measure branch coverage (if/else paths)
 source = src           # Only measure code in src/ directory
@@ -701,6 +871,7 @@ omit = */tests/*       # Don't measure test files themselves
 ```
 
 **[report] section:**
+
 ```ini
 show_missing = True    # Show which lines aren't covered
 precision = 1          # Show coverage as XX.X%
@@ -708,6 +879,7 @@ sort = Cover           # Sort by coverage percentage
 ```
 
 **[html] section:**
+
 ```ini
 directory = htmlcov    # Generate HTML reports in htmlcov/
 ```
@@ -727,6 +899,7 @@ open htmlcov/index.html
 **Customizing:**
 
 To exclude specific lines from coverage, add comment:
+
 ```python
 def debug_function():  # pragma: no cover
     """This won't be counted in coverage."""
@@ -734,6 +907,7 @@ def debug_function():  # pragma: no cover
 ```
 
 To exclude specific files, edit `.coveragerc`:
+
 ```ini
 omit =
     */tests/*
@@ -763,10 +937,12 @@ def _detect_environment() -> str:
 ### Connection String Examples
 
 **Docker (inside container):**
+
 - Neo4j: `neo4j://neo4j:7687` (uses container hostname)
 - EventStore: `esdb://eventstore:2113?tls=false`
 
 **Host (your Mac):**
+
 - Neo4j: `neo4j://localhost:7687` (Docker port-forwarded)
 - EventStore: `esdb://localhost:2113?tls=false`
 
@@ -779,11 +955,13 @@ cursor .env
 ```
 
 Add:
+
 ```bash
 ENVIRONMENT=host  # Options: host, docker, ci
 ```
 
 Then restart services:
+
 ```bash
 make db-down
 make db-up
@@ -798,16 +976,19 @@ docker compose run --rm app python -c "from src.config import Config; print(Conf
 ```
 
 **Expected output:**
+
 ```
 docker
 ```
 
 From your Mac terminal:
+
 ```bash
 python3 -c "from src.config import Config; print(Config().environment)"
 ```
 
 **Expected output:**
+
 ```
 host
 ```
@@ -818,18 +999,18 @@ host
 
 ### File Locations Summary
 
-| File | Purpose | Committed to Git? |
-|------|---------|-------------------|
-| `.env` | API keys, secrets | ❌ No (gitignored) |
-| `.env.example` | Template for `.env` | ✅ Yes |
-| `.cursorrules` | Cursor AI config | ✅ Yes |
-| `.gitignore` | Files to exclude from Git | ✅ Yes |
-| `.vscode/settings.json` | Cursor IDE settings | ❌ No (gitignored) |
-| `docker-compose.yml` | Service definitions | ✅ Yes |
-| `Dockerfile` | Python app container | ✅ Yes |
-| `Makefile` | Development commands | ✅ Yes |
-| `requirements.txt` | Python dependencies | ✅ Yes |
-| `pytest.ini` | Test configuration | ✅ Yes |
+| File                    | Purpose                   | Committed to Git?  |
+| ----------------------- | ------------------------- | ------------------ |
+| `.env`                  | API keys, secrets         | ❌ No (gitignored) |
+| `.env.example`          | Template for `.env`       | ✅ Yes             |
+| `.cursorrules`          | Cursor AI config          | ✅ Yes             |
+| `.gitignore`            | Files to exclude from Git | ✅ Yes             |
+| `.vscode/settings.json` | Cursor IDE settings       | ❌ No (gitignored) |
+| `docker-compose.yml`    | Service definitions       | ✅ Yes             |
+| `Dockerfile`            | Python app container      | ✅ Yes             |
+| `Makefile`              | Development commands      | ✅ Yes             |
+| `requirements.txt`      | Python dependencies       | ✅ Yes             |
+| `pytest.ini`            | Test configuration        | ✅ Yes             |
 
 ### Essential Commands
 
@@ -861,57 +1042,65 @@ docker compose run --rm app python -c "from src.config import Config; print(Conf
 **Problem: Cursor AI suggestions are generic/wrong**
 
 1. Verify `.cursorrules` exists:
+
    ```bash
    ls -la .cursorrules
    ```
 
 2. Reload Cursor:
+
    ```
    Cmd+Shift+P → "Developer: Reload Window"
    ```
 
 3. Try AI chat:
+
    ```
    Cmd+L → Ask "What architecture pattern does this project use?"
    ```
-   
+
    Should mention "event sourcing" and "Neo4j projections".
 
 **Problem: API key errors even though `.env` is correct**
 
 1. Check for extra whitespace:
+
    ```bash
    cat .env | grep OPENAI_API_KEY | cat -v
    ```
-   
+
    Should show NO `^M` (carriage return) or extra spaces.
 
 2. Verify key format:
+
    ```bash
    grep OPENAI_API_KEY .env
    ```
-   
+
    Should start with `sk-proj-` or `sk-` (format: `sk-proj-[long-string]`).
 
 3. Test key directly:
+
    ```bash
    export OPENAI_API_KEY=$(grep OPENAI_API_KEY .env | cut -d= -f2)
    curl https://api.openai.com/v1/models \
      -H "Authorization: Bearer $OPENAI_API_KEY" | head -20
    ```
-   
+
    Should show list of models, not error.
 
 **Problem: Docker can't connect to databases**
 
 1. Check environment detection:
+
    ```bash
    docker compose run --rm app python -c "from src.config import Config; c=Config(); print(f'{c.environment=}, {c.neo4j.uri=}')"
    ```
-   
+
    Should show `environment='docker', uri='neo4j://neo4j:7687'`.
 
 2. Force Docker environment:
+
    ```bash
    cursor .env
    # Add: ENVIRONMENT=docker
@@ -935,4 +1124,3 @@ docker compose run --rm app python -c "from src.config import Config; print(Conf
 ---
 
 **Have questions?** Check **00-README.md** for links to all onboarding guides.
-

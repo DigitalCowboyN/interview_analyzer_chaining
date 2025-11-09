@@ -1,0 +1,184 @@
+# ============================================
+# Python - Byte-compiled / optimized files
+# ============================================
+*.py[cod]
+$py.class
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# ============================================
+# Python - C extensions
+# ============================================
+*.so
+
+# ============================================
+# Python - Distribution / packaging
+# ============================================
+.Python
+build/
+dist/
+download/
+develop-eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ============================================
+# Testing - Coverage and test artifacts
+# ============================================
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+daft_fixture.*
+
+# ============================================
+# Environments - Virtual environments and secrets
+# ============================================
+# CRITICAL: Never commit these files with API keys!
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# DevContainer environment (has secrets)
+.devcontainer/devcontainer.env
+
+# ============================================
+# Python - Framework specific
+# ============================================
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# ============================================
+# Documentation - Build artifacts
+# ============================================
+docs/_build/
+/site
+
+# ============================================
+# Python - Type checking and linting
+# ============================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# ============================================
+# Python - Jupyter Notebook
+# ============================================
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
+
+# ============================================
+# IDE - Editor specific files
+# ============================================
+# VS Code (allow some settings, ignore others)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# PyCharm
+.idea/
+
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+
+# ============================================
+# OS - System generated files
+# ============================================
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+ehthumbs.db
+Thumbs.db
+
+# ============================================
+# Project Specific - Generated data and logs
+# ============================================
+# Data directories (adjust based on your needs)
+data/
+data/output/
+data/maps/
+output/
+# Uncomment to ignore input data:
+# data/input/
+
+# Log files
+*.log
+logs/
+
+# ============================================
+# Project Specific - Tool artifacts
+# ============================================
+# AI coding assistants
+.aider*
+repomix-output.xml
+
+# ============================================
+# Additional Python tools
+# ============================================
+# Translations
+*.mo
+*.pot
+*.po
+
+# PyBuilder
+target/
+
+# Cython debug
+cython_debug/
+

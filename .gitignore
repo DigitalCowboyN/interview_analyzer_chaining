@@ -146,6 +146,7 @@ output/
 logs/
 
 # Other project specific ignores from original file
-.devcontainer/
+# DevContainer environment (has secrets - but keep devcontainer.json!)
+.devcontainer/devcontainer.env
 .aider*
 repomix-output.xml

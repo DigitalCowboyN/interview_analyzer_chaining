@@ -16,6 +16,7 @@ The following configuration template files have been **moved from the project ro
 | N/A | `docs/onboarding/devcontainer.json.example` | DevContainer configuration reference (NEW) |
 | N/A | `docs/onboarding/coveragerc.example` | Code coverage configuration reference (NEW) |
 | N/A | `docs/onboarding/flake8.example` | Flake8 linter configuration reference (NEW) |
+| N/A | `docs/onboarding/gitignore.example` | Git exclusion patterns reference (NEW) |
 
 ## How to Use These Templates
 
@@ -72,12 +73,14 @@ All templates now use bracketed placeholders like `[YOUR_OPENAI_API_KEY]` instea
 - `docs/onboarding/devcontainer.json.example`
 - `docs/onboarding/coveragerc.example`
 - `docs/onboarding/flake8.example`
+- `docs/onboarding/gitignore.example`
 - `docs/onboarding/cursorrules.example`
 
 **Actual Config Files:**
 - `.env` (in project root) - **NEVER commit** (has secrets)
 - `.devcontainer/devcontainer.env` (in .devcontainer/) - **NEVER commit** (has secrets)
 - `.devcontainer/devcontainer.json` (in .devcontainer/) - Can commit (no secrets)
+- `.gitignore` (in project root) - Can commit (no secrets, critical for security)
 - `.coveragerc` (in project root) - Can commit (no secrets)
 - `.flake8` (in project root) - Can commit (no secrets)
 - `.cursorrules` (in project root, optional) - Can commit (no secrets)

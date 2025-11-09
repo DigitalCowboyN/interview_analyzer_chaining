@@ -1,0 +1,50 @@
+{
+  "name": "Interview Analyzer Chaining Dev",
+  "dockerComposeFile": [
+    "../docker-compose.yml"
+  ],
+  "service": "app",
+  "workspaceFolder": "/workspaces/interview_analyzer_chaining",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash",
+        "python.analysis.extraPaths": [
+          "/workspaces/interview_analyzer_chaining/src"
+        ]
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "ms-python.flake8",
+        "esbenp.prettier-vscode",
+        "ms-python.debugpy",
+        "ms-azuretools.vscode-docker",
+        "njpwerner.autodocstring",
+        "charliermarsh.ruff"
+      ]
+    }
+  },
+  "forwardPorts": [
+    8000,
+    6379,
+    7474,
+    7687,
+    2113,
+    1113
+  ],
+  "remoteUser": "root",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "git": "latest"
+  },
+  "runServices": [
+    "redis",
+    "neo4j",
+    "neo4j-test",
+    "eventstore",
+    "projection-service",
+    "app"
+  ],
+  "postStartCommand": "sleep 20 && echo 'All services ready including EventStore and Projection Service'"
+}
