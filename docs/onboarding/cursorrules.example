@@ -1,0 +1,230 @@
+# Interview Analyzer - Cursor AI Rules
+# These rules configure how Cursor's AI assistant helps with this codebase
+
+## Project Context
+This is an event-sourced interview analysis system using:
+- Python 3.11+
+- FastAPI for REST API
+- Neo4j for read models (graph database)
+- EventStoreDB for event sourcing
+- Celery + Redis for async tasks
+- Docker Compose for orchestration
+
+## Code Style & Standards
+
+### Python Style (PEP 8)
+- Max line length: 120 characters (enforced by Flake8)
+- Use 4 spaces for indentation (no tabs)
+- Two blank lines between top-level definitions (E302)
+- One blank line between class methods
+- At least two spaces before inline comments (E261)
+- No trailing whitespace (W291)
+- Type hints required for all function parameters and return values
+
+### Code Quality
+- Run `make lint` before suggesting changes (checks with flake8)
+- Run `make format` to auto-format code (uses black with 120 char line length)
+- All functions/classes must have docstrings explaining purpose, parameters, and return values
+- Use type hints consistently: `def process(data: dict[str, Any]) -> ProcessResult:`
+
+### Testing
+- Always use TDD: write failing test first, then implement
+- Tests live in `tests/` matching `src/` structure
+- Use pytest fixtures from `tests/fixtures/` for setup
+- Type hints required in test functions for documentation
+- Check for false positives: tests should actually validate behavior
+- Consider if new test file is needed vs. modifying existing test
+- Run `make test` to execute full test suite (600+ tests)
+- Run `pytest tests/specific_test.py -v` for focused testing
+- Check coverage with `make coverage` (generates htmlcov/ report)
+
+## Architecture Patterns
+
+### Event Sourcing
+- **Write to EventStoreDB first** for commands (source of truth)
+- Events are immutable, append-only
+- Stream naming: `{AggregateType}-{aggregate_id}` (e.g., `Interview-uuid`, `Sentence-uuid`)
+- Event types: InterviewCreated, SentenceCreated, SentenceEdited, AnalysisGenerated, AnalysisOverridden
+- Always include: aggregate_id, aggregate_type, correlation_id, event_type, timestamp, data
+
+### Projection Handlers
+- Read events from EventStoreDB
+- **Write to Neo4j** to build read models (graphs)
+- Must be idempotent (handle duplicate events)
+- Handle events asynchronously via projection service
+- Transaction management: Use `tx = await session.begin_transaction()` with explicit try/except/finally
+
+### Command Handlers
+- Process user commands (EditSentence, OverrideAnalysis)
+- Load aggregate from EventStoreDB
+- Apply business logic
+- Append new events to EventStoreDB
+- Return success/failure
+
+### API Layer
+- REST API with FastAPI
+- All endpoints under `/api/v1/` prefix
+- Separate routers by domain: `health.py`, `edits.py`
+- Use Pydantic V2 models for request/response validation
+- Async endpoints for I/O operations
+
+## Database Configuration
+
+### Environment Detection
+The system auto-detects environment and adjusts connections:
+- **Docker**: Uses container hostnames (`neo4j`, `eventstore`)
+- **CI**: Uses `localhost` with specific ports
+- **Host** (Mac): Uses `localhost` with standard ports
+- Override with `ENVIRONMENT` env var if needed
+
+### Neo4j (Graph Database - Read Models)
+- Connection: `neo4j://neo4j:7687` (Docker) or `neo4j://localhost:7687` (Host)
+- Password: Set in `NEO4J_PASSWORD` env var (must match docker-compose.yml)
+- Use async driver: `from neo4j import AsyncGraphDatabase`
+- Transaction API: `tx = await session.begin_transaction()`, `await tx.commit()`
+- Schema: Nodes = Interview, Sentence, File; Relationships = CONTAINS, FROM_FILE
+
+### EventStoreDB (Event Store - Write Model)
+- Connection: `esdb://eventstore:2113?tls=false` (Docker) or `esdb://localhost:2113?tls=false` (Host)
+- Set in `ESDB_CONNECTION_STRING` env var
+- Use `esdbclient` library: `from esdbclient import EventStoreDBClient`
+- Always check expected_version to prevent concurrency issues
+
+### Configuration in Tests
+- Test fixtures are environment-aware
+- Override via env vars: `NEO4J_URI`, `NEO4J_PASSWORD`, `ESDB_CONNECTION_STRING`
+- Use `@pytest.fixture` for database setup/teardown
+- Clean up test data in teardown
+
+## Common Patterns
+
+### Error Handling
+- Use custom exceptions from `src/utils/exceptions.py`
+- Log errors with context: `logger.error(f"Failed to process {id}", exc_info=True)`
+- Return informative error messages
+- Handle database connection failures gracefully
+
+### Correlation IDs
+- Generate once at pipeline start: `correlation_id = str(uuid.uuid4())`
+- Pass through all events in same processing chain
+- Used for tracing related events across aggregates
+
+### Dual-Write Pattern (Pipeline)
+- Generate IDs early (interview_id, correlation_id)
+- Use `Neo4jMapStorage` for writing sentences (emits SentenceCreated events)
+- Use `PipelineEventEmitter` for InterviewCreated and AnalysisGenerated events
+- Ensures both Neo4j and EventStoreDB are updated
+
+## Development Workflow
+
+### Starting Services
+```bash
+make db-up          # Start all Docker services
+make db-down        # Stop all services
+```
+
+### Running Tests
+```bash
+make test           # Full test suite (pytest -v)
+make coverage       # Test with HTML coverage report
+pytest tests/unit/  # Run specific test directory
+pytest -k "test_name" # Run tests matching pattern
+```
+
+### Code Quality
+```bash
+make lint           # Check with flake8
+make format         # Auto-format with black
+```
+
+### Running Pipeline
+```bash
+make run            # Process sample interview file
+# Or with custom file:
+docker compose run --rm app python -m src.pipeline /path/to/file.txt
+```
+
+### Database Access
+Neo4j Browser: http://localhost:7474
+- Username: `neo4j`
+- Password: From `NEO4J_PASSWORD` in `.env`
+
+EventStoreDB UI: http://localhost:2113
+- No authentication by default (dev only)
+
+## Reminders for AI Assistant
+
+1. **Always consider architecture**: Is this a command (write to EventStore) or query (read from Neo4j)?
+2. **Type hints everywhere**: No exceptions, even in tests
+3. **Line length limit**: 120 chars max (enforced by Flake8)
+4. **TDD workflow**: Test first, then implementation
+5. **Environment awareness**: Use environment detection, not hardcoded URLs
+6. **Transaction safety**: Use explicit transaction management for Neo4j
+7. **Event immutability**: Never modify existing events, only append new ones
+8. **Correlation tracking**: Maintain correlation_id through event chains
+9. **Security**: Never suggest committing `.env` files or secrets
+10. **Documentation**: Update docstrings when changing function signatures
+
+## File Locations
+
+- Source code: `src/`
+- Tests: `tests/` (mirrors src/ structure)
+- Fixtures: `tests/fixtures/`
+- API routers: `src/api/routers/`
+- Event models: `src/events/aggregates.py`
+- Configuration: `src/config.py` (loads from .env)
+- Database managers: `src/database/neo4j_manager.py`, `src/event_store/client.py`
+- Pipeline: `src/pipeline.py`
+- Command handlers: `src/commands/handlers/`
+- Projection handlers: `src/projections/handlers/`
+
+## Common Commands Quick Reference
+
+```bash
+# Development
+make build          # Build Docker images
+make run            # Run pipeline on sample file
+make test           # Run all tests
+make coverage       # Generate coverage report
+make lint           # Check code style
+make format         # Auto-format code
+
+# Database
+make db-up          # Start databases
+make db-down        # Stop databases
+make clean          # Remove volumes (fresh start)
+
+# API
+docker compose up api  # Start FastAPI server (http://localhost:8000)
+```
+
+## When Suggesting Changes
+
+1. Consider impact on event sourcing (are we maintaining immutability?)
+2. Check if tests need updating (always update tests with code)
+3. Verify type hints are present and correct
+4. Ensure line length <= 120 characters
+5. Add docstrings for new functions/classes
+6. Consider environment-aware configuration (Docker/CI/Host)
+7. Check if changes affect projections (Neo4j sync)
+8. Verify correlation_id propagation in event chains
+9. Ensure Neo4j transaction handling is correct (no async context manager for begin_transaction)
+10. Run `make lint` and `make test` before declaring success
+
+## Known Issues to Avoid
+
+1. **Neo4j Transactions**: Use `tx = await session.begin_transaction()` NOT `async with session.begin_transaction()`
+2. **HTTPX Testing**: Use `transport=ASGITransport(app=app)` not `app=app` directly
+3. **Handler Signature**: Handlers use single `handle(event)` method, not `handle_edit_sentence`, etc.
+4. **Pipeline IDs**: Generate interview_id and correlation_id early, pass to _setup_file_io
+5. **Pydantic V2**: Use new validator syntax, expect deprecation warnings (pre-existing)
+6. **API Routing**: All routes need proper registration in main.py with correct prefix
+
+## Security
+
+- **Never commit `.env` files** - they contain real API keys
+- Use `.env.example` as template
+- Store secrets in environment variables
+- Use password managers for API keys
+- Rotate keys immediately if exposed
+- See `docs/onboarding/SECURITY-WARNING.md` for more details

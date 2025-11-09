@@ -1,0 +1,25 @@
+[flake8]
+# Maximum line length (PEP 8 recommends 79, but 120 is common for modern projects)
+max-line-length = 120
+
+# Directories and files to exclude from linting
+exclude = 
+    .git,
+    __pycache__,
+    .pytest_cache,
+    .venv,
+    venv,
+    .env,
+    .DS_Store,
+    *.pyc,
+    .aider.tags.cache.v4,
+    .aider.chat.history.md,
+    .aider.input.history,
+    repomix-output.xml
+
+# Error codes to ignore
+ignore = 
+    E203,  # Whitespace before ':' (conflicts with black formatter)
+    W503,  # Line break before binary operator (deprecated, conflicts with W504)
+    F401   # Module imported but unused (often needed for __init__.py exports)
+
