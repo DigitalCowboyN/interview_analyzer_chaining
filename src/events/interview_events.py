@@ -97,7 +97,7 @@ def create_interview_created_event(
         aggregate_type=AggregateType.INTERVIEW,
         aggregate_id=aggregate_id,
         version=version,
-        data=data.dict(),
+        data=data.model_dump(),
         **envelope_kwargs
     )
 
@@ -131,7 +131,7 @@ def create_interview_updated_event(
         aggregate_type=AggregateType.INTERVIEW,
         aggregate_id=aggregate_id,
         version=version,
-        data=data.dict(),
+        data=data.model_dump(),
         **envelope_kwargs
     )
 
@@ -165,7 +165,7 @@ def create_status_changed_event(
         aggregate_type=AggregateType.INTERVIEW,
         aggregate_id=aggregate_id,
         version=version,
-        data=data.dict(),
+        data=data.model_dump(),
         **envelope_kwargs
     )
 
@@ -192,7 +192,7 @@ def create_interview_archived_event(
         aggregate_type=AggregateType.INTERVIEW,
         aggregate_id=aggregate_id,
         version=version,
-        data=data.dict(),
+        data=data.model_dump(),
         **envelope_kwargs
     )
 
@@ -219,6 +219,6 @@ def create_interview_deleted_event(
         aggregate_type=AggregateType.INTERVIEW,
         aggregate_id=aggregate_id,
         version=version,
-        data=data.dict(),
+        data=data.model_dump(),
         **envelope_kwargs
     )

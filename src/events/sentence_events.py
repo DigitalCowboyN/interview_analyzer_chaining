@@ -168,7 +168,7 @@ def create_sentence_created_event(
         aggregate_type=AggregateType.SENTENCE,
         aggregate_id=aggregate_id,
         version=version,
-        data=data.dict(),
+        data=data.model_dump(),
         **envelope_kwargs
     )
 
@@ -197,7 +197,7 @@ def create_sentence_edited_event(
         aggregate_type=AggregateType.SENTENCE,
         aggregate_id=aggregate_id,
         version=version,
-        data=data.dict(),
+        data=data.model_dump(),
         **envelope_kwargs
     )
 
@@ -250,7 +250,7 @@ def create_analysis_generated_event(
         aggregate_type=AggregateType.SENTENCE,
         aggregate_id=aggregate_id,
         version=version,
-        data=data.dict(),
+        data=data.model_dump(),
         **envelope_kwargs
     )
 
@@ -278,6 +278,6 @@ def create_analysis_overridden_event(
         aggregate_type=AggregateType.SENTENCE,
         aggregate_id=aggregate_id,
         version=version,
-        data=data.dict(),
+        data=data.model_dump(),
         **envelope_kwargs
     )

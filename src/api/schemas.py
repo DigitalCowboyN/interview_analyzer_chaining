@@ -6,7 +6,7 @@ Defines Pydantic models used for API request validation and response serializati
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FileListResponse(BaseModel):
@@ -22,6 +22,9 @@ class FileListResponse(BaseModel):
 
 class AnalysisResult(BaseModel):
     """Represents the analysis result for a single sentence."""
+
+    # Allow for potential error fields or other dynamic fields from analysis
+    model_config = ConfigDict(extra="allow")
 
     sentence_id: int = Field(
         ..., description="Unique identifier for the sentence within the file."
@@ -39,10 +42,6 @@ class AnalysisResult(BaseModel):
     topic_level_3: Optional[str] = None
     overall_keywords: Optional[List[str]] = None
     domain_keywords: Optional[List[str]] = None
-
-    # Allow for potential error fields or other dynamic fields from analysis
-    class Config:
-        extra = "allow"
 
 
 class FileContentResponse(BaseModel):

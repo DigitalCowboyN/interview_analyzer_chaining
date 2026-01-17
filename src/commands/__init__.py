@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.events.envelope import Actor
 
@@ -17,13 +17,10 @@ from src.events.envelope import Actor
 class Command(BaseModel):
     """Base class for all commands."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     correlation_id: Optional[str] = Field(None, description="Correlation ID for tracking related operations")
     actor: Optional[Actor] = Field(None, description="Who/what initiated this command")
-
-    class Config:
-        """Pydantic configuration."""
-
-        arbitrary_types_allowed = True
 
 
 class CommandResult(BaseModel):

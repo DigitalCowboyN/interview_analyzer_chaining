@@ -161,7 +161,7 @@ class EventStoreClient:
                         "version": event.version,
                         "occurred_at": event.occurred_at.isoformat(),
                         "schema_version": event.schema_version,
-                        "actor": event.actor.dict() if event.actor else None,
+                        "actor": event.actor.model_dump() if event.actor else None,
                         "correlation_id": event.correlation_id,
                         "causation_id": event.causation_id,
                         "source": event.source,

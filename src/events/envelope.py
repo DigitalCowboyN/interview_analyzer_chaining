@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ActorType(str, Enum):
@@ -31,14 +31,11 @@ class AggregateType(str, Enum):
 class Actor(BaseModel):
     """Information about who/what initiated the event."""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     user_id: Optional[str] = None
     display: Optional[str] = None
     actor_type: ActorType
-
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
 
 
 class EventEnvelope(BaseModel):
@@ -72,8 +69,11 @@ class EventEnvelope(BaseModel):
     project_id: Optional[str] = Field(None, description="Project/tenant ID if applicable")
     tags: List[str] = Field(default_factory=list, description="Free-form debugging labels")
 
-    @validator("occurred_at")
-    def occurred_at_must_be_utc(cls, v):
+    model_config = ConfigDict(use_enum_values=True)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def occurred_at_must_be_utc(cls, v: datetime) -> datetime:
         """Ensure occurred_at is timezone-aware and in UTC."""
         if v.tzinfo is None:
             raise ValueError("occurred_at must be timezone-aware")
@@ -81,8 +81,9 @@ class EventEnvelope(BaseModel):
             v = v.astimezone(timezone.utc)
         return v
 
-    @validator("event_id")
-    def event_id_must_be_valid_uuid(cls, v):
+    @field_validator("event_id")
+    @classmethod
+    def event_id_must_be_valid_uuid(cls, v: str) -> str:
         """Validate that event_id is a valid UUID."""
         try:
             uuid.UUID(v)
@@ -90,20 +91,15 @@ class EventEnvelope(BaseModel):
             raise ValueError("event_id must be a valid UUID")
         return v
 
-    @validator("aggregate_id")
-    def aggregate_id_must_be_valid_uuid(cls, v):
+    @field_validator("aggregate_id")
+    @classmethod
+    def aggregate_id_must_be_valid_uuid(cls, v: str) -> str:
         """Validate that aggregate_id is a valid UUID."""
         try:
             uuid.UUID(v)
         except ValueError:
             raise ValueError("aggregate_id must be a valid UUID")
         return v
-
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
-        json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 class EventMetadata(BaseModel):
@@ -113,6 +109,8 @@ class EventMetadata(BaseModel):
     Useful for event filtering, querying, and processing without
     deserializing the full event payload.
     """
+
+    model_config = ConfigDict(use_enum_values=True)
 
     event_id: str
     event_type: str
@@ -128,12 +126,6 @@ class EventMetadata(BaseModel):
     trace_id: Optional[str] = None
     project_id: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
-
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
-        json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 def generate_event_id() -> str:
