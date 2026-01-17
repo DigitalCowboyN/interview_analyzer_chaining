@@ -275,7 +275,7 @@ class TestSentenceAggregate:
 class TestRepositoryPattern:
     """Test repository pattern with mocked EventStore."""
 
-    def test_interview_repository_stream_naming(self):
+    async def test_interview_repository_stream_naming(self):
         """Test interview repository stream naming convention."""
         mock_store = MagicMock()
         repo = InterviewRepository(mock_store)
@@ -285,7 +285,7 @@ class TestRepositoryPattern:
 
         assert stream_name == f"Interview-{aggregate_id}"
 
-    def test_sentence_repository_stream_naming(self):
+    async def test_sentence_repository_stream_naming(self):
         """Test sentence repository stream naming convention."""
         mock_store = MagicMock()
         repo = SentenceRepository(mock_store)

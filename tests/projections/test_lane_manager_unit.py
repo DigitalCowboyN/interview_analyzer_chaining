@@ -20,7 +20,7 @@ from src.projections.lane_manager import Lane, LaneManager
 class TestLanePartitioning:
     """Test lane partitioning logic."""
 
-    def test_consistent_hashing(self):
+    async def test_consistent_hashing(self):
         """Test that same interview_id always maps to same lane."""
         handler_registry = MagicMock()
         manager = LaneManager(handler_registry, lane_count=12)
@@ -33,7 +33,7 @@ class TestLanePartitioning:
         # All should be the same lane
         assert all(lane == lanes[0] for lane in lanes)
 
-    def test_different_interviews_can_map_to_different_lanes(self):
+    async def test_different_interviews_can_map_to_different_lanes(self):
         """Test that different interview_ids can map to different lanes."""
         handler_registry = MagicMock()
         manager = LaneManager(handler_registry, lane_count=12)
@@ -48,7 +48,7 @@ class TestLanePartitioning:
         unique_lanes = set(lane_ids)
         assert len(unique_lanes) > 1, "All interviews mapped to same lane - hash distribution broken"
 
-    def test_lane_distribution(self):
+    async def test_lane_distribution(self):
         """Test that interviews are reasonably distributed across lanes."""
         handler_registry = MagicMock()
         manager = LaneManager(handler_registry, lane_count=12)
@@ -71,7 +71,7 @@ class TestLanePartitioning:
             assert count > avg * 0.5, f"Lane {lane_id} underutilized: {count} (expected ~{avg})"
             assert count < avg * 1.5, f"Lane {lane_id} overutilized: {count} (expected ~{avg})"
 
-    def test_hash_matches_expected_algorithm(self):
+    async def test_hash_matches_expected_algorithm(self):
         """Test that hash algorithm matches what we expect."""
         handler_registry = MagicMock()
         manager = LaneManager(handler_registry, lane_count=12)

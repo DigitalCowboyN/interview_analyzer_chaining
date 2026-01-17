@@ -188,8 +188,8 @@ async def test_local_map_storage_write_uninitialized(tmp_path: Path) -> None:
 # --- PHASE 1: FOUNDATION TESTS ---
 
 
-# Constructor Validation Tests (non-async)
-def test_local_text_data_source_constructor_validation():
+# Constructor Validation Tests
+async def test_local_text_data_source_constructor_validation():
     """Tests LocalTextDataSource constructor type validation."""
     # Valid Path object should work
     valid_path = Path("/test/path.txt")
@@ -207,7 +207,7 @@ def test_local_text_data_source_constructor_validation():
         LocalTextDataSource(None)  # None instead of Path
 
 
-def test_local_analysis_writer_constructor_validation():
+async def test_local_analysis_writer_constructor_validation():
     """Tests LocalJsonlAnalysisWriter constructor type validation."""
     # Valid Path object should work
     valid_path = Path("/test/analysis.jsonl")
@@ -225,7 +225,7 @@ def test_local_analysis_writer_constructor_validation():
         LocalJsonlAnalysisWriter(None)
 
 
-def test_local_map_storage_constructor_validation():
+async def test_local_map_storage_constructor_validation():
     """Tests LocalJsonlMapStorage constructor type validation."""
     # Valid Path object should work
     valid_path = Path("/test/map.jsonl")
