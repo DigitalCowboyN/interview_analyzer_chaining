@@ -424,48 +424,57 @@ async def clean_event_store(event_store_client):
 
     Note: In production, you would never delete streams. This is only for testing.
     """
-    # Common test file name used in test fixtures
-    test_filename = "test_interview.txt"
-
-    # Calculate deterministic interview_id that will be used (matches pipeline logic)
     import uuid
-    interview_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{test_filename}"))
-
-    # Streams that will be created during test
-    test_streams = [f"Interview-{interview_id}"]
-
-    # Calculate sentence IDs (tests typically have 4 sentences)
-    for i in range(10):  # Clean up to 10 possible sentences
-        sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{i}"))
-        test_streams.append(f"Sentence-{sentence_id}")
-
-    # Delete test streams before test runs
     from esdbclient import StreamState
 
-    for stream_name in test_streams:
-        try:
-            # Delete stream regardless of current version (StreamState.ANY)
-            # This is a tombstone delete - marks stream as deleted
-            event_store_client._client.delete_stream(
-                stream_name,
-                current_version=StreamState.ANY
-            )
-        except Exception as e:
-            # Stream doesn't exist yet, which is fine
-            # Or other errors like permission issues
-            pass
+    # Collect all test streams to clean up
+    test_streams = []
+
+    # Pattern 1: Common test file name used in test fixtures
+    test_filenames = [
+        "test_interview.txt",
+        # Pattern 2: Concurrent test files (test_performance.py)
+        *[f"concurrent_test_{i}.txt" for i in range(20)],
+        # Pattern 3: E2E test files
+        "e2e_test_file.txt",
+        "test_file_1.txt",
+        "test_file_2.txt",
+        "test_file_3.txt",
+        # Pattern 4: Large file tests
+        "large_test_file.txt",
+        # Pattern 5: Error recovery tests
+        "error_test_file.txt",
+    ]
+
+    for test_filename in test_filenames:
+        # Calculate deterministic interview_id (matches pipeline logic)
+        interview_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{test_filename}"))
+        test_streams.append(f"Interview-{interview_id}")
+
+        # Calculate sentence IDs (tests typically have up to 100 sentences for large files)
+        for i in range(100):
+            sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{i}"))
+            test_streams.append(f"Sentence-{sentence_id}")
+
+    def delete_streams(streams):
+        """Delete streams, ignoring errors for non-existent streams."""
+        for stream_name in streams:
+            try:
+                event_store_client._client.delete_stream(
+                    stream_name,
+                    current_version=StreamState.ANY
+                )
+            except Exception:
+                # Stream doesn't exist or other errors - ignore
+                pass
+
+    # Delete test streams before test runs
+    delete_streams(test_streams)
 
     yield event_store_client
 
-    # Optionally clean up after test as well (for extra safety)
-    for stream_name in test_streams:
-        try:
-            event_store_client._client.delete_stream(
-                stream_name,
-                current_version=StreamState.ANY
-            )
-        except Exception:
-            pass
+    # Clean up after test as well (for extra safety)
+    delete_streams(test_streams)
 
 
 @pytest.fixture(scope="function")
