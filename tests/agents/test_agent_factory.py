@@ -118,11 +118,12 @@ def test_different_providers_different_instances(mock_openai_config, mock_anthro
 
         openai_agent = AgentFactory.create_agent("openai")
 
-    with patch("src.agents.agent_factory.config", mock_anthropic_config):
-        anthropic_agent = AgentFactory.create_agent("anthropic")
+        # Switch factory config to anthropic for second agent creation
+        with patch("src.agents.agent_factory.config", mock_anthropic_config):
+            anthropic_agent = AgentFactory.create_agent("anthropic")
 
-        assert openai_agent is not anthropic_agent
-        assert type(openai_agent) != type(anthropic_agent)
+            assert openai_agent is not anthropic_agent
+            assert type(openai_agent) != type(anthropic_agent)
 
 
 # Test configuration-driven selection
