@@ -4,9 +4,11 @@ src/io/neo4j_map_storage.py
 Neo4j implementation of the ConversationMapStorage protocol.
 """
 
+import warnings
 from typing import Any, Dict, List, Set
 
 from src.utils.logger import get_logger
+from src.utils.metrics import metrics_tracker
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
 from .protocols import ConversationMapStorage
@@ -36,6 +38,21 @@ class Neo4jMapStorage(ConversationMapStorage):
         self.interview_id = str(interview_id)
         self.event_emitter = event_emitter
         self.correlation_id = correlation_id
+
+        # M2.8: Deprecation warning for direct write path
+        if event_emitter is None:
+            warnings.warn(
+                "Direct Neo4j writes without event_emitter are deprecated and will be removed in M3.0. "
+                "Pass an event_emitter instance to enable event-first dual-write architecture. "
+                "See M2.8_MIGRATION_SUMMARY.md for migration guidance.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            logger.warning(
+                "DEPRECATED: Neo4jMapStorage initialized without event_emitter. "
+                "Direct writes will be removed in M3.0. Use event-first dual-write pattern."
+            )
+
         logger.debug(f"Neo4jMapStorage initialized for Project: {self.project_id}, Interview: {self.interview_id}")
 
     async def initialize(self):
@@ -73,10 +90,16 @@ class Neo4jMapStorage(ConversationMapStorage):
         logger.debug(f"Merged Project {self.project_id}")
 
         # 2. Ensure Interview exists and link it to Project
+        # Direct writes set event_version=0 (projection service will update to actual version)
         interview_query = """
             MATCH (p:Project {project_id: $project_id})
             MERGE (i:Interview {interview_id: $interview_id})
-            ON CREATE SET i.created_at = datetime(), i.processed_by = 'system', i.filename = $interview_id
+            ON CREATE SET
+                i.created_at = datetime(),
+                i.processed_by = 'system',
+                i.filename = $interview_id,
+                i.event_version = 0,
+                i.source = 'pipeline_direct'
             MERGE (p)-[:CONTAINS_INTERVIEW]->(i)
             RETURN i
         """
@@ -119,37 +142,46 @@ class Neo4jMapStorage(ConversationMapStorage):
         sentence_id = entry["sentence_id"]
         logger.debug(f"Writing entry for Sentence ID: {sentence_id} in Interview: {self.interview_id}")
 
-        try:
-            async with await Neo4jConnectionManager.get_session() as session:
-                await self._run_write_entry_queries(session, entry)
-            logger.debug(f"Successfully wrote entry for Sentence ID: {sentence_id}")
+        # STEP 1: EMIT EVENT FIRST (CRITICAL - Event-First Dual-Write)
+        # Events are the source of truth. If event emission fails, abort the operation.
+        if self.event_emitter:
+            try:
+                await self.event_emitter.emit_sentence_created(
+                    interview_id=self.interview_id,
+                    index=entry["sequence_order"],
+                    text=entry["sentence"],
+                    speaker=entry.get("speaker"),
+                    start_ms=entry.get("start_time"),
+                    end_ms=entry.get("end_time"),
+                    correlation_id=self.correlation_id,
+                )
+                logger.info(f"✅ Event emitted for sentence {sentence_id}")
 
-            # Emit SentenceCreated event (if event sourcing enabled)
-            if self.event_emitter:
-                try:
-                    await self.event_emitter.emit_sentence_created(
-                        interview_id=self.interview_id,
-                        index=entry["sequence_order"],
-                        text=entry["sentence"],
-                        speaker=entry.get("speaker"),
-                        start_ms=entry.get("start_time"),
-                        end_ms=entry.get("end_time"),
-                        correlation_id=self.correlation_id,
-                    )
-                    logger.debug(f"Emitted SentenceCreated event for sentence {sentence_id}.")
-                except Exception as emit_e:
-                    # Event emission is non-blocking - log but don't raise
-                    logger.error(
-                        f"Failed to emit SentenceCreated event for sentence {sentence_id}: {emit_e}",
-                        exc_info=True,
-                    )
+                # Track event-first success metric
+                metrics_tracker.increment_dual_write_event_first_success()
 
-        except Exception as e:
-            logger.error(
-                f"Failed Neo4j write_entry for Sentence ID {sentence_id} (Interview {self.interview_id}): {e}",
-                exc_info=True,
-            )
-            raise
+            except Exception as event_error:
+                # EVENT FAILURE = OPERATION FAILURE
+                # This is architecturally correct: events are the immutable source of truth.
+                # If we cannot persist the event, we must not write to Neo4j.
+
+                # Track event-first failure metric
+                metrics_tracker.increment_dual_write_event_first_failure()
+
+                logger.error(
+                    f"❌ CRITICAL: Failed to emit SentenceCreated event for sentence {sentence_id}. "
+                    f"Aborting Neo4j write to maintain event-first integrity. Error: {event_error}",
+                    exc_info=True,
+                )
+                raise RuntimeError(
+                    f"Event emission failed for sentence {sentence_id}. "
+                    f"Operation aborted to maintain event-first integrity."
+                ) from event_error
+
+        # M2.8: REMOVED DIRECT NEO4J WRITES
+        # Projection service is now the SOLE writer to Neo4j.
+        # Events are the single source of truth - projection service reads events and writes to Neo4j.
+        logger.info(f"✅ Event emitted for sentence {sentence_id}. Projection service will handle Neo4j write.")
 
     async def _run_write_entry_queries(self, session, entry: Dict[str, Any]):
         """Run write entry queries directly on the session."""
@@ -164,6 +196,8 @@ class Neo4jMapStorage(ConversationMapStorage):
         s_speaker = entry.get("speaker")
 
         # Properties to set on creation
+        # Note: Direct writes get event_version=0 (placeholder before projection service updates it)
+        # Projection service will set event_version to actual event version when it processes events
         create_props = {
             "sequence_order": s_order,
             "text": s_text,
@@ -171,6 +205,8 @@ class Neo4jMapStorage(ConversationMapStorage):
             "end_time": s_end,
             "speaker": s_speaker,
             "is_edited": False,
+            "event_version": 0,  # Direct writes are version 0 (before projection)
+            "source": "pipeline_direct",  # Track source of write
         }
         # Filter out None values from create_props
         create_props = {k: v for k, v in create_props.items() if v is not None}
@@ -282,31 +318,31 @@ class Neo4jMapStorage(ConversationMapStorage):
             # Re-raise or return empty list depending on desired error handling
             raise
 
-    async def read_sentence_ids(self) -> Set[int]:
+    async def read_sentence_ids(self) -> Set[str]:
         """
-        Reads all unique sentence IDs for the associated Interview from Neo4j.
+        M2.8: Reads all unique sentence IDs (UUIDs) for the associated Interview from Neo4j.
+
+        Note: In M2.8, sentence_ids are UUID strings generated by the projection service.
         """
         logger.debug(f"Reading sentence IDs for Interview: {self.interview_id}")
         cypher = """
             MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
             RETURN s.sentence_id AS sentenceId
         """
-        # Note: Using RETURN DISTINCT s.sentence_id might be slightly more efficient
-        # if the driver/db doesn't optimize the set creation well, but adding to a Python set handles uniqueness.
 
-        sentence_ids: Set[int] = set()
+        sentence_ids: Set[str] = set()
         try:
             async with await Neo4jConnectionManager.get_session() as session:
                 result = await session.run(cypher, interview_id=self.interview_id)
                 # Process results asynchronously
                 async for record in result:
                     s_id = record["sentenceId"]
-                    # Ensure the ID is an integer before adding
-                    if isinstance(s_id, int):
-                        sentence_ids.add(s_id)
+                    # M2.8: sentence_ids are now strings (UUIDs)
+                    if s_id is not None:
+                        sentence_ids.add(str(s_id))
                     else:
                         logger.warning(
-                            f"Found non-integer sentence_id ({s_id}) for Interview {self.interview_id}, skipping."
+                            f"Found null sentence_id for Interview {self.interview_id}, skipping."
                         )
 
             logger.debug(

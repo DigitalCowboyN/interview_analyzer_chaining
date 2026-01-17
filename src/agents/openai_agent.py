@@ -1,12 +1,11 @@
 """
-agent.py
+openai_agent.py
 
-Defines the OpenAIAgent class for interacting with OpenAI's API, specifically
-configured for structured JSON responses. Handles API calls, response parsing,
-error handling with retries, and metrics tracking.
+OpenAI implementation of the LLM agent interface for sentence analysis.
+Handles interactions with OpenAI's API using the Responses API with JSON mode.
 
-This module provides a singleton instance `agent` for convenient use throughout
-the application.
+This is a refactored version of the original agent.py, now inheriting from
+BaseLLMAgent to support multi-provider architecture.
 
 Key Functionality:
     - Asynchronous API calls using `openai` library and `asyncio`.
@@ -19,15 +18,11 @@ Key Functionality:
       (`src.utils.metrics`).
 
 Usage:
-    from src.agents.agent import agent
+    from src.agents.agent_factory import AgentFactory
 
-    async def main():
-        try:
-            result = await agent.call_model("Prompt instructing JSON output.")
-            print(result)
-        except Exception as e:
-            print(f"API call failed: {e}")
-
+    # Get OpenAI agent
+    agent = AgentFactory.create_agent("openai")
+    result = await agent.call_model("Prompt instructing JSON output.")
 """
 
 import asyncio
@@ -36,23 +31,24 @@ from typing import Any, Dict
 
 from openai import APIError, AsyncOpenAI
 
-from src.config import (
-    config,  # Custom configuration loader; see config.yaml for details
-)
-from src.utils.logger import get_logger  # Centralized logger for the project
-from src.utils.metrics import metrics_tracker  # Correctly import the global instance
+from src.config import config
+from src.utils.logger import get_logger
+from src.utils.metrics import metrics_tracker
+from .base_agent import BaseLLMAgent
 
 # Get a configured logger for logging debug, warning, and error messages.
 logger = get_logger()
 
 
-class OpenAIAgent:
+class OpenAIAgent(BaseLLMAgent):
     """
-    Manages interactions with the OpenAI API for text analysis tasks.
+    OpenAI implementation of LLM agent for text analysis tasks.
 
     Encapsulates API call logic, including prompt formatting for JSON output,
     response handling, error retries, and metrics tracking (API calls, token usage).
     Uses configuration settings loaded via `src.config`.
+
+    Inherits from BaseLLMAgent to support multi-provider architecture.
     """
 
     def __init__(self):
@@ -65,6 +61,8 @@ class OpenAIAgent:
         Raises:
             ValueError: If the `openai.api_key` is not found in the configuration.
         """
+        super().__init__()
+
         api_key = config["openai"]["api_key"]
         if not api_key:
             raise ValueError("OpenAI API key is not set.")
@@ -245,6 +243,10 @@ class OpenAIAgent:
                 "call_model failed after retries without specific exception recorded."
             )
 
+    def get_provider_name(self) -> str:
+        """Return the provider name for logging and metrics."""
+        return "openai"
 
-# Create a global singleton instance of OpenAIAgent for application-wide use.
-agent = OpenAIAgent()
+    def get_model_name(self) -> str:
+        """Return the configured model name."""
+        return self.model

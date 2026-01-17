@@ -60,8 +60,12 @@ class PipelineConfig(BaseModel):
 
 
 class ConfigModel(BaseModel):
+    llm: Dict[str, Any] = Field(default_factory=dict)
     openai: Dict[str, Any] = Field(default_factory=dict)
     openai_api: Dict[str, Any] = Field(default_factory=dict)
+    anthropic: Dict[str, Any] = Field(default_factory=dict)
+    anthropic_api: Dict[str, Any] = Field(default_factory=dict)
+    google: Dict[str, Any] = Field(default_factory=dict)
     preprocessing: Dict[str, Any] = Field(default_factory=dict)
     classification: Dict[str, Any] = Field(default_factory=dict)
     paths: Dict[str, Any] = Field(default_factory=dict)
@@ -70,6 +74,11 @@ class ConfigModel(BaseModel):
     logging: Dict[str, Any] = Field(default_factory=dict)
     neo4j: Optional[Neo4jConfig] = None
     api: Dict[str, Any] = Field(default_factory=dict)
+    embedding: Dict[str, Any] = Field(default_factory=dict)
+    clustering: Dict[str, Any] = Field(default_factory=dict)
+    additional: Dict[str, Any] = Field(default_factory=dict)
+    event_sourcing: Dict[str, Any] = Field(default_factory=dict)
+    project: Dict[str, Any] = Field(default_factory=dict)
     # Add other top-level sections as needed
 
 

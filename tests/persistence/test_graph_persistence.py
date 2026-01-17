@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from openai import RateLimitError
 
-from src.agents.agent import OpenAIAgent
+from src.agents.openai_agent import OpenAIAgent
 
 
 class TestOpenAIAgentInitialization:
@@ -40,7 +40,7 @@ class TestOpenAIAgentInitialization:
             "openai_api": {"retry": {"max_attempts": 3, "backoff_factor": 2}},
         }
 
-        with patch("src.agents.agent.config", test_config):
+        with patch("src.agents.openai_agent.config", test_config):
             agent = OpenAIAgent()
 
             assert agent.model == "gpt-4"
@@ -53,7 +53,7 @@ class TestOpenAIAgentInitialization:
         """Test agent initialization fails gracefully with missing API key."""
         invalid_config = {"openai": {"api_key": "", "model_name": "gpt-4"}}  # Empty API key should fail
 
-        with patch("src.agents.agent.config", invalid_config):
+        with patch("src.agents.openai_agent.config", invalid_config):
             with pytest.raises(ValueError, match="OpenAI API key is not set"):
                 OpenAIAgent()
 
@@ -64,7 +64,7 @@ class TestOpenAIAgentInitialization:
             # No openai_api section - should use defaults
         }
 
-        with patch("src.agents.agent.config", minimal_config):
+        with patch("src.agents.openai_agent.config", minimal_config):
             agent = OpenAIAgent()
 
             assert agent.retry_attempts == 5  # Default value
@@ -87,7 +87,7 @@ class TestOpenAIAgentAPIInteraction:
             "openai_api": {"retry": {"max_attempts": 2, "backoff_factor": 1.5}},  # Reduced for faster tests
         }
 
-        with patch("src.agents.agent.config", test_config):
+        with patch("src.agents.openai_agent.config", test_config):
             return OpenAIAgent()
 
     def create_realistic_openai_response(self, content_dict: Dict[str, Any]) -> MagicMock:
@@ -288,7 +288,7 @@ class TestOpenAIAgentIntegration:
             "openai_api": {"retry": {"max_attempts": 3, "backoff_factor": 2}},
         }
 
-        with patch("src.agents.agent.config", interview_config):
+        with patch("src.agents.openai_agent.config", interview_config):
             return OpenAIAgent()
 
     def create_realistic_openai_response(self, content_dict: Dict[str, Any]) -> MagicMock:

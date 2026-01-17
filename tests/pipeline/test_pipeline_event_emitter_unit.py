@@ -81,19 +81,20 @@ class TestPipelineEventEmitter:
         assert expected_version == -1  # Allow any version
 
     async def test_emit_interview_created_handles_exception(self, emitter, mock_event_store, caplog):
-        """Test that InterviewCreated emission logs errors but doesn't raise."""
+        """Test that InterviewCreated emission logs errors AND raises (event-first architecture)."""
         mock_event_store.append_events.side_effect = Exception("ESDB connection failed")
 
         interview_id = str(uuid.uuid4())
         project_id = str(uuid.uuid4())
 
-        # Should not raise exception
-        await emitter.emit_interview_created(
-            interview_id=interview_id,
-            project_id=project_id,
-            title="test.txt",
-            source="/path/to/test.txt",
-        )
+        # SHOULD raise exception (event-first dual-write)
+        with pytest.raises(Exception, match="ESDB connection failed"):
+            await emitter.emit_interview_created(
+                interview_id=interview_id,
+                project_id=project_id,
+                title="test.txt",
+                source="/path/to/test.txt",
+            )
 
         # Check error was logged
         assert "Failed to emit InterviewCreated event" in caplog.text
@@ -193,17 +194,18 @@ class TestPipelineEventEmitter:
         assert event1.aggregate_id == event2.aggregate_id
 
     async def test_emit_sentence_created_handles_exception(self, emitter, mock_event_store, caplog):
-        """Test that SentenceCreated emission logs errors but doesn't raise."""
+        """Test that SentenceCreated emission logs errors AND raises (event-first architecture)."""
         mock_event_store.append_events.side_effect = Exception("ESDB connection failed")
 
         interview_id = str(uuid.uuid4())
 
-        # Should not raise exception
-        await emitter.emit_sentence_created(
-            interview_id=interview_id,
-            index=0,
-            text="Test sentence",
-        )
+        # SHOULD raise exception (event-first dual-write)
+        with pytest.raises(Exception, match="ESDB connection failed"):
+            await emitter.emit_sentence_created(
+                interview_id=interview_id,
+                index=0,
+                text="Test sentence",
+            )
 
         # Check error was logged
         assert "Failed to emit SentenceCreated event" in caplog.text
@@ -261,7 +263,7 @@ class TestPipelineEventEmitter:
         assert sentence_id == expected_sentence_id
 
     async def test_emit_analysis_generated_handles_exception(self, emitter, mock_event_store, caplog):
-        """Test that AnalysisGenerated emission logs errors but doesn't raise."""
+        """Test that AnalysisGenerated emission logs errors AND raises (event-first architecture)."""
         mock_event_store.append_events.side_effect = Exception("ESDB connection failed")
 
         interview_id = str(uuid.uuid4())
@@ -270,12 +272,13 @@ class TestPipelineEventEmitter:
             "overall_keywords": ["test"],
         }
 
-        # Should not raise exception
-        await emitter.emit_analysis_generated(
-            interview_id=interview_id,
-            sentence_index=0,
-            analysis_data=analysis_data,
-        )
+        # SHOULD raise exception (event-first dual-write)
+        with pytest.raises(Exception, match="ESDB connection failed"):
+            await emitter.emit_analysis_generated(
+                interview_id=interview_id,
+                sentence_index=0,
+                analysis_data=analysis_data,
+            )
 
         # Check error was logged
         assert "Failed to emit AnalysisGenerated event" in caplog.text

@@ -12,6 +12,7 @@ import asyncio
 import uuid
 from typing import Any, Dict, Optional
 
+from src.agents.agent_factory import agent
 from src.events.envelope import Actor, ActorType
 from src.events.interview_events import (
     InterviewStatus,
@@ -22,8 +23,9 @@ from src.events.sentence_events import (
     create_analysis_generated_event,
     create_sentence_created_event,
 )
-from src.events.store import EventStoreClient
+from src.events.store import EventStoreClient, StreamState
 from src.utils.logger import get_logger
+from src.utils.metrics import metrics_tracker
 
 logger = get_logger()
 
@@ -78,7 +80,10 @@ class PipelineEventEmitter:
         correlation_id: Optional[str] = None,
     ):
         """
-        Emit InterviewCreated event (non-blocking).
+        Emit InterviewCreated event (BLOCKING - raises on failure).
+
+        Event-first dual-write: This method raises exceptions on failure.
+        The caller (pipeline) must handle the exception and abort the operation.
 
         Args:
             interview_id: Interview UUID
@@ -87,6 +92,9 @@ class PipelineEventEmitter:
             source: Source file path
             language: Language code (default: "en")
             correlation_id: Correlation ID for event tracking
+
+        Raises:
+            Exception: If event emission fails (must be handled by caller)
         """
         try:
             event = create_interview_created_event(
@@ -106,8 +114,14 @@ class PipelineEventEmitter:
                 f"Emitted InterviewCreated event for interview {interview_id} " f"(correlation_id={correlation_id})"
             )
 
+            # Track success metric
+            metrics_tracker.increment_event_emission_success("InterviewCreated")
+
         except Exception as e:
-            # Log but don't raise - Neo4j write already succeeded
+            # Track failure metric
+            metrics_tracker.increment_event_emission_failure("InterviewCreated")
+
+            # Log error with context
             self.logger.error(
                 f"Failed to emit InterviewCreated event for interview {interview_id}: {e}",
                 exc_info=True,
@@ -118,6 +132,10 @@ class PipelineEventEmitter:
                     "event_type": "InterviewCreated",
                 },
             )
+
+            # RE-RAISE for event-first dual-write behavior
+            # Caller must handle and abort operation
+            raise
 
     async def emit_interview_status_changed(
         self,
@@ -178,7 +196,10 @@ class PipelineEventEmitter:
         correlation_id: Optional[str] = None,
     ):
         """
-        Emit SentenceCreated event (non-blocking).
+        Emit SentenceCreated event (BLOCKING - raises on failure).
+
+        Event-first dual-write: This method raises exceptions on failure.
+        The caller (neo4j_map_storage) must handle the exception and abort the operation.
 
         Args:
             interview_id: Interview UUID
@@ -188,6 +209,9 @@ class PipelineEventEmitter:
             start_ms: Optional start time in milliseconds
             end_ms: Optional end time in milliseconds
             correlation_id: Correlation ID for event tracking
+
+        Raises:
+            Exception: If event emission fails (must be handled by caller)
         """
         try:
             # Generate deterministic UUID for sentence
@@ -213,7 +237,14 @@ class PipelineEventEmitter:
                 f"(interview={interview_id}, index={index}, correlation_id={correlation_id})"
             )
 
+            # Track success metric
+            metrics_tracker.increment_event_emission_success("SentenceCreated")
+
         except Exception as e:
+            # Track failure metric
+            metrics_tracker.increment_event_emission_failure("SentenceCreated")
+
+            # Log error with context
             self.logger.error(
                 f"Failed to emit SentenceCreated event for interview {interview_id}, index {index}: {e}",
                 exc_info=True,
@@ -225,6 +256,10 @@ class PipelineEventEmitter:
                 },
             )
 
+            # RE-RAISE for event-first dual-write behavior
+            # Caller must handle and abort operation
+            raise
+
     async def emit_analysis_generated(
         self,
         interview_id: str,
@@ -233,13 +268,19 @@ class PipelineEventEmitter:
         correlation_id: Optional[str] = None,
     ):
         """
-        Emit AnalysisGenerated event (non-blocking).
+        Emit AnalysisGenerated event (BLOCKING - raises on failure).
+
+        Event-first dual-write: This method raises exceptions on failure.
+        The caller (neo4j_analysis_writer) must handle the exception and abort the operation.
 
         Args:
             interview_id: Interview UUID
             sentence_index: Sentence index (sequence_order)
             analysis_data: Analysis result dictionary from SentenceAnalyzer
             correlation_id: Correlation ID for event tracking
+
+        Raises:
+            Exception: If event emission fails (must be handled by caller)
         """
         try:
             # Generate deterministic UUID for sentence
@@ -252,29 +293,53 @@ class PipelineEventEmitter:
                 "purpose": analysis_data.get("purpose"),
             }
 
+            # M2.8: Apply cardinality limits at event emission time
+            # Keywords have a default limit of 6, others are unlimited
+            keywords = analysis_data.get("overall_keywords", [])
+            # First deduplicate (preserving order), then apply limit
+            keywords = list(dict.fromkeys(keywords))[:6] if keywords else []
+
+            # Determine event version by reading current stream
+            # This ensures each AnalysisGenerated event gets unique version
+            stream_name = f"Sentence-{sentence_id}"
+            try:
+                existing_events = await self.client.read_stream(stream_name)
+                # Count existing events to determine next version
+                next_version = len(existing_events)
+            except Exception:
+                # Stream doesn't exist or read failed, assume first event after SentenceCreated
+                next_version = 1
+
             event = create_analysis_generated_event(
                 aggregate_id=sentence_id,
-                version=1,  # Assumes SentenceCreated was version 0
-                model=analysis_data.get("model", "gpt-4"),
+                version=next_version,  # Increments with each analysis
+                model=analysis_data.get("model", agent.get_model_name()),
                 model_version=analysis_data.get("model_version", "1.0"),
                 classification=classification,
-                keywords=analysis_data.get("overall_keywords", []),
-                topics=analysis_data.get("topics", []),
-                domain_keywords=analysis_data.get("domain_keywords", []),
+                keywords=keywords,  # Limited to 6
+                topics=analysis_data.get("topics", []),  # Unlimited
+                domain_keywords=analysis_data.get("domain_keywords", []),  # Unlimited
                 confidence=analysis_data.get("confidence", 1.0),
                 actor=Actor(actor_type=ActorType.SYSTEM, user_id="pipeline"),
                 correlation_id=correlation_id,
             )
 
-            stream_name = f"Sentence-{sentence_id}"
-            # Don't use expected_version - we don't track versions during dual-write
-            await self.client.append_events(stream_name, [event], expected_version=-1)
+            # Use StreamState.ANY to allow multiple analyses for the same sentence
+            # M2.8: Multiple analyses can be generated (overwrite scenario in tests)
+            await self.client.append_events(stream_name, [event], expected_version=StreamState.ANY)
             self.logger.debug(
                 f"Emitted AnalysisGenerated event for sentence {sentence_id} "
                 f"(interview={interview_id}, index={sentence_index}, correlation_id={correlation_id})"
             )
 
+            # Track success metric
+            metrics_tracker.increment_event_emission_success("AnalysisGenerated")
+
         except Exception as e:
+            # Track failure metric
+            metrics_tracker.increment_event_emission_failure("AnalysisGenerated")
+
+            # Log error with context
             self.logger.error(
                 f"Failed to emit AnalysisGenerated event for interview {interview_id}, "
                 f"sentence index {sentence_index}: {e}",
@@ -287,14 +352,6 @@ class PipelineEventEmitter:
                 },
             )
 
-    async def emit_interview_created_async(self, *args, **kwargs):
-        """Fire-and-forget wrapper for emit_interview_created."""
-        asyncio.create_task(self.emit_interview_created(*args, **kwargs))
-
-    async def emit_sentence_created_async(self, *args, **kwargs):
-        """Fire-and-forget wrapper for emit_sentence_created."""
-        asyncio.create_task(self.emit_sentence_created(*args, **kwargs))
-
-    async def emit_analysis_generated_async(self, *args, **kwargs):
-        """Fire-and-forget wrapper for emit_analysis_generated."""
-        asyncio.create_task(self.emit_analysis_generated(*args, **kwargs))
+            # RE-RAISE for event-first dual-write behavior
+            # Caller must handle and abort operation
+            raise

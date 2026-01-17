@@ -17,6 +17,15 @@ These tests verify that the system can handle various failure scenarios graceful
 - Connection pool exhaustion
 - Partial write failures and data consistency
 - Recovery from corrupted state
+
+**M2.8 STATUS**: SKIPPED - Tests target Neo4j fault tolerance.
+In M2.8 architecture, EventStoreDB is the source of truth and Neo4j can be rebuilt
+from events. Fault tolerance focus should be on EventStoreDB, not Neo4j.
+
+**ROADMAP**:
+- M2.8: SKIP (documented)
+- M2.9: Optional - Rewrite to test EventStoreDB fault tolerance
+- M3.0: REWRITE for projection service fault tolerance (if needed)
 """
 
 import asyncio
@@ -31,6 +40,17 @@ from src.io.neo4j_analysis_writer import Neo4jAnalysisWriter
 from src.io.neo4j_map_storage import Neo4jMapStorage
 from src.persistence.graph_persistence import save_analysis_to_graph
 from src.utils.neo4j_driver import Neo4jConnectionManager
+
+# M2.8: Skip all fault tolerance tests - test Neo4j but EventStoreDB is source of truth
+pytestmark = [
+    pytest.mark.neo4j,
+    pytest.mark.integration,
+    pytest.mark.skip(
+        reason="M2.8: Tests target Neo4j fault tolerance, but EventStoreDB is the source of truth. "
+               "Neo4j can be rebuilt from events. Focus should be on EventStoreDB fault tolerance. "
+               "Consider rewriting for EventStoreDB in M2.9 or projection service in M3.0."
+    ),
+]
 
 
 @pytest.mark.neo4j

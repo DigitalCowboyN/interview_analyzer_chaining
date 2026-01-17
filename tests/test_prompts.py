@@ -21,7 +21,27 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import yaml
 
-from src.agents.agent import OpenAIAgent
+from src.agents.agent_factory import AgentFactory
+
+
+def mock_openai_response(content_dict):
+    """Helper function to create a mock OpenAI Response object."""
+    mock_resp = MagicMock()
+    mock_output = MagicMock()
+    mock_content = MagicMock()
+    mock_content.text = json.dumps(content_dict)
+    mock_output.content = [mock_content]
+    mock_resp.output = [mock_output]
+    return mock_resp
+
+
+def mock_anthropic_response(content_dict):
+    """Helper function to create a mock Anthropic Messages API response."""
+    mock_resp = MagicMock()
+    mock_content = MagicMock()
+    mock_content.text = json.dumps(content_dict)
+    mock_resp.content = [mock_content]
+    return mock_resp
 
 
 class TestPromptFileHandling:
@@ -268,21 +288,12 @@ class TestPromptFormatting:
 class TestPromptIntegration:
     """Test integration of prompts with actual agent behavior."""
 
-    @pytest.fixture
-    def configured_agent(self):
-        """Provide a configured agent for testing."""
-        test_config = {
-            "openai": {
-                "api_key": "test-key-for-prompts",
-                "model_name": "gpt-4",
-                "max_tokens": 1000,
-                "temperature": 0.3,
-            },
-            "openai_api": {"retry": {"max_attempts": 2, "backoff_factor": 1.5}},
-        }
-
-        with patch("src.agents.agent.config", test_config):
-            return OpenAIAgent()
+    @pytest.fixture(params=["openai", "anthropic"])
+    def configured_agent(self, request):
+        """Provide a configured agent for testing (both providers)."""
+        provider = request.param
+        AgentFactory.reset()
+        return AgentFactory.create_agent(provider)
 
     def create_realistic_response_for_prompt(self, prompt_content: str, sentence: str) -> Dict[str, Any]:
         """Generate realistic responses based on prompt type and sentence content."""
@@ -356,16 +367,6 @@ class TestPromptIntegration:
 
         return {}
 
-    def create_openai_response_mock(self, content_dict: Dict[str, Any]) -> MagicMock:
-        """Create a mock OpenAI response with correct structure."""
-        mock_response = MagicMock()
-        mock_output = MagicMock()
-        mock_content = MagicMock()
-        mock_content.text = json.dumps(content_dict)
-        mock_output.content = [mock_content]
-        mock_response.output = [mock_output]
-        return mock_response
-
     @pytest.mark.asyncio
     async def test_realistic_interview_question_analysis(self, configured_agent):
         """Test analysis of realistic interview questions using actual prompts."""
@@ -382,8 +383,17 @@ class TestPromptIntegration:
 
         expected_response = self.create_realistic_response_for_prompt(function_prompt, sentence)
 
-        with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
-            mock_create.return_value = self.create_openai_response_mock(expected_response)
+        # Determine provider and patch appropriate endpoint
+        provider = agent.get_provider_name()
+        if provider == "openai":
+            mock_target = agent.client.responses
+            mock_response_fn = mock_openai_response
+        else:  # anthropic
+            mock_target = agent.client.messages
+            mock_response_fn = mock_anthropic_response
+
+        with patch.object(mock_target, "create", new_callable=AsyncMock) as mock_create:
+            mock_create.return_value = mock_response_fn(expected_response)
 
             result = await agent.call_model(function_prompt)
 
@@ -408,8 +418,17 @@ class TestPromptIntegration:
 
         expected_response = self.create_realistic_response_for_prompt(purpose_prompt, sentence)
 
-        with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
-            mock_create.return_value = self.create_openai_response_mock(expected_response)
+        # Determine provider and patch appropriate endpoint
+        provider = agent.get_provider_name()
+        if provider == "openai":
+            mock_target = agent.client.responses
+            mock_response_fn = mock_openai_response
+        else:  # anthropic
+            mock_target = agent.client.messages
+            mock_response_fn = mock_anthropic_response
+
+        with patch.object(mock_target, "create", new_callable=AsyncMock) as mock_create:
+            mock_create.return_value = mock_response_fn(expected_response)
 
             result = await agent.call_model(purpose_prompt)
 
@@ -436,8 +455,17 @@ class TestPromptIntegration:
 
         expected_response = self.create_realistic_response_for_prompt(domain_prompt, sentence)
 
-        with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
-            mock_create.return_value = self.create_openai_response_mock(expected_response)
+        # Determine provider and patch appropriate endpoint
+        provider = agent.get_provider_name()
+        if provider == "openai":
+            mock_target = agent.client.responses
+            mock_response_fn = mock_openai_response
+        else:  # anthropic
+            mock_target = agent.client.messages
+            mock_response_fn = mock_anthropic_response
+
+        with patch.object(mock_target, "create", new_callable=AsyncMock) as mock_create:
+            mock_create.return_value = mock_response_fn(expected_response)
 
             result = await agent.call_model(domain_prompt)
 
@@ -463,8 +491,17 @@ class TestPromptIntegration:
 
         expected_response = self.create_realistic_response_for_prompt(topic_prompt, sentence)
 
-        with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
-            mock_create.return_value = self.create_openai_response_mock(expected_response)
+        # Determine provider and patch appropriate endpoint
+        provider = agent.get_provider_name()
+        if provider == "openai":
+            mock_target = agent.client.responses
+            mock_response_fn = mock_openai_response
+        else:  # anthropic
+            mock_target = agent.client.messages
+            mock_response_fn = mock_anthropic_response
+
+        with patch.object(mock_target, "create", new_callable=AsyncMock) as mock_create:
+            mock_create.return_value = mock_response_fn(expected_response)
 
             result = await agent.call_model(topic_prompt)
 
@@ -478,15 +515,12 @@ class TestPromptIntegration:
 class TestPromptErrorHandling:
     """Test error handling in prompt processing with realistic scenarios."""
 
-    @pytest.fixture
-    def agent_with_config(self):
-        """Provide agent with test configuration."""
-        test_config = {
-            "openai": {"api_key": "test-error-handling", "model_name": "gpt-4", "max_tokens": 500, "temperature": 0.2}
-        }
-
-        with patch("src.agents.agent.config", test_config):
-            return OpenAIAgent()
+    @pytest.fixture(params=["openai", "anthropic"])
+    def agent_with_config(self, request):
+        """Provide agent with test configuration (both providers)."""
+        provider = request.param
+        AgentFactory.reset()
+        return AgentFactory.create_agent(provider)
 
     def test_missing_prompt_file_handling(self):
         """Test graceful handling of missing prompt files."""
@@ -532,16 +566,19 @@ class TestPromptErrorHandling:
 
         function_prompt = task_prompts["sentence_function_type"]["prompt"].format(sentence=special_sentence)
 
-        # Mock a response that handles the special characters
-        mock_response = MagicMock()
-        mock_output = MagicMock()
-        mock_content = MagicMock()
-        mock_content.text = json.dumps({"function_type": "declarative", "confidence": "0.85"})
-        mock_output.content = [mock_content]
-        mock_response.output = [mock_output]
+        # Determine provider and create appropriate mock response
+        provider = agent.get_provider_name()
+        response_content = {"function_type": "declarative", "confidence": "0.85"}
 
-        with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create:
-            mock_create.return_value = mock_response
+        if provider == "openai":
+            mock_target = agent.client.responses
+            mock_response_fn = mock_openai_response
+        else:  # anthropic
+            mock_target = agent.client.messages
+            mock_response_fn = mock_anthropic_response
+
+        with patch.object(mock_target, "create", new_callable=AsyncMock) as mock_create:
+            mock_create.return_value = mock_response_fn(response_content)
 
             result = await agent.call_model(function_prompt)
 

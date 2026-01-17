@@ -159,6 +159,84 @@ class MetricsTracker:
         """Helper to increment successful sentences count."""
         self.increment_metric("pipeline", "sentences_success", count)
 
+    # --- Dual-Write Metrics (M2.2 Event-First Architecture) ---
+
+    def increment_event_emission_success(self, event_type: str, count: int = 1):
+        """
+        Increments the count of successful event emissions by event type.
+
+        Args:
+            event_type (str): The type of event (e.g., 'InterviewCreated', 'SentenceCreated').
+            count (int): The number of successful emissions to add. Defaults to 1.
+        """
+        self.increment_metric("events", f"emission_success_{event_type}", count)
+
+    def increment_event_emission_failure(self, event_type: str, count: int = 1):
+        """
+        Increments the count of failed event emissions by event type.
+
+        Args:
+            event_type (str): The type of event (e.g., 'InterviewCreated', 'SentenceCreated').
+            count (int): The number of failed emissions to add. Defaults to 1.
+        """
+        self.increment_metric("events", f"emission_failure_{event_type}", count)
+
+    def increment_dual_write_event_first_success(self, count: int = 1):
+        """
+        Increments the count of successful event-first writes (event succeeded, proceeding to Neo4j).
+
+        Args:
+            count (int): The number of successful event-first writes. Defaults to 1.
+        """
+        self.increment_metric("dual_write", "event_first_success", count)
+
+    def increment_dual_write_event_first_failure(self, count: int = 1):
+        """
+        Increments the count of failed event-first writes (event failed, operation aborted).
+
+        Args:
+            count (int): The number of failed event-first writes. Defaults to 1.
+        """
+        self.increment_metric("dual_write", "event_first_failure", count)
+
+    def increment_dual_write_neo4j_after_event_success(self, count: int = 1):
+        """
+        Increments the count of successful Neo4j writes after event emission.
+
+        Args:
+            count (int): The number of successful Neo4j writes. Defaults to 1.
+        """
+        self.increment_metric("dual_write", "neo4j_after_event_success", count)
+
+    def increment_dual_write_neo4j_after_event_failure(self, count: int = 1):
+        """
+        Increments the count of failed Neo4j writes after successful event emission.
+
+        Args:
+            count (int): The number of failed Neo4j writes. Defaults to 1.
+        """
+        self.increment_metric("dual_write", "neo4j_after_event_failure", count)
+
+    def increment_projection_duplicate_skipped(self, aggregate_type: str, count: int = 1):
+        """
+        Increments the count of duplicate nodes skipped by projection service.
+
+        Args:
+            aggregate_type (str): The type of aggregate (e.g., 'Interview', 'Sentence').
+            count (int): The number of duplicates skipped. Defaults to 1.
+        """
+        self.increment_metric("projections", f"duplicate_skipped_{aggregate_type}", count)
+
+    def increment_projection_version_conflict(self, aggregate_type: str, count: int = 1):
+        """
+        Increments the count of version conflicts encountered by projection service.
+
+        Args:
+            aggregate_type (str): The type of aggregate (e.g., 'Interview', 'Sentence').
+            count (int): The number of version conflicts. Defaults to 1.
+        """
+        self.increment_metric("projections", f"version_conflict_{aggregate_type}", count)
+
     def get_summary(self) -> dict:
         """
         Returns a dictionary summarizing the tracked metrics, including custom ones.

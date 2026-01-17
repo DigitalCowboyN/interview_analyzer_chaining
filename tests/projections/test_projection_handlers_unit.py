@@ -265,9 +265,14 @@ class TestInterviewHandlers:
         """Test InterviewCreated handler creates correct nodes."""
         handler = InterviewCreatedHandler()
 
-        # Mock transaction
+        # Mock transaction with proper result consumption
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 5  # Properties updated
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
         mock_tx = AsyncMock()
-        mock_tx.run = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
 
         event = EventEnvelope(
             event_type="InterviewCreated",
@@ -290,10 +295,10 @@ class TestInterviewHandlers:
         mock_tx.run.assert_called_once()
         call_args = mock_tx.run.call_args
 
-        # Verify query creates Project and Interview nodes
+        # Verify query creates Project and Interview nodes (using MERGE for dual-write safety)
         query = call_args[0][0]
         assert "MERGE (p:Project" in query
-        assert "CREATE (i:Interview" in query
+        assert "MERGE (i:Interview" in query  # Changed to MERGE for deduplication during dual-write
         assert "CONTAINS_INTERVIEW" in query
 
         # Verify parameters
@@ -301,6 +306,9 @@ class TestInterviewHandlers:
         assert params["project_id"] == "test-project"
         assert params["title"] == "Test Interview"
         assert params["interview_id"] == event.aggregate_id
+
+        # Verify result was consumed
+        mock_result.consume.assert_called_once()
 
     async def test_interview_metadata_updated_handler(self):
         """Test InterviewMetadataUpdated handler updates correct fields."""
@@ -368,8 +376,14 @@ class TestSentenceHandlers:
         """Test SentenceCreated handler creates sentence node."""
         handler = SentenceCreatedHandler()
 
+        # Mock transaction with proper result consumption
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 5  # Properties updated
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
         mock_tx = AsyncMock()
-        mock_tx.run = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
 
         interview_id = str(uuid.uuid4())
         sentence_id = str(uuid.uuid4())
@@ -396,11 +410,14 @@ class TestSentenceHandlers:
         params = call_args[1]
 
         assert "MATCH (i:Interview" in query
-        assert "CREATE (s:Sentence" in query
+        assert "MERGE (s:Sentence" in query  # Changed to MERGE for deduplication during dual-write
         assert "HAS_SENTENCE" in query
         assert params["interview_id"] == interview_id
         assert params["sentence_id"] == sentence_id
         assert params["text"] == "This is a test sentence."
+
+        # Verify result was consumed
+        mock_result.consume.assert_called_once()
 
     async def test_sentence_edited_handler(self):
         """Test SentenceEdited handler updates text and sets edited flag."""
@@ -437,8 +454,34 @@ class TestSentenceHandlers:
         """Test AnalysisGenerated handler creates analysis and dimension nodes."""
         handler = AnalysisGeneratedHandler()
 
+        # Mock result for "find edited relationships" query (first query)
+        mock_edited_result = AsyncMock()
+        mock_edited_result.single = AsyncMock(return_value=None)  # No existing edited rels
+
+        # Mock result for "delete old analysis" query (second query)
+        mock_delete_result = AsyncMock()
+        mock_delete_summary = MagicMock()
+        mock_delete_summary.counters.nodes_deleted = 0  # No nodes deleted (first analysis)
+        mock_delete_result.consume = AsyncMock(return_value=mock_delete_summary)
+
+        # Mock results for subsequent queries (create analysis, link dimensions)
+        mock_generic_result = AsyncMock()
+
+        # Configure mock_tx.run to return different results for each call
+        # Total calls: find_edited(1) + delete(1) + create_analysis(1) + classification(3) + keywords(2) + topics(1) + domain(1) = 10
         mock_tx = AsyncMock()
-        mock_tx.run = AsyncMock()
+        mock_tx.run = AsyncMock(side_effect=[
+            mock_edited_result,      # 1: find edited rels
+            mock_delete_result,      # 2: delete old analysis
+            mock_generic_result,     # 3: create analysis
+            mock_generic_result,     # 4-6: link classification (function, structure, purpose)
+            mock_generic_result,
+            mock_generic_result,
+            mock_generic_result,     # 7-8: link keywords (2 values)
+            mock_generic_result,
+            mock_generic_result,     # 9: link topics (1 value)
+            mock_generic_result,     # 10: link domain keywords (1 value)
+        ])
 
         event = EventEnvelope(
             event_type="AnalysisGenerated",
@@ -462,11 +505,161 @@ class TestSentenceHandlers:
 
         await handler.apply(mock_tx, event)
 
-        # Should have made multiple calls: analysis + dimensions
-        assert mock_tx.run.call_count >= 1
+        # Should have made multiple calls: find edited, delete, analysis + dimensions
+        assert mock_tx.run.call_count >= 3
 
-        # Check first call creates Analysis node
-        first_call = mock_tx.run.call_args_list[0]
-        query = first_call[0][0]
+        # Check third call creates Analysis node (after find edited & delete)
+        third_call = mock_tx.run.call_args_list[2]
+        query = third_call[0][0]
         assert "CREATE (a:Analysis" in query
         assert "HAS_ANALYSIS" in query
+
+
+@pytest.mark.asyncio
+class TestProjectionHandlerDeduplication:
+    """Test deduplication behavior during dual-write phase."""
+
+    async def test_sentence_created_skips_duplicate_from_direct_write(self):
+        """Test that projection service skips sentence when direct write already created it."""
+        handler = SentenceCreatedHandler()
+
+        # Mock transaction that returns 0 properties_set (duplicate skipped)
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 0  # No properties updated = duplicate skipped
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        interview_id = str(uuid.uuid4())
+        sentence_id = str(uuid.uuid4())
+
+        event = EventEnvelope(
+            event_type="SentenceCreated",
+            aggregate_type=AggregateType.SENTENCE,
+            aggregate_id=sentence_id,
+            version=1,  # Projection service version
+            data={
+                "interview_id": interview_id,
+                "index": 0,
+                "text": "Test sentence.",
+                "speaker": "Speaker A",
+            },
+        )
+
+        # Apply event
+        await handler.apply(mock_tx, event)
+
+        # Should have run query
+        mock_tx.run.assert_called_once()
+
+        # Should have consumed result to check counters
+        mock_result.consume.assert_called_once()
+
+    async def test_sentence_created_updates_when_version_is_newer(self):
+        """Test that projection service updates sentence when event version is newer."""
+        handler = SentenceCreatedHandler()
+
+        # Mock transaction that returns >0 properties_set (update succeeded)
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 5  # Properties updated = version was newer
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        interview_id = str(uuid.uuid4())
+        sentence_id = str(uuid.uuid4())
+
+        event = EventEnvelope(
+            event_type="SentenceCreated",
+            aggregate_type=AggregateType.SENTENCE,
+            aggregate_id=sentence_id,
+            version=1,
+            data={
+                "interview_id": interview_id,
+                "index": 0,
+                "text": "Test sentence.",
+            },
+        )
+
+        # Apply event
+        await handler.apply(mock_tx, event)
+
+        # Should have run query and consumed result
+        mock_tx.run.assert_called_once()
+        mock_result.consume.assert_called_once()
+
+    async def test_interview_created_skips_duplicate_from_direct_write(self):
+        """Test that projection service skips interview when direct write already created it."""
+        handler = InterviewCreatedHandler()
+
+        # Mock transaction that returns 0 properties_set (duplicate skipped)
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 0  # No properties updated = duplicate skipped
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        interview_id = str(uuid.uuid4())
+
+        event = EventEnvelope(
+            event_type="InterviewCreated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=interview_id,
+            version=1,  # Projection service version
+            data={
+                "project_id": "test-project",
+                "title": "Test Interview",
+                "source": "test.txt",
+                "language": "en",
+                "status": "created",
+            },
+        )
+
+        # Apply event
+        await handler.apply(mock_tx, event)
+
+        # Should have run query and consumed result
+        mock_tx.run.assert_called_once()
+        mock_result.consume.assert_called_once()
+
+    async def test_interview_created_updates_when_version_is_newer(self):
+        """Test that projection service updates interview when event version is newer."""
+        handler = InterviewCreatedHandler()
+
+        # Mock transaction that returns >0 properties_set (update succeeded)
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 5  # Properties updated = version was newer
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        interview_id = str(uuid.uuid4())
+
+        event = EventEnvelope(
+            event_type="InterviewCreated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=interview_id,
+            version=1,
+            data={
+                "project_id": "test-project",
+                "title": "Test Interview",
+                "source": "test.txt",
+                "language": "en",
+                "status": "created",
+            },
+        )
+
+        # Apply event
+        await handler.apply(mock_tx, event)
+
+        # Should have run query and consumed result
+        mock_tx.run.assert_called_once()
+        mock_result.consume.assert_called_once()

@@ -1,5 +1,5 @@
 """
-Integration tests for dual-write pipeline (M2.2).
+Integration tests for dual-write pipeline (M2.2 - Event-First Architecture).
 
 Tests that the pipeline correctly emits events to EventStoreDB
 alongside Neo4j writes during file processing.
@@ -10,7 +10,9 @@ These tests validate:
 3. AnalysisGenerated event emission per analysis
 4. Correlation ID propagation across events
 5. Deterministic UUID generation for sentences
-6. Non-blocking error handling (Neo4j succeeds even if events fail)
+6. Event-first dual-write behavior:
+   - Event emission failures abort operations (events are source of truth)
+   - Neo4j failures after successful event emission are non-critical (logged, projection service handles)
 """
 
 import uuid
@@ -35,6 +37,8 @@ class TestDualWritePipelineEventEmission:
         """Create a mock EventStoreClient for testing."""
         mock_client = MagicMock(spec=EventStoreClient)
         mock_client.append_events = AsyncMock()
+        # Mock read_stream for dynamic versioning (returns empty list = new stream)
+        mock_client.read_stream = AsyncMock(side_effect=Exception("Stream does not exist"))
         return mock_client
 
     @pytest.fixture
@@ -288,7 +292,7 @@ class TestNeo4jMapStorageEventIntegration:
         interview_id,
         correlation_id,
     ):
-        """Test that Neo4jMapStorage emits SentenceCreated after successful write."""
+        """M2.8: Test that Neo4jMapStorage emits SentenceCreated event (no direct Neo4j write)."""
         # Arrange
         with patch(
             "src.io.neo4j_map_storage.Neo4jConnectionManager.get_session",
@@ -313,8 +317,9 @@ class TestNeo4jMapStorageEventIntegration:
             # Act
             await storage.write_entry(entry)
 
-            # Assert - Neo4j write happened
-            mock_neo4j_session.run.assert_called()
+            # M2.8: No direct Neo4j write - only event emission
+            # Projection service will handle Neo4j writes from events
+            mock_neo4j_session.run.assert_not_called()
 
             # Assert - Event emitted with correct data
             mock_event_emitter.emit_sentence_created.assert_called_once()
@@ -327,7 +332,7 @@ class TestNeo4jMapStorageEventIntegration:
             assert call_kwargs["end_ms"] == 2000
             assert call_kwargs["correlation_id"] == correlation_id
 
-    async def test_map_storage_neo4j_succeeds_even_if_event_fails(
+    async def test_map_storage_event_failure_aborts_neo4j_write(
         self,
         mock_neo4j_session,
         mock_event_emitter,
@@ -335,7 +340,7 @@ class TestNeo4jMapStorageEventIntegration:
         interview_id,
         correlation_id,
     ):
-        """Test that Neo4j write succeeds even if event emission fails."""
+        """Test that event emission failure aborts Neo4j write (event-first architecture)."""
         # Arrange - event emission will fail
         mock_event_emitter.emit_sentence_created.side_effect = Exception("EventStoreDB down")
 
@@ -356,14 +361,44 @@ class TestNeo4jMapStorageEventIntegration:
                 "sentence": "Test sentence.",
             }
 
-            # Act - should not raise despite event emission failure
-            await storage.write_entry(entry)
+            # Act & Assert - should raise RuntimeError due to event emission failure
+            with pytest.raises(RuntimeError, match="Event emission failed"):
+                await storage.write_entry(entry)
 
-            # Assert - Neo4j write still happened
-            mock_neo4j_session.run.assert_called()
+            # Assert - Neo4j write did NOT happen (event failed first)
+            mock_neo4j_session.run.assert_not_called()
 
             # Assert - Event emission was attempted
             mock_event_emitter.emit_sentence_created.assert_called_once()
+
+    @pytest.mark.skip(reason="M2.8: No direct Neo4j writes - projection service handles all writes")
+    async def test_map_storage_neo4j_failure_after_event_logs_warning(
+        self,
+        mock_neo4j_session,
+        mock_event_emitter,
+        project_id,
+        interview_id,
+        correlation_id,
+    ):
+        """
+        [SKIPPED - M2.8] Test that Neo4j failure after successful event emission logs warning but doesn't raise.
+
+        This test is no longer relevant in M2.8 because:
+        - Pipeline only emits events (no direct Neo4j writes)
+        - Projection service is sole writer to Neo4j
+        - No "Neo4j failure after event" scenario to test
+
+        Original dual-write scenario:
+        1. Event emission succeeds
+        2. Neo4j write attempted (and fails)
+        3. Operation continues (event already persisted)
+
+        M2.8 scenario:
+        1. Event emission succeeds
+        2. No Neo4j write attempted
+        3. Projection service handles writes from events
+        """
+        pass
 
 
 @pytest.mark.asyncio
@@ -406,7 +441,7 @@ class TestNeo4jAnalysisWriterEventIntegration:
         interview_id,
         correlation_id,
     ):
-        """Test that Neo4jAnalysisWriter emits AnalysisGenerated after successful write."""
+        """M2.8: Test that Neo4jAnalysisWriter emits AnalysisGenerated event (no direct Neo4j write for successful results)."""
         # Arrange
         with patch(
             "src.io.neo4j_analysis_writer.Neo4jConnectionManager.get_session",
@@ -431,8 +466,9 @@ class TestNeo4jAnalysisWriterEventIntegration:
             # Act
             await writer.write_result(result)
 
-            # Assert - Neo4j write happened
-            mock_neo4j_session.run.assert_called()
+            # M2.8: No direct Neo4j write for successful analyses - only event emission
+            # Projection service will handle Neo4j writes from events
+            mock_neo4j_session.run.assert_not_called()
 
             # Assert - Event emitted with correct data
             mock_event_emitter.emit_analysis_generated.assert_called_once()
@@ -478,7 +514,7 @@ class TestNeo4jAnalysisWriterEventIntegration:
             # Assert - NO event emitted (error results don't generate events)
             mock_event_emitter.emit_analysis_generated.assert_not_called()
 
-    async def test_analysis_writer_neo4j_succeeds_even_if_event_fails(
+    async def test_analysis_writer_event_failure_aborts_neo4j_write(
         self,
         mock_neo4j_session,
         mock_event_emitter,
@@ -486,7 +522,7 @@ class TestNeo4jAnalysisWriterEventIntegration:
         interview_id,
         correlation_id,
     ):
-        """Test that Neo4j write succeeds even if event emission fails."""
+        """Test that event emission failure aborts Neo4j write (event-first architecture)."""
         # Arrange - event emission will fail
         mock_event_emitter.emit_analysis_generated.side_effect = Exception("EventStoreDB down")
 
@@ -506,11 +542,42 @@ class TestNeo4jAnalysisWriterEventIntegration:
                 "classification": "statement",
             }
 
-            # Act - should not raise despite event emission failure
-            await writer.write_result(result)
+            # Act & Assert - should raise RuntimeError due to event emission failure
+            with pytest.raises(RuntimeError, match="Event emission failed"):
+                await writer.write_result(result)
 
-            # Assert - Neo4j write still happened
-            mock_neo4j_session.run.assert_called()
+            # Assert - Neo4j write did NOT happen (event failed first)
+            mock_neo4j_session.run.assert_not_called()
 
             # Assert - Event emission was attempted
             mock_event_emitter.emit_analysis_generated.assert_called_once()
+
+    @pytest.mark.skip(reason="M2.8: No direct Neo4j writes for successful analyses - projection service handles all writes")
+    async def test_analysis_writer_neo4j_failure_after_event_logs_warning(
+        self,
+        mock_neo4j_session,
+        mock_event_emitter,
+        project_id,
+        interview_id,
+        correlation_id,
+    ):
+        """
+        [SKIPPED - M2.8] Test that Neo4j failure after successful event emission logs warning but doesn't raise.
+
+        This test is no longer relevant in M2.8 because:
+        - Successful analyses only emit events (no direct Neo4j writes)
+        - Projection service is sole writer to Neo4j for successful analyses
+        - Error analyses still get direct writes (but no events emitted)
+        - No "Neo4j failure after event" scenario for successful analyses
+
+        Original dual-write scenario:
+        1. Event emission succeeds
+        2. Neo4j write attempted (and fails)
+        3. Operation continues (event already persisted)
+
+        M2.8 scenario for successful analyses:
+        1. Event emission succeeds
+        2. No Neo4j write attempted
+        3. Projection service handles writes from events
+        """
+        pass

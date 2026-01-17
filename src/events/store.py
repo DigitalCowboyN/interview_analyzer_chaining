@@ -177,7 +177,13 @@ class EventStoreClient:
         for attempt in range(self.max_retries + 1):
             try:
                 async with self.get_client() as client:
-                    if expected_version is None or expected_version < 0:
+                    # Handle StreamState enum values (ANY, NO_STREAM, etc.)
+                    if isinstance(expected_version, StreamState):
+                        # Pass StreamState directly (e.g., StreamState.ANY, StreamState.NO_STREAM)
+                        commit_position = client.append_to_stream(
+                            stream_name=stream_name, events=new_events, current_version=expected_version
+                        )
+                    elif expected_version is None or expected_version < 0:
                         # New stream - use StreamState.NO_STREAM
                         commit_position = client.append_to_stream(
                             stream_name=stream_name, events=new_events, current_version=StreamState.NO_STREAM
@@ -189,9 +195,13 @@ class EventStoreClient:
                         )
 
                     # Calculate new version (expected_version + number of events)
-                    new_version = (
-                        expected_version if expected_version is not None and expected_version >= 0 else -1
-                    ) + len(events)
+                    # For StreamState enums, we can't calculate version, so return -1
+                    if isinstance(expected_version, StreamState):
+                        new_version = -1
+                    else:
+                        new_version = (
+                            expected_version if expected_version is not None and expected_version >= 0 else -1
+                        ) + len(events)
 
                     logger.debug(
                         f"Appended {len(events)} events to stream '{stream_name}' "

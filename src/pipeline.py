@@ -596,12 +596,8 @@ class PipelineOrchestrator:
         logger.debug(f"{prefix}Using project_id: {project_id}")
 
         try:
-            # 1. Setup IO (passing IDs for potential Neo4jMapStorage setup)
-            data_source, map_storage, analysis_writer, _ = self._setup_file_io(
-                file_path, interview_id=interview_id, project_id=project_id, correlation_id=correlation_id
-            )
-
-            # Emit InterviewCreated event (if event sourcing enabled)
+            # STEP 1: EMIT INTERVIEWCREATED EVENT FIRST (CRITICAL - Event-First Dual-Write)
+            # Events are the source of truth. If event emission fails, abort file processing.
             if self.event_emitter and interview_id and project_id:
                 try:
                     await self.event_emitter.emit_interview_created(
@@ -612,13 +608,35 @@ class PipelineOrchestrator:
                         language=self.config.get("project", {}).get("default_language", "en"),
                         correlation_id=correlation_id,
                     )
-                    logger.debug(f"{prefix}Emitted InterviewCreated event.")
-                except Exception as emit_e:
-                    # Event emission is non-blocking - log but continue
+                    logger.info(f"{prefix}✅ InterviewCreated event emitted")
+
+                    # Track event-first success metric
+                    from src.utils.metrics import metrics_tracker
+                    metrics_tracker.increment_dual_write_event_first_success()
+
+                except Exception as event_error:
+                    # Track event-first failure metric
+                    from src.utils.metrics import metrics_tracker
+                    metrics_tracker.increment_dual_write_event_first_failure()
+
+                    # EVENT FAILURE = OPERATION FAILURE
+                    # This is architecturally correct: events are the immutable source of truth.
+                    # If we cannot persist the event, we must not process the file.
                     logger.error(
-                        f"{prefix}Failed to emit InterviewCreated event: {emit_e}",
+                        f"{prefix}❌ CRITICAL: Failed to emit InterviewCreated event. "
+                        f"Aborting file processing to maintain event-first integrity. Error: {event_error}",
                         exc_info=True,
                     )
+                    raise RuntimeError(
+                        f"Event emission failed for interview {interview_id}. "
+                        f"Operation aborted to maintain event-first integrity."
+                    ) from event_error
+
+            # STEP 2: Setup IO (passing IDs for potential Neo4jMapStorage setup)
+            # This happens AFTER event emission, so if event fails, we never create storage objects.
+            data_source, map_storage, analysis_writer, _ = self._setup_file_io(
+                file_path, interview_id=interview_id, project_id=project_id, correlation_id=correlation_id
+            )
 
             # 2. Read and Segment Sentences
             num_sentences, sentences = await self._read_and_segment_sentences(data_source)

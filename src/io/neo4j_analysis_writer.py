@@ -7,10 +7,12 @@ Neo4j implementation of the SentenceAnalysisWriter protocol.
 import datetime
 import json
 import uuid
+import warnings
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from src.config import config  # Import config to access cardinality limits
 from src.utils.logger import get_logger
+from src.utils.metrics import metrics_tracker
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
 from .protocols import SentenceAnalysisWriter
@@ -41,6 +43,21 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         self.interview_id = str(interview_id)
         self.event_emitter = event_emitter
         self.correlation_id = correlation_id
+
+        # M2.8: Deprecation warning for direct write path
+        if event_emitter is None:
+            warnings.warn(
+                "Direct Neo4j writes without event_emitter are deprecated and will be removed in M3.0. "
+                "Pass an event_emitter instance to enable event-first dual-write architecture. "
+                "See M2.8_MIGRATION_SUMMARY.md for migration guidance.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            logger.warning(
+                "DEPRECATED: Neo4jAnalysisWriter initialized without event_emitter. "
+                "Direct writes will be removed in M3.0. Use event-first dual-write pattern."
+            )
+
         # Load default cardinality limits from config once during initialization
         self.default_limits = config.get("pipeline", {}).get("default_cardinality_limits", {})
         logger.debug(f"Neo4jAnalysisWriter initialized for Project: {self.project_id}, Interview: {self.interview_id}")
@@ -82,43 +99,66 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
 
         logger.debug(f"Writing analysis result for Sentence ID: {sentence_id} in Interview: {self.interview_id}")
 
-        try:
-            async with await Neo4jConnectionManager.get_session() as session:
-                # Run the analysis writing operations directly on the session
-                await self._run_write_result_queries(
-                    session,
-                    self.project_id,
-                    self.interview_id,
-                    sentence_id,
-                    result,
-                    is_error_result,
-                    self.default_limits,
+        # STEP 1: EMIT EVENT FIRST (CRITICAL - Event-First Dual-Write)
+        # Only emit events for successful analysis results (not error results).
+        # Events are the source of truth. If event emission fails, abort the operation.
+        if self.event_emitter and not is_error_result:
+            try:
+                await self.event_emitter.emit_analysis_generated(
+                    interview_id=self.interview_id,
+                    sentence_index=sentence_id,  # Using sentence_id as index
+                    analysis_data=result,
+                    correlation_id=self.correlation_id,
                 )
-            logger.debug(f"Successfully wrote analysis result for Sentence ID: {sentence_id}")
+                logger.info(f"✅ AnalysisGenerated event emitted for sentence {sentence_id}")
 
-            # Emit AnalysisGenerated event (if event sourcing enabled and not an error result)
-            if self.event_emitter and not is_error_result:
-                try:
-                    await self.event_emitter.emit_analysis_generated(
-                        interview_id=self.interview_id,
-                        sentence_index=sentence_id,  # Using sentence_id as index
-                        analysis_data=result,
-                        correlation_id=self.correlation_id,
-                    )
-                    logger.debug(f"Emitted AnalysisGenerated event for sentence {sentence_id}.")
-                except Exception as emit_e:
-                    # Event emission is non-blocking - log but don't raise
-                    logger.error(
-                        f"Failed to emit AnalysisGenerated event for sentence {sentence_id}: {emit_e}",
-                        exc_info=True,
-                    )
+                # Track event-first success metric
+                metrics_tracker.increment_dual_write_event_first_success()
 
-        except Exception as e:
-            logger.error(
-                f"Failed Neo4j write_result for Sentence ID {sentence_id} (Interview {self.interview_id}): {e}",
-                exc_info=True,
-            )
-            raise
+            except Exception as event_error:
+                # EVENT FAILURE = OPERATION FAILURE
+                # This is architecturally correct: events are the immutable source of truth.
+                # If we cannot persist the event, we must not write to Neo4j.
+
+                # Track event-first failure metric
+                metrics_tracker.increment_dual_write_event_first_failure()
+
+                logger.error(
+                    f"❌ CRITICAL: Failed to emit AnalysisGenerated event for sentence {sentence_id}. "
+                    f"Aborting Neo4j write to maintain event-first integrity. Error: {event_error}",
+                    exc_info=True,
+                )
+                raise RuntimeError(
+                    f"Event emission failed for sentence {sentence_id} analysis. "
+                    f"Operation aborted to maintain event-first integrity."
+                ) from event_error
+
+        # M2.8: CONDITIONAL NEO4J WRITES
+        # - Successful analyses: NO direct write (projection service handles via events)
+        # - Error results: DIRECT write (no events emitted for errors)
+        if is_error_result:
+            # Error results must be written directly (no event emitted)
+            try:
+                async with await Neo4jConnectionManager.get_session() as session:
+                    await self._run_write_result_queries(
+                        session,
+                        self.project_id,
+                        self.interview_id,
+                        sentence_id,
+                        result,
+                        is_error_result,
+                        self.default_limits,
+                    )
+                logger.info(f"✅ Neo4j direct write succeeded for error result of sentence {sentence_id}")
+            except Exception as neo4j_error:
+                logger.error(
+                    f"Failed to write error result to Neo4j for sentence {sentence_id}: {neo4j_error}",
+                    exc_info=True,
+                )
+                raise  # Re-raise - error results must be persisted
+        else:
+            # Successful analysis - projection service will write from event
+            logger.info(f"✅ Event emitted for sentence {sentence_id} analysis. Projection service will handle Neo4j write.")
 
     # Session-based function for write_result
     async def _run_write_result_queries(
@@ -329,9 +369,8 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         props_on_create: Dict,
     ):
         if not dimension_value:
-            # If value is None or empty, potentially remove existing link (if not edited)
-            # For now, we just do nothing if no value provided.
-            # TODO: Add logic to remove existing link if value is None and rel not edited?
+            # If value is None or empty, skip creating link
+            # Note: Edit protection logic is now handled by projection service handlers
             logger.debug(f"Skipping link {relationship_type} from Analysis {analysis_node_id}: No value provided.")
             return
 
@@ -523,14 +562,17 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
 
     async def read_analysis_ids(self) -> Set[int]:
         """
-        Reads sentence IDs that have associated Analysis nodes for the Interview.
+        Reads sentence indices (sequence_order) that have associated Analysis nodes for the Interview.
+
+        Note: In M2.8, sentence nodes use UUID-based sentence_id, but we return the sequence_order (index)
+        for compatibility with the existing interface.
         """
         logger.debug(f"Reading analysis IDs for Interview: {self.interview_id}")
         cypher = """
             MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
             // Ensure there is an Analysis node linked
             WHERE (s)-[:HAS_ANALYSIS]->(:Analysis)
-            RETURN s.sentence_id AS sentenceId
+            RETURN s.sequence_order AS sentenceIndex
         """
 
         sentence_ids: Set[int] = set()
@@ -539,12 +581,12 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
                 result = await session.run(cypher, interview_id=self.interview_id)
                 # Process results asynchronously
                 async for record in result:
-                    s_id = record["sentenceId"]
-                    if isinstance(s_id, int):
-                        sentence_ids.add(s_id)
+                    s_index = record["sentenceIndex"]
+                    if isinstance(s_index, int):
+                        sentence_ids.add(s_index)
                     else:
                         logger.warning(
-                            f"Read non-integer sentence_id ({s_id}) with analysis for Interview "
+                            f"Read non-integer sequence_order ({s_index}) with analysis for Interview "
                             f"{self.interview_id}, skipping."
                         )
 

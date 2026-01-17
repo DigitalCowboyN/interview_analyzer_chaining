@@ -1,12 +1,11 @@
 """
 test_api_calls.py
 
-This module contains unit tests for the `OpenAIAgent.call_model` method,
-focusing on its ability to process and parse responses from the OpenAI API client.
+Multi-provider integration tests for agent call_model methods.
 
-These tests utilize mocking (`unittest.mock.patch`) to simulate responses
-from the `agent.client.responses.create` method, thereby isolating the
-`call_model` logic without making actual external API calls.
+These tests verify that both OpenAI and Anthropic agents can process and parse
+responses correctly. Tests use mocking to simulate API responses, isolating the
+call_model logic without making actual external API calls.
 
 Usage Example:
     Run the tests using pytest:
@@ -18,24 +17,23 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.agents.agent import OpenAIAgent
+from src.agents.agent_factory import AgentFactory
 
 pytestmark = pytest.mark.asyncio
 
 
-def mock_response(content_dict):
+def mock_openai_response(content_dict):
     """
-    Helper function to create a mock Response object mimicking `openai.responses.create`.
+    Helper function to create a mock OpenAI Response object.
 
-    Constructs a `MagicMock` object with the nested structure expected from the
-    OpenAI client's response (response -> output -> content -> text).
+    Constructs a MagicMock with the structure expected from OpenAI's
+    Responses API: response.output[0].content[0].text
 
     Args:
-        content_dict (dict): A dictionary to be JSON-serialized and set as the
-                             `text` attribute of the innermost mock content.
+        content_dict (dict): Dictionary to be JSON-serialized as response text.
 
     Returns:
-        MagicMock: A mock response object suitable for patching `client.responses.create`.
+        MagicMock: Mock response for OpenAI client.responses.create
     """
     mock_resp = MagicMock()
     mock_output = MagicMock()
@@ -46,26 +44,44 @@ def mock_response(content_dict):
     return mock_resp
 
 
-async def test_openai_integration():
+def mock_anthropic_response(content_dict):
     """
-    Unit test for `OpenAIAgent.call_model` handling a successful mocked response.
+    Helper function to create a mock Anthropic Messages API response.
 
-    Instantiates `OpenAIAgent`, patches the underlying `client.responses.create`
-    method to return a predefined mock response, and calls `agent.call_model`.
-
-    Asserts that the dictionary returned by `call_model` contains the expected
-    structure and values extracted from the mocked response content.
+    Constructs a MagicMock with the structure expected from Anthropic's
+    Messages API: response.content[0].text
 
     Args:
-        None
+        content_dict (dict): Dictionary to be JSON-serialized as response text.
 
     Returns:
-        None
+        MagicMock: Mock response for Anthropic client.messages.create
+    """
+    mock_resp = MagicMock()
+    mock_content = MagicMock()
+    mock_content.text = json.dumps(content_dict)
+    mock_resp.content = [mock_content]
+    return mock_resp
+
+
+@pytest.mark.parametrize("provider", ["openai", "anthropic"])
+async def test_agent_integration(provider):
+    """
+    Multi-provider test for agent.call_model handling successful mocked responses.
+
+    Tests both OpenAI and Anthropic agents using parameterization. Each provider
+    uses its appropriate mock response structure and API endpoint.
+
+    Args:
+        provider (str): Provider name ("openai" or "anthropic")
 
     Raises:
-        AssertionError: If the response dictionary does not match the expected content.
+        AssertionError: If response doesn't match expected content.
     """
-    agent = OpenAIAgent()
+    # Reset factory to ensure clean state
+    AgentFactory.reset()
+    agent = AgentFactory.create_agent(provider)
+
     response_content = {
         "function_type": "declarative",
         "structure_type": "simple sentence",
@@ -75,14 +91,20 @@ async def test_openai_integration():
         "keywords": ["integration", "API"],
         "domain_keywords": ["integration"],
     }
-    # Patch the create method on the agent's client using AsyncMock.
-    with patch.object(
-        agent.client.responses, "create", new_callable=AsyncMock
-    ) as mock_create:
-        mock_create.return_value = mock_response(response_content)
+
+    # Patch appropriate API endpoint based on provider
+    if provider == "openai":
+        mock_target = agent.client.responses
+        mock_response_fn = mock_openai_response
+    else:  # anthropic
+        mock_target = agent.client.messages
+        mock_response_fn = mock_anthropic_response
+
+    with patch.object(mock_target, "create", new_callable=AsyncMock) as mock_create:
+        mock_create.return_value = mock_response_fn(response_content)
         response = await agent.call_model("Integration test prompt")
 
-    # Verify the response structure and values.
+    # Verify response structure and values (same for both providers)
     assert isinstance(response, dict)
     assert response.get("function_type") == "declarative"
     assert response.get("structure_type") == "simple sentence"
@@ -91,3 +113,23 @@ async def test_openai_integration():
     assert response.get("topic_level_3") == "API evaluation"
     assert response.get("keywords") == ["integration", "API"]
     assert response.get("domain_keywords") == ["integration"]
+
+
+async def test_openai_integration():
+    """
+    Legacy test maintained for backward compatibility.
+
+    Use test_agent_integration with provider="openai" instead.
+    This test is kept to avoid breaking existing test suites.
+    """
+    await test_agent_integration("openai")
+
+
+async def test_anthropic_integration():
+    """
+    Anthropic-specific integration test.
+
+    Tests that Anthropic agent correctly processes mocked responses
+    with the Messages API structure.
+    """
+    await test_agent_integration("anthropic")

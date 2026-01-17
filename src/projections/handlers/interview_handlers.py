@@ -7,6 +7,7 @@ Handles InterviewCreated, InterviewUpdated, StatusChanged, etc.
 import logging
 
 from src.events.envelope import EventEnvelope
+from src.utils.metrics import metrics_tracker
 
 from .base_handler import BaseProjectionHandler
 
@@ -20,6 +21,10 @@ class InterviewCreatedHandler(BaseProjectionHandler):
         """
         Create Interview and Project nodes.
 
+        Uses MERGE instead of CREATE to handle dual-write scenario where pipeline
+        may have already created interview directly in Neo4j. Only updates if the
+        event version is newer than what's currently stored.
+
         Args:
             tx: Neo4j transaction
             event: InterviewCreated event
@@ -32,24 +37,29 @@ class InterviewCreatedHandler(BaseProjectionHandler):
         ON CREATE SET
             p.created_at = datetime($created_at)
 
-        // Create interview
-        CREATE (i:Interview {
-            interview_id: $interview_id,
-            aggregate_id: $aggregate_id,
-            title: $title,
-            source: $source,
-            language: $language,
-            status: $status,
-            created_at: datetime($created_at),
-            updated_at: datetime($updated_at),
-            event_version: $event_version
-        })
+        // MERGE instead of CREATE for dual-write safety
+        MERGE (i:Interview {interview_id: $interview_id})
+
+        // Only update if event version is newer (or not set)
+        WITH i, p
+        WHERE i.event_version IS NULL OR i.event_version < $event_version
+
+        SET
+            i.aggregate_id = $aggregate_id,
+            i.title = $title,
+            i.source = $source,
+            i.language = $language,
+            i.status = $status,
+            i.created_at = datetime($created_at),
+            i.updated_at = datetime($updated_at),
+            i.event_version = $event_version,
+            i.source_writer = $source_writer
 
         // Link to project
         MERGE (p)-[:CONTAINS_INTERVIEW]->(i)
         """
 
-        await tx.run(
+        result = await tx.run(
             query,
             project_id=data.get("project_id", "default"),
             interview_id=event.aggregate_id,
@@ -61,9 +71,22 @@ class InterviewCreatedHandler(BaseProjectionHandler):
             created_at=data.get("created_at", event.occurred_at.isoformat()),
             updated_at=data.get("updated_at", event.occurred_at.isoformat()),
             event_version=event.version,
+            source_writer="projection_service",  # Track that projection wrote this
         )
 
-        logger.info(f"Created Interview node for {event.aggregate_id} " f"(title: {data.get('title')})")
+        # Track deduplication metrics
+        # Check if properties were actually updated (WHERE clause passed)
+        summary = await result.consume()
+        if summary.counters.properties_set > 0:
+            # Properties were updated - either new node or version was newer
+            logger.info(f"Applied InterviewCreated event (v{event.version}) for interview {event.aggregate_id}")
+        else:
+            # No properties updated - likely a duplicate with same/newer version already present
+            logger.debug(
+                f"Skipped InterviewCreated event (v{event.version}) for interview {event.aggregate_id} "
+                f"- existing version is equal or newer (deduplication)"
+            )
+            metrics_tracker.increment_projection_duplicate_skipped("Interview")
 
 
 class InterviewMetadataUpdatedHandler(BaseProjectionHandler):

@@ -361,6 +361,8 @@ class TestLoadTesting:
             esdb_connection = f"esdb://{host}:{port}?tls=false"
         test_config["event_sourcing"] = {"enabled": True, "connection_string": esdb_connection}
 
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
         output_dir = tmp_path / "output"
         output_dir.mkdir()
         test_config["paths"]["output_dir"] = str(output_dir)
@@ -369,12 +371,12 @@ class TestLoadTesting:
         file_paths = []
         for i in range(10):
             content = f"File {i} sentence 1.\nFile {i} sentence 2.\nFile {i} sentence 3."
-            file_path = tmp_path / f"concurrent_test_{i}.txt"
+            file_path = input_dir / f"concurrent_test_{i}.txt"
             file_path.write_text(content)
             file_paths.append(file_path)
 
         # === Process concurrently ===
-        pipeline = PipelineOrchestrator(config_dict=test_config)
+        pipeline = PipelineOrchestrator(input_dir=input_dir, config_dict=test_config)
 
         start_time = time.time()
         tasks = [pipeline._process_single_file(Path(fp)) for fp in file_paths]

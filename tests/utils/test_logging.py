@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from openai import RateLimitError
 
-from src.agents.agent import OpenAIAgent
+from src.agents.openai_agent import OpenAIAgent
 
 # Removed: from src.utils.logger import get_logger (not needed for test logic itself)
 

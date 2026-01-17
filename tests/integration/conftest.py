@@ -417,12 +417,55 @@ async def clean_event_store(event_store_client):
     """
     Clears test event streams before each test.
 
+    Deletes known test streams to ensure test isolation. This is safe because:
+    1. Tests use deterministic UUIDs based on known test filenames
+    2. We can calculate which streams will be created
+    3. We only delete those specific test streams
+
     Note: In production, you would never delete streams. This is only for testing.
     """
-    # EventStoreDB doesn't have a "delete all streams" operation
-    # We'll rely on using unique stream names per test or manual cleanup
-    # For now, this is a placeholder that ensures the client is connected
+    # Common test file name used in test fixtures
+    test_filename = "test_interview.txt"
+
+    # Calculate deterministic interview_id that will be used (matches pipeline logic)
+    import uuid
+    interview_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{test_filename}"))
+
+    # Streams that will be created during test
+    test_streams = [f"Interview-{interview_id}"]
+
+    # Calculate sentence IDs (tests typically have 4 sentences)
+    for i in range(10):  # Clean up to 10 possible sentences
+        sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{i}"))
+        test_streams.append(f"Sentence-{sentence_id}")
+
+    # Delete test streams before test runs
+    from esdbclient import StreamState
+
+    for stream_name in test_streams:
+        try:
+            # Delete stream regardless of current version (StreamState.ANY)
+            # This is a tombstone delete - marks stream as deleted
+            event_store_client._client.delete_stream(
+                stream_name,
+                current_version=StreamState.ANY
+            )
+        except Exception as e:
+            # Stream doesn't exist yet, which is fine
+            # Or other errors like permission issues
+            pass
+
     yield event_store_client
+
+    # Optionally clean up after test as well (for extra safety)
+    for stream_name in test_streams:
+        try:
+            event_store_client._client.delete_stream(
+                stream_name,
+                current_version=StreamState.ANY
+            )
+        except Exception:
+            pass
 
 
 @pytest.fixture(scope="function")

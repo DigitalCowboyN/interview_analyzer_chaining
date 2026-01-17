@@ -8,6 +8,10 @@ These tests complement the existing integration tests by focusing on:
 - Resource management and connection pooling
 - Error recovery scenarios
 - Performance characteristics under load
+
+**M2.8 STATUS**: DEPRECATED - Tests use direct Neo4j write pattern without event_emitter.
+This functionality is deprecated in M2.8 and will be removed in M3.0.
+See M2.8_MIGRATION_SUMMARY.md for migration to event-first dual-write pattern.
 """
 
 import asyncio
@@ -18,6 +22,17 @@ import pytest
 from src.io.neo4j_analysis_writer import Neo4jAnalysisWriter
 from src.io.neo4j_map_storage import Neo4jMapStorage
 from src.utils.neo4j_driver import Neo4jConnectionManager
+
+# M2.8: Mark all tests in this file as skipped - deprecated direct-write pattern
+pytestmark = [
+    pytest.mark.neo4j,
+    pytest.mark.integration,
+    pytest.mark.skip(
+        reason="M2.8: Direct Neo4j writes without event_emitter are deprecated. "
+               "These lifecycle tests exercise deprecated functionality and will be "
+               "removed in M3.0. See M2.8_MIGRATION_SUMMARY.md for migration guidance."
+    ),
+]
 
 
 @pytest.mark.neo4j

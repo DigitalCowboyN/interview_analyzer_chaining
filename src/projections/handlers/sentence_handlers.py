@@ -8,6 +8,7 @@ import logging
 from typing import List
 
 from src.events.envelope import EventEnvelope
+from src.utils.metrics import metrics_tracker
 
 from .base_handler import BaseProjectionHandler
 
@@ -21,6 +22,10 @@ class SentenceCreatedHandler(BaseProjectionHandler):
         """
         Create Sentence node and link to Interview.
 
+        Uses MERGE instead of CREATE to handle dual-write scenario where pipeline
+        may have already written sentence directly to Neo4j. Only updates if the
+        event version is newer than what's currently stored.
+
         Args:
             tx: Neo4j transaction
             event: SentenceCreated event
@@ -31,27 +36,34 @@ class SentenceCreatedHandler(BaseProjectionHandler):
         // Match the interview
         MATCH (i:Interview {interview_id: $interview_id})
 
-        // Create sentence
-        CREATE (s:Sentence {
-            sentence_id: $sentence_id,
-            aggregate_id: $aggregate_id,
-            text: $text,
-            sequence_order: $sequence_order,
-            speaker: $speaker,
-            start_ms: $start_ms,
-            end_ms: $end_ms,
-            status: $status,
-            is_edited: false,
-            created_at: datetime($created_at),
-            updated_at: datetime($updated_at),
-            event_version: $event_version
-        })
+        // MERGE instead of CREATE for dual-write safety
+        // This allows both direct writes and projection writes to coexist
+        MERGE (s:Sentence {sentence_id: $sentence_id})
+
+        // Only update if event version is newer (or not set)
+        // This ensures projection service doesn't overwrite newer data
+        WITH s, i
+        WHERE s.event_version IS NULL OR s.event_version < $event_version
+
+        SET
+            s.aggregate_id = $aggregate_id,
+            s.text = $text,
+            s.sequence_order = $sequence_order,
+            s.speaker = $speaker,
+            s.start_ms = $start_ms,
+            s.end_ms = $end_ms,
+            s.status = $status,
+            s.is_edited = false,
+            s.created_at = datetime($created_at),
+            s.updated_at = datetime($updated_at),
+            s.event_version = $event_version,
+            s.source = $source
 
         // Link to interview
         MERGE (i)-[:HAS_SENTENCE]->(s)
         """
 
-        await tx.run(
+        result = await tx.run(
             query,
             interview_id=data.get("interview_id"),
             sentence_id=event.aggregate_id,
@@ -65,9 +77,22 @@ class SentenceCreatedHandler(BaseProjectionHandler):
             created_at=data.get("created_at", event.occurred_at.isoformat()),
             updated_at=data.get("updated_at", event.occurred_at.isoformat()),
             event_version=event.version,
+            source="projection_service",  # Track that projection wrote this
         )
 
-        logger.info(f"Created Sentence node {event.aggregate_id} for interview " f"{data.get('interview_id')}")
+        # Track deduplication metrics
+        # Check if properties were actually updated (WHERE clause passed)
+        summary = await result.consume()
+        if summary.counters.properties_set > 0:
+            # Properties were updated - either new node or version was newer
+            logger.info(f"Applied SentenceCreated event (v{event.version}) for sentence {event.aggregate_id}")
+        else:
+            # No properties updated - likely a duplicate with same/newer version already present
+            logger.debug(
+                f"Skipped SentenceCreated event (v{event.version}) for sentence {event.aggregate_id} "
+                f"- existing version is equal or newer (deduplication)"
+            )
+            metrics_tracker.increment_projection_duplicate_skipped("Sentence")
 
 
 class SentenceEditedHandler(BaseProjectionHandler):
@@ -116,10 +141,48 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
         """
         data = event.data
 
-        # Create Analysis node
+        # Delete old Analysis node and create new one (overwrite behavior)
+        # M2.8: Multiple AnalysisGenerated events can occur for same sentence.
+        # Latest event should replace previous analysis.
+        # BUT: Preserve user edits (relationships with is_edited=true)
+
+        # First, check for user-edited relationships before deleting
+        query_find_edited = """
+        MATCH (s:Sentence {aggregate_id: $aggregate_id})-[:HAS_ANALYSIS]->(old_a:Analysis)
+        OPTIONAL MATCH (old_a)-[r_func:HAS_FUNCTION {is_edited: true}]->(ft:FunctionType)
+        OPTIONAL MATCH (old_a)-[r_struct:HAS_STRUCTURE {is_edited: true}]->(st:StructureType)
+        OPTIONAL MATCH (old_a)-[r_purp:HAS_PURPOSE {is_edited: true}]->(p:Purpose)
+        RETURN
+            ft.name as edited_function,
+            st.name as edited_structure,
+            p.name as edited_purpose
+        """
+        result = await tx.run(query_find_edited, aggregate_id=event.aggregate_id)
+        record = await result.single()
+
+        # Store edited values if they exist
+        edited_dims = {}
+        if record:
+            if record["edited_function"]:
+                edited_dims["function_type"] = record["edited_function"]
+            if record["edited_structure"]:
+                edited_dims["structure_type"] = record["edited_structure"]
+            if record["edited_purpose"]:
+                edited_dims["purpose"] = record["edited_purpose"]
+
+        # Now delete any existing Analysis nodes
+        query_delete_old = """
+        MATCH (s:Sentence {aggregate_id: $aggregate_id})-[:HAS_ANALYSIS]->(old_a:Analysis)
+        DETACH DELETE old_a
+        """
+        result = await tx.run(query_delete_old, aggregate_id=event.aggregate_id)
+        summary = await result.consume()
+        if summary.counters.nodes_deleted > 0:
+            logger.info(f"Deleted {summary.counters.nodes_deleted} old Analysis node(s) for sentence {event.aggregate_id}")
+
+        # Then create new Analysis node
         query_analysis = """
         MATCH (s:Sentence {aggregate_id: $aggregate_id})
-
         CREATE (a:Analysis {
             analysis_id: $analysis_id,
             model: $model,
@@ -129,7 +192,6 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
             is_overridden: false,
             created_at: datetime($created_at)
         })
-
         MERGE (s)-[:HAS_ANALYSIS]->(a)
         """
 
@@ -146,70 +208,92 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
             created_at=event.occurred_at.isoformat(),
         )
 
-        # Link classification dimensions
+        # Link classification dimensions using specific analysis_id
+        # Pass edited_dims to preserve user edits
         classification = data.get("classification", {})
-        await self._link_classification(tx, event.aggregate_id, classification)
+        await self._link_classification(tx, event.aggregate_id, analysis_id, classification, edited_dims)
 
         # Link keywords
         keywords = data.get("keywords", [])
-        await self._link_dimension_list(tx, event.aggregate_id, "Keyword", "MENTIONS_OVERALL_KEYWORD", keywords)
+        await self._link_dimension_list(tx, event.aggregate_id, analysis_id, "Keyword", "MENTIONS_OVERALL_KEYWORD", keywords)
 
         # Link topics
         topics = data.get("topics", [])
-        await self._link_dimension_list(tx, event.aggregate_id, "Topic", "MENTIONS_TOPIC", topics)
+        await self._link_dimension_list(tx, event.aggregate_id, analysis_id, "Topic", "MENTIONS_TOPIC", topics)
 
         # Link domain keywords
         domain_keywords = data.get("domain_keywords", [])
         await self._link_dimension_list(
-            tx, event.aggregate_id, "DomainKeyword", "MENTIONS_DOMAIN_KEYWORD", domain_keywords
+            tx, event.aggregate_id, analysis_id, "DomainKeyword", "MENTIONS_DOMAIN_KEYWORD", domain_keywords
         )
 
         logger.info(f"Generated analysis for Sentence {event.aggregate_id}")
 
-    async def _link_classification(self, tx, sentence_id: str, classification: dict):
-        """Link classification dimension nodes."""
-        # Function type
-        function_type = classification.get("function_type")
+    async def _link_classification(self, tx, sentence_id: str, analysis_id: str, classification: dict, edited_dims: dict = None):
+        """Link classification dimension nodes to specific Analysis, preserving user edits."""
+        edited_dims = edited_dims or {}
+
+        # Function type - use edited value if present, otherwise use event value
+        function_type = edited_dims.get("function_type") or classification.get("function_type")
+        is_func_edited = "function_type" in edited_dims
         if function_type:
             query = """
-            MATCH (s:Sentence {aggregate_id: $sentence_id})
+            MATCH (a:Analysis {analysis_id: $analysis_id})
             MERGE (ft:FunctionType {name: $name})
-            MERGE (s)-[:HAS_FUNCTION_TYPE]->(ft)
+            MERGE (a)-[r:HAS_FUNCTION]->(ft)
+            SET r.is_edited = $is_edited
             """
-            await tx.run(query, sentence_id=sentence_id, name=function_type)
+            await tx.run(query, analysis_id=analysis_id, name=function_type, is_edited=is_func_edited)
 
-        # Structure type
-        structure_type = classification.get("structure_type")
+        # Structure type - use edited value if present, otherwise use event value
+        structure_type = edited_dims.get("structure_type") or classification.get("structure_type")
+        is_struct_edited = "structure_type" in edited_dims
         if structure_type:
             query = """
-            MATCH (s:Sentence {aggregate_id: $sentence_id})
+            MATCH (a:Analysis {analysis_id: $analysis_id})
             MERGE (st:StructureType {name: $name})
-            MERGE (s)-[:HAS_STRUCTURE_TYPE]->(st)
+            MERGE (a)-[r:HAS_STRUCTURE]->(st)
+            SET r.is_edited = $is_edited
             """
-            await tx.run(query, sentence_id=sentence_id, name=structure_type)
+            await tx.run(query, analysis_id=analysis_id, name=structure_type, is_edited=is_struct_edited)
 
-        # Purpose
-        purpose = classification.get("purpose")
+        # Purpose - use edited value if present, otherwise use event value
+        purpose = edited_dims.get("purpose") or classification.get("purpose")
+        is_purp_edited = "purpose" in edited_dims
         if purpose:
             query = """
-            MATCH (s:Sentence {aggregate_id: $sentence_id})
+            MATCH (a:Analysis {analysis_id: $analysis_id})
             MERGE (p:Purpose {name: $name})
-            MERGE (s)-[:HAS_PURPOSE]->(p)
+            MERGE (a)-[r:HAS_PURPOSE]->(p)
+            SET r.is_edited = $is_edited
             """
-            await tx.run(query, sentence_id=sentence_id, name=purpose)
+            await tx.run(query, analysis_id=analysis_id, name=purpose, is_edited=is_purp_edited)
 
-    async def _link_dimension_list(self, tx, sentence_id: str, node_label: str, rel_type: str, values: List[str]):
-        """Link a list of dimension nodes."""
+    async def _link_dimension_list(self, tx, sentence_id: str, analysis_id: str, node_label: str, rel_type: str, values: List[str]):
+        """Link a list of dimension nodes from specific Analysis."""
         if not values:
             return
 
+        # Determine property name based on node label
+        # Keyword and DomainKeyword use 'text', others use 'name'
+        prop_name = "text" if node_label in ["Keyword", "DomainKeyword"] else "name"
+
         for value in values:
-            query = f"""
-            MATCH (s:Sentence {{aggregate_id: $sentence_id}})
-            MERGE (d:{node_label} {{name: $name}})
-            MERGE (s)-[:{rel_type}]->(d)
-            """
-            await tx.run(query, sentence_id=sentence_id, name=value)
+            # Set additional properties based on node type
+            if node_label == "DomainKeyword":
+                query = f"""
+                MATCH (a:Analysis {{analysis_id: $analysis_id}})
+                MERGE (d:{node_label} {{{prop_name}: $value}})
+                ON CREATE SET d.is_custom = false
+                MERGE (a)-[r:{rel_type} {{is_edited: false}}]->(d)
+                """
+            else:
+                query = f"""
+                MATCH (a:Analysis {{analysis_id: $analysis_id}})
+                MERGE (d:{node_label} {{{prop_name}: $value}})
+                MERGE (a)-[r:{rel_type} {{is_edited: false}}]->(d)
+                """
+            await tx.run(query, analysis_id=analysis_id, value=value)
 
 
 class AnalysisOverriddenHandler(BaseProjectionHandler):

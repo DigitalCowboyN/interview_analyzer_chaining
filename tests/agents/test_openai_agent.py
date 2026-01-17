@@ -1,7 +1,7 @@
 """
-tests/test_agent.py
+tests/agents/test_openai_agent.py
 
-Contains unit tests for the `OpenAIAgent` class (`src.agents.agent.py`).
+Contains unit tests for the `OpenAIAgent` class (`src.agents.openai_agent.py`).
 
 These tests verify:
     - Successful processing of valid API responses.
@@ -27,7 +27,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from openai import APIError, RateLimitError
 
-from src.agents.agent import OpenAIAgent
+from src.agents.openai_agent import OpenAIAgent
 
 # Note: Only async tests are marked with @pytest.mark.asyncio individually
 
@@ -82,7 +82,7 @@ def test_initialization_missing_api_key():
 
     This test covers the missing line 70 in coverage.
     """
-    with patch("src.agents.agent.config", {"openai": {"api_key": ""}}):
+    with patch("src.agents.openai_agent.config", {"openai": {"api_key": ""}}):
         with pytest.raises(ValueError, match="OpenAI API key is not set"):
             OpenAIAgent()
 
@@ -91,7 +91,7 @@ def test_initialization_none_api_key():
     """
     Tests that `OpenAIAgent` raises `ValueError` when API key is None.
     """
-    with patch("src.agents.agent.config", {"openai": {"api_key": None}}):
+    with patch("src.agents.openai_agent.config", {"openai": {"api_key": None}}):
         with pytest.raises(ValueError, match="OpenAI API key is not set"):
             OpenAIAgent()
 
@@ -110,7 +110,7 @@ def test_initialization_success():
         "openai_api": {"retry": {"max_attempts": 3, "backoff_factor": 2}},
     }
 
-    with patch("src.agents.agent.config", mock_config):
+    with patch("src.agents.openai_agent.config", mock_config):
         agent = OpenAIAgent()
         assert agent.model == "gpt-4"
         assert agent.max_tokens == 1000
@@ -194,7 +194,7 @@ async def test_successful_call_with_token_usage_realistic_scenario(agent):
     usage_data = {"total_tokens": 245, "input_tokens": 180, "output_tokens": 65}
 
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
-        "src.agents.agent.metrics_tracker"
+        "src.agents.openai_agent.metrics_tracker"
     ) as mock_metrics:
 
         mock_create.return_value = mock_response(response_content, usage_data)
@@ -229,7 +229,7 @@ async def test_successful_call_without_token_usage(agent):
     response_content = {"function_type": "declarative"}
 
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
-        "src.agents.agent.metrics_tracker"
+        "src.agents.openai_agent.metrics_tracker"
     ) as mock_metrics:
 
         mock_create.return_value = mock_response(response_content)  # No usage data
@@ -269,7 +269,7 @@ async def test_successful_call_with_incomplete_token_usage(agent):
     mock_resp.usage = mock_usage
 
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
-        "src.agents.agent.metrics_tracker"
+        "src.agents.openai_agent.metrics_tracker"
     ) as mock_metrics:
 
         mock_create.return_value = mock_resp
@@ -471,7 +471,7 @@ async def test_malformed_json_response_during_interview_analysis(agent):
     and an empty dict is returned, allowing batch processing to continue.
     """
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
-        "src.agents.agent.metrics_tracker"
+        "src.agents.openai_agent.metrics_tracker"
     ) as mock_metrics:
 
         mock_resp = MagicMock()
@@ -549,7 +549,7 @@ async def test_zero_retry_attempts(agent):
     agent.retry_attempts = 0
 
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
-        "src.agents.agent.metrics_tracker"
+        "src.agents.openai_agent.metrics_tracker"
     ) as mock_metrics:
 
         # This should never be called since retry_attempts is 0
@@ -580,7 +580,7 @@ async def test_negative_retry_attempts(agent):
     agent.retry_attempts = -1
 
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
-        "src.agents.agent.metrics_tracker"
+        "src.agents.openai_agent.metrics_tracker"
     ) as mock_metrics:
 
         # Should raise the fallback exception
@@ -633,7 +633,7 @@ async def test_metrics_tracking_on_api_error(agent):
     error_to_raise = APIError("Persistent API error", request=MagicMock(), body=MagicMock())
 
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
-        "src.agents.agent.metrics_tracker"
+        "src.agents.openai_agent.metrics_tracker"
     ) as mock_metrics:
 
         mock_create.side_effect = error_to_raise
@@ -653,7 +653,7 @@ async def test_metrics_tracking_on_unexpected_error(agent):
     error_to_raise = ValueError("Unexpected error")
 
     with patch.object(agent.client.responses, "create", new_callable=AsyncMock) as mock_create, patch(
-        "src.agents.agent.metrics_tracker"
+        "src.agents.openai_agent.metrics_tracker"
     ) as mock_metrics:
 
         mock_create.side_effect = error_to_raise
@@ -682,7 +682,7 @@ def test_initialization_with_missing_retry_config():
         # Missing openai_api section
     }
 
-    with patch("src.agents.agent.config", mock_config):
+    with patch("src.agents.openai_agent.config", mock_config):
         agent = OpenAIAgent()
         # Should use default values
         assert agent.retry_attempts == 5  # Default
@@ -708,7 +708,7 @@ def test_initialization_with_partial_retry_config():
         },
     }
 
-    with patch("src.agents.agent.config", mock_config):
+    with patch("src.agents.openai_agent.config", mock_config):
         agent = OpenAIAgent()
         assert agent.retry_attempts == 3  # From config
         assert agent.backoff_factor == 2  # Default

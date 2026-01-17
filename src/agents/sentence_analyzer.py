@@ -2,7 +2,7 @@
 sentence_analyzer.py
 
 Defines the SentenceAnalyzer class responsible for performing multi-dimensional
-analysis on individual sentences using the OpenAI API.
+analysis on individual sentences using the configured LLM provider.
 
 It orchestrates the process of:
     - Loading classification prompts from a YAML configuration file.
@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import ValidationError
 
-from src.agents.agent import agent  # Uses the OpenAIAgent instance for API calls.
+from src.agents.agent_factory import agent  # Uses the agent factory singleton for API calls.
 
 # Import global config but alias it to avoid direct use unless necessary
 from src.config import config as global_config
@@ -47,7 +47,7 @@ logger = get_logger()
 
 class SentenceAnalyzer:
     """
-    Analyzes individual sentences across multiple dimensions using OpenAI.
+    Analyzes individual sentences across multiple dimensions using the configured LLM provider.
 
     Loads classification prompts from configuration and uses the `agent` module
     to make concurrent API calls for dimensions like function, structure, purpose,
@@ -106,7 +106,7 @@ class SentenceAnalyzer:
         """
         Classifies a single sentence across defined dimensions via concurrent API calls.
 
-        Formats prompts using the sentence and provided contexts, calls the OpenAI API
+        Formats prompts using the sentence and provided contexts, calls the LLM API
         concurrently for each classification task (function, structure, purpose, etc.),
         validates the JSON response for each task using Pydantic models defined in
         `src.models.llm_responses`, and aggregates the results.
@@ -128,7 +128,7 @@ class SentenceAnalyzer:
 
         Raises:
             Exception: Propagates exceptions raised by `agent.call_model` if API calls
-                       fail after retries (e.g., persistent `openai.APIError`).
+                       fail after retries (e.g., persistent API errors).
         """
         results = {}
 
