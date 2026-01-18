@@ -2,30 +2,51 @@
 
 ## Overview
 
-This project provides an asynchronous pipeline and a FastAPI interface for processing text files (e.g., interview transcripts) and performing detailed, multi-dimensional analysis on each sentence. It leverages OpenAI's language models, the spaCy library for NLP tasks, and a robust, configurable architecture to produce structured JSON output.
+This project provides an asynchronous pipeline and a FastAPI interface for processing text files (e.g., interview transcripts) and performing detailed, multi-dimensional analysis on each sentence. It leverages OpenAI's language models (with Anthropic and Google Gemini support), the spaCy library for NLP tasks, and an **event-sourced architecture** to produce structured, auditable output.
 
-The pipeline segments input text, builds contextual information around each sentence, and uses an `AnalysisService` to orchestrate concurrent API calls to an OpenAI model (via `OpenAIAgent`) for classifying sentences based on function, structure, purpose, topic, and keywords according to configurable prompts. Results are written asynchronously using a **decoupled Input/Output (IO) layer defined by protocols**, allowing for different storage backends (e.g., local files, cloud storage, databases). Utilities for interacting with Neo4j are also included.
+The pipeline segments input text, builds contextual information around each sentence, and uses an `AnalysisService` to orchestrate concurrent API calls to LLM providers for classifying sentences based on function, structure, purpose, topic, and keywords according to configurable prompts.
 
-The accompanying FastAPI application allows interaction with the generated analysis files.
+**Architecture:** The system uses CQRS (Command Query Responsibility Segregation) with EventStoreDB as the source of truth and Neo4j as the read model. All state changes are captured as immutable events, enabling full audit trails and event replay.
+
+The accompanying FastAPI application allows interaction with the generated analysis files and provides edit endpoints for user corrections.
 
 The project is containerized using Docker and Docker Compose for a consistent development and runtime environment.
 
+> **Current Status:** M2.8 Complete (Event-Sourced Architecture - Production Ready)
+> **Tests:** 691 passing | **Coverage:** 72.2%
+> See [ROADMAP.md](docs/ROADMAP.md) for milestone details.
+
 ## System Architecture
 
-1.  **API Request:** A user sends a request to the FastAPI application (e.g., `POST /analysis/`) to process an input file.
-2.  **Task Queuing:** The API endpoint queues a background task using Celery, with Redis acting as the message broker.
-3.  **Worker Processing:** A Celery worker (`worker` service) picks up the task.
-4.  **Pipeline Execution:** The worker executes the main analysis pipeline (`src/pipeline.py`):
-    - Reads the input text file (`TextDataSource`).
-    - Segments text into sentences (`spaCy`).
-    - Creates an intermediate map file (`ConversationMapStorage`).
-    - Builds context for each sentence (`ContextBuilder` via `AnalysisService`).
-    - Analyzes sentences using the LLM (`SentenceAnalyzer` via `AnalysisService`).
-    - Analysis results are queued internally.
-5.  **Results Persistence (`_result_writer` in `pipeline.py`):**
-    - Results are dequeued.
-    - Each result is written to a JSONL file using `SentenceAnalysisWriter` (e.g., `*_analysis.jsonl`).
-    - **In parallel**, each result is also persisted to the Neo4j database via `src.persistence.graph_persistence.save_analysis_to_graph`, using the `Neo4jConnectionManager`.
+```
+User Upload / Edit API
+    ↓
+Pipeline / Command Handlers
+    ├──→ EventStoreDB (events) ← Source of Truth
+    └──→ Neo4j (direct write)  ← Temporary (dual-write phase)
+
+EventStoreDB
+    ↓
+Projection Service (12 lanes)
+    ↓
+Neo4j (materialized view)
+```
+
+### Processing Flow
+
+1. **API Request:** User sends a request to FastAPI (e.g., `POST /analysis/`) to process an input file.
+2. **Task Queuing:** The API queues a background task using Celery with Redis as the message broker.
+3. **Pipeline Execution:** A Celery worker executes the analysis pipeline:
+   - Reads input text file and segments into sentences (spaCy)
+   - Builds context windows around each sentence
+   - Analyzes sentences using LLM (7 parallel classification calls)
+4. **Event-First Persistence:**
+   - Events emitted to EventStoreDB (`InterviewCreated`, `SentenceCreated`, `AnalysisGenerated`)
+   - Results written to JSONL files
+   - Direct write to Neo4j (temporary during dual-write phase)
+5. **Projection Service:** Subscribes to EventStoreDB, projects events to Neo4j graph
+
+> **Architecture Docs:** See [docs/architecture/](docs/architecture/) for detailed Mermaid diagrams.
 
 ## Features
 
@@ -45,41 +66,50 @@ The project is containerized using Docker and Docker Compose for a consistent de
 - **Background Processing:** Uses **Celery** with a **Redis** broker/backend to run the potentially long-running analysis pipeline asynchronously, initiated via the API (`worker` service executes tasks defined likely around `src/pipeline.py`).
 - **Modular Architecture:** Code organized into logical components (`pipeline`, `agents`, `services`, `api`, `models`, `utils`, `io`).
 - **Robust Testing:** Comprehensive unit and integration tests using `pytest`, executable within the Docker environment.
-- **Neo4j Utilities:** Includes `Neo4jConnectionManager` for managing asynchronous connections to a Neo4j 4.4 database.
+- **Event Sourcing:** All state changes captured as immutable events in EventStoreDB, enabling audit trails and replay.
+- **CQRS Pattern:** Command handlers emit events; projection service updates Neo4j read model.
+- **Neo4j Graph Database:** Neo4j 5.22 serves as the read model with rich relationship queries.
 - **Containerized Environment:** Defined via `Dockerfile` and `docker-compose.yml` for reproducible setup.
 - **Dev Container Support:** Configured for use with VS Code Remote - Containers (`.devcontainer/devcontainer.json`).
 
 ## Technology Stack
 
-- **Programming Language:** Python 3.10 (specified in Dockerfile)
-- **Core Libraries:** `asyncio`, `openai`, `spacy`, `pydantic`, `pyyaml`, `aiofiles`, `celery`
-- **Database Driver (Optional):** `neo4j` (Async driver)
-- **API Framework:** `fastapi`, `uvicorn`
-- **HTTP Client (Testing):** `httpx`
-- **NLP Model (Segmentation):** `en_core_web_sm` (spaCy)
-- **LLM:** Configurable OpenAI model (e.g., `gpt-4o`)
-- **Testing:** `pytest`, `pytest-asyncio`, `unittest.mock`
-- **Linting/Formatting:** `flake8`, `black` (Recommended)
-- **Database:** Neo4j 4.4
-- **Containerization:** Docker, Docker Compose
-- **Development Environment:** VS Code Dev Containers (optional)
-- **Task Queue:** Celery
-- **Message Broker:** Redis
+| Component | Technology | Version |
+|-----------|-----------|---------|
+| Language | Python | 3.10 |
+| API Framework | FastAPI + Uvicorn | 0.117.0+ |
+| Event Store | EventStoreDB | 23.10.1 |
+| Graph Database | Neo4j | 5.22.0 |
+| Task Queue | Celery | 5.5.3 |
+| Message Broker | Redis | 7 Alpine |
+| NLP | spaCy + en_core_web_sm | 3.8.11 |
+| LLM APIs | OpenAI, Anthropic, Gemini | Various |
+| Validation | Pydantic | 2.12.5 |
+| Testing | pytest, pytest-asyncio | 8.3.3 |
+| Containerization | Docker, Docker Compose | Latest |
 
-## Database (Neo4j)
+**Core Libraries:** `asyncio`, `openai`, `anthropic`, `spacy`, `pydantic`, `esdbclient`, `neo4j`, `celery`, `aiofiles`
 
-This project uses a Neo4j graph database (currently v4.4 via Docker) as a **secondary persistence layer** alongside the primary JSONL output files.
+## Databases
+
+### EventStoreDB (Source of Truth)
+
+EventStoreDB stores all domain events as immutable records:
+
+- **Event Streams:** `Interview-{uuid}`, `Sentence-{uuid}`
+- **Event Types:** `InterviewCreated`, `SentenceCreated`, `SentenceEdited`, `AnalysisGenerated`, `AnalysisOverridden`
+- **Features:** Optimistic concurrency, persistent subscriptions, event replay
+
+### Neo4j (Read Model)
+
+Neo4j 5.22 serves as the **read model** in the CQRS architecture, providing rich graph queries for analysis exploration.
+
+**Write Paths:**
+1. **Direct writes** (temporary during dual-write phase) - Pipeline writes directly
+2. **Projection service** - Subscribes to EventStoreDB and projects events to Neo4j
 
 **Purpose:**
-The graph database stores the structured analysis results, enabling complex querying and exploration of relationships between sentences, topics, keywords, and analysis dimensions that might be difficult with flat files.
-
-**Interaction:**
-
-- During pipeline execution, the `_result_writer` function (`src/pipeline.py`) iterates through analysis results.
-- For each result, it calls `save_analysis_to_graph` (`src/persistence/graph_persistence.py`).
-- This function uses the `Neo4jConnectionManager` (`src/utils/neo4j_driver.py`) to acquire an asynchronous Neo4j session.
-- Within the session, it executes a series of Cypher queries primarily using `MERGE` to idempotently create or update nodes (`SourceFile`, `Sentence`, `Topic`, `Keyword`, etc.) and their relationships based on the analysis data.
-- The operations for a single sentence analysis are grouped within an async session context.
+The graph database enables complex querying and exploration of relationships between sentences, topics, keywords, and analysis dimensions.
 
 **Schema:**
 _(Based on `src/persistence/graph_persistence.py`)_
@@ -110,48 +140,45 @@ _(Based on `src/persistence/graph_persistence.py`)_
 
 ```
 ├── data/
-│   ├── input/         # Default directory for input .txt files
-│   ├── output/        # Default directory for output analysis .jsonl files
-│   └── maps/          # Default directory for intermediate map .jsonl files
-├── docker/            # Dockerfile for the application services
-├── .devcontainer/     # VS Code Dev Container configuration
-│   ├── devcontainer.json
-│   └── devcontainer.env # Example/Placeholder env vars for dev container context (not primary source)
-├── logs/              # Default directory for log files
-├── prompts/           # Directory for LLM prompt YAML files
+│   ├── input/              # Input .txt files
+│   ├── output/             # Output analysis .jsonl files
+│   └── maps/               # Intermediate map .jsonl files
+├── docs/
+│   ├── architecture/       # Mermaid architecture diagrams
+│   ├── onboarding/         # Getting started guides
+│   └── ROADMAP.md          # Project roadmap (canonical)
+├── docker/                 # Dockerfile for application services
+├── .devcontainer/          # VS Code Dev Container configuration
+├── logs/                   # Log files
+├── prompts/                # LLM prompt YAML files
 ├── src/
-│   ├── agents/        # LLM interaction, context building, sentence analysis logic
-│   ├── api/           # FastAPI application: main app, routers, schemas
-│   ├── io/            # Input/Output protocols and implementations
-│   │   ├── __init__.py
-│   │   ├── protocols.py
-│   │   └── local_storage.py
-│   ├── models/        # Pydantic models for LLM responses
-│   ├── persistence/   # Modules for saving data to persistent stores (e.g., graph)
-│   │   ├── __init__.py
-│   │   └── graph_persistence.py # Logic for saving analysis to Neo4j
-│   ├── services/      # Service layer coordinating agents
-│   ├── utils/         # Helper functions, config, logger, metrics, text processing
-│   ├── __init__.py
-│   ├── config.py      # Configuration loading logic
-│   ├── main.py        # FastAPI application entry point & CLI pipeline runner
-│   └── pipeline.py    # Core pipeline processing functions
-├── tests/
+│   ├── agents/             # LLM interaction, context building, analysis
+│   ├── api/                # FastAPI routers and schemas
+│   │   └── routers/        # files.py, analysis.py, edits.py
+│   ├── commands/           # Command handlers (CQRS write side)
+│   ├── events/             # Event sourcing: aggregates, store, repository
+│   ├── io/                 # IO protocols and implementations
+│   ├── models/             # Pydantic models
+│   ├── persistence/        # Neo4j graph persistence
+│   ├── projections/        # Event projection service
+│   │   └── handlers/       # Event-to-Neo4j projection handlers
+│   ├── services/           # Business logic services
+│   ├── utils/              # Helpers, config, logger, metrics
+│   ├── main.py             # FastAPI entry point
+│   ├── pipeline.py         # Core pipeline processing
+│   └── run_projection_service.py  # Projection service entry
+├── tests/                  # Test suite (691 tests)
 │   ├── agents/
 │   ├── api/
+│   ├── commands/
+│   ├── events/
 │   ├── integration/
-│   ├── io/            # Tests for IO implementations
-│   ├── services/
-│   └── utils/
-├── .env               # Runtime environment variables (API Keys, DB Passwords) - **Gitignored**
-├── .env.example       # Example environment variable file
-├── .gitignore
-├── config.yaml        # Main application configuration
-├── docker-compose.yml # Docker Compose configuration defining services
-├── Makefile           # Commands for build, run, test, etc. within Docker
-├── pytest.ini         # Pytest configuration
-├── README.md          # This file
-└── requirements.txt   # Python package dependencies (installed in Docker image)
+│   ├── projections/
+│   └── ...
+├── config.yaml             # Main application configuration
+├── docker-compose.yml      # Docker Compose services
+├── Makefile                # Build, run, test commands
+└── requirements.txt        # Python dependencies
 ```
 
 ## Prerequisites
@@ -257,12 +284,19 @@ Common tasks can be run using the Makefile within the Docker environment:
 
 ## API Endpoints
 
-- **`GET /`**: Health check endpoint.
-- **`GET /files/`**: Lists the filenames of generated analysis (`_analysis.jsonl`) files found in the configured output directory.
-- **`GET /files/{filename}`**: Retrieves the full content of a specific analysis file.
-- **`GET /files/{filename}/sentences/{sentence_id}`**: Retrieves the analysis result for a specific sentence ID within a given analysis file.
-- **`POST /analysis/`**: Accepts an `input_filename` and schedules the analysis pipeline for that file using **FastAPI BackgroundTasks** (returns `202 Accepted`).
-- _(More endpoints could be added for detailed task status, specific analysis requests without running the full pipeline, etc.)_
+### Files & Analysis
+- **`GET /`** - Health check
+- **`GET /files/`** - List analysis files
+- **`GET /files/{filename}`** - Get analysis file content
+- **`GET /files/{filename}/sentences/{sentence_id}`** - Get specific sentence analysis
+- **`POST /analysis/`** - Trigger background analysis (returns `202 Accepted`)
+
+### Edit Endpoints (M2.9)
+- **`POST /edits/sentences/{interview_id}/{sentence_index}/edit`** - Edit sentence text
+- **`POST /edits/sentences/{interview_id}/{sentence_index}/analysis/override`** - Override AI analysis
+- **`GET /edits/sentences/{interview_id}/{sentence_index}/history`** - Get edit history
+
+> Interactive documentation available at `http://localhost:8000/docs`
 
 ## Input and Output Files
 

@@ -446,7 +446,7 @@ interview_analyzer_chaining/
 │       ├── helpers.py            # Helper functions
 │       └── text_processing.py    # Text utilities
 │
-└── tests/                 # Test suite (673 tests)
+└── tests/                 # Test suite (691 passing, 84 skipped)
     ├── conftest.py        # Pytest fixtures
     ├── api/              # API tests
     ├── commands/         # Command handler tests
@@ -571,8 +571,8 @@ Projection service provides eventual consistency and handles conflicts.
 | Event Store | EventStoreDB | 23.10.1 Jammy |
 | LLM API | OpenAI | `gpt-4o-mini-2024-07-18` |
 | LLM API | Google Gemini | `gemini-2.0-flash` |
-| NLP | spaCy + Model | 3.8.7 + `en_core_web_sm` 3.7.0 |
-| Data Validation | Pydantic | 2.11.7 |
+| NLP | spaCy + Model | 3.8.11 + `en_core_web_sm` 3.7.0 |
+| Data Validation | Pydantic | 2.12.5 |
 | Testing | pytest | 8.3.3 |
 | Test Coverage | pytest-cov | 6.0.0 |
 | Linting | flake8 | 7.3.0 |
