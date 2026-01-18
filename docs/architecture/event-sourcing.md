@@ -227,38 +227,34 @@ sequenceDiagram
     participant P as Pipeline
     participant E as EventEmitter
     participant ES as EventStoreDB
-    participant N4 as Neo4j (Direct)
     participant PS as Projection Service
-    participant N4P as Neo4j (Projected)
+    participant N4 as Neo4j
 
     U->>P: Upload file
 
     Note over P: Create Interview
     P->>E: emit InterviewCreated
     E->>ES: append to Interview-{id}
-    P->>N4: create Interview node (temp)
 
     loop For each sentence
         Note over P: Create Sentence
         P->>E: emit SentenceCreated
         E->>ES: append to Sentence-{id}
-        P->>N4: create Sentence node (temp)
 
         Note over P: Analyze Sentence
         P->>E: emit AnalysisGenerated
         E->>ES: append to Sentence-{id}
-        P->>N4: update with analysis (temp)
     end
 
-    Note over PS: Projection Service subscribes
+    Note over PS: Projection Service (sole writer)
     ES-->>PS: InterviewCreated
-    PS->>N4P: MERGE Interview node
+    PS->>N4: MERGE Interview node
 
     ES-->>PS: SentenceCreated
-    PS->>N4P: MERGE Sentence node
+    PS->>N4: MERGE Sentence node
 
     ES-->>PS: AnalysisGenerated
-    PS->>N4P: MERGE analysis relationships
+    PS->>N4: MERGE analysis relationships
 ```
 
 ## Event Flow: User Edit

@@ -59,16 +59,14 @@ flowchart TD
         llm --> func & struct & purpose & topic1 & topic3 & kw_overall & kw_domain
     end
 
-    subgraph Persistence["6. Dual-Write Persistence"]
+    subgraph Persistence["6. Event-First Persistence"]
         consolidate[Consolidate Results]
         event_analysis[fa:fa-bolt AnalysisGenerated<br/>Event]
         jsonl[fa:fa-file-code Analysis File<br/>data/output/*_analysis.jsonl]
-        neo4j_direct[fa:fa-project-diagram Neo4j<br/>Direct Write]
 
         func & struct & purpose & topic1 & topic3 & kw_overall & kw_domain --> consolidate
         consolidate --> event_analysis
         consolidate --> jsonl
-        consolidate -.->|temporary| neo4j_direct
     end
 
     subgraph Projection["7. Event Projection"]
@@ -214,26 +212,32 @@ flowchart TD
     subgraph Pipeline["Pipeline Operation"]
         op[Operation Start]
         emit[Emit Event to ESDB]
-        write_neo4j[Write to Neo4j]
         complete[Operation Complete]
     end
 
     subgraph Errors["Error Handling"]
         event_fail{Event Failed?}
-        neo4j_fail{Neo4j Failed?}
         abort[fa:fa-times-circle ABORT<br/>Raise Exception]
-        log_warn[fa:fa-exclamation-triangle Log Warning<br/>Continue]
+    end
+
+    subgraph Projection["Projection Service"]
+        proj[Process Event]
+        neo4j_write[Write to Neo4j]
+        proj_fail{Write Failed?}
+        park[Park Event<br/>for Retry]
     end
 
     op --> emit --> event_fail
     event_fail -->|Yes| abort
-    event_fail -->|No| write_neo4j --> neo4j_fail
-    neo4j_fail -->|Yes| log_warn --> complete
-    neo4j_fail -->|No| complete
+    event_fail -->|No| complete
+
+    emit -.->|async| proj --> neo4j_write --> proj_fail
+    proj_fail -->|Yes| park
+    proj_fail -->|No| complete
 
     style abort fill:#f66,stroke:#333
-    style log_warn fill:#ff9,stroke:#333
+    style park fill:#ff9,stroke:#333
     style complete fill:#6f6,stroke:#333
 ```
 
-**Key Principle:** Events are the source of truth. Event failures abort the operation. Neo4j failures during dual-write phase are logged but don't block (projection service will handle).
+**Key Principle:** Events are the source of truth. Event failures abort the operation. Projection service is the sole writer to Neo4j and handles retries independently.
