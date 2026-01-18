@@ -1,8 +1,18 @@
 # Documentation
 
-This directory contains documentation for the Interview Analyzer project, with a focus on the M2.8 event-sourced architecture migration.
+This directory contains documentation for the Interview Analyzer project.
 
-## Getting Started with M2.8
+## Project Roadmap
+
+**[ROADMAP.md](ROADMAP.md)** - Complete project roadmap including:
+- Completed milestones (M1 through M2.8)
+- Upcoming work (M2.9 User Edit API, M3.0 Remove Dual-Write)
+- Planned features (M3.1 Vector Search, M3.2 AI Agent Upgrade)
+- Dependency upgrade schedule (neo4j 6.x, openai 2.x, etc.)
+
+---
+
+## M2.8 Event-Sourced Architecture
 
 ### Executive Summary (Start Here)
 📄 **[M2.8_MIGRATION_SUMMARY.md](M2.8_MIGRATION_SUMMARY.md)** - Complete overview of the M2.8 migration
