@@ -17,13 +17,13 @@
 | M2.7 | ✅ Complete | Testing & Validation |
 | M2.8 | ✅ Complete | Event-Sourced Architecture (Production Ready) |
 | M2.9 | ✅ Complete | User Edit API |
-| **M3.0** | ⏳ **Next** | Remove Dual-Write + neo4j 6.x |
-| M3.1 | 📋 Planned | Vector Search |
+| M3.0 | ✅ Complete | Remove Dual-Write + neo4j 6.x |
+| **M3.1** | ⏳ **Next** | Vector Search |
 | M3.2 | 📋 Planned | AI Agent Upgrade (openai 2.x) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M3.0 (Remove Dual-Write)
-**Tests:** 694 passing, 81 skipped | **Coverage:** 72.2%
+**Current Phase:** M3.1 (Vector Search)
+**Tests:** 554 passing, 8 skipped | **Coverage:** 72%
 
 ---
 
@@ -44,17 +44,16 @@
 
 ---
 
-### M3.0: Remove Dual-Write 📋 PLANNED
+### M3.0: Remove Dual-Write ✅ COMPLETE
 
-- [ ] Remove direct Neo4j writes from pipeline
-- [ ] Projection service becomes SOLE writer
-- [ ] Remove deprecated code paths
-- [ ] Remove 27 legacy tests
-- [ ] Upgrade neo4j 5.28.1 → 6.x
-- [ ] Update documentation
-- [ ] 1-2 weeks production validation
+- [x] Remove direct Neo4j writes from pipeline
+- [x] Projection service becomes SOLE writer
+- [x] Remove deprecated code paths
+- [x] Remove 27+ legacy tests (41 tests deleted)
+- [x] Upgrade neo4j 5.28.1 → 6.x (driver) / 5.26.0 (server)
+- [x] Update documentation
 
-**Dependencies:** M2.9 complete ✓
+**Completed:** 2026-01-18
 
 ---
 
@@ -170,7 +169,7 @@
 
 | Package | Current | Target | Milestone | Rationale |
 |---------|---------|--------|-----------|-----------|
-| neo4j | 5.28.1 | 6.x | **M3.0** | Vector types; single write path |
+| neo4j | ~~5.28.1~~ 6.x | ✅ Done | **M3.0** | Vector types; single write path |
 | openai | 1.93.3 | 2.x | **M3.2** | Agents SDK; function outputs |
 | anthropic | >=0.39.0 | Latest | **M3.2** | Keep in sync |
 | pytest | 8.3.3 | 9.x | M3.3 | Dev tooling |
@@ -182,12 +181,13 @@
 
 ## Technical Debt
 
-### Post-M3.0 Cleanup
-- [ ] Remove 27 legacy tests (test_neo4j_analysis_writer_legacy.py)
-- [ ] Remove deprecated Neo4jMapStorage direct write code
-- [ ] Remove deprecated Neo4jAnalysisWriter direct write code
-- [ ] Update 11 data integrity tests for eventual consistency
-- [ ] Rewrite 5 fault tolerance tests for EventStoreDB
+### Post-M3.0 Cleanup ✅ DONE
+- [x] Remove 27 legacy tests (test_neo4j_analysis_writer_legacy.py)
+- [x] Remove deprecated Neo4jMapStorage direct write code
+- [x] Remove deprecated Neo4jAnalysisWriter direct write code
+- [x] Remove graph_persistence tests (14 tests)
+- [ ] Update 11 data integrity tests for eventual consistency (M3.1)
+- [ ] Rewrite 5 fault tolerance tests for EventStoreDB (M3.1)
 
 ### Future Improvements (Unprioritized)
 - [ ] Prometheus metrics exporter (currently in-memory)
@@ -204,33 +204,18 @@
 ## Architecture Overview
 
 ```
-Current State (M2.8 - Dual-Write)
-─────────────────────────────────
+Current State (M3.0 - Single-Writer) ✅
+───────────────────────────────────────
 User Upload / Edit API
     ↓
 Pipeline / Command Handlers
-    ├──→ EventStoreDB (events) ← Source of Truth
-    └──→ Neo4j (direct write)  ← Temporary (removed in M3.0)
+    └──→ EventStoreDB (events only) ← Source of Truth
 
 EventStoreDB
     ↓
-Projection Service
+Projection Service (12 lanes)
     ↓
-Neo4j (materialized view)
-
-
-Target State (M3.0 - Single-Writer)
-────────────────────────────────────
-User Upload / Edit API
-    ↓
-Pipeline / Command Handlers
-    └──→ EventStoreDB (events only)
-
-EventStoreDB
-    ↓
-Projection Service
-    ↓
-Neo4j (sole writer)
+Neo4j (sole writer, materialized view)
 ```
 
 ---
@@ -239,6 +224,7 @@ Neo4j (sole writer)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-01-18 | M3.0 complete: single-writer architecture | Removed 41 legacy tests, all direct Neo4j writes eliminated |
 | 2026-01-18 | Bundle neo4j 6.x with M3.0 | Single write path simplifies migration |
 | 2026-01-18 | Separate openai 2.x to M3.2 | Orthogonal to event-sourcing; needs dedicated focus |
 | 2026-01-18 | Defer pytest/redis to M3.3 | No immediate benefit; low priority |

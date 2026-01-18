@@ -2,15 +2,14 @@
 src/io/neo4j_analysis_writer.py
 
 Neo4j implementation of the SentenceAnalysisWriter protocol.
+
+Note: Direct Neo4j writes have been removed as of M3.0.
+The projection service is now the sole writer to Neo4j.
+This class now only emits events - the projection service handles materialization.
 """
 
-import datetime
-import json
-import uuid
-import warnings
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Dict, Optional, Set
 
-from src.config import config  # Import config to access cardinality limits
 from src.utils.logger import get_logger
 from src.utils.metrics import metrics_tracker
 from src.utils.neo4j_driver import Neo4jConnectionManager
@@ -22,9 +21,8 @@ logger = get_logger()
 
 class Neo4jAnalysisWriter(SentenceAnalysisWriter):
     """
-    Writes sentence analysis results to a Neo4j graph database.
-    Connects Analysis nodes to Sentences and related dimension nodes (Keywords, Topics, etc.).
-    Handles cardinality constraints and edit flags based on configuration and graph state.
+    Emits analysis events for the projection service to materialize in Neo4j.
+    Direct Neo4j writes have been removed - projection service is the sole writer.
     """
 
     def __init__(self, project_id: str, interview_id: str, event_emitter=None, correlation_id=None):
@@ -34,7 +32,7 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         Args:
             project_id (str): The unique ID (UUID ideally) of the project.
             interview_id (str): The unique ID (UUID ideally) of the interview.
-            event_emitter: Optional PipelineEventEmitter for dual-write phase.
+            event_emitter: PipelineEventEmitter for event sourcing.
             correlation_id: Optional correlation ID for event tracking.
         """
         if not project_id or not interview_id:
@@ -44,22 +42,12 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         self.event_emitter = event_emitter
         self.correlation_id = correlation_id
 
-        # M2.8: Deprecation warning for direct write path
         if event_emitter is None:
-            warnings.warn(
-                "Direct Neo4j writes without event_emitter are deprecated and will be removed in M3.0. "
-                "Pass an event_emitter instance to enable event-first dual-write architecture. "
-                "See M2.8_MIGRATION_SUMMARY.md for migration guidance.",
-                DeprecationWarning,
-                stacklevel=2
-            )
             logger.warning(
-                "DEPRECATED: Neo4jAnalysisWriter initialized without event_emitter. "
-                "Direct writes will be removed in M3.0. Use event-first dual-write pattern."
+                "Neo4jAnalysisWriter initialized without event_emitter. "
+                "Event sourcing is required - projection service handles Neo4j writes."
             )
 
-        # Load default cardinality limits from config once during initialization
-        self.default_limits = config.get("pipeline", {}).get("default_cardinality_limits", {})
         logger.debug(f"Neo4jAnalysisWriter initialized for Project: {self.project_id}, Interview: {self.interview_id}")
 
     async def initialize(self):
@@ -68,509 +56,80 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         (Usually not strictly needed if MapStorage ran first, but good practice).
         """
         logger.debug(f"Initializing Neo4j writer for Interview: {self.interview_id}")
-        # Optional: Can run a lightweight query to ensure Project/Interview exist
-        # or simply rely on them being created by Neo4jMapStorage.initialize
-        # For now, we assume they exist.
+        # Rely on them being created by Neo4jMapStorage.initialize or projection service
         pass
 
     async def write_result(self, result: Dict[str, Any]):
         """
-        Writes a single analysis result to the Neo4j graph.
-
-        - Finds the corresponding Sentence node.
-        - Creates/updates the Analysis node linked to the Sentence.
-        - Creates/updates dimension nodes (Keyword, Topic, etc.).
-        - Creates/updates relationships between Analysis and dimension nodes,
-          respecting cardinality limits and edit flags.
+        Emits an AnalysisGenerated event for the projection service to handle.
+        Direct Neo4j writes have been removed - projection service is the sole writer.
 
         Args:
             result (Dict[str, Any]): Dictionary containing analysis data, including
-                                     'sentence_id' and analysis fields. Can also be
-                                     an error dictionary {sentence_id: ..., error: True, ...}
+                                     'sentence_id' and analysis fields.
         """
         sentence_id = result.get("sentence_id")
         if sentence_id is None:
             logger.error(f"write_result missing 'sentence_id' in result: {result}")
-            # Or raise ValueError? For now, log and skip.
             return
 
-        # Check if the result itself is an error reported by the analysis service
+        # Check if the result is an error reported by the analysis service
         is_error_result = result.get("error", False)
 
-        logger.debug(f"Writing analysis result for Sentence ID: {sentence_id} in Interview: {self.interview_id}")
+        logger.debug(f"Processing analysis result for Sentence ID: {sentence_id} in Interview: {self.interview_id}")
 
-        # STEP 1: EMIT EVENT FIRST (CRITICAL - Event-First Dual-Write)
-        # Only emit events for successful analysis results (not error results).
-        # Events are the source of truth. If event emission fails, abort the operation.
-        if self.event_emitter and not is_error_result:
+        # Skip event emission for error results (projection service doesn't need them)
+        if is_error_result:
+            logger.warning(
+                f"Skipping event emission for error result of sentence {sentence_id}: "
+                f"{result.get('error_message', 'Unknown error')}"
+            )
+            return
+
+        # Emit event for projection service to materialize in Neo4j
+        if self.event_emitter:
             try:
                 await self.event_emitter.emit_analysis_generated(
                     interview_id=self.interview_id,
-                    sentence_index=sentence_id,  # Using sentence_id as index
+                    sentence_index=sentence_id,
                     analysis_data=result,
                     correlation_id=self.correlation_id,
                 )
                 logger.info(f"✅ AnalysisGenerated event emitted for sentence {sentence_id}")
-
-                # Track event-first success metric
                 metrics_tracker.increment_dual_write_event_first_success()
 
             except Exception as event_error:
-                # EVENT FAILURE = OPERATION FAILURE
-                # This is architecturally correct: events are the immutable source of truth.
-                # If we cannot persist the event, we must not write to Neo4j.
-
-                # Track event-first failure metric
                 metrics_tracker.increment_dual_write_event_first_failure()
-
                 logger.error(
-                    f"❌ CRITICAL: Failed to emit AnalysisGenerated event for sentence {sentence_id}. "
-                    f"Aborting Neo4j write to maintain event-first integrity. Error: {event_error}",
+                    f"❌ Failed to emit AnalysisGenerated event for sentence {sentence_id}: {event_error}",
                     exc_info=True,
                 )
                 raise RuntimeError(
-                    f"Event emission failed for sentence {sentence_id} analysis. "
-                    f"Operation aborted to maintain event-first integrity."
+                    f"Event emission failed for sentence {sentence_id} analysis."
                 ) from event_error
-
-        # M2.8: CONDITIONAL NEO4J WRITES
-        # - Successful analyses: NO direct write (projection service handles via events)
-        # - Error results: DIRECT write (no events emitted for errors)
-        if is_error_result:
-            # Error results must be written directly (no event emitted)
-            try:
-                async with await Neo4jConnectionManager.get_session() as session:
-                    await self._run_write_result_queries(
-                        session,
-                        self.project_id,
-                        self.interview_id,
-                        sentence_id,
-                        result,
-                        is_error_result,
-                        self.default_limits,
-                    )
-                logger.info(f"✅ Neo4j direct write succeeded for error result of sentence {sentence_id}")
-            except Exception as neo4j_error:
-                logger.error(
-                    f"Failed to write error result to Neo4j for sentence {sentence_id}: {neo4j_error}",
-                    exc_info=True,
-                )
-                raise  # Re-raise - error results must be persisted
         else:
-            # Successful analysis - projection service will write from event
-            logger.info(f"✅ Event emitted for sentence {sentence_id} analysis. Projection service will handle Neo4j write.")
-
-    # Session-based function for write_result
-    async def _run_write_result_queries(
-        self,
-        session,
-        project_id: str,
-        interview_id: str,
-        sentence_id: int,
-        result: Dict[str, Any],
-        is_error_result: bool,
-        default_limits: Dict,
-    ):
-        logger.debug(f"Running write_result transaction for Sentence ID: {sentence_id}")
-
-        # 1. Find the Sentence node
-        match_sentence_query = """
-            MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
-            RETURN s
-        """
-        sentence_node_result = await session.run(
-            match_sentence_query, interview_id=interview_id, sentence_id=sentence_id
-        )
-        sentence_node = await sentence_node_result.single()
-
-        if not sentence_node:
-            logger.error(
-                f"_write_result_tx: Sentence node {sentence_id} not found for Interview {interview_id}. "
-                f"Cannot write analysis."
-            )
-            # Raise an error or just return? Raising is safer to signal inconsistency.
-            raise ValueError(f"Sentence node {sentence_id} not found for Interview {interview_id}")
-
-        # 2. MERGE the Analysis node linked to the Sentence
-        #    Set properties on create.
-        #    Store the raw error structure if it's an error result.
-        analysis_props_on_create = {
-            "analysis_id": str(uuid.uuid4()),
-            "model_name": result.get(
-                "model_name", config.get("openai", {}).get("model_name")
-            ),  # Get model from result or config
-            "created_at": datetime.datetime.now(),
-            "is_edited": False,
-            "error_data": (
-                json.dumps(result) if is_error_result else None
-            ),  # Store error details as JSON string if it's an error
-        }
-        # Filter out None values
-        analysis_props_on_create = {k: v for k, v in analysis_props_on_create.items() if v is not None}
-
-        merge_analysis_query = """
-            MATCH (s:Sentence {sentence_id: $sentence_id})<-[:HAS_SENTENCE]-(:Interview {interview_id: $interview_id})
-            MERGE (s)-[:HAS_ANALYSIS]->(a:Analysis)
-            ON CREATE SET a += $props
-            ON MATCH SET a += $props
-            RETURN a
-        """
-        analysis_node_result = await session.run(
-            merge_analysis_query,
-            sentence_id=sentence_id,
-            interview_id=interview_id,
-            props=analysis_props_on_create,
-        )
-        analysis_node = (await analysis_node_result.single())["a"]  # Get the analysis node
-        logger.debug(f"_write_result_tx: Merged Analysis node for Sentence {sentence_id}")
-
-        # --- If it was an error result, stop here ---
-        if is_error_result:
             logger.warning(
-                f"_write_result_tx: Stored error information for Sentence {sentence_id}. "
-                f"No further dimensions processed."
-            )
-            return  # Do not process dimensions for error results
-
-        # --- Step 3: Handle Dimensions ---
-
-        # Fetch project-specific cardinality overrides once
-        project_limits = await self._fetch_project_limits(session, project_id)
-
-        # Helper function calls for each dimension type
-        # Function Type (Cardinality 1)
-        await self._handle_dimension_link(
-            session=session,
-            analysis_node_id=analysis_node.element_id,  # Pass internal ID
-            dimension_label="FunctionType",
-            dimension_key="name",
-            dimension_value=result.get("function_type"),
-            relationship_type="HAS_FUNCTION",
-            cardinality_limit=(
-                project_limits.get("HAS_FUNCTION")
-                if project_limits.get("HAS_FUNCTION") is not None
-                else default_limits.get("HAS_FUNCTION", 1)
-            ),  # Default 1
-            props_on_create={},
-        )
-
-        # Structure Type (Assume Cardinality 1 for now)
-        await self._handle_dimension_link(
-            session=session,
-            analysis_node_id=analysis_node.element_id,
-            dimension_label="StructureType",
-            dimension_key="name",
-            dimension_value=result.get("structure_type"),
-            relationship_type="HAS_STRUCTURE",
-            cardinality_limit=(
-                project_limits.get("HAS_STRUCTURE")
-                if project_limits.get("HAS_STRUCTURE") is not None
-                else default_limits.get("HAS_STRUCTURE", 1)
-            ),  # Default 1
-            props_on_create={},
-        )
-
-        # Purpose (Assume Cardinality 1 for now)
-        await self._handle_dimension_link(
-            session=session,
-            analysis_node_id=analysis_node.element_id,
-            dimension_label="Purpose",
-            dimension_key="name",
-            dimension_value=result.get("purpose"),
-            relationship_type="HAS_PURPOSE",
-            cardinality_limit=(
-                project_limits.get("HAS_PURPOSE")
-                if project_limits.get("HAS_PURPOSE") is not None
-                else default_limits.get("HAS_PURPOSE", 1)
-            ),  # Default 1
-            props_on_create={},
-        )
-
-        # Topics (Cardinality Many)
-        await self._handle_dimension_list_link(
-            session=session,
-            analysis_node_id=analysis_node.element_id,
-            dimension_label="Topic",
-            dimension_key="name",
-            dimension_values=result.get("topics", []),  # Assuming 'topics' key holds a list of topic names
-            relationship_type="MENTIONS_TOPIC",
-            cardinality_limit=(
-                project_limits.get("MENTIONS_TOPIC")
-                if project_limits.get("MENTIONS_TOPIC") is not None
-                else default_limits.get("MENTIONS_TOPIC", None)
-            ),  # Default unlimited
-            props_on_create=lambda v: {"name": v},  # Function to create props for new Topic node
-            # We might need to handle level property for Topic here too
-        )
-
-        # Keywords (Cardinality N)
-        await self._handle_dimension_list_link(
-            session=session,
-            analysis_node_id=analysis_node.element_id,
-            dimension_label="Keyword",
-            dimension_key="text",
-            dimension_values=result.get(
-                "overall_keywords", []
-            ),  # Fixed: Use 'overall_keywords' to match SentenceAnalyzer output
-            relationship_type="MENTIONS_OVERALL_KEYWORD",
-            cardinality_limit=(
-                project_limits.get("MENTIONS_OVERALL_KEYWORD")
-                if project_limits.get("MENTIONS_OVERALL_KEYWORD") is not None
-                else default_limits.get("MENTIONS_OVERALL_KEYWORD", 6)
-            ),  # Default 6
-            props_on_create=lambda v: {"text": v},
-        )
-
-        # Domain Keywords (Cardinality Many)
-        await self._handle_dimension_list_link(
-            session=session,
-            analysis_node_id=analysis_node.element_id,
-            dimension_label="DomainKeyword",
-            dimension_key="text",
-            dimension_values=result.get("domain_keywords", []),  # Assuming 'domain_keywords' key
-            relationship_type="MENTIONS_DOMAIN_KEYWORD",
-            cardinality_limit=(
-                project_limits.get("MENTIONS_DOMAIN_KEYWORD")
-                if project_limits.get("MENTIONS_DOMAIN_KEYWORD") is not None
-                else default_limits.get("MENTIONS_DOMAIN_KEYWORD", None)
-            ),  # Default unlimited
-            props_on_create=lambda v: {
-                "text": v,
-                "is_custom": False,
-            },  # Assume keywords from analysis are not custom? Or derive?
-        )
-
-    async def _fetch_project_limits(self, session, project_id: str) -> Dict[str, Optional[int]]:
-        "Fetches cardinality limit overrides from the Project node."
-        query = """
-            MATCH (p:Project {project_id: $project_id})
-            RETURN p.max_functions_limit as HAS_FUNCTION,
-                   p.max_structures_limit as HAS_STRUCTURE,
-                   p.max_purposes_limit as HAS_PURPOSE,
-                   p.max_keywords_limit as MENTIONS_OVERALL_KEYWORD,
-                   p.max_topics_limit as MENTIONS_TOPIC,
-                   p.max_domain_keywords_limit as MENTIONS_DOMAIN_KEYWORD
-        """
-        result = await session.run(query, project_id=project_id)
-        record = await result.single()
-        return dict(record) if record else {}
-
-    # Helper for single-value dimension links (handles Max 1 cardinality)
-    async def _handle_dimension_link(
-        self,
-        session,
-        *,
-        analysis_node_id: int,
-        dimension_label: str,
-        dimension_key: str,
-        dimension_value: Optional[str],
-        relationship_type: str,
-        cardinality_limit: Optional[int],
-        props_on_create: Dict,
-    ):
-        if not dimension_value:
-            # If value is None or empty, skip creating link
-            # Note: Edit protection logic is now handled by projection service handlers
-            logger.debug(f"Skipping link {relationship_type} from Analysis {analysis_node_id}: No value provided.")
-            return
-
-        # Check cardinality limit - if it's 0, don't create any relationships
-        if cardinality_limit is not None and cardinality_limit == 0:
-            logger.debug(
-                f"Skipping link {relationship_type} from Analysis {analysis_node_id}: " f"Cardinality limit is 0."
-            )
-            return
-
-        # Create dimension node properties
-        dim_props = {dimension_key: dimension_value}
-        dim_props.update(props_on_create)  # Add extra props like level if needed
-
-        # Cypher Query:
-        # 1. MATCH the Analysis node by its internal ID.
-        # 2. OPTIONAL MATCH any existing relationship of this type AND its target node.
-        # 3. If relationship exists AND rel.is_edited = true, RETURN (do nothing).
-        # 4. If relationship exists AND rel.is_edited = false, DELETE the relationship.
-        # 5. MERGE the dimension node (ensures uniqueness based on key property).
-        # 6. CREATE the new relationship from Analysis to Dimension node, set is_edited = false.
-        query = f"""
-        MATCH (a:Analysis) WHERE elementId(a) = $analysis_node_id
-        OPTIONAL MATCH (a)-[r_old:{relationship_type}]->(d_old:{dimension_label})
-
-        // Check if edit protection applies
-        WITH a, r_old, d_old,
-             CASE WHEN r_old IS NOT NULL AND r_old.is_edited = true THEN true ELSE false END as is_protected
-        WHERE is_protected = false // Proceed only if not protected
-
-        // Delete old relationship if it exists (and wasn't protected)
-        FOREACH (_ IN CASE WHEN r_old IS NOT NULL THEN [1] ELSE [] END | DELETE r_old)
-
-        // Merge dimension node and create new relationship
-        MERGE (d_new:{dimension_label} {{{dimension_key}: $dim_value}})
-        ON CREATE SET d_new += $props_on_create
-        CREATE (a)-[r_new:{relationship_type} {{is_edited: false}}]->(d_new)
-        """
-
-        # Combine parameters
-        params = {
-            "analysis_node_id": analysis_node_id,
-            "dim_value": dimension_value,
-            "props_on_create": props_on_create,
-        }
-
-        await session.run(query, params)
-        logger.debug(
-            f"Handled link {relationship_type} from Analysis {analysis_node_id} to {dimension_label} {dimension_value}"
-        )
-
-    # Helper for multi-value dimension links (handles Max N cardinality)
-    async def _handle_dimension_list_link(
-        self,
-        session,
-        *,
-        analysis_node_id: int,
-        dimension_label: str,
-        dimension_key: str,
-        dimension_values: List[str],
-        relationship_type: str,
-        cardinality_limit: Optional[int],
-        props_on_create: Callable[[str], Dict[str, Any]],
-    ):
-        if not dimension_values:
-            logger.debug(
-                f"Skipping list link {relationship_type} from Analysis {analysis_node_id}: " f"No values provided."
-            )
-            # Optionally, remove all non-edited existing links if the input list is empty
-            # query_delete_all_unedited = f"""
-            # MATCH (a:Analysis)-[r:{relationship_type}]->(d:{dimension_label})
-            # WHERE elementId(a) = $analysis_node_id AND (r.is_edited IS NULL OR r.is_edited = false)
-            # DELETE r
-            # """
-            # tx.run(query_delete_all_unedited, analysis_node_id=analysis_node_id)
-            # logger.debug(f"Removed existing unedited {relationship_type} links for Analysis "
-            #              f"{analysis_node_id} due to empty input list.")
-            return
-
-        # Ensure uniqueness in input values
-        unique_dimension_values = set(dimension_values)
-
-        # 1. Get current state: existing linked values and their edit status
-        query_get_existing = f"""
-        MATCH (a:Analysis)-[r:{relationship_type}]->(d:{dimension_label})
-        WHERE elementId(a) = $analysis_node_id
-        RETURN d.{dimension_key} AS value, COALESCE(r.is_edited, false) AS edited
-        """
-        existing_results = await session.run(query_get_existing, analysis_node_id=analysis_node_id)
-
-        existing_edited_values = set()
-        existing_unedited_values = set()
-        async for record in existing_results:
-            if record["edited"]:
-                existing_edited_values.add(record["value"])
-            else:
-                existing_unedited_values.add(record["value"])
-
-        logger.debug(
-            f"{relationship_type} existing state: Edited={existing_edited_values}, "
-            f"Unedited={existing_unedited_values}"
-        )
-
-        # 2. Identify changes
-        target_values_set = unique_dimension_values
-        values_to_add_set = target_values_set - existing_edited_values - existing_unedited_values
-        unedited_values_to_remove_set = existing_unedited_values - target_values_set
-
-        # 3. Calculate available slots for new items (considering the limit and preserved edited items)
-        slots_available = float("inf")  # Assume infinite slots if limit is None
-        if cardinality_limit is not None and cardinality_limit >= 0:
-            slots_available = max(0, cardinality_limit - len(existing_edited_values))
-
-        logger.debug(
-            f"{relationship_type}: Limit={cardinality_limit}, "
-            f"Edited={len(existing_edited_values)}, AvailableSlots={slots_available}"
-        )
-
-        # 4. Delete obsolete unedited relationships
-        if unedited_values_to_remove_set:
-            query_delete_unedited = f"""
-            MATCH (a:Analysis)-[r:{relationship_type}]->(d:{dimension_label})
-            WHERE elementId(a) = $analysis_node_id
-              AND (r.is_edited IS NULL OR r.is_edited = false)
-              AND d.{dimension_key} IN $values_to_remove
-            DELETE r
-            """
-            await session.run(
-                query_delete_unedited,
-                analysis_node_id=analysis_node_id,
-                values_to_remove=list(unedited_values_to_remove_set),
-            )
-            logger.debug(
-                f"Deleted {len(unedited_values_to_remove_set)} obsolete unedited {relationship_type} "
-                f"links for Analysis {analysis_node_id}"
-            )
-
-        # 5. Add new relationships up to the available slot limit
-        if values_to_add_set and slots_available > 0:
-            # Preserve original order by filtering the original list and deduplicating
-            seen = set()
-            values_to_add_list = []
-            for value in dimension_values:
-                if value in values_to_add_set and value not in seen:
-                    values_to_add_list.append(value)
-                    seen.add(value)
-            if slots_available != float("inf"):
-                values_to_add_list = values_to_add_list[: int(slots_available)]  # Take only as many as allowed
-
-            if values_to_add_list:
-                # Process each value individually to handle props_on_create lambda
-                for new_value in values_to_add_list:
-                    # Compute properties for this specific value using the lambda
-                    computed_props = props_on_create(new_value)
-
-                    query_add_single = f"""
-                    MATCH (a:Analysis) WHERE elementId(a) = $analysis_node_id
-                    MERGE (d:{dimension_label} {{{dimension_key}: $new_value}})
-                    ON CREATE SET d += $computed_props
-                    CREATE (a)-[r:{relationship_type} {{is_edited: false}}]->(d)
-                    """
-
-                    await session.run(
-                        query_add_single,
-                        analysis_node_id=analysis_node_id,
-                        new_value=new_value,
-                        computed_props=computed_props,
-                    )
-                logger.debug(
-                    f"Added {len(values_to_add_list)} new {relationship_type} links " f"for Analysis {analysis_node_id}"
-                )
-            else:
-                logger.debug(
-                    f"No new {relationship_type} links to add for Analysis {analysis_node_id} "
-                    f"(limit reached or no new values)"
-                )
-        else:
-            logger.debug(
-                f"No new {relationship_type} links to add for Analysis {analysis_node_id} "
-                f"(slots_available={slots_available}, values_to_add={values_to_add_set})"
+                f"No event_emitter configured - cannot emit event for sentence {sentence_id}. "
+                "Projection service will not receive this analysis."
             )
 
     async def finalize(self):
         """
-        Finalizes the analysis writing operation (likely a no-op).
+        Finalizes the analysis writing operation (no-op).
         """
         logger.debug(f"Finalizing Neo4j writer for Interview: {self.interview_id}")
-        pass  # Sessions managed by context manager
+        pass
 
     async def read_analysis_ids(self) -> Set[int]:
         """
         Reads sentence indices (sequence_order) that have associated Analysis nodes for the Interview.
 
-        Note: In M2.8, sentence nodes use UUID-based sentence_id, but we return the sequence_order (index)
+        Note: In M2.8+, sentence nodes use UUID-based sentence_id, but we return the sequence_order (index)
         for compatibility with the existing interface.
         """
         logger.debug(f"Reading analysis IDs for Interview: {self.interview_id}")
         cypher = """
             MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
-            // Ensure there is an Analysis node linked
             WHERE (s)-[:HAS_ANALYSIS]->(:Analysis)
             RETURN s.sequence_order AS sentenceIndex
         """
@@ -579,7 +138,6 @@ class Neo4jAnalysisWriter(SentenceAnalysisWriter):
         try:
             async with await Neo4jConnectionManager.get_session() as session:
                 result = await session.run(cypher, interview_id=self.interview_id)
-                # Process results asynchronously
                 async for record in result:
                     s_index = record["sentenceIndex"]
                     if isinstance(s_index, int):

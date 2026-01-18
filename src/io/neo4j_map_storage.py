@@ -2,9 +2,12 @@
 src/io/neo4j_map_storage.py
 
 Neo4j implementation of the ConversationMapStorage protocol.
+
+Note: Direct Neo4j writes have been removed as of M3.0.
+The projection service is now the sole writer to Neo4j.
+This class now only emits events - the projection service handles materialization.
 """
 
-import warnings
 from typing import Any, Dict, List, Set
 
 from src.utils.logger import get_logger
@@ -39,18 +42,10 @@ class Neo4jMapStorage(ConversationMapStorage):
         self.event_emitter = event_emitter
         self.correlation_id = correlation_id
 
-        # M2.8: Deprecation warning for direct write path
         if event_emitter is None:
-            warnings.warn(
-                "Direct Neo4j writes without event_emitter are deprecated and will be removed in M3.0. "
-                "Pass an event_emitter instance to enable event-first dual-write architecture. "
-                "See M2.8_MIGRATION_SUMMARY.md for migration guidance.",
-                DeprecationWarning,
-                stacklevel=2
-            )
             logger.warning(
-                "DEPRECATED: Neo4jMapStorage initialized without event_emitter. "
-                "Direct writes will be removed in M3.0. Use event-first dual-write pattern."
+                "Neo4jMapStorage initialized without event_emitter. "
+                "Event sourcing is required for Neo4j writes - projection service handles materialization."
             )
 
         logger.debug(f"Neo4jMapStorage initialized for Project: {self.project_id}, Interview: {self.interview_id}")
@@ -178,99 +173,8 @@ class Neo4jMapStorage(ConversationMapStorage):
                     f"Operation aborted to maintain event-first integrity."
                 ) from event_error
 
-        # M2.8: REMOVED DIRECT NEO4J WRITES
-        # Projection service is now the SOLE writer to Neo4j.
-        # Events are the single source of truth - projection service reads events and writes to Neo4j.
+        # Projection service handles Neo4j write from events
         logger.info(f"✅ Event emitted for sentence {sentence_id}. Projection service will handle Neo4j write.")
-
-    async def _run_write_entry_queries(self, session, entry: Dict[str, Any]):
-        """Run write entry queries directly on the session."""
-        logger.debug(f"Running write_entry queries for Sentence ID: {entry.get('sentence_id')}")
-
-        # Extract data, providing defaults for optional fields
-        s_id = entry["sentence_id"]
-        s_order = entry["sequence_order"]
-        s_text = entry["sentence"]
-        s_start = entry.get("start_time")
-        s_end = entry.get("end_time")
-        s_speaker = entry.get("speaker")
-
-        # Properties to set on creation
-        # Note: Direct writes get event_version=0 (placeholder before projection service updates it)
-        # Projection service will set event_version to actual event version when it processes events
-        create_props = {
-            "sequence_order": s_order,
-            "text": s_text,
-            "start_time": s_start,
-            "end_time": s_end,
-            "speaker": s_speaker,
-            "is_edited": False,
-            "event_version": 0,  # Direct writes are version 0 (before projection)
-            "source": "pipeline_direct",  # Track source of write
-        }
-        # Filter out None values from create_props
-        create_props = {k: v for k, v in create_props.items() if v is not None}
-
-        # Properties to set on match (conditionally)
-        update_props = {
-            "sequence_order": s_order,
-            "text": s_text,
-            "start_time": s_start,
-            "end_time": s_end,
-            "speaker": s_speaker,
-        }
-        # Filter out None values from update_props
-        update_props = {k: v for k, v in update_props.items() if v is not None}
-
-        # 1. MERGE Sentence node and conditionally SET properties
-        merge_sentence_query = """
-            MATCH (i:Interview {interview_id: $interview_id})
-            MERGE (i)-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $s_id})
-            ON CREATE SET s += $create_props
-            ON MATCH SET
-                s.sequence_order = CASE WHEN s.is_edited = false THEN $sequence_order ELSE s.sequence_order END,
-                s.text = CASE WHEN s.is_edited = false THEN $text ELSE s.text END,
-                s.start_time = CASE WHEN s.is_edited = false THEN $start_time ELSE s.start_time END,
-                s.end_time = CASE WHEN s.is_edited = false THEN $end_time ELSE s.end_time END,
-                s.speaker = CASE WHEN s.is_edited = false THEN $speaker ELSE s.speaker END
-            RETURN s.is_edited as was_edited
-        """
-        await session.run(
-            merge_sentence_query,
-            interview_id=self.interview_id,
-            s_id=s_id,
-            create_props=create_props,
-            sequence_order=s_order,
-            text=s_text,
-            start_time=s_start,
-            end_time=s_end,
-            speaker=s_speaker,
-        )
-        logger.debug(f"Merged Sentence {s_id}")
-
-        # 2. Manage sequence relationships (:FIRST_SENTENCE, :NEXT_SENTENCE)
-        if s_order == 0:
-            first_sentence_query = """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence {sentence_id: $s_id})
-                MERGE (i)-[:FIRST_SENTENCE]->(s)
-            """
-            await session.run(first_sentence_query, interview_id=self.interview_id, s_id=s_id)
-            logger.debug(f"Merged :FIRST_SENTENCE for Sentence {s_id}")
-        else:
-            prev_sequence_order = s_order - 1
-            next_sentence_query = """
-                MATCH (i:Interview {interview_id: $interview_id})
-                MATCH (prev_s:Sentence {sequence_order: $prev_sequence_order})<-[:HAS_SENTENCE]-(i)
-                MATCH (s:Sentence {sentence_id: $s_id})<-[:HAS_SENTENCE]-(i)
-                MERGE (prev_s)-[:NEXT_SENTENCE]->(s)
-            """
-            await session.run(
-                next_sentence_query,
-                interview_id=self.interview_id,
-                prev_sequence_order=prev_sequence_order,
-                s_id=s_id,
-            )
-            logger.debug(f"Merged :NEXT_SENTENCE from sequence_order {prev_sequence_order} to sentence_id {s_id}")
 
     async def finalize(self):
         """

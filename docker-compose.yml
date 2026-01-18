@@ -75,7 +75,7 @@ services:
 
   # Add Neo4j service
   neo4j:
-    image: neo4j:5.22.0 # Use Neo4j 5.x again
+    image: neo4j:5.26.0 # M3.0: Updated for compatibility
     ports:
       - "7474:7474" # HTTP browser
       - "7687:7687" # Bolt driver
@@ -95,7 +95,7 @@ services:
 
   # Neo4j service for TESTING
   neo4j-test:
-    image: neo4j:5.22.0 # Use Neo4j 5.x again
+    image: neo4j:5.26.0 # M3.0: Updated for compatibility
     container_name: interview_analyzer_neo4j_test # Distinct name
     ports:
       # Use different host ports to avoid conflicts with the main neo4j service

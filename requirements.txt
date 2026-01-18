@@ -50,5 +50,5 @@ celery==5.5.3
 redis==6.2.0
 
 # Database
-neo4j==5.28.1
+neo4j>=6.0.0,<7.0.0  # M3.0: Upgraded for vector types support
 esdbclient==1.1.7

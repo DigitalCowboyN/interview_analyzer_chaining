@@ -56,8 +56,6 @@ from src.io.protocols import (
     TextDataSource,
 )
 
-# Import graph persistence components
-from src.persistence.graph_persistence import save_analysis_to_graph
 from src.services.analysis_service import AnalysisService
 
 # SentenceAnalyzer is used indirectly via AnalysisService
@@ -68,7 +66,6 @@ from src.utils.logger import get_logger
 # from src.agents.context_builder import ContextBuilder
 # Import the singleton instance, not the class
 from src.utils.metrics import metrics_tracker
-from src.utils.neo4j_driver import connection_manager  # Import the singleton
 
 # Import the new path helper
 from src.utils.path_helpers import PipelinePaths, generate_pipeline_paths
@@ -225,34 +222,6 @@ class PipelineOrchestrator:
                 exc_info=True,
             )
             self.metrics_tracker.increment_errors(f"{writer_id}_jsonl_write_error")  # Use instance tracker
-            return False  # Indicate failure
-
-    async def _handle_graph_save(
-        self, result: Dict[str, Any], analysis_writer: SentenceAnalysisWriter, prefix: str
-    ) -> bool:
-        """Handles saving a single result to the graph database."""
-        sentence_id = result.get("sentence_id", "N/A")
-        filename = result.get("filename")
-
-        if not filename:
-            logger.warning(
-                f"{prefix}Filename missing in result data for sentence_id {sentence_id}, skipping graph save."
-            )
-            return False  # Indicate failure (or skip)
-
-        try:
-            # Extract interview_id from the analysis_writer if it's a Neo4jAnalysisWriter
-            interview_id = getattr(analysis_writer, "interview_id", None)
-            await save_analysis_to_graph(
-                result, filename, interview_id, connection_manager
-            )  # Pass interview_id to save_analysis_to_graph
-            return True  # Indicate success
-        except Exception as graph_e:
-            logger.error(
-                f"{prefix}Writer failed saving result ID: {sentence_id} from {filename} to graph: {graph_e}",
-                exc_info=True,
-            )
-            self.metrics_tracker.increment_errors(f"{filename}_graph_save_error")  # Use instance tracker
             return False  # Indicate failure
 
     # --- End Result Handling Methods ---
@@ -412,12 +381,11 @@ class PipelineOrchestrator:
         correlation_id: Optional[str] = None,
     ):
         """
-        Saves analysis results via JSONL and Graph DB.
-        Handles writer initialization/finalization and metric updates.
-        (Logic moved from _analyze_and_save_results)
+        Saves analysis results to JSONL and emits events for projection service.
+        Neo4j writes are handled by the projection service (single-writer architecture).
         """
         writer_id = analysis_writer.get_identifier()
-        logger.info(f"{prefix}Saving {len(analysis_results)} results via {writer_id} and graph DB...")
+        logger.info(f"{prefix}Saving {len(analysis_results)} results via {writer_id}...")
         initialized = False
         num_results_written = 0
         num_results_failed = 0
@@ -451,19 +419,14 @@ class PipelineOrchestrator:
                         continue  # Skip to the next result
                     # --- End error check ---
 
-                    # Call internal handlers for saving (only if not an error result)
+                    # Write to JSONL (projection service handles Neo4j via events)
                     jsonl_success = await self._handle_jsonl_write(result, analysis_writer, prefix)
-                    graph_success = await self._handle_graph_save(
-                        result, analysis_writer, prefix
-                    )  # DEBUG: Re-enabled graph save
-                    # graph_success = True # DEBUG: Assume graph save succeeded
 
-                    if jsonl_success and graph_success:
+                    if jsonl_success:
                         num_results_written += 1
-                        # Increment results_processed metric only on successful save to both targets
                         self.metrics_tracker.increment_results_processed(file_name)
-                        
-                        # Emit AnalysisGenerated event (if event sourcing enabled)
+
+                        # Emit AnalysisGenerated event (projection service writes to Neo4j)
                         if self.event_emitter and interview_id and correlation_id:
                             try:
                                 await self.event_emitter.emit_analysis_generated(
@@ -482,8 +445,7 @@ class PipelineOrchestrator:
                     else:
                         num_results_failed += 1
                         logger.warning(
-                            f"{prefix}Result ID {sentence_id} encountered an error during saving "
-                            f"(JSONL: {jsonl_success}, Graph: {graph_success})"
+                            f"{prefix}Result ID {sentence_id} encountered an error during JSONL save"
                         )
                         self.metrics_tracker.increment_errors(f"{file_name}_result_save_failure")
                 else:
