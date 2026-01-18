@@ -24,7 +24,6 @@ from src.main import app
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.eventstore
-@pytest.mark.skip(reason="Edit API endpoints not yet implemented - future M2.9 functionality")
 class TestE2EUserEditWorkflow:
     """Test end-to-end user edit workflows via API."""
 
@@ -78,9 +77,9 @@ class TestE2EUserEditWorkflow:
 
         # === Step 1: User edits sentence via API ===
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.put(
-                f"/api/v1/edits/{interview_id}/sentences/{sentence_index}",
-                json={"new_text": "Edited sentence text."},
+            response = await client.post(
+                f"/edits/sentences/{interview_id}/{sentence_index}/edit",
+                json={"text": "Edited sentence text."},
                 headers={"X-User-ID": "test-user-123", "X-Correlation-ID": str(uuid.uuid4())},
             )
 
@@ -104,7 +103,7 @@ class TestE2EUserEditWorkflow:
 
         # === Step 3: Verify edit history accessible via API ===
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            history_response = await client.get(f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/history")
+            history_response = await client.get(f"/edits/sentences/{interview_id}/{sentence_index}/history")
 
         assert history_response.status_code == 200
         history = history_response.json()
@@ -188,11 +187,11 @@ class TestE2EUserEditWorkflow:
         # === Step 1: User overrides analysis via API ===
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
-                f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/analysis",
+                f"/edits/sentences/{interview_id}/{sentence_index}/analysis/override",
                 json={
-                    "classification": {"function_type": "statement"},
+                    "function_type": "statement",
                     "keywords": ["corrected", "keywords"],
-                    "override_note": "AI misclassified this as a question",
+                    "note": "AI misclassified this as a question",
                 },
                 headers={"X-User-ID": "expert-123", "X-Correlation-ID": str(uuid.uuid4())},
             )
@@ -213,9 +212,9 @@ class TestE2EUserEditWorkflow:
         assert override_event.version == 2
         assert override_event.actor.actor_type == "human"
         assert override_event.actor.user_id == "expert-123"
-        assert override_event.data["fields_overridden"]["classification"]["function_type"] == "statement"
+        assert override_event.data["fields_overridden"]["function_type"] == "statement"
         assert override_event.data["fields_overridden"]["keywords"] == ["corrected", "keywords"]
-        assert override_event.data["override_note"] == "AI misclassified this as a question"
+        assert override_event.data["note"] == "AI misclassified this as a question"
 
         print("\n✓ Analysis override workflow validated:")
         print("  - Override API returned 202 Accepted")
@@ -279,9 +278,9 @@ class TestE2EUserEditWorkflow:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             for i, new_text in enumerate(edits, start=1):
-                response = await client.put(
-                    f"/api/v1/edits/{interview_id}/sentences/{sentence_index}",
-                    json={"new_text": new_text},
+                response = await client.post(
+                    f"/edits/sentences/{interview_id}/{sentence_index}/edit",
+                    json={"text": new_text},
                     headers={"X-User-ID": f"user-{i}"},
                 )
                 assert response.status_code == 202
@@ -298,7 +297,7 @@ class TestE2EUserEditWorkflow:
 
         # === Verify history API returns all events ===
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            history_response = await client.get(f"/api/v1/edits/{interview_id}/sentences/{sentence_index}/history")
+            history_response = await client.get(f"/edits/sentences/{interview_id}/{sentence_index}/history")
 
         assert history_response.status_code == 200
         history = history_response.json()

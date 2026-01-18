@@ -16,30 +16,31 @@
 | M2.3-M2.5 | ✅ Complete | Projection Infrastructure |
 | M2.7 | ✅ Complete | Testing & Validation |
 | M2.8 | ✅ Complete | Event-Sourced Architecture (Production Ready) |
-| **M2.9** | ⏳ **Next** | User Edit API |
-| M3.0 | 📋 Planned | Remove Dual-Write + neo4j 6.x |
+| M2.9 | ✅ Complete | User Edit API |
+| **M3.0** | ⏳ **Next** | Remove Dual-Write + neo4j 6.x |
 | M3.1 | 📋 Planned | Vector Search |
 | M3.2 | 📋 Planned | AI Agent Upgrade (openai 2.x) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M2.9 (User Edit API)
-**Tests:** 691 passing, 84 skipped | **Coverage:** 72.2%
+**Current Phase:** M3.0 (Remove Dual-Write)
+**Tests:** 694 passing, 81 skipped | **Coverage:** 72.2%
 
 ---
 
 ## Milestone Checklist
 
-### M2.9: User Edit API ⏳ NEXT
+### M2.9: User Edit API ✅ COMPLETE
 
-- [ ] Review existing `src/api/routers/edits.py` implementation
-- [ ] Complete `PUT /interviews/{id}/sentences/{id}` endpoint
-- [ ] Complete `PUT /interviews/{id}/sentences/{id}/analysis` endpoint
-- [ ] Integration with command handlers
-- [ ] Return accepted status with version
-- [ ] E2E tests passing
-- [ ] Documentation updated
+- [x] Review existing `src/api/routers/edits.py` implementation
+- [x] Complete `POST /edits/sentences/{interview_id}/{sentence_index}/edit` endpoint
+- [x] Complete `POST /edits/sentences/{interview_id}/{sentence_index}/analysis/override` endpoint
+- [x] Complete `GET /edits/sentences/{interview_id}/{sentence_index}/history` endpoint
+- [x] Integration with command handlers (SentenceCommandHandler.handle)
+- [x] Return 202 Accepted status with version
+- [x] E2E tests passing (3 tests)
+- [x] Unit tests passing (16 tests)
 
-**Dependencies:** None (can start now)
+**Completed:** 2026-01-18
 
 ---
 
@@ -53,7 +54,7 @@
 - [ ] Update documentation
 - [ ] 1-2 weeks production validation
 
-**Dependencies:** M2.9 complete
+**Dependencies:** M2.9 complete ✓
 
 ---
 
@@ -148,6 +149,18 @@
 - Cardinality enforcement at source
 - Deprecation warnings for legacy paths
 - **Completed:** 2026-01-17 (Production Ready)
+
+</details>
+
+<details>
+<summary>M2.9: User Edit API ✅</summary>
+
+- Edit sentence endpoint: `POST /edits/sentences/{id}/{index}/edit`
+- Override analysis endpoint: `POST /edits/sentences/{id}/{index}/analysis/override`
+- History endpoint: `GET /edits/sentences/{id}/{index}/history`
+- Returns 202 Accepted with version
+- 16 unit tests + 3 E2E tests
+- **Completed:** 2026-01-18
 
 </details>
 

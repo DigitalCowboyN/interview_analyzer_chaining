@@ -71,16 +71,16 @@ def get_event_store() -> EventStoreClient:
     return EventStoreClient(connection_string)
 
 
-def get_sentence_repository() -> SentenceRepository:
-    """Get SentenceRepository instance."""
-    event_store = get_event_store()
-    return SentenceRepository(event_store)
-
-
 def get_sentence_command_handler() -> SentenceCommandHandler:
     """Get SentenceCommandHandler instance."""
-    repo = get_sentence_repository()
-    return SentenceCommandHandler(repo)
+    event_store = get_event_store()
+    return SentenceCommandHandler(event_store)
+
+
+def get_sentence_repository() -> SentenceRepository:
+    """Get SentenceRepository instance for loading sentences."""
+    event_store = get_event_store()
+    return SentenceRepository(event_store)
 
 
 def create_actor_from_request(
@@ -111,6 +111,7 @@ def create_actor_from_request(
 @router.post(
     "/sentences/{interview_id}/{sentence_index}/edit",
     response_model=EditResponse,
+    status_code=202,
     summary="Edit Sentence Text",
     description="Edit the text of a sentence. Generates SentenceEdited event.",
 )
@@ -161,7 +162,7 @@ async def edit_sentence(
 
         # Execute command
         handler = get_sentence_command_handler()
-        result = await handler.handle_edit_sentence(command)
+        result = await handler.handle(command)
 
         logger.info(
             f"Sentence {sentence_id} edited by {actor.user_id} "
@@ -188,6 +189,7 @@ async def edit_sentence(
 @router.post(
     "/sentences/{interview_id}/{sentence_index}/analysis/override",
     response_model=EditResponse,
+    status_code=202,
     summary="Override Analysis Results",
     description="Override AI analysis results with human corrections. Generates AnalysisOverridden event.",
 )
@@ -259,7 +261,7 @@ async def override_analysis(
 
         # Execute command
         handler = get_sentence_command_handler()
-        result = await handler.handle_override_analysis(command)
+        result = await handler.handle(command)
 
         logger.info(
             f"Analysis for sentence {sentence_id} overridden by {actor.user_id} "

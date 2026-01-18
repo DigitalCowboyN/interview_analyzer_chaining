@@ -36,7 +36,7 @@ class TestEditSentenceEndpoint:
     def mock_handler(self):
         """Mock SentenceCommandHandler."""
         handler = MagicMock()
-        handler.handle_edit_sentence = AsyncMock()
+        handler.handle = AsyncMock()
         return handler
 
     @pytest.fixture
@@ -62,7 +62,7 @@ class TestEditSentenceEndpoint:
         sentence_id = str(
             uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}")
         )
-        mock_handler.handle_edit_sentence.return_value = CommandResult(
+        mock_handler.handle.return_value = CommandResult(
             aggregate_id=sentence_id, version=1, event_count=1
         )
 
@@ -86,8 +86,8 @@ class TestEditSentenceEndpoint:
         assert "accepted" in response.message.lower()
 
         # Verify handler was called with correct command
-        mock_handler.handle_edit_sentence.assert_called_once()
-        command = mock_handler.handle_edit_sentence.call_args[0][0]
+        mock_handler.handle.assert_called_once()
+        command = mock_handler.handle.call_args[0][0]
         assert command.new_text == "Edited sentence text"
         assert command.editor_type == "human"
         assert command.actor.user_id == "test-user"
@@ -103,7 +103,7 @@ class TestEditSentenceEndpoint:
         sentence_id = str(
             uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}")
         )
-        mock_handler.handle_edit_sentence.return_value = CommandResult(
+        mock_handler.handle.return_value = CommandResult(
             aggregate_id=sentence_id, version=1, event_count=1
         )
 
@@ -147,7 +147,7 @@ class TestEditSentenceEndpoint:
         sentence_id = str(
             uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}")
         )
-        mock_handler.handle_edit_sentence.return_value = CommandResult(
+        mock_handler.handle.return_value = CommandResult(
             aggregate_id=sentence_id, version=1, event_count=1
         )
 
@@ -165,7 +165,7 @@ class TestEditSentenceEndpoint:
             )
 
         # Assert
-        command = mock_handler.handle_edit_sentence.call_args[0][0]
+        command = mock_handler.handle.call_args[0][0]
         assert command.actor.user_id == "anonymous"
 
     async def test_edit_sentence_generates_correlation_id_if_not_provided(
@@ -178,7 +178,7 @@ class TestEditSentenceEndpoint:
         sentence_id = str(
             uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}")
         )
-        mock_handler.handle_edit_sentence.return_value = CommandResult(
+        mock_handler.handle.return_value = CommandResult(
             aggregate_id=sentence_id, version=1, event_count=1
         )
 
@@ -196,7 +196,7 @@ class TestEditSentenceEndpoint:
             )
 
         # Assert
-        command = mock_handler.handle_edit_sentence.call_args[0][0]
+        command = mock_handler.handle.call_args[0][0]
         assert command.correlation_id is not None
         assert len(command.correlation_id) == 36  # UUID format
 
@@ -208,7 +208,7 @@ class TestEditSentenceEndpoint:
         request = EditSentenceRequest(text="New text")
 
         # Mock handler to raise ValueError (sentence not found)
-        mock_handler.handle_edit_sentence.side_effect = ValueError(
+        mock_handler.handle.side_effect = ValueError(
             "Sentence not found"
         )
 
@@ -237,7 +237,7 @@ class TestEditSentenceEndpoint:
         request = EditSentenceRequest(text="New text")
 
         # Mock handler to raise unexpected error
-        mock_handler.handle_edit_sentence.side_effect = Exception("Database error")
+        mock_handler.handle.side_effect = Exception("Database error")
 
         # Act & Assert
         with patch(
@@ -265,7 +265,7 @@ class TestOverrideAnalysisEndpoint:
     def mock_handler(self):
         """Mock SentenceCommandHandler."""
         handler = MagicMock()
-        handler.handle_override_analysis = AsyncMock()
+        handler.handle = AsyncMock()
         return handler
 
     @pytest.fixture
@@ -295,7 +295,7 @@ class TestOverrideAnalysisEndpoint:
 
         # Mock handler response
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
-        mock_handler.handle_override_analysis.return_value = CommandResult(aggregate_id=sentence_id, 
+        mock_handler.handle.return_value = CommandResult(aggregate_id=sentence_id, 
             version=2, event_count=1
         )
 
@@ -319,8 +319,8 @@ class TestOverrideAnalysisEndpoint:
         assert "accepted" in response.message.lower()
 
         # Verify handler was called with correct command
-        mock_handler.handle_override_analysis.assert_called_once()
-        command = mock_handler.handle_override_analysis.call_args[0][0]
+        mock_handler.handle.assert_called_once()
+        command = mock_handler.handle.call_args[0][0]
         assert command.fields_overridden["function_type"] == "question"
         assert command.fields_overridden["structure_type"] == "simple"
         assert command.fields_overridden["purpose"] == "inquiry"
@@ -340,7 +340,7 @@ class TestOverrideAnalysisEndpoint:
         )
 
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
-        mock_handler.handle_override_analysis.return_value = CommandResult(aggregate_id=sentence_id, 
+        mock_handler.handle.return_value = CommandResult(aggregate_id=sentence_id, 
             version=2, event_count=1
         )
 
@@ -358,7 +358,7 @@ class TestOverrideAnalysisEndpoint:
             )
 
         # Assert - only provided fields should be in fields_overridden
-        command = mock_handler.handle_override_analysis.call_args[0][0]
+        command = mock_handler.handle.call_args[0][0]
         assert "function_type" in command.fields_overridden
         assert "keywords" in command.fields_overridden
         assert "structure_type" not in command.fields_overridden
@@ -399,7 +399,7 @@ class TestOverrideAnalysisEndpoint:
         request = OverrideAnalysisRequest(function_type="question")
 
         # Mock handler to raise ValueError
-        mock_handler.handle_override_analysis.side_effect = ValueError(
+        mock_handler.handle.side_effect = ValueError(
             "Sentence not found"
         )
 
@@ -427,7 +427,7 @@ class TestOverrideAnalysisEndpoint:
         request = OverrideAnalysisRequest(function_type="question")
 
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
-        mock_handler.handle_override_analysis.return_value = CommandResult(aggregate_id=sentence_id, 
+        mock_handler.handle.return_value = CommandResult(aggregate_id=sentence_id, 
             version=2, event_count=1
         )
 

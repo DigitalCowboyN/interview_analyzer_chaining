@@ -16,6 +16,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from src.api.routers import analysis as analysis_router
+from src.api.routers import edits as edits_router
 
 # --- Add router imports ---
 from src.api.routers import files as files_router
@@ -36,7 +37,8 @@ app = FastAPI(
 
 # --- Include the routers ---
 app.include_router(files_router.router)
-app.include_router(analysis_router.router)  # Add the analysis router
+app.include_router(analysis_router.router)
+app.include_router(edits_router.router)
 # ------------------------------
 
 
