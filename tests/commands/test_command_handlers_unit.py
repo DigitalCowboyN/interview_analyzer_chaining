@@ -348,3 +348,349 @@ class TestSentenceCommandHandlerUnit:
                 await handler.handle(command)
 
             assert "Invalid editor type" in str(exc_info.value)
+
+    async def test_create_sentence_already_exists(self):
+        """Test creating a sentence that already exists."""
+        sentence_id = str(uuid.uuid4())
+        interview_id = str(uuid.uuid4())
+
+        # Mock repository that returns existing sentence
+        existing_sentence = Sentence(sentence_id)
+        mock_repo = AsyncMock()
+        mock_repo.load.return_value = existing_sentence
+
+        mock_factory = MagicMock()
+        mock_factory.create_sentence_repository.return_value = mock_repo
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = SentenceCommandHandler()
+            handler.repo_factory = mock_factory
+
+            command = CreateSentenceCommand(
+                sentence_id=sentence_id,
+                interview_id=interview_id,
+                index=0,
+                text="Test.",
+            )
+
+            from src.commands import CommandValidationError
+
+            with pytest.raises(CommandValidationError) as exc_info:
+                await handler.handle(command)
+
+            assert "already exists" in str(exc_info.value)
+
+    async def test_edit_sentence_not_found(self):
+        """Test editing a sentence that doesn't exist."""
+        sentence_id = str(uuid.uuid4())
+        interview_id = str(uuid.uuid4())
+
+        mock_repo = AsyncMock()
+        mock_repo.load.return_value = None
+
+        mock_factory = MagicMock()
+        mock_factory.create_sentence_repository.return_value = mock_repo
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = SentenceCommandHandler()
+            handler.repo_factory = mock_factory
+
+            command = EditSentenceCommand(
+                sentence_id=sentence_id,
+                interview_id=interview_id,
+                new_text="Edited text.",
+                editor_type="human",
+            )
+
+            from src.commands import CommandValidationError
+
+            with pytest.raises(CommandValidationError) as exc_info:
+                await handler.handle(command)
+
+            assert "not found" in str(exc_info.value)
+
+    async def test_generate_analysis_not_found(self):
+        """Test generating analysis for non-existent sentence."""
+        sentence_id = str(uuid.uuid4())
+        interview_id = str(uuid.uuid4())
+
+        mock_repo = AsyncMock()
+        mock_repo.load.return_value = None
+
+        mock_factory = MagicMock()
+        mock_factory.create_sentence_repository.return_value = mock_repo
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = SentenceCommandHandler()
+            handler.repo_factory = mock_factory
+
+            command = GenerateAnalysisCommand(
+                sentence_id=sentence_id,
+                interview_id=interview_id,
+                model="gpt-4",
+                model_version="1.0",
+                classification={"function_type": "question"},
+                keywords=["test"],
+                confidence=0.9,
+            )
+
+            from src.commands import CommandValidationError
+
+            with pytest.raises(CommandValidationError) as exc_info:
+                await handler.handle(command)
+
+            assert "not found" in str(exc_info.value)
+
+    async def test_override_analysis_success(self):
+        """Test overriding analysis successfully."""
+        sentence_id = str(uuid.uuid4())
+        interview_id = str(uuid.uuid4())
+
+        # Create existing sentence with analysis
+        existing_sentence = Sentence(sentence_id)
+        existing_sentence.create(
+            interview_id=interview_id,
+            index=0,
+            text="Test sentence.",
+            actor=Actor(user_id="test", actor_type=ActorType.SYSTEM, display="Test"),
+        )
+        existing_sentence.generate_analysis(
+            model="gpt-4",
+            model_version="1.0",
+            classification={"function_type": "declarative"},
+            keywords=["test"],
+            confidence=0.9,
+        )
+        existing_sentence.mark_events_as_committed()
+
+        mock_repo = AsyncMock()
+        mock_repo.load.return_value = existing_sentence
+        mock_repo.save = AsyncMock()
+
+        mock_factory = MagicMock()
+        mock_factory.create_sentence_repository.return_value = mock_repo
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = SentenceCommandHandler()
+            handler.repo_factory = mock_factory
+
+            command = OverrideAnalysisCommand(
+                sentence_id=sentence_id,
+                interview_id=interview_id,
+                fields_overridden={"function_type": "question"},
+                note="Manual correction",
+                actor=Actor(user_id="user-1", actor_type=ActorType.HUMAN, display="User"),
+            )
+
+            result = await handler.handle(command)
+
+            assert result.success is True
+            mock_repo.save.assert_called_once()
+
+    async def test_override_analysis_not_found(self):
+        """Test overriding analysis for non-existent sentence."""
+        sentence_id = str(uuid.uuid4())
+        interview_id = str(uuid.uuid4())
+
+        mock_repo = AsyncMock()
+        mock_repo.load.return_value = None
+
+        mock_factory = MagicMock()
+        mock_factory.create_sentence_repository.return_value = mock_repo
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = SentenceCommandHandler()
+            handler.repo_factory = mock_factory
+
+            command = OverrideAnalysisCommand(
+                sentence_id=sentence_id,
+                interview_id=interview_id,
+                fields_overridden={"function_type": "question"},
+            )
+
+            from src.commands import CommandValidationError
+
+            with pytest.raises(CommandValidationError) as exc_info:
+                await handler.handle(command)
+
+            assert "not found" in str(exc_info.value)
+
+    async def test_unknown_command_type(self):
+        """Test handling unknown command type."""
+        mock_factory = MagicMock()
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = SentenceCommandHandler()
+            handler.repo_factory = mock_factory
+
+            # Create a mock command that's not a known type
+            unknown_command = MagicMock()
+
+            from src.commands import CommandValidationError
+
+            with pytest.raises(CommandValidationError) as exc_info:
+                await handler.handle(unknown_command)
+
+            assert "Unknown command type" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+class TestInterviewCommandHandlerAdditional:
+    """Additional tests for InterviewCommandHandler."""
+
+    async def test_update_interview_success(self):
+        """Test successfully updating an interview."""
+        interview_id = str(uuid.uuid4())
+
+        # Create existing interview
+        existing_interview = Interview(interview_id)
+        existing_interview.create(
+            title="Original Title",
+            source="test.txt",
+            actor=Actor(user_id="test", actor_type=ActorType.SYSTEM, display="Test"),
+        )
+        existing_interview.mark_events_as_committed()
+
+        mock_repo = AsyncMock()
+        mock_repo.load.return_value = existing_interview
+        mock_repo.save = AsyncMock()
+
+        mock_factory = MagicMock()
+        mock_factory.create_interview_repository.return_value = mock_repo
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = InterviewCommandHandler()
+            handler.repo_factory = mock_factory
+
+            command = UpdateInterviewCommand(
+                interview_id=interview_id,
+                title="Updated Title",
+                language="fr",
+            )
+
+            result = await handler.handle(command)
+
+            assert result.success is True
+            mock_repo.save.assert_called_once()
+
+    async def test_change_status_success(self):
+        """Test successfully changing interview status."""
+        interview_id = str(uuid.uuid4())
+
+        # Create existing interview
+        existing_interview = Interview(interview_id)
+        existing_interview.create(
+            title="Test Interview",
+            source="test.txt",
+            actor=Actor(user_id="test", actor_type=ActorType.SYSTEM, display="Test"),
+        )
+        existing_interview.mark_events_as_committed()
+
+        mock_repo = AsyncMock()
+        mock_repo.load.return_value = existing_interview
+        mock_repo.save = AsyncMock()
+
+        mock_factory = MagicMock()
+        mock_factory.create_interview_repository.return_value = mock_repo
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = InterviewCommandHandler()
+            handler.repo_factory = mock_factory
+
+            command = ChangeInterviewStatusCommand(
+                interview_id=interview_id,
+                new_status="processing",
+                reason="Starting analysis",
+            )
+
+            result = await handler.handle(command)
+
+            assert result.success is True
+            assert "processing" in result.message.lower()
+            mock_repo.save.assert_called_once()
+
+    async def test_change_status_not_found(self):
+        """Test changing status of non-existent interview."""
+        interview_id = str(uuid.uuid4())
+
+        mock_repo = AsyncMock()
+        mock_repo.load.return_value = None
+
+        mock_factory = MagicMock()
+        mock_factory.create_interview_repository.return_value = mock_repo
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = InterviewCommandHandler()
+            handler.repo_factory = mock_factory
+
+            command = ChangeInterviewStatusCommand(
+                interview_id=interview_id,
+                new_status="processing",
+            )
+
+            from src.commands import CommandValidationError
+
+            with pytest.raises(CommandValidationError) as exc_info:
+                await handler.handle(command)
+
+            assert "not found" in str(exc_info.value)
+
+    async def test_unknown_interview_command_type(self):
+        """Test handling unknown interview command type."""
+        mock_factory = MagicMock()
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = InterviewCommandHandler()
+            handler.repo_factory = mock_factory
+
+            # Create a mock command that's not a known type
+            unknown_command = MagicMock()
+
+            from src.commands import CommandValidationError
+
+            with pytest.raises(CommandValidationError) as exc_info:
+                await handler.handle(unknown_command)
+
+            assert "Unknown command type" in str(exc_info.value)
+
+
+class TestGlobalHandlerFunctions:
+    """Test global handler getter functions."""
+
+    def test_get_interview_command_handler_creates_singleton(self):
+        """Test get_interview_command_handler returns singleton."""
+        import src.commands.handlers as handlers_module
+
+        handlers_module._interview_handler = None
+
+        with patch("src.commands.handlers.get_event_store_client") as mock_get_client:
+            mock_get_client.return_value = MagicMock()
+
+            from src.commands.handlers import get_interview_command_handler
+
+            handler1 = get_interview_command_handler()
+            handler2 = get_interview_command_handler()
+
+            assert handler1 is handler2
+            assert isinstance(handler1, InterviewCommandHandler)
+
+        handlers_module._interview_handler = None
+
+    def test_get_sentence_command_handler_creates_singleton(self):
+        """Test get_sentence_command_handler returns singleton."""
+        import src.commands.handlers as handlers_module
+
+        handlers_module._sentence_handler = None
+
+        with patch("src.commands.handlers.get_event_store_client") as mock_get_client:
+            mock_get_client.return_value = MagicMock()
+
+            from src.commands.handlers import get_sentence_command_handler
+
+            handler1 = get_sentence_command_handler()
+            handler2 = get_sentence_command_handler()
+
+            assert handler1 is handler2
+            assert isinstance(handler1, SentenceCommandHandler)
+
+        handlers_module._sentence_handler = None

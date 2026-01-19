@@ -2,7 +2,7 @@
 
 > **Created:** 2026-01-18
 > **Updated:** 2026-01-19
-> **Current Coverage:** 81.32% (829 tests passing, 54 skipped) ✅ TARGET MET
+> **Current Coverage:** 84.2% (902 tests passing, 54 skipped) ✅ TARGET MET
 > **Target Coverage:** 80%+
 
 ---
@@ -100,77 +100,19 @@ Unit Tests Needed:
 
 ---
 
-## Phase 1: Event Sourcing Foundation (62-63% Coverage)
+## Phase 1: Event Sourcing Foundation ✅ COMPLETE
 
 **Goal:** Strengthen the event sourcing core to 85%+
+**Status:** All 3 modules complete with 81 additional tests.
 
-### P1.1: Event Store (`src/events/store.py`)
-**Current:** 62% | **Target:** 85%
+### P1.1: Event Store (`src/events/store.py`) ✅
+**Effort:** Medium | **Impact:** High | **Tests:** 34 | **Coverage:** 92.5%
 
-```
-Unit Tests Needed:
-- test_connect_success
-- test_connect_failure_raises
-- test_disconnect_closes_connection
-- test_append_events_success
-- test_append_events_concurrency_error
-- test_append_events_retry_on_transient_error
-- test_read_stream_success
-- test_read_stream_not_found
-- test_read_stream_to_envelope_conversion
-- test_get_stream_version
-- test_stream_exists
+### P1.2: Repository (`src/events/repository.py`) ✅
+**Effort:** Medium | **Impact:** High | **Tests:** 27 | **Coverage:** 94.6%
 
-Integration Tests Needed:
-- test_full_event_lifecycle_with_eventstore
-- test_concurrent_appends_optimistic_locking
-- test_large_event_batch_performance
-```
-
-### P1.2: Repository (`src/events/repository.py`)
-**Current:** 63% | **Target:** 85%
-
-```
-Unit Tests Needed:
-- test_load_aggregate_found
-- test_load_aggregate_not_found
-- test_save_aggregate_new
-- test_save_aggregate_existing_with_version
-- test_save_aggregate_concurrency_conflict
-- test_save_with_retry_on_conflict
-- test_exists_returns_true_when_found
-- test_exists_returns_false_when_not_found
-- test_get_version_returns_current_version
-
-Integration Tests Needed:
-- test_interview_aggregate_full_lifecycle
-- test_sentence_aggregate_full_lifecycle
-- test_concurrent_modifications_handled
-```
-
-### P1.3: Command Handlers (`src/commands/handlers.py`)
-**Current:** 63% | **Target:** 85%
-
-```
-Unit Tests Needed:
-# InterviewCommandHandler
-- test_handle_create_interview_command
-- test_handle_update_metadata_command
-- test_handle_change_status_command
-- test_handle_unknown_command_raises
-
-# SentenceCommandHandler
-- test_handle_create_sentence_command
-- test_handle_edit_sentence_command
-- test_handle_generate_analysis_command
-- test_handle_override_analysis_command
-- test_handle_preserves_edited_flag
-- test_handle_validation_error
-
-Integration Tests Needed:
-- test_command_to_event_to_aggregate_flow
-- test_command_handler_uses_repository_correctly
-```
+### P1.3: Command Handlers (`src/commands/handlers.py`) ✅
+**Effort:** Medium | **Impact:** High | **Tests:** 20 | **Coverage:** 89.4%
 
 ---
 
