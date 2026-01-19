@@ -169,20 +169,15 @@ class TestE2EFileProcessingWithDualWrite:
                 record["sentence_count"] == expected_sentence_count
             ), f"Expected {expected_sentence_count} sentences in Neo4j, got {record['sentence_count']}"
 
-            # Check for SourceFile node
-            result = await session.run(
-                "MATCH (f:SourceFile {filename: $filename}) RETURN f", filename=sample_interview_file.name
-            )
-            file_node = await result.single()
-            assert file_node is not None, "SourceFile node not found in Neo4j"
+            # Note: SourceFile nodes were created by dual-write mechanism removed in M3.0
+            # Projection handlers only create Interview, Project, and Sentence nodes
 
-        print("\n✓ M2.8 Single file processing validated:")
+        print("\n✓ M3.0 Single file processing validated:")
         print("  - InterviewCreated event in EventStoreDB")
         print(f"  - {expected_sentence_count} SentenceCreated events in EventStoreDB")
         print("  - Events processed through projection service")
         print("  - Interview node in Neo4j (written by projection service)")
         print(f"  - {expected_sentence_count} Sentence nodes in Neo4j (written by projection service)")
-        print("  - SourceFile node in Neo4j")
         print("  - Correlation ID consistent across all events")
 
     async def test_deterministic_sentence_uuids(

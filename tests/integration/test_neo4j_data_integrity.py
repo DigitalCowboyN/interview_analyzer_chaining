@@ -28,7 +28,8 @@ import pytest
 
 from src.io.neo4j_analysis_writer import Neo4jAnalysisWriter
 from src.io.neo4j_map_storage import Neo4jMapStorage
-from src.persistence.graph_persistence import save_analysis_to_graph
+# Note: save_analysis_to_graph was removed in M3.0 (dual-write removal)
+# Projection service is now the sole writer to Neo4j
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
 # M2.8: Skip all data integrity tests - assume immediate consistency, but M2.8 has eventual consistency

@@ -508,8 +508,8 @@ class TestNeo4jAnalysisWriterEventIntegration:
             # Act
             await writer.write_result(error_result)
 
-            # Assert - Neo4j write happened
-            mock_neo4j_session.run.assert_called()
+            # Assert - NO Neo4j write (M3.0: projection service is sole writer)
+            mock_neo4j_session.run.assert_not_called()
 
             # Assert - NO event emitted (error results don't generate events)
             mock_event_emitter.emit_analysis_generated.assert_not_called()
