@@ -471,3 +471,357 @@ class TestSentenceAnalyzerIntegration:
 
         # Third sentence: "I have 5 years..." - declarative (statement)
         assert results[2]["function_type"] == "declarative"
+
+
+class TestSentenceAnalyzerConfigErrors:
+    """Test configuration error handling paths."""
+
+    def test_initialization_with_missing_config_key(self):
+        """Test initialization with missing nested config keys."""
+        # Config missing the nested prompt_files key
+        incomplete_config = {
+            "classification": {
+                "local": {}  # Missing prompt_files
+            },
+            "domain_keywords": [],
+        }
+
+        analyzer = SentenceAnalyzer(config_dict=incomplete_config)
+
+        # Should handle gracefully with empty prompts
+        assert analyzer.prompts == {}
+
+    def test_initialization_with_empty_config(self):
+        """Test initialization with empty config dict."""
+        empty_config = {}
+
+        analyzer = SentenceAnalyzer(config_dict=empty_config)
+
+        # Should handle gracefully
+        assert analyzer.prompts == {}
+
+    def test_initialization_with_none_prompt_path(self):
+        """Test initialization when prompt path is None."""
+        config_with_none = {
+            "classification": {
+                "local": {
+                    "prompt_files": {
+                        "no_context": None  # Explicitly None
+                    }
+                }
+            },
+            "domain_keywords": [],
+        }
+
+        analyzer = SentenceAnalyzer(config_dict=config_with_none)
+
+        # Should handle gracefully
+        assert analyzer.prompts == {}
+
+    def test_initialization_with_invalid_yaml_file(self, tmp_path):
+        """Test initialization with a malformed YAML file."""
+        # Create a file with invalid YAML content
+        bad_yaml = tmp_path / "bad.yaml"
+        bad_yaml.write_text("this: is: not: valid: yaml: [unclosed")
+
+        config = {
+            "classification": {
+                "local": {
+                    "prompt_files": {
+                        "no_context": str(bad_yaml)
+                    }
+                }
+            },
+            "domain_keywords": [],
+        }
+
+        analyzer = SentenceAnalyzer(config_dict=config)
+
+        # Should handle gracefully
+        assert analyzer.prompts == {}
+
+
+class TestSentenceAnalyzerValidationErrors:
+    """Test Pydantic validation error handling for each response type."""
+
+    @pytest.fixture
+    def analyzer_with_prompts(self, tmp_path):
+        """Create analyzer with valid prompts for testing validation errors."""
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+        prompt_file = prompts_dir / "test_prompts.yaml"
+
+        prompts = {
+            "sentence_function_type": {"prompt": "Test: '{sentence}'"},
+            "sentence_structure_type": {"prompt": "Test: '{sentence}'"},
+            "sentence_purpose": {"prompt": "Test: '{sentence}' context: {context}"},
+            "topic_level_1": {"prompt": "Test: '{sentence}' context: {context}"},
+            "topic_level_3": {"prompt": "Test: '{sentence}' context: {context}"},
+            "topic_overall_keywords": {"prompt": "Test context: {context}"},
+            "domain_specific_keywords": {"prompt": "Test: '{sentence}' keywords: {domain_keywords}"},
+        }
+
+        import yaml
+        with open(prompt_file, "w") as f:
+            yaml.dump(prompts, f)
+
+        config = {
+            "classification": {"local": {"prompt_files": {"no_context": str(prompt_file)}}},
+            "domain_keywords": ["test"],
+        }
+
+        return SentenceAnalyzer(config_dict=config)
+
+    @pytest.fixture
+    def test_contexts(self):
+        """Provide test contexts."""
+        return {
+            "immediate_context": "test context",
+            "observer_context": "test observer",
+            "broader_context": "test broader",
+        }
+
+    @pytest.mark.asyncio
+    async def test_validation_error_function_type(self, analyzer_with_prompts, test_contexts):
+        """Test handling of validation error for function_type response."""
+        # Return invalid response (missing required field)
+        async def mock_call_model(prompt: str) -> Dict[str, Any]:
+            if "function" in prompt.lower() or prompt == analyzer_with_prompts.prompts["sentence_function_type"]["prompt"].format(sentence="Test sentence"):
+                return {"wrong_field": "value"}  # Invalid - missing function_type
+            # Return valid responses for other dimensions
+            return {
+                "structure_type": "simple",
+                "purpose": "test",
+                "topic_level_1": "test",
+                "topic_level_3": "test",
+                "overall_keywords": ["test"],
+                "domain_keywords": ["test"],
+            }
+
+        # Need to return different responses for different calls
+        call_count = [0]
+        async def mock_call_ordered(prompt: str) -> Dict[str, Any]:
+            call_count[0] += 1
+            if call_count[0] == 1:  # function_type
+                return {"wrong_field": "value"}  # Invalid
+            elif call_count[0] == 2:  # structure_type
+                return {"structure_type": "simple"}
+            elif call_count[0] == 3:  # purpose
+                return {"purpose": "test"}
+            elif call_count[0] == 4:  # topic_level_1
+                return {"topic_level_1": "test"}
+            elif call_count[0] == 5:  # topic_level_3
+                return {"topic_level_3": "test"}
+            elif call_count[0] == 6:  # overall_keywords
+                return {"overall_keywords": ["test"]}
+            elif call_count[0] == 7:  # domain_keywords
+                return {"domain_keywords": ["test"]}
+            return {}
+
+        with patch("src.agents.sentence_analyzer.agent") as mock_agent:
+            mock_agent.call_model = AsyncMock(side_effect=mock_call_ordered)
+
+            result = await analyzer_with_prompts.classify_sentence("Test sentence", test_contexts)
+
+        # function_type should be empty string (default) due to validation error
+        assert result["function_type"] == ""
+        # Other fields should have values
+        assert result["structure_type"] == "simple"
+
+    @pytest.mark.asyncio
+    async def test_validation_error_structure_type(self, analyzer_with_prompts, test_contexts):
+        """Test handling of validation error for structure_type response."""
+        call_count = [0]
+        async def mock_call_ordered(prompt: str) -> Dict[str, Any]:
+            call_count[0] += 1
+            if call_count[0] == 1:  # function_type
+                return {"function_type": "declarative"}
+            elif call_count[0] == 2:  # structure_type
+                return {"invalid": "response"}  # Invalid
+            elif call_count[0] == 3:  # purpose
+                return {"purpose": "test"}
+            elif call_count[0] == 4:  # topic_level_1
+                return {"topic_level_1": "test"}
+            elif call_count[0] == 5:  # topic_level_3
+                return {"topic_level_3": "test"}
+            elif call_count[0] == 6:  # overall_keywords
+                return {"overall_keywords": ["test"]}
+            elif call_count[0] == 7:  # domain_keywords
+                return {"domain_keywords": ["test"]}
+            return {}
+
+        with patch("src.agents.sentence_analyzer.agent") as mock_agent:
+            mock_agent.call_model = AsyncMock(side_effect=mock_call_ordered)
+
+            result = await analyzer_with_prompts.classify_sentence("Test sentence", test_contexts)
+
+        assert result["function_type"] == "declarative"
+        assert result["structure_type"] == ""  # Default due to validation error
+
+    @pytest.mark.asyncio
+    async def test_validation_error_purpose(self, analyzer_with_prompts, test_contexts):
+        """Test handling of validation error for purpose response."""
+        call_count = [0]
+        async def mock_call_ordered(prompt: str) -> Dict[str, Any]:
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return {"function_type": "declarative"}
+            elif call_count[0] == 2:
+                return {"structure_type": "simple"}
+            elif call_count[0] == 3:  # purpose
+                return {"bad_field": "value"}  # Invalid
+            elif call_count[0] == 4:
+                return {"topic_level_1": "test"}
+            elif call_count[0] == 5:
+                return {"topic_level_3": "test"}
+            elif call_count[0] == 6:
+                return {"overall_keywords": ["test"]}
+            elif call_count[0] == 7:
+                return {"domain_keywords": ["test"]}
+            return {}
+
+        with patch("src.agents.sentence_analyzer.agent") as mock_agent:
+            mock_agent.call_model = AsyncMock(side_effect=mock_call_ordered)
+
+            result = await analyzer_with_prompts.classify_sentence("Test sentence", test_contexts)
+
+        assert result["purpose"] == ""  # Default due to validation error
+
+    @pytest.mark.asyncio
+    async def test_validation_error_topic_level_1(self, analyzer_with_prompts, test_contexts):
+        """Test handling of validation error for topic_level_1 response."""
+        call_count = [0]
+        async def mock_call_ordered(prompt: str) -> Dict[str, Any]:
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return {"function_type": "declarative"}
+            elif call_count[0] == 2:
+                return {"structure_type": "simple"}
+            elif call_count[0] == 3:
+                return {"purpose": "test"}
+            elif call_count[0] == 4:  # topic_level_1
+                return {"wrong": "field"}  # Invalid
+            elif call_count[0] == 5:
+                return {"topic_level_3": "test"}
+            elif call_count[0] == 6:
+                return {"overall_keywords": ["test"]}
+            elif call_count[0] == 7:
+                return {"domain_keywords": ["test"]}
+            return {}
+
+        with patch("src.agents.sentence_analyzer.agent") as mock_agent:
+            mock_agent.call_model = AsyncMock(side_effect=mock_call_ordered)
+
+            result = await analyzer_with_prompts.classify_sentence("Test sentence", test_contexts)
+
+        assert result["topic_level_1"] == ""  # Default due to validation error
+
+    @pytest.mark.asyncio
+    async def test_validation_error_topic_level_3(self, analyzer_with_prompts, test_contexts):
+        """Test handling of validation error for topic_level_3 response."""
+        call_count = [0]
+        async def mock_call_ordered(prompt: str) -> Dict[str, Any]:
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return {"function_type": "declarative"}
+            elif call_count[0] == 2:
+                return {"structure_type": "simple"}
+            elif call_count[0] == 3:
+                return {"purpose": "test"}
+            elif call_count[0] == 4:
+                return {"topic_level_1": "test"}
+            elif call_count[0] == 5:  # topic_level_3
+                return {"not_topic": "bad"}  # Invalid
+            elif call_count[0] == 6:
+                return {"overall_keywords": ["test"]}
+            elif call_count[0] == 7:
+                return {"domain_keywords": ["test"]}
+            return {}
+
+        with patch("src.agents.sentence_analyzer.agent") as mock_agent:
+            mock_agent.call_model = AsyncMock(side_effect=mock_call_ordered)
+
+            result = await analyzer_with_prompts.classify_sentence("Test sentence", test_contexts)
+
+        assert result["topic_level_3"] == ""  # Default due to validation error
+
+    @pytest.mark.asyncio
+    async def test_validation_error_overall_keywords(self, analyzer_with_prompts, test_contexts):
+        """Test handling of validation error for overall_keywords response."""
+        call_count = [0]
+        async def mock_call_ordered(prompt: str) -> Dict[str, Any]:
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return {"function_type": "declarative"}
+            elif call_count[0] == 2:
+                return {"structure_type": "simple"}
+            elif call_count[0] == 3:
+                return {"purpose": "test"}
+            elif call_count[0] == 4:
+                return {"topic_level_1": "test"}
+            elif call_count[0] == 5:
+                return {"topic_level_3": "test"}
+            elif call_count[0] == 6:  # overall_keywords
+                return {"no_keywords": "here"}  # Invalid
+            elif call_count[0] == 7:
+                return {"domain_keywords": ["test"]}
+            return {}
+
+        with patch("src.agents.sentence_analyzer.agent") as mock_agent:
+            mock_agent.call_model = AsyncMock(side_effect=mock_call_ordered)
+
+            result = await analyzer_with_prompts.classify_sentence("Test sentence", test_contexts)
+
+        assert result["overall_keywords"] == []  # Default (empty list) due to validation error
+
+    @pytest.mark.asyncio
+    async def test_validation_error_domain_keywords(self, analyzer_with_prompts, test_contexts):
+        """Test handling of validation error for domain_keywords response."""
+        call_count = [0]
+        async def mock_call_ordered(prompt: str) -> Dict[str, Any]:
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return {"function_type": "declarative"}
+            elif call_count[0] == 2:
+                return {"structure_type": "simple"}
+            elif call_count[0] == 3:
+                return {"purpose": "test"}
+            elif call_count[0] == 4:
+                return {"topic_level_1": "test"}
+            elif call_count[0] == 5:
+                return {"topic_level_3": "test"}
+            elif call_count[0] == 6:
+                return {"overall_keywords": ["test"]}
+            elif call_count[0] == 7:  # domain_keywords
+                return {"wrong_keywords_field": []}  # Invalid
+            return {}
+
+        with patch("src.agents.sentence_analyzer.agent") as mock_agent:
+            mock_agent.call_model = AsyncMock(side_effect=mock_call_ordered)
+
+            result = await analyzer_with_prompts.classify_sentence("Test sentence", test_contexts)
+
+        assert result["domain_keywords"] == []  # Default (empty list) due to validation error
+
+    @pytest.mark.asyncio
+    async def test_multiple_validation_errors(self, analyzer_with_prompts, test_contexts):
+        """Test handling when multiple responses have validation errors."""
+        # All responses are invalid
+        async def mock_all_invalid(prompt: str) -> Dict[str, Any]:
+            return {"invalid": "response"}
+
+        with patch("src.agents.sentence_analyzer.agent") as mock_agent:
+            mock_agent.call_model = AsyncMock(side_effect=mock_all_invalid)
+
+            result = await analyzer_with_prompts.classify_sentence("Test sentence", test_contexts)
+
+        # All fields should have default values
+        assert result["function_type"] == ""
+        assert result["structure_type"] == ""
+        assert result["purpose"] == ""
+        assert result["topic_level_1"] == ""
+        assert result["topic_level_3"] == ""
+        assert result["overall_keywords"] == []
+        assert result["domain_keywords"] == []
+        # Sentence should still be present
+        assert result["sentence"] == "Test sentence"
