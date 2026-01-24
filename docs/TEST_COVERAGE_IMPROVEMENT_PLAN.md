@@ -1,8 +1,8 @@
 # Test Coverage Improvement Plan
 
 > **Created:** 2026-01-18
-> **Updated:** 2026-01-19
-> **Current Coverage:** 84.2% (902 tests passing, 54 skipped) ✅ TARGET MET
+> **Updated:** 2026-01-24
+> **Current Coverage:** 86.0% (943 tests passing, 54 skipped) ✅ TARGET MET
 > **Target Coverage:** 80%+
 
 ---
@@ -116,12 +116,13 @@ Unit Tests Needed:
 
 ---
 
-## Phase 2: Pipeline Coverage (52%)
+## Phase 2: Pipeline Coverage ✅ COMPLETE
 
 **Goal:** Increase pipeline coverage to 75%+
+**Status:** Pipeline coverage improved from 52% to 81.4% with 21 tests.
 
-### P2.1: Pipeline Orchestrator (`src/pipeline.py`)
-**Current:** 52% | **Target:** 75%
+### P2.1: Pipeline Orchestrator (`src/pipeline.py`) ✅
+**Effort:** Medium | **Impact:** High | **Tests:** 21 | **Coverage:** 81.4%
 
 ```
 Unit Tests Needed:
@@ -194,22 +195,14 @@ Unit Tests Needed:
 
 ---
 
-## Phase 4: Resilience & Operations
+## Phase 4: Resilience & Operations ✅ COMPLETE
 
-### P4.1: Parked Events (`src/projections/parked_events.py`)
-**Current:** 29% | **Target:** 80%
+### P4.1: Parked Events (`src/projections/parked_events.py`) ✅
+**Effort:** Medium | **Impact:** High | **Tests:** 20 | **Coverage:** 100%
 
-```
-Unit Tests Needed:
-- test_parked_event_creation
-- test_parked_event_to_dict
-- test_park_event_success
-- test_park_event_with_error_capture
-- test_get_parked_events_success
-- test_get_parked_events_empty
-- test_get_parked_count
-- test_replay_parked_event (future)
-```
+**Note:** Tests uncovered and fixed production bugs:
+- `EventEnvelope.metadata` attribute did not exist - fixed to use `actor`, `correlation_id`, `source`
+- Invalid `event_id` format (`parked-{uuid}`) - fixed to generate proper UUID
 
 ---
 

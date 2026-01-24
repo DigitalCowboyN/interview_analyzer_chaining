@@ -62,7 +62,9 @@ class ParkedEvent:
                 "version": self.original_event.version,
                 "occurred_at": self.original_event.occurred_at.isoformat(),
                 "data": self.original_event.data,
-                "metadata": self.original_event.metadata,
+                "actor": self.original_event.actor.model_dump() if self.original_event.actor else None,
+                "correlation_id": self.original_event.correlation_id,
+                "source": self.original_event.source,
             },
             "error": {
                 "message": self.error_message,
@@ -127,18 +129,19 @@ class ParkedEventsManager:
             # a proper event envelope for it
             from src.events.envelope import EventEnvelope as Envelope
 
+            import uuid as uuid_module
+
             parked_envelope = Envelope(
-                event_id=f"parked-{event.event_id}",
+                event_id=str(uuid_module.uuid4()),
                 event_type="EventParked",
                 aggregate_type=event.aggregate_type,
                 aggregate_id=event.aggregate_id,
                 version=0,  # Parked events don't have versions
                 data=parked_data,
-                metadata={
-                    "original_event_id": event.event_id,
-                    "original_event_type": event.event_type,
-                    "parked_at": parked_event.parked_at.isoformat(),
-                },
+                tags=[
+                    f"original_event_id:{event.event_id}",
+                    f"original_event_type:{event.event_type}",
+                ],
             )
 
             await self.event_store.append_events(stream_name, [parked_envelope])
@@ -180,7 +183,12 @@ class ParkedEventsManager:
                     original_data = data["original_event"]
 
                     # Reconstruct original event envelope
-                    from src.events.envelope import EventEnvelope as Envelope
+                    from src.events.envelope import Actor, EventEnvelope as Envelope
+
+                    # Reconstruct actor if present
+                    actor = None
+                    if original_data.get("actor"):
+                        actor = Actor(**original_data["actor"])
 
                     original_event = Envelope(
                         event_id=original_data["event_id"],
@@ -189,7 +197,9 @@ class ParkedEventsManager:
                         aggregate_id=original_data["aggregate_id"],
                         version=original_data["version"],
                         data=original_data["data"],
-                        metadata=original_data.get("metadata", {}),
+                        actor=actor,
+                        correlation_id=original_data.get("correlation_id"),
+                        source=original_data.get("source"),
                     )
 
                     parked_event = ParkedEvent(
