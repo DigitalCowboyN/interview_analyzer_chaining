@@ -371,35 +371,6 @@ class TestNeo4jMapStorageEventIntegration:
             # Assert - Event emission was attempted
             mock_event_emitter.emit_sentence_created.assert_called_once()
 
-    @pytest.mark.skip(reason="M2.8: No direct Neo4j writes - projection service handles all writes")
-    async def test_map_storage_neo4j_failure_after_event_logs_warning(
-        self,
-        mock_neo4j_session,
-        mock_event_emitter,
-        project_id,
-        interview_id,
-        correlation_id,
-    ):
-        """
-        [SKIPPED - M2.8] Test that Neo4j failure after successful event emission logs warning but doesn't raise.
-
-        This test is no longer relevant in M2.8 because:
-        - Pipeline only emits events (no direct Neo4j writes)
-        - Projection service is sole writer to Neo4j
-        - No "Neo4j failure after event" scenario to test
-
-        Original dual-write scenario:
-        1. Event emission succeeds
-        2. Neo4j write attempted (and fails)
-        3. Operation continues (event already persisted)
-
-        M2.8 scenario:
-        1. Event emission succeeds
-        2. No Neo4j write attempted
-        3. Projection service handles writes from events
-        """
-        pass
-
 
 @pytest.mark.asyncio
 class TestNeo4jAnalysisWriterEventIntegration:
@@ -551,33 +522,3 @@ class TestNeo4jAnalysisWriterEventIntegration:
 
             # Assert - Event emission was attempted
             mock_event_emitter.emit_analysis_generated.assert_called_once()
-
-    @pytest.mark.skip(reason="M2.8: No direct Neo4j writes for successful analyses - projection service handles all writes")
-    async def test_analysis_writer_neo4j_failure_after_event_logs_warning(
-        self,
-        mock_neo4j_session,
-        mock_event_emitter,
-        project_id,
-        interview_id,
-        correlation_id,
-    ):
-        """
-        [SKIPPED - M2.8] Test that Neo4j failure after successful event emission logs warning but doesn't raise.
-
-        This test is no longer relevant in M2.8 because:
-        - Successful analyses only emit events (no direct Neo4j writes)
-        - Projection service is sole writer to Neo4j for successful analyses
-        - Error analyses still get direct writes (but no events emitted)
-        - No "Neo4j failure after event" scenario for successful analyses
-
-        Original dual-write scenario:
-        1. Event emission succeeds
-        2. Neo4j write attempted (and fails)
-        3. Operation continues (event already persisted)
-
-        M2.8 scenario for successful analyses:
-        1. Event emission succeeds
-        2. No Neo4j write attempted
-        3. Projection service handles writes from events
-        """
-        pass

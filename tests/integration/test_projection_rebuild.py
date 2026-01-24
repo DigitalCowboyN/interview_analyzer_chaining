@@ -3,6 +3,11 @@ Integration tests for projection service rebuild capability.
 
 Tests that projection service can rebuild Neo4j database from scratch using only events.
 This validates the core event sourcing principle: state can be derived from events.
+
+Updated for M3.0 single-writer architecture:
+- Pipeline only emits events (no direct Neo4j writes)
+- Projection service is the SOLE writer to Neo4j
+- Rebuild tests replay events through projection handlers
 """
 
 import uuid
@@ -19,9 +24,51 @@ from src.utils.environment import detect_environment
 @pytest.mark.integration
 @pytest.mark.eventstore
 @pytest.mark.neo4j
-@pytest.mark.skip(reason="Projection service integration tests - requires M2.8 transition and proper service setup")
 class TestProjectionRebuild:
     """Test projection service rebuild capabilities."""
+
+    async def _process_events_through_handlers(self, event_store, interview_id, sentence_count=4):
+        """Helper to process all events for an interview through projection handlers."""
+        from src.projections.handlers.interview_handlers import (
+            InterviewCreatedHandler,
+            InterviewStatusChangedHandler,
+        )
+        from src.projections.handlers.sentence_handlers import (
+            AnalysisGeneratedHandler,
+            SentenceCreatedHandler,
+        )
+
+        # Process Interview events
+        interview_handler = InterviewCreatedHandler()
+        status_handler = InterviewStatusChangedHandler()
+
+        interview_stream = f"Interview-{interview_id}"
+        try:
+            interview_events = await event_store.read_stream(interview_stream)
+            for event in interview_events:
+                if event.event_type == "InterviewCreated":
+                    await interview_handler.handle(event)
+                elif event.event_type == "StatusChanged":
+                    await status_handler.handle(event)
+        except Exception:
+            pass  # Stream may not exist yet
+
+        # Process Sentence and Analysis events
+        sentence_handler = SentenceCreatedHandler()
+        analysis_handler = AnalysisGeneratedHandler()
+
+        for i in range(sentence_count):
+            sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{i}"))
+            sentence_stream = f"Sentence-{sentence_id}"
+            try:
+                sentence_events = await event_store.read_stream(sentence_stream)
+                for event in sentence_events:
+                    if event.event_type == "SentenceCreated":
+                        await sentence_handler.handle(event)
+                    elif event.event_type == "AnalysisGenerated":
+                        await analysis_handler.handle(event)
+            except Exception:
+                pass  # Stream may not exist yet
 
     async def test_projection_service_rebuilds_neo4j_from_events(
         self,
@@ -33,12 +80,13 @@ class TestProjectionRebuild:
         """
         Test that projection service can rebuild Neo4j from scratch using only events.
 
-        Scenario:
-        1. Pipeline processes file → creates events + direct writes to Neo4j
-        2. Capture original Neo4j state (nodes, relationships, properties)
-        3. Delete ALL Neo4j nodes
-        4. Replay all events through projection service
-        5. Compare rebuilt state with original state
+        Scenario (M3.0 single-writer architecture):
+        1. Pipeline processes file → creates events only
+        2. Process events through projection handlers → creates Neo4j state
+        3. Capture original Neo4j state (nodes, relationships, properties)
+        4. Delete ALL Neo4j nodes
+        5. Replay all events through projection service
+        6. Compare rebuilt state with original state
 
         This validates:
         - Events are sufficient to rebuild entire state
@@ -67,7 +115,11 @@ class TestProjectionRebuild:
 
         interview_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{sample_interview_file.name}"))
 
-        # === STEP 2: Capture original Neo4j state ===
+        # === STEP 2: Process events through projection handlers (creates Neo4j state) ===
+        # In single-writer architecture, pipeline only creates events - projection service creates Neo4j state
+        await self._process_events_through_handlers(clean_event_store, interview_id, sentence_count=4)
+
+        # === STEP 3: Capture original Neo4j state ===
         from src.utils.neo4j_driver import Neo4jConnectionManager
 
         driver = await Neo4jConnectionManager.get_driver(test_mode=True)
@@ -138,7 +190,7 @@ class TestProjectionRebuild:
         print(f"  - {len(original_sentences)} Sentence nodes")
         print(f"  - {len(original_analyses)} Analysis nodes")
 
-        # === STEP 3: Delete ALL Neo4j nodes ===
+        # === STEP 4: Delete ALL Neo4j nodes ===
         async with driver.session() as session:
             await session.run("MATCH (n) DETACH DELETE n")
             result = await session.run("MATCH (n) RETURN count(n) as count")
@@ -148,7 +200,7 @@ class TestProjectionRebuild:
 
         print("\n✓ Deleted all Neo4j nodes")
 
-        # === STEP 4: Rebuild from events via projection service ===
+        # === STEP 5: Rebuild from events via projection service ===
         from src.projections.handlers.interview_handlers import (
             InterviewCreatedHandler,
             InterviewStatusChangedHandler,
@@ -187,7 +239,7 @@ class TestProjectionRebuild:
                     await analysis_handler.handle(event)
                     print(f"✓ Processed AnalysisGenerated event for sentence {i}")
 
-        # === STEP 5: Compare rebuilt state with original ===
+        # === STEP 6: Compare rebuilt state with original ===
         async with driver.session() as session:
             # Verify Interview node
             result = await session.run(
