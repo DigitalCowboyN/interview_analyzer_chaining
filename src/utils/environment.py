@@ -39,7 +39,8 @@ def detect_environment() -> str:
     # Method 2: Check if we're in a container via cgroup
     try:
         with open("/proc/1/cgroup", "r") as f:
-            if "docker" in f.read() or "containerd" in f.read():
+            cgroup_content = f.read()
+            if "docker" in cgroup_content or "containerd" in cgroup_content:
                 return "docker"
     except (FileNotFoundError, PermissionError):
         pass
