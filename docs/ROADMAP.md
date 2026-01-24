@@ -18,13 +18,13 @@
 | M2.8 | ✅ Complete | Event-Sourced Architecture (Production Ready) |
 | M2.9 | ✅ Complete | User Edit API |
 | M3.0 | ✅ Complete | Remove Dual-Write + neo4j 6.x |
-| **TC** | ✅ **Complete** | Test Coverage Improvement (86.0%) |
+| **TC** | ✅ **Complete** | Test Coverage Improvement (90.1%) |
 | M3.1 | 📋 Planned | Vector Search |
 | M3.2 | 📋 Planned | AI Agent Upgrade (openai 2.x) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** Ready for M3.1 (Vector Search)
-**Tests:** 943 passing, 54 skipped | **Coverage:** 86.0%
+**Tests:** 1000 passing, 60 skipped | **Coverage:** 90.1%
 
 ---
 
@@ -70,12 +70,19 @@
 - [x] Phase 4: Parked Events Tests (20 tests)
   - Parked Events coverage: 29% → 100%
   - Fixed production bugs: invalid EventEnvelope.metadata reference
+- [x] Phase 5: Critical Gaps (27 tests)
+  - run_projection_service.py: 0% → 100%
+  - sentence_analyzer.py: 65% → 92%
+- [x] Phase 6: Domain Model (96 tests)
+  - aggregates.py: 75% → 99%
+  - environment.py: 57% → 95%
+  - Fixed bug: detect_environment() f.read() called twice
 - [x] Fix M3.0 integration test compatibility
 - [x] Update TEST_COVERAGE_IMPROVEMENT_PLAN.md
 
 **Results:**
-- Tests: 554 → 943 (+389 tests)
-- Coverage: 66.8% → 86.0% (+19.2%)
+- Tests: 554 → 1000 (+446 tests)
+- Coverage: 66.8% → 90.1% (+23.3%)
 
 **Completed:** 2026-01-24
 
@@ -194,10 +201,13 @@
 - Phase 1: Event Sourcing Foundation (81 tests, 89-95% coverage)
 - Phase 2: Pipeline Tests (21 tests, 81.4% coverage)
 - Phase 4: Parked Events Tests (20 tests, 100% coverage)
+- Phase 5: Critical Gaps (27 tests) - run_projection_service 100%, sentence_analyzer 92%
+- Phase 6: Domain Model (96 tests) - aggregates 99%, environment 95%
 - Fixed M3.0 integration test compatibility
 - Fixed production bugs in parked_events.py (invalid metadata reference)
-- Coverage: 66.8% → 86.0% (+19.2%)
-- Tests: 554 → 943 (+389 tests)
+- Fixed bug in environment.py (detect_environment f.read() called twice)
+- Coverage: 66.8% → 90.1% (+23.3%)
+- Tests: 554 → 1000 (+446 tests)
 - **Completed:** 2026-01-24
 
 </details>
@@ -263,6 +273,7 @@ Neo4j (sole writer, materialized view)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-01-24 | Test coverage 90.1% achieved | 1000 tests, added Phase 5-6, fixed environment.py bug |
 | 2026-01-24 | Test coverage milestone extended | 86.0% coverage achieved, 943 tests, fixed parked_events.py bugs |
 | 2026-01-19 | Test coverage milestone complete | 84.2% coverage achieved (target 80%), 902 tests |
 | 2026-01-18 | M3.0 complete: single-writer architecture | Removed 41 legacy tests, all direct Neo4j writes eliminated |
