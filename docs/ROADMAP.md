@@ -24,7 +24,7 @@
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** Ready for M3.1 (Vector Search)
-**Tests:** 1000 passing, 60 skipped | **Coverage:** 90.1%
+**Tests:** 1027 passing, 45 skipped | **Coverage:** 90.1%
 
 ---
 
