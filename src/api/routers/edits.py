@@ -62,12 +62,22 @@ class EditResponse(BaseModel):
 # --- Helper Functions ---
 
 def get_event_store() -> EventStoreClient:
-    """Get EventStoreDB client instance."""
-    from src.config import config
+    """Get EventStoreDB client instance with environment-aware defaults."""
+    import os
 
-    connection_string = config.get("event_sourcing", {}).get(
-        "connection_string", "esdb://localhost:2113?tls=false"
-    )
+    from src.config import config
+    from src.utils.environment import detect_environment
+
+    # Priority: 1) config file, 2) env var, 3) environment-aware default
+    connection_string = config.get("event_sourcing", {}).get("connection_string")
+    if not connection_string:
+        connection_string = os.getenv("ESDB_CONNECTION_STRING")
+    if not connection_string:
+        env = detect_environment()
+        if env in ("docker", "ci"):
+            connection_string = "esdb://eventstore:2113?tls=false"
+        else:
+            connection_string = "esdb://localhost:2113?tls=false"
     return EventStoreClient(connection_string)
 
 

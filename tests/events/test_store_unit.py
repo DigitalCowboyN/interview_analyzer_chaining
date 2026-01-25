@@ -627,6 +627,71 @@ class TestGlobalClient:
         # Should not raise
         await close_global_client()
 
+    async def test_get_event_store_client_host_environment_detection(self):
+        """Test that get_event_store_client uses localhost for host environment."""
+        import src.events.store as store_module
+        store_module._global_client = None
+
+        # Clear env var and mock host environment
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("src.utils.environment.detect_environment", return_value="host"):
+                client = get_event_store_client()
+                assert client.connection_string == "esdb://localhost:2113?tls=false"
+
+        store_module._global_client = None
+
+    async def test_get_event_store_client_docker_environment_detection(self):
+        """Test that get_event_store_client uses eventstore for docker environment."""
+        import src.events.store as store_module
+        store_module._global_client = None
+
+        # Clear env var and mock docker environment
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("src.utils.environment.detect_environment", return_value="docker"):
+                client = get_event_store_client()
+                assert client.connection_string == "esdb://eventstore:2113?tls=false"
+
+        store_module._global_client = None
+
+    async def test_get_event_store_client_ci_environment_detection(self):
+        """Test that get_event_store_client uses eventstore for CI environment."""
+        import src.events.store as store_module
+        store_module._global_client = None
+
+        # Clear env var and mock CI environment
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("src.utils.environment.detect_environment", return_value="ci"):
+                client = get_event_store_client()
+                assert client.connection_string == "esdb://eventstore:2113?tls=false"
+
+        store_module._global_client = None
+
+    async def test_get_event_store_client_env_var_overrides_detection(self):
+        """Test that environment variable takes precedence over environment detection."""
+        import src.events.store as store_module
+        store_module._global_client = None
+
+        # Env var should override even when detection would return docker
+        with patch.dict("os.environ", {"ESDB_CONNECTION_STRING": "esdb://override:9999?tls=true"}):
+            with patch("src.utils.environment.detect_environment", return_value="docker"):
+                client = get_event_store_client()
+                assert client.connection_string == "esdb://override:9999?tls=true"
+
+        store_module._global_client = None
+
+    async def test_get_event_store_client_explicit_overrides_all(self):
+        """Test that explicit connection_string parameter takes highest precedence."""
+        import src.events.store as store_module
+        store_module._global_client = None
+
+        # Explicit should override env var and detection
+        with patch.dict("os.environ", {"ESDB_CONNECTION_STRING": "esdb://envvar:8888?tls=true"}):
+            with patch("src.utils.environment.detect_environment", return_value="docker"):
+                client = get_event_store_client(connection_string="esdb://explicit:7777?tls=false")
+                assert client.connection_string == "esdb://explicit:7777?tls=false"
+
+        store_module._global_client = None
+
 
 class TestExceptionClasses:
     """Test custom exception classes."""

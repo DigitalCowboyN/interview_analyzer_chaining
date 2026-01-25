@@ -365,11 +365,20 @@ def get_event_store_client(
     """
     import os
 
+    from src.utils.environment import detect_environment
+
     global _global_client
 
     if _global_client is None:
-        # First try provided connection_string, then environment variable, then default to eventstore service
-        conn_str = connection_string or os.getenv("ESDB_CONNECTION_STRING", "esdb://eventstore:2113?tls=false")
+        # Priority: 1) explicit connection_string, 2) env var, 3) environment-aware default
+        conn_str = connection_string or os.getenv("ESDB_CONNECTION_STRING")
+        if not conn_str:
+            env = detect_environment()
+            if env in ("docker", "ci"):
+                conn_str = "esdb://eventstore:2113?tls=false"
+            else:
+                conn_str = "esdb://localhost:2113?tls=false"
+            logger.debug(f"Using environment-aware ESDB default for '{env}': {conn_str}")
         _global_client = EventStoreClient(connection_string=conn_str, max_retries=max_retries, retry_delay=retry_delay)
         logger.info(f"Initialized EventStore client with connection string: {conn_str}")
 

@@ -5,6 +5,7 @@ Validates that commands correctly create events and update aggregates.
 """
 
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -21,8 +22,13 @@ class TestInterviewCommandHandler:
 
     async def test_create_interview_command(self):
         """Test creating an interview via command."""
-        # Create handler with in-memory event store (for testing)
-        handler = InterviewCommandHandler()
+        # Create mock event store
+        mock_event_store = MagicMock(spec=EventStoreClient)
+        mock_event_store.read_stream = AsyncMock(return_value=[])  # No existing events
+        mock_event_store.append_events = AsyncMock(return_value=0)  # Return version 0
+
+        # Create handler with mocked event store
+        handler = InterviewCommandHandler(event_store=mock_event_store)
 
         # Create command
         interview_id = str(uuid.uuid4())
@@ -42,9 +48,12 @@ class TestInterviewCommandHandler:
         # Verify result
         assert result.success is True
         assert result.aggregate_id == interview_id
-        assert result.version == 0  # First event
+        assert result.version == 0  # Version returned from append_events
         assert result.event_count == 1
         assert "created successfully" in result.message.lower()
+
+        # Verify event store was called
+        mock_event_store.append_events.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -53,8 +62,13 @@ class TestSentenceCommandHandler:
 
     async def test_create_sentence_command(self):
         """Test creating a sentence via command."""
-        # Create handler
-        handler = SentenceCommandHandler()
+        # Create mock event store
+        mock_event_store = MagicMock(spec=EventStoreClient)
+        mock_event_store.read_stream = AsyncMock(return_value=[])  # No existing events
+        mock_event_store.append_events = AsyncMock(return_value=0)  # Return version 0
+
+        # Create handler with mocked event store
+        handler = SentenceCommandHandler(event_store=mock_event_store)
 
         # Create command
         sentence_id = str(uuid.uuid4())
@@ -73,17 +87,57 @@ class TestSentenceCommandHandler:
         # Verify result
         assert result.success is True
         assert result.aggregate_id == sentence_id
-        assert result.version == 0  # First event
+        assert result.version == 0  # Version returned from append_events
         assert result.event_count == 1
+
+        # Verify event store was called
+        mock_event_store.append_events.assert_called_once()
 
     async def test_edit_sentence_command(self):
         """Test editing a sentence via command."""
-        # Create handler
-        handler = SentenceCommandHandler()
+        from datetime import datetime, timezone
 
-        # First create a sentence
+        # Create mock event store that simulates existing sentence
+        mock_event_store = MagicMock(spec=EventStoreClient)
+
+        # Track append calls to simulate version increments
+        append_calls = []
+
+        async def mock_append(*args, **kwargs):
+            version = len(append_calls)
+            append_calls.append(args)
+            return version
+
+        mock_event_store.append_events = AsyncMock(side_effect=mock_append)
+
         sentence_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
+        correlation_id = str(uuid.uuid4())
+
+        # Create a mock event for the existing sentence (matches EventEnvelope structure)
+        existing_event = MagicMock()
+        existing_event.event_type = "SentenceCreated"
+        existing_event.version = 0
+        existing_event.data = {
+            "sentence_id": sentence_id,
+            "interview_id": interview_id,
+            "index": 0,
+            "text": "Original text.",
+            "speaker": None,
+            "start_ms": None,
+            "end_ms": None,
+        }
+        existing_event.actor = Actor(user_id="test-user", actor_type=ActorType.SYSTEM, display="Test System")
+        existing_event.correlation_id = correlation_id
+        existing_event.occurred_at = datetime.now(timezone.utc)
+
+        # First call returns empty (create), second call returns the created event (edit)
+        mock_event_store.read_stream = AsyncMock(side_effect=[[], [existing_event]])
+
+        # Create handler with mocked event store
+        handler = SentenceCommandHandler(event_store=mock_event_store)
+
+        # First create a sentence
         create_command = CreateSentenceCommand(
             sentence_id=sentence_id,
             interview_id=interview_id,
@@ -106,5 +160,8 @@ class TestSentenceCommandHandler:
         # Verify result
         assert result.success is True
         assert result.aggregate_id == sentence_id
-        assert result.version == 1  # Second event
+        assert result.version == 1  # Version returned from second append (0 was first, 1 is second)
         assert result.event_count == 1  # Only the edit event
+
+        # Verify event store was called twice (create + edit)
+        assert len(append_calls) == 2

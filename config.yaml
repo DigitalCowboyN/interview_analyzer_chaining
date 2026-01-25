@@ -104,9 +104,11 @@ logging:
   # ... (existing settings) ...
 
 # Event Sourcing Configuration
+# connection_string is auto-detected based on environment (docker/ci vs host)
+# Override with ESDB_CONNECTION_STRING env var if needed
 event_sourcing:
   enabled: true
-  connection_string: "esdb://eventstore:2113?tls=false"
+  # connection_string: auto-detected (localhost for host, eventstore for docker/ci)
 
 # Project Configuration
 project:

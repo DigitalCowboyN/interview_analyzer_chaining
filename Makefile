@@ -1,7 +1,8 @@
 # Makefile
 
 # Variables
-PYTHON = python3
+# Python detection: Allow override, else prefer 'python' (pyenv), fallback to 'python3'
+PYTHON ?= $(shell command -v python 2>/dev/null || command -v python3 2>/dev/null)
 MODULE_NAME = src
 TEST_DIR = tests
 
@@ -58,7 +59,7 @@ test-unit:
 	@echo "Running unit tests..."
 	$(PYTHON) -m pytest -m "not integration" --cov=$(MODULE_NAME) --cov-report=term-missing
 
-# Integration tests only
+# Integration tests only (assumes services running; auto-detects environment)
 .PHONY: test-integration
 test-integration:
 	@echo "Running integration tests..."
@@ -90,77 +91,57 @@ clean:
 	find . -type f -name '*.pyc' -delete
 	find . -type d -name '__pycache__' -delete
 
-# Run API server (explicit target)
-.PHONY: run-api-explicit
-run-api-explicit:
-	@echo "Running API server..."
-	docker compose up -d app
-
-# Run tests
-.PHONY: test-explicit
-test-explicit:
-	@echo "Running tests..."
-	docker compose run --rm app pytest $(ARGS)
-
-# Run linter
-.PHONY: lint-explicit
-lint-explicit:
-	@echo "Running linter..."
-	docker compose run --rm app flake8 src tests
-
-# Run formatter
-.PHONY: format-explicit
-format-explicit:
-	@echo "Running formatter..."
-	docker compose run --rm app black src tests
-
-# Stop and remove containers and potentially volumes
-.PHONY: clean-explicit
-clean-explicit:
-	@echo "Stopping and removing containers..."
-	docker compose down -v
-	@echo "Cleaning complete."
-
-# Start only database services
-.PHONY: db-up
-db-up:
-	@echo "Starting database services (Neo4j, Redis)..."
-	docker compose up -d neo4j redis
-
-# Stop only database services
-.PHONY: db-down
-db-down:
-	@echo "Stopping database services..."
-	docker compose stop neo4j redis
-
-# Run the pipeline
-.PHONY: run-pipeline
-run-pipeline:
-	@echo "Running pipeline..."
-	docker compose run --rm app python src/main.py --run-pipeline $(ARGS)
 
 # Default target (shows help)
 .PHONY: help
 help:
 	@echo "Usage: make [target]"
 	@echo ""
-	@echo "Targets:"
-	@echo "  build          Build the Docker image for the application."
-	@echo "  run            Run the application container (API server by default)."
-	@echo "  run-pipeline   Run the processing pipeline within a container."
-	@echo "  run-api        Run the FastAPI server within a container (same as run)."
-	@echo "  test           Run pytest tests within a container."
-	@echo "  test-cov       Run tests with coverage reporting."
-	@echo "  test-unit      Run unit tests only (exclude integration tests)."
-	@echo "  test-integration Run integration tests only."
-	@echo "  coverage       Generate terminal coverage report."
-	@echo "  coverage-html  Generate HTML coverage report."
-	@echo "  coverage-xml   Generate XML coverage report (for CI/CD)."
-	@echo "  lint           Run flake8 linter within a container."
-	@echo "  format         Run black code formatter within a container."
-	@echo "  clean          Stop and remove containers, remove volumes."
-	@echo "  db-up          Start database services (Neo4j, Redis) using Docker Compose."
-	@echo "  db-down        Stop database services."
+	@echo "Testing:"
+	@echo "  test                 Run pytest tests (local)"
+	@echo "  test-unit            Run unit tests only (no integration markers)"
+	@echo "  test-integration     Run integration tests (assumes services running)"
+	@echo "  test-integration-full  Start services → run integration tests → stop services"
+	@echo "  test-all-full        Start services → run ALL tests with coverage → stop"
+	@echo "  test-cov             Run tests with coverage report"
+	@echo ""
+	@echo "  Options for test-integration-full and test-all-full:"
+	@echo "    PYTEST_ARGS=\"-v -x\"   Pass extra pytest arguments"
+	@echo "    KEEP_SERVICES=1       Don't stop services after tests"
+	@echo ""
+	@echo "Test Infrastructure:"
+	@echo "  test-infra-up        Start neo4j-test + eventstore with health checks"
+	@echo "  test-infra-down      Stop test infrastructure"
+	@echo "  wait-neo4j-test      Wait for Neo4j test database to be healthy"
+	@echo "  wait-eventstore      Wait for EventStoreDB to be healthy"
+	@echo ""
+	@echo "Database Services:"
+	@echo "  db-up                Start Neo4j + Redis"
+	@echo "  db-down              Stop Neo4j + Redis"
+	@echo "  db-test-up           Start test Neo4j database"
+	@echo "  db-test-down         Stop test Neo4j database"
+	@echo "  db-test-clear        Clear test Neo4j database"
+	@echo ""
+	@echo "Event Sourcing:"
+	@echo "  eventstore-up        Start EventStoreDB"
+	@echo "  eventstore-down      Stop EventStoreDB"
+	@echo "  eventstore-health    Check EventStoreDB health"
+	@echo "  es-up                Start EventStoreDB + Projection Service"
+	@echo "  es-down              Stop event sourcing system"
+	@echo "  es-status            Show event sourcing system status"
+	@echo ""
+	@echo "Application:"
+	@echo "  build                Build Docker images"
+	@echo "  run                  Run application (API)"
+	@echo "  run-api              Run FastAPI server (local)"
+	@echo "  run-worker           Run Celery worker (local)"
+	@echo "  run-pipeline         Run processing pipeline"
+	@echo ""
+	@echo "Code Quality:"
+	@echo "  lint                 Run flake8 linter"
+	@echo "  format               Run black formatter"
+	@echo "  clean                Remove __pycache__ and .pyc files"
+	@echo "  clean-coverage       Remove coverage data"
 
 # Build the Docker image
 .PHONY: build
@@ -174,48 +155,6 @@ run:
 	@echo "Running application container (API)..."
 	docker compose up -d app
 
-# Run tests
-.PHONY: test-explicit
-test-explicit:
-	@echo "Running tests..."
-	docker compose run --rm app pytest $(ARGS)
-
-# Run linter
-.PHONY: lint-explicit
-lint-explicit:
-	@echo "Running linter..."
-	docker compose run --rm app flake8 src tests
-
-# Run formatter
-.PHONY: format-explicit
-format-explicit:
-	@echo "Running formatter..."
-	docker compose run --rm app black src tests
-
-# Stop and remove containers and potentially volumes
-.PHONY: clean-explicit
-clean-explicit:
-	@echo "Stopping and removing containers..."
-	docker compose down -v
-	@echo "Cleaning complete."
-
-# Start only database services
-.PHONY: db-up
-db-up:
-	@echo "Starting database services (Neo4j, Redis)..."
-	docker compose up -d neo4j redis
-
-# Stop only database services
-.PHONY: db-down
-db-down:
-	@echo "Stopping database services..."
-	docker compose stop neo4j redis
-
-# Run the pipeline
-.PHONY: run-pipeline
-run-pipeline:
-	@echo "Running pipeline..."
-	docker compose run --rm app python src/main.py --run-pipeline $(ARGS)
 
 # --- Test Database Management --- #
 
@@ -361,4 +300,97 @@ test-full-system:
 	@echo "Running full system test suite..."
 	$(PYTHON) -m pytest tests/ -v --ignore=tests/integration/test_projection_replay.py --ignore=tests/integration/test_idempotency.py --ignore=tests/integration/test_performance.py
 
-# --- End Testing --- # 
+# --- End Testing --- #
+
+# --- Integration Test Orchestration --- #
+# These targets properly orchestrate service startup, health checks, and test execution
+
+# Configuration for health check retries
+HEALTH_RETRIES ?= 30
+HEALTH_INTERVAL ?= 2
+
+# Wait for Neo4j test database to be healthy
+.PHONY: wait-neo4j-test
+wait-neo4j-test:
+	@echo "Waiting for Neo4j test database to be healthy..."
+	@for i in $$(seq 1 $(HEALTH_RETRIES)); do \
+		if docker exec interview_analyzer_neo4j_test cypher-shell -u neo4j -p testpassword "RETURN 1" >/dev/null 2>&1; then \
+			echo "✓ Neo4j test database is healthy"; \
+			exit 0; \
+		fi; \
+		echo "  Attempt $$i/$(HEALTH_RETRIES) - waiting $(HEALTH_INTERVAL)s..."; \
+		sleep $(HEALTH_INTERVAL); \
+	done; \
+	echo "✗ Neo4j test database failed health check after $(HEALTH_RETRIES) attempts"; \
+	exit 1
+
+# Wait for EventStoreDB to be healthy
+.PHONY: wait-eventstore
+wait-eventstore:
+	@echo "Waiting for EventStoreDB to be healthy..."
+	@for i in $$(seq 1 $(HEALTH_RETRIES)); do \
+		if docker exec interview_analyzer_eventstore curl -sf http://localhost:2113/health/live >/dev/null 2>&1; then \
+			echo "✓ EventStoreDB is healthy"; \
+			exit 0; \
+		fi; \
+		echo "  Attempt $$i/$(HEALTH_RETRIES) - waiting $(HEALTH_INTERVAL)s..."; \
+		sleep $(HEALTH_INTERVAL); \
+	done; \
+	echo "✗ EventStoreDB failed health check after $(HEALTH_RETRIES) attempts"; \
+	exit 1
+
+# Start test infrastructure (neo4j-test + eventstore)
+.PHONY: test-infra-up
+test-infra-up:
+	@echo "Starting test infrastructure..."
+	docker compose up -d neo4j-test eventstore
+	@$(MAKE) wait-neo4j-test
+	@$(MAKE) wait-eventstore
+	@echo "✓ Test infrastructure ready"
+
+# Stop test infrastructure
+.PHONY: test-infra-down
+test-infra-down:
+	@echo "Stopping test infrastructure..."
+	docker compose stop neo4j-test eventstore
+	@echo "✓ Test infrastructure stopped"
+
+# Full integration test run: start services → run tests → report
+# Usage: make test-integration-full
+#        make test-integration-full PYTEST_ARGS="-v -x"
+#        make test-integration-full KEEP_SERVICES=1  (don't stop services after)
+PYTEST_ARGS ?= -v
+KEEP_SERVICES ?= 0
+
+.PHONY: test-integration-full
+test-integration-full: test-infra-up
+	@echo ""
+	@echo "=== Running Integration Tests ==="
+	@echo ""
+	-$(PYTHON) -m pytest -m "integration or eventstore or neo4j" $(PYTEST_ARGS); \
+	TEST_EXIT=$$?; \
+	echo ""; \
+	if [ "$(KEEP_SERVICES)" = "0" ]; then \
+		$(MAKE) test-infra-down; \
+	else \
+		echo "KEEP_SERVICES=1: Test infrastructure left running"; \
+	fi; \
+	exit $$TEST_EXIT
+
+# Full test suite with all markers
+.PHONY: test-all-full
+test-all-full: test-infra-up
+	@echo ""
+	@echo "=== Running Full Test Suite ==="
+	@echo ""
+	-$(PYTHON) -m pytest --cov=$(MODULE_NAME) --cov-report=term-missing $(PYTEST_ARGS); \
+	TEST_EXIT=$$?; \
+	echo ""; \
+	if [ "$(KEEP_SERVICES)" = "0" ]; then \
+		$(MAKE) test-infra-down; \
+	else \
+		echo "KEEP_SERVICES=1: Test infrastructure left running"; \
+	fi; \
+	exit $$TEST_EXIT
+
+# --- End Integration Test Orchestration --- #

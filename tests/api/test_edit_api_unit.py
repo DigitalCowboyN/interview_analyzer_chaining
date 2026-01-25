@@ -595,3 +595,53 @@ class TestCreateActorFromRequest:
 
         assert actor.actor_type == ActorType.HUMAN
         assert actor.user_id == "anonymous"
+
+
+class TestGetEventStoreEnvironmentDetection:
+    """Test get_event_store environment detection logic."""
+
+    def test_host_environment_uses_localhost(self):
+        """Test that host environment uses localhost connection."""
+        from src.api.routers.edits import get_event_store
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("src.utils.environment.detect_environment", return_value="host"):
+                client = get_event_store()
+                assert client.connection_string == "esdb://localhost:2113?tls=false"
+
+    def test_docker_environment_uses_eventstore(self):
+        """Test that docker environment uses eventstore service name."""
+        from src.api.routers.edits import get_event_store
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("src.utils.environment.detect_environment", return_value="docker"):
+                client = get_event_store()
+                assert client.connection_string == "esdb://eventstore:2113?tls=false"
+
+    def test_ci_environment_uses_eventstore(self):
+        """Test that CI environment uses eventstore service name."""
+        from src.api.routers.edits import get_event_store
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("src.utils.environment.detect_environment", return_value="ci"):
+                client = get_event_store()
+                assert client.connection_string == "esdb://eventstore:2113?tls=false"
+
+    def test_env_var_overrides_environment_detection(self):
+        """Test that ESDB_CONNECTION_STRING env var takes precedence."""
+        from src.api.routers.edits import get_event_store
+
+        with patch.dict("os.environ", {"ESDB_CONNECTION_STRING": "esdb://custom:9999?tls=true"}):
+            with patch("src.utils.environment.detect_environment", return_value="host"):
+                client = get_event_store()
+                assert client.connection_string == "esdb://custom:9999?tls=true"
+
+    def test_config_file_takes_precedence(self):
+        """Test that config file connection_string takes highest precedence."""
+        from src.api.routers.edits import get_event_store
+
+        with patch.dict("os.environ", {"ESDB_CONNECTION_STRING": "esdb://envvar:8888?tls=true"}):
+            with patch("src.config.config") as mock_config:
+                mock_config.get.return_value = {"connection_string": "esdb://config:7777?tls=false"}
+                client = get_event_store()
+                assert client.connection_string == "esdb://config:7777?tls=false"

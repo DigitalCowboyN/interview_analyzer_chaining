@@ -15,6 +15,7 @@ services:
       - .env # Load environment variables from .env file
     environment:
       - PYTHONUNBUFFERED=1 # Ensure logs appear immediately
+      - ESDB_CONNECTION_STRING=esdb://eventstore:2113?tls=false
     # If the API needs to wait for Redis (good practice)
     # Also add explicit depends_on for the test database
     depends_on:
@@ -62,6 +63,7 @@ services:
       - .env # Load environment variables
     environment:
       - PYTHONUNBUFFERED=1
+      - ESDB_CONNECTION_STRING=esdb://eventstore:2113?tls=false
     depends_on:
       redis:
         condition: service_healthy

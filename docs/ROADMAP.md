@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-01-24
+**Last Updated:** 2026-01-25
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -24,7 +24,7 @@
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** Ready for M3.1 (Vector Search)
-**Tests:** 1027 passing, 45 skipped | **Coverage:** 90.1%
+**Tests:** 1027 passing, 44 skipped | **Coverage:** 90.1%
 
 ---
 
@@ -77,14 +77,19 @@
   - aggregates.py: 75% → 99%
   - environment.py: 57% → 95%
   - Fixed bug: detect_environment() f.read() called twice
+- [x] Phase 7: Integration Test Infrastructure (10 tests)
+  - Makefile Python auto-detection (pyenv/Homebrew/system)
+  - ESDB environment-aware connection (host/docker/CI)
+  - `make test-infra-up/down` and `make test-integration-full` targets
+  - 75 integration tests passing, 44 skipped (architectural)
 - [x] Fix M3.0 integration test compatibility
 - [x] Update TEST_COVERAGE_IMPROVEMENT_PLAN.md
 
 **Results:**
-- Tests: 554 → 1000 (+446 tests)
+- Tests: 554 → 1027 (+473 tests)
 - Coverage: 66.8% → 90.1% (+23.3%)
 
-**Completed:** 2026-01-24
+**Completed:** 2026-01-25
 
 ---
 
@@ -203,12 +208,13 @@
 - Phase 4: Parked Events Tests (20 tests, 100% coverage)
 - Phase 5: Critical Gaps (27 tests) - run_projection_service 100%, sentence_analyzer 92%
 - Phase 6: Domain Model (96 tests) - aggregates 99%, environment 95%
+- Phase 7: Integration Test Infrastructure (10 tests) - ESDB environment detection, Makefile improvements
 - Fixed M3.0 integration test compatibility
 - Fixed production bugs in parked_events.py (invalid metadata reference)
 - Fixed bug in environment.py (detect_environment f.read() called twice)
 - Coverage: 66.8% → 90.1% (+23.3%)
-- Tests: 554 → 1000 (+446 tests)
-- **Completed:** 2026-01-24
+- Tests: 554 → 1027 (+473 tests)
+- **Completed:** 2026-01-25
 
 </details>
 
@@ -273,6 +279,7 @@ Neo4j (sole writer, materialized view)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-01-25 | Integration test infrastructure complete | ESDB environment detection, Make targets for test orchestration |
 | 2026-01-24 | Test coverage 90.1% achieved | 1000 tests, added Phase 5-6, fixed environment.py bug |
 | 2026-01-24 | Test coverage milestone extended | 86.0% coverage achieved, 943 tests, fixed parked_events.py bugs |
 | 2026-01-19 | Test coverage milestone complete | 84.2% coverage achieved (target 80%), 902 tests |

@@ -8,8 +8,11 @@ Updated for M3.0 single-writer architecture:
 - Pipeline only emits events (no direct Neo4j writes)
 - Projection service is the SOLE writer to Neo4j
 - Rebuild tests replay events through projection handlers
+
+Note: These tests require valid OpenAI API credentials as they run the full pipeline.
 """
 
+import os
 import uuid
 from pathlib import Path
 
@@ -20,10 +23,18 @@ from src.pipeline import PipelineOrchestrator
 from src.utils.environment import detect_environment
 
 
+def _has_valid_openai_key() -> bool:
+    """Check if a valid OpenAI API key is available."""
+    key = os.environ.get("OPENAI_API_KEY", "")
+    # Skip if no key or if using test placeholder
+    return bool(key) and key not in ("test-key", "test", "fake-key", "dummy")
+
+
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.eventstore
 @pytest.mark.neo4j
+@pytest.mark.skipif(not _has_valid_openai_key(), reason="Requires valid OpenAI API key")
 class TestProjectionRebuild:
     """Test projection service rebuild capabilities."""
 

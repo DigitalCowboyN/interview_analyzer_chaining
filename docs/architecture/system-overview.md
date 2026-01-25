@@ -1,6 +1,6 @@
 # System Overview
 
-> **Last Updated:** 2026-01-18
+> **Last Updated:** 2026-01-25
 
 ## System Context
 
@@ -182,17 +182,30 @@ flowchart TB
 
 ## Environment Detection
 
-The system auto-detects its runtime environment:
+The system auto-detects its runtime environment for EventStoreDB connections:
 
 ```mermaid
 flowchart TD
-    Start[Start] --> CheckDocker{/.dockerenv exists?}
+    Start[Start] --> CheckConfig{Config file<br/>connection_string?}
+    CheckConfig -->|Yes| UseConfig["Use config value"]
+    CheckConfig -->|No| CheckEnv{ESDB_CONNECTION_STRING<br/>env var set?}
+    CheckEnv -->|Yes| UseEnvVar["Use env var value"]
+    CheckEnv -->|No| Detect[Auto-detect environment]
+
+    Detect --> CheckDocker{/.dockerenv exists?}
     CheckDocker -->|Yes| Docker[Docker Environment]
     CheckDocker -->|No| CheckCI{CI env var set?}
     CheckCI -->|Yes| CI[CI Environment]
     CheckCI -->|No| Host[Host Environment]
 
-    Docker --> DockerConfig["Use service names<br/>neo4j:7687<br/>eventstore:2113"]
-    CI --> CIConfig["Use localhost<br/>with CI ports"]
-    Host --> HostConfig["Use localhost<br/>localhost:7687<br/>localhost:2113"]
+    Docker --> DockerConfig["esdb://eventstore:2113?tls=false"]
+    CI --> CIConfig["esdb://eventstore:2113?tls=false"]
+    Host --> HostConfig["esdb://localhost:2113?tls=false"]
 ```
+
+**Priority Order:**
+1. Config file `event_sourcing.connection_string` (highest)
+2. `ESDB_CONNECTION_STRING` environment variable
+3. Auto-detected based on runtime environment (lowest)
+
+**Implementation:** See `src/events/store.py:get_event_store_client()` and `src/api/routers/edits.py:get_event_store()`

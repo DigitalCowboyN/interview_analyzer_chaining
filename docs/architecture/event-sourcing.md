@@ -1,6 +1,6 @@
 # Event Sourcing Architecture
 
-> **Last Updated:** 2026-01-18
+> **Last Updated:** 2026-01-25
 
 ## Overview
 
