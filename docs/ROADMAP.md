@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-01-25
+**Last Updated:** 2026-01-26
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -19,12 +19,13 @@
 | M2.9 | ✅ Complete | User Edit API |
 | M3.0 | ✅ Complete | Remove Dual-Write + neo4j 6.x |
 | **TC** | ✅ Complete | Test Coverage Improvement (90.1%) + Phase 9 Cleanup |
+| **TC.10** | ⏳ In Progress | Test Fixes + Infrastructure Integration |
 | M3.1 | 📋 Planned | Vector Search |
 | M3.2 | 📋 Planned | AI Agent Upgrade (openai 2.x) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** Ready for M3.1 (Vector Search)
-**Tests:** 1027 passing, 44 skipped | **Coverage:** 90.1%
+**Current Phase:** TC.10 (Test Fixes + Infrastructure Integration)
+**Tests:** 1091 passing, 1 failing (infra), 19 skipped | **Coverage:** 90.1%
 
 ---
 
@@ -95,6 +96,30 @@
 - Skipped tests: Reduced from 44 architectural skips to 33 (11 deleted, 8 refactored)
 
 **Completed:** 2026-01-25
+
+---
+
+### TC.10: Test Fixes + Infrastructure Integration ⏳ IN PROGRESS
+
+**Goal:** Fix remaining test issues and enable infrastructure-dependent integration tests
+
+- [x] Fix projection handler unit tests (mock bug: Neo4jConnectionManager.get_session)
+- [x] Fix pipeline conftest fixture (mock bug: classify_sentence vs analyze_sentence)
+- [x] Add integration markers to live API tests (26 tests now properly marked)
+- [ ] Fix test_projection_rebuild.py infrastructure test
+  - Requires running EventStoreDB + Neo4j
+  - Need `make test-rebuild` target for isolated execution
+- [ ] Verify all Make targets work for infrastructure tests
+
+**Test Status After Fixes:**
+- Unit tests (`-m "not integration"`): 977 passed, 3 skipped
+- Full suite (with valid API keys): 1091 passed, 1 failed (infra), 19 skipped
+- The 1 failing test requires EventStoreDB + Neo4j infrastructure
+
+**Make Targets Required:**
+- `make test-rebuild` - Run projection rebuild test with infrastructure
+- `make test-infra-up` - Start Neo4j + EventStoreDB (existing)
+- `make test-infra-down` - Stop infrastructure (existing)
 
 ---
 
@@ -284,6 +309,9 @@ Neo4j (sole writer, materialized view)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-01-26 | TC.10 phase for infrastructure tests | Projection rebuild test needs dedicated Make target and infra |
+| 2026-01-26 | Fixed mock bugs in unit tests | Neo4j session mock used wrong pattern; pipeline fixture mocked wrong method |
+| 2026-01-26 | Added integration markers to 26 live API tests | Proper skipping when running unit tests without API keys |
 | 2026-01-25 | Integration test infrastructure complete | ESDB environment detection, Make targets for test orchestration |
 | 2026-01-24 | Test coverage 90.1% achieved | 1000 tests, added Phase 5-6, fixed environment.py bug |
 | 2026-01-24 | Test coverage milestone extended | 86.0% coverage achieved, 943 tests, fixed parked_events.py bugs |

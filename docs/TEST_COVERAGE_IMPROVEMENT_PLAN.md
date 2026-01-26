@@ -1,8 +1,8 @@
 # Test Coverage Improvement Plan
 
 > **Created:** 2026-01-18
-> **Updated:** 2026-01-24
-> **Current Coverage:** 90.1% (1027 tests passing, 45 skipped) ✅ STRETCH GOAL MET
+> **Updated:** 2026-01-26
+> **Current Coverage:** 90.1% (1091 tests passing, 19 skipped) ✅ STRETCH GOAL MET
 > **Target Coverage:** 90%+ (stretch goal)
 
 ---
@@ -569,8 +569,9 @@ tests/
 | Metric | Start | Current | Target |
 |--------|-------|---------|--------|
 | Overall Coverage | 66.8% | **90.1%** ✅ | 90%+ |
-| Tests Passing | 554 | **1027** ✅ | 1050+ |
-| Tests Skipped | 54 | **45** | <10 |
+| Tests Passing | 554 | **1091** ✅ | 1050+ |
+| Tests Skipped | 54 | **19** ✅ | <10 |
+| Tests Failing | N/A | **1** (infra) | 0 |
 | E2E Tests | 6 | 6 | 15+ |
 
 ### Coverage by Module (Current State)
@@ -756,6 +757,112 @@ These tests already use the correct pattern:
 - 2 tests documented (configuration issues - performance tests, not correctness)
 - 2 tests kept as-is (projection rebuild - conditional skip is correct)
 - Skipped tests reduced from 44 to ~33 (removed deprecated, refactored data integrity)
+
+---
+
+## Phase 10: Test Fixes & Infrastructure Integration ⏳ IN PROGRESS
+
+**Goal:** Fix remaining test issues and enable infrastructure-dependent tests
+**Priority:** P0 - Blocking test suite stability
+**Status:** In Progress (2026-01-26)
+
+### P10.1: Fix Mock Bugs in Unit Tests ✅ COMPLETE
+
+**Files Modified:**
+- `tests/projections/test_projection_handlers_unit.py`
+- `tests/pipeline/conftest.py`
+
+**Bug 1: Neo4j Session Mock Pattern**
+```python
+# WRONG - instance attribute doesn't override class method
+handler.neo4j_manager = MagicMock()
+handler.neo4j_manager.get_session = MagicMock(return_value=mock_session)
+
+# CORRECT - patch at module level
+with patch(
+    "src.projections.handlers.base_handler.Neo4jConnectionManager.get_session",
+    return_value=mock_session,
+):
+```
+
+**Bug 2: Pipeline Fixture Mocked Wrong Method**
+```python
+# WRONG - mocked analyze_sentence but code calls classify_sentence
+sentence_analyzer.analyze_sentence = mock_analyze_sentence
+
+# CORRECT - mock the actual async method being called
+async def mock_classify_sentence(sentence: str, contexts: Dict[str, str]) -> Dict[str, Any]:
+    ...
+sentence_analyzer.classify_sentence = mock_classify_sentence
+```
+
+### P10.2: Add Integration Markers to Live API Tests ✅ COMPLETE
+
+**Files Modified:**
+- `tests/integration/test_anthropic_api_messages.py`
+- `tests/integration/test_multi_provider_api_live.py`
+- `tests/integration/test_openai_api_responses.py`
+- `tests/integration/test_prompt_validation_live.py`
+- `tests/integration/test_sentence_classification_live.py`
+
+**Change:** Added `pytestmark = pytest.mark.integration` to each file.
+
+**Result:** 26 live API tests now properly skipped when running `pytest -m "not integration"`.
+
+### P10.3: Infrastructure Test - Projection Rebuild 📋 IN PROGRESS
+
+**File:** `tests/integration/test_projection_rebuild.py`
+**Tests:** 2 | **Status:** 1 failing (requires infrastructure)
+
+**Test:** `test_projection_service_rebuilds_neo4j_from_events`
+
+**What it tests:**
+1. Pipeline processes file → emits events to EventStoreDB
+2. Projection handlers process events → create Neo4j state
+3. Delete all Neo4j nodes
+4. Replay events through projection handlers
+5. Verify Neo4j state is correctly rebuilt
+
+**Infrastructure Required:**
+- EventStoreDB running on `localhost:2113` or `eventstore:2113`
+- Neo4j test database running on `localhost:7688`
+- Valid OpenAI API key (for pipeline processing)
+
+**Make Target Needed:**
+```makefile
+# Run projection rebuild test specifically
+.PHONY: test-rebuild
+test-rebuild: test-infra-up
+	@echo "Running projection rebuild test..."
+	$(PYTHON) -m pytest tests/integration/test_projection_rebuild.py -v
+	@if [ "$(KEEP_SERVICES)" = "0" ]; then $(MAKE) test-infra-down; fi
+```
+
+### P10.4: Verify Make Targets 📋 PLANNED
+
+Ensure all test Make targets work correctly:
+
+| Target | Purpose | Status |
+|--------|---------|--------|
+| `make test-unit` | Run unit tests only | ✅ Works |
+| `make test-integration` | Run integration tests | ✅ Works |
+| `make test-infra-up` | Start Neo4j + ESDB | ✅ Works |
+| `make test-infra-down` | Stop infrastructure | ✅ Works |
+| `make test-integration-full` | Full integration cycle | ✅ Works |
+| `make test-rebuild` | Projection rebuild test | 📋 Needs adding |
+
+### Summary
+
+| Sub-Phase | Description | Status |
+|-----------|-------------|--------|
+| P10.1 | Fix mock bugs in unit tests | ✅ Complete |
+| P10.2 | Add integration markers to live API tests | ✅ Complete |
+| P10.3 | Enable projection rebuild test | 📋 In Progress |
+| P10.4 | Verify Make targets | 📋 Planned |
+
+**Test Results After Phase 10 Fixes:**
+- Unit tests (`-m "not integration"`): **977 passed**, 3 skipped
+- Full suite (with valid API keys): **1091 passed**, 1 failed (infra), 19 skipped
 
 ---
 
