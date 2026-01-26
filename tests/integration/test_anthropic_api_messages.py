@@ -25,6 +25,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from anthropic import AsyncAnthropic
 
+# Mark all tests in this module as integration tests (requires real API keys)
+pytestmark = pytest.mark.integration
+
 # Check for API key
 API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 if not API_KEY:

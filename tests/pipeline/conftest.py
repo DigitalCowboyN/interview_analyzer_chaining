@@ -231,8 +231,9 @@ def real_analysis_service_with_mocked_llm(realistic_config, mock_metrics_tracker
     sentence_analyzer = SentenceAnalyzer(realistic_config)
 
     # Mock only the LLM interaction, not the logic
+    # Note: AnalysisService calls classify_sentence (async method), not analyze_sentence
 
-    def mock_analyze_sentence(sentence: str, context: Dict[str, Any], task_id: str = None) -> Dict[str, Any]:
+    async def mock_classify_sentence(sentence: str, contexts: Dict[str, str]) -> Dict[str, Any]:
         """
         Mock that returns realistic analysis based on actual sentence content.
 
@@ -276,8 +277,8 @@ def real_analysis_service_with_mocked_llm(realistic_config, mock_metrics_tracker
             },
         }
 
-    # Apply the mock
-    sentence_analyzer.analyze_sentence = mock_analyze_sentence
+    # Apply the mock to classify_sentence (the method AnalysisService actually calls)
+    sentence_analyzer.classify_sentence = mock_classify_sentence
 
     # Create the real AnalysisService
     analysis_service = AnalysisService(

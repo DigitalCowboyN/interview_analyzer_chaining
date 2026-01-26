@@ -173,6 +173,8 @@ class TestBaseHandlerRetryLogic:
 
     async def test_retries_on_transient_error(self):
         """Test that handler retries on transient errors."""
+        from unittest.mock import patch
+
         attempt_count = 0
 
         class TestHandler(BaseProjectionHandler):
@@ -189,6 +191,7 @@ class TestBaseHandlerRetryLogic:
         mock_tx = AsyncMock()
         mock_tx.run = AsyncMock()
         mock_tx.commit = AsyncMock()
+        mock_tx.rollback = AsyncMock()
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()
@@ -198,9 +201,6 @@ class TestBaseHandlerRetryLogic:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        handler.neo4j_manager = MagicMock()
-        handler.neo4j_manager.get_session = MagicMock(return_value=mock_session)
-
         event = EventEnvelope(
             event_type="TestEvent",
             aggregate_type=AggregateType.INTERVIEW,
@@ -209,14 +209,20 @@ class TestBaseHandlerRetryLogic:
             data={},
         )
 
-        # Handle with retry
-        await handler.handle_with_retry(event, lane_id=0)
+        # Patch Neo4jConnectionManager.get_session at module level
+        with patch(
+            "src.projections.handlers.base_handler.Neo4jConnectionManager.get_session",
+            return_value=mock_session,
+        ):
+            # Handle with retry
+            await handler.handle_with_retry(event, lane_id=0)
 
         # Should have attempted 3 times
         assert attempt_count == 3
 
     async def test_parks_event_after_max_retries(self):
         """Test that handler parks event after max retries."""
+        from unittest.mock import patch
 
         class TestHandler(BaseProjectionHandler):
             async def apply(self, tx, event):
@@ -238,9 +244,6 @@ class TestBaseHandlerRetryLogic:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        handler.neo4j_manager = MagicMock()
-        handler.neo4j_manager.get_session = MagicMock(return_value=mock_session)
-
         event = EventEnvelope(
             event_type="TestEvent",
             aggregate_type=AggregateType.INTERVIEW,
@@ -249,9 +252,14 @@ class TestBaseHandlerRetryLogic:
             data={},
         )
 
-        # Handle with retry - should raise after parking
-        with pytest.raises(Exception):
-            await handler.handle_with_retry(event, lane_id=0)
+        # Patch Neo4jConnectionManager.get_session at module level
+        with patch(
+            "src.projections.handlers.base_handler.Neo4jConnectionManager.get_session",
+            return_value=mock_session,
+        ):
+            # Handle with retry - should raise after parking
+            with pytest.raises(Exception):
+                await handler.handle_with_retry(event, lane_id=0)
 
         # Should have parked the event
         handler.parked_events_manager.park_event.assert_called_once()

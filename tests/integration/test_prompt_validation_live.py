@@ -26,6 +26,9 @@ import yaml
 
 from src.agents.agent_factory import AgentFactory
 
+# Mark all tests in this module as integration tests (requires real API keys)
+pytestmark = pytest.mark.integration
+
 # Check for API keys
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY")
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY")

@@ -24,11 +24,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from openai import AsyncOpenAI
 
+# Mark all tests in this module as integration tests (requires real API keys)
+pytestmark = pytest.mark.integration
+
 # Make sure your OPENAI_API_KEY is set in the environment.
 API_KEY = os.environ.get("OPENAI_API_KEY")
 if not API_KEY:
-    raise ValueError(
-        "API key is not set. Please set the OPENAI_API_KEY environment variable."
+    pytest.skip(
+        "OPENAI_API_KEY not set - skipping OpenAI API tests",
+        allow_module_level=True
     )
 
 client = AsyncOpenAI(api_key=API_KEY)

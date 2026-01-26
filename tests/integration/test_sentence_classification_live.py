@@ -33,6 +33,9 @@ from src.agents.context_builder import ContextBuilder
 from src.agents.sentence_analyzer import SentenceAnalyzer
 from src.config import config
 
+# Mark all tests in this module as integration tests (requires real API keys)
+pytestmark = pytest.mark.integration
+
 # Check for API keys
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY")
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY")
