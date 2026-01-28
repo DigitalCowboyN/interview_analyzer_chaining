@@ -29,6 +29,7 @@ class InterviewCreatedData(BaseModel):
 
     title: str = Field(..., description="Interview title/name")
     source: str = Field(..., description="Source of the interview (e.g., filename)")
+    project_id: str = Field(..., description="ID of the project this interview belongs to")
     language: Optional[str] = Field(None, description="Language of the interview content")
     started_at: Optional[datetime] = Field(None, description="When the interview was conducted")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional interview metadata")
@@ -67,6 +68,7 @@ def create_interview_created_event(
     version: int,
     title: str,
     source: str,
+    project_id: str,
     language: Optional[str] = None,
     started_at: Optional[datetime] = None,
     metadata: Optional[Dict[str, Any]] = None,
@@ -80,6 +82,7 @@ def create_interview_created_event(
         version: Version number in the aggregate stream
         title: Interview title/name
         source: Source of the interview content
+        project_id: ID of the project this interview belongs to
         language: Language of the interview content
         started_at: When the interview was conducted
         metadata: Additional interview metadata
@@ -89,7 +92,7 @@ def create_interview_created_event(
         EventEnvelope: Complete event ready for storage
     """
     data = InterviewCreatedData(
-        title=title, source=source, language=language, started_at=started_at, metadata=metadata or {}
+        title=title, source=source, project_id=project_id, language=language, started_at=started_at, metadata=metadata or {}
     )
 
     return EventEnvelope(
@@ -98,6 +101,7 @@ def create_interview_created_event(
         aggregate_id=aggregate_id,
         version=version,
         data=data.model_dump(),
+        project_id=project_id,  # Also store in envelope for querying
         **envelope_kwargs
     )
 

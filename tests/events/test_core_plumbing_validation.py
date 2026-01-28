@@ -87,9 +87,10 @@ class TestInterviewEvents:
     def test_create_interview_created_event(self):
         """Test creating an InterviewCreated event."""
         aggregate_id = str(uuid.uuid4())
+        project_id = str(uuid.uuid4())
 
         event = create_interview_created_event(
-            aggregate_id=aggregate_id, version=1, title="Test Interview", source="test_file.txt", language="en"
+            aggregate_id=aggregate_id, version=1, title="Test Interview", source="test_file.txt", project_id=project_id, language="en"
         )
 
         assert event.event_type == "InterviewCreated"
@@ -181,10 +182,11 @@ class TestInterviewAggregate:
     def test_interview_load_from_history(self):
         """Test loading interview from historical events."""
         aggregate_id = str(uuid.uuid4())
+        project_id = str(uuid.uuid4())
 
         # Create events manually
         created_event = create_interview_created_event(
-            aggregate_id=aggregate_id, version=0, title="Historical Interview", source="history.txt"
+            aggregate_id=aggregate_id, version=0, title="Historical Interview", source="history.txt", project_id=project_id
         )
 
         # Load into new aggregate

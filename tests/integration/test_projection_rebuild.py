@@ -61,8 +61,10 @@ class TestProjectionRebuild:
                     await interview_handler.handle(event)
                 elif event.event_type == "StatusChanged":
                     await status_handler.handle(event)
-        except Exception:
-            pass  # Stream may not exist yet
+        except Exception as e:
+            # Only swallow "stream not found" errors, re-raise handler errors
+            if "not found" not in str(e).lower() and "does not exist" not in str(e).lower():
+                raise
 
         # Process Sentence and Analysis events
         sentence_handler = SentenceCreatedHandler()
@@ -78,8 +80,10 @@ class TestProjectionRebuild:
                         await sentence_handler.handle(event)
                     elif event.event_type == "AnalysisGenerated":
                         await analysis_handler.handle(event)
-            except Exception:
-                pass  # Stream may not exist yet
+            except Exception as e:
+                # Only swallow "stream not found" errors, re-raise handler errors
+                if "not found" not in str(e).lower() and "does not exist" not in str(e).lower():
+                    raise
 
     async def test_projection_service_rebuilds_neo4j_from_events(
         self,

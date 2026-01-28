@@ -52,67 +52,20 @@ class Neo4jMapStorage(ConversationMapStorage):
 
     async def initialize(self):
         """
-        Ensures the Project and Interview nodes exist and clears old data for the interview.
-        Uses MERGE for Project and Interview creation/matching.
-        Detaches and deletes any existing Sentence nodes linked to this Interview.
-        """
-        logger.debug(f"Initializing Neo4j storage for Interview: {self.interview_id}")
+        Initialize storage for the interview.
 
-        # Use a transaction for multiple operations
-        try:
-            async with await Neo4jConnectionManager.get_session() as session:
-                # Create Project and Interview nodes, clear old data
-                await self._run_initialization_queries(session)
-            logger.info(f"Neo4j initialization complete for Interview: {self.interview_id}")
-        except Exception as e:
-            logger.error(
-                f"Failed Neo4j initialization for Interview {self.interview_id}: {e}",
-                exc_info=True,
-            )
-            # Re-raise the exception to signal failure to the caller
-            raise
+        M3.0 Architecture: This is now a no-op. The projection service is the sole writer
+        to Neo4j. Project and Interview nodes are created by the projection service when
+        processing InterviewCreated events.
 
-    async def _run_initialization_queries(self, session):
-        """Run initialization queries directly on the session."""
-        logger.debug(f"Running initialization queries for Interview: {self.interview_id}")
-        # 1. Ensure Project exists
-        project_query = """
-            MERGE (p:Project {project_id: $project_id})
-            ON CREATE SET p.created_at = datetime(), p.created_by = 'system'
-            RETURN p
+        Previously this method created Project/Interview nodes directly, but that violated
+        the single-writer principle and caused version conflicts with projection handlers.
         """
-        await session.run(project_query, project_id=self.project_id)
-        logger.debug(f"Merged Project {self.project_id}")
-
-        # 2. Ensure Interview exists and link it to Project
-        # Direct writes set event_version=0 (projection service will update to actual version)
-        interview_query = """
-            MATCH (p:Project {project_id: $project_id})
-            MERGE (i:Interview {interview_id: $interview_id})
-            ON CREATE SET
-                i.created_at = datetime(),
-                i.processed_by = 'system',
-                i.filename = $interview_id,
-                i.event_version = 0,
-                i.source = 'pipeline_direct'
-            MERGE (p)-[:CONTAINS_INTERVIEW]->(i)
-            RETURN i
-        """
-        await session.run(interview_query, project_id=self.project_id, interview_id=self.interview_id)
-        logger.debug(f"Merged Interview {self.interview_id} and relationship to Project {self.project_id}")
-
-        # 3. Delete old sentences and downstream analyses for this interview
-        delete_query = """
-            MATCH (i:Interview {interview_id: $interview_id})
-            OPTIONAL MATCH (i)-[:HAS_SENTENCE]->(s:Sentence)
-            DETACH DELETE s
-        """
-        result = await session.run(delete_query, interview_id=self.interview_id)
-        summary = await result.consume()  # Consume result to get summary info
         logger.debug(
-            f"Detached and deleted {summary.counters.nodes_deleted} old sentence nodes "
-            f"for Interview {self.interview_id}"
+            f"Neo4jMapStorage.initialize() called for Interview: {self.interview_id} - "
+            f"no-op in M3.0 single-writer architecture"
         )
+        # No direct Neo4j writes - projection service handles all writes
 
     async def write_entry(self, entry: Dict[str, Any]):
         """

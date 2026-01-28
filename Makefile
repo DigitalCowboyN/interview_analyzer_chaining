@@ -103,6 +103,7 @@ help:
 	@echo "  test-integration     Run integration tests (assumes services running)"
 	@echo "  test-integration-full  Start services → run integration tests → stop services"
 	@echo "  test-all-full        Start services → run ALL tests with coverage → stop"
+	@echo "  test-rebuild         Run projection rebuild test (validates event sourcing)"
 	@echo "  test-cov             Run tests with coverage report"
 	@echo ""
 	@echo "  Options for test-integration-full and test-all-full:"
@@ -299,6 +300,26 @@ test-projections:
 test-full-system:
 	@echo "Running full system test suite..."
 	$(PYTHON) -m pytest tests/ -v --ignore=tests/integration/test_projection_replay.py --ignore=tests/integration/test_idempotency.py --ignore=tests/integration/test_performance.py
+
+# Projection rebuild test - validates event sourcing architecture
+# Requires: EventStoreDB + Neo4j running, valid OpenAI API key
+# Usage: make test-rebuild
+#        make test-rebuild KEEP_SERVICES=1  (don't stop services after)
+.PHONY: test-rebuild
+test-rebuild: test-infra-up
+	@echo ""
+	@echo "=== Running Projection Rebuild Test ==="
+	@echo "This test validates that Neo4j can be rebuilt from events."
+	@echo ""
+	-$(PYTHON) -m pytest tests/integration/test_projection_rebuild.py -v --no-cov $(PYTEST_ARGS); \
+	TEST_EXIT=$$?; \
+	echo ""; \
+	if [ "$(KEEP_SERVICES)" = "0" ]; then \
+		$(MAKE) test-infra-down; \
+	else \
+		echo "KEEP_SERVICES=1: Test infrastructure left running"; \
+	fi; \
+	exit $$TEST_EXIT
 
 # --- End Testing --- #
 

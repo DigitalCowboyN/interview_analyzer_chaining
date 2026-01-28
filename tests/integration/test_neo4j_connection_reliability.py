@@ -114,19 +114,24 @@ class TestConnectionManagerReliability:
         assert is_ready is True
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        os.getenv("RUNNING_IN_DOCKER") == "true" or os.path.exists("/.dockerenv"),
-        reason="Timeout test not applicable in Docker where all Neo4j services are available",
-    )
-    async def test_wait_for_ready_timeout(self):
+    async def test_wait_for_ready_timeout(self, monkeypatch):
         """Test wait_for_ready timeout behavior with unavailable database."""
         await Neo4jConnectionManager.close_driver()
 
-        # This should timeout quickly since no database is running
+        # Use a definitely-unavailable port to test timeout behavior
+        # Port 9999 on localhost should not have a Neo4j instance
+        monkeypatch.setenv("NEO4J_URI", "bolt://localhost:9999")
+        monkeypatch.setenv("NEO4J_USER", "neo4j")
+        monkeypatch.setenv("NEO4J_PASSWORD", "invalid")
+
+        # This should timeout since the configured database is not available
         is_ready = await Neo4jConnectionManager.wait_for_ready(
-            timeout=2.0, test_mode=False  # Use production config which won't be available
+            timeout=2.0, test_mode=False
         )
         assert is_ready is False
+
+        # Cleanup: reset driver so subsequent tests get fresh state
+        await Neo4jConnectionManager.close_driver()
 
     @pytest.mark.asyncio
     async def test_driver_cleanup(self, ensure_neo4j_test_service):

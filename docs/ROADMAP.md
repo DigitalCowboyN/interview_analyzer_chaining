@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-01-26
+**Last Updated:** 2026-01-28
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -19,13 +19,13 @@
 | M2.9 | ✅ Complete | User Edit API |
 | M3.0 | ✅ Complete | Remove Dual-Write + neo4j 6.x |
 | **TC** | ✅ Complete | Test Coverage Improvement (90.1%) + Phase 9 Cleanup |
-| **TC.10** | ⏳ In Progress | Test Fixes + Infrastructure Integration |
+| **TC.10** | ✅ Complete | Test Fixes + Infrastructure Integration |
 | M3.1 | 📋 Planned | Vector Search |
 | M3.2 | 📋 Planned | AI Agent Upgrade (openai 2.x) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** TC.10 (Test Fixes + Infrastructure Integration)
-**Tests:** 1091 passing, 1 failing (infra), 19 skipped | **Coverage:** 90.1%
+**Current Phase:** M3.1 Planning
+**Tests:** 977 unit + 115 integration passing, 19 skipped | **Coverage:** 87.9% (unit) / 56.7% (integration)
 
 ---
 
@@ -99,27 +99,29 @@
 
 ---
 
-### TC.10: Test Fixes + Infrastructure Integration ⏳ IN PROGRESS
+### TC.10: Test Fixes + Infrastructure Integration ✅ COMPLETE
 
 **Goal:** Fix remaining test issues and enable infrastructure-dependent integration tests
 
 - [x] Fix projection handler unit tests (mock bug: Neo4jConnectionManager.get_session)
 - [x] Fix pipeline conftest fixture (mock bug: classify_sentence vs analyze_sentence)
 - [x] Add integration markers to live API tests (26 tests now properly marked)
-- [ ] Fix test_projection_rebuild.py infrastructure test
-  - Requires running EventStoreDB + Neo4j
-  - Need `make test-rebuild` target for isolated execution
-- [ ] Verify all Make targets work for infrastructure tests
+- [x] Fix test_projection_rebuild.py infrastructure test
+  - Made Neo4jMapStorage.initialize() a no-op for M3.0 single-writer architecture
+  - Added `make test-rebuild` target
+- [x] Fix InterviewCreatedData to include project_id in event data
+  - Handlers now correctly read project_id from event payload
+- [x] Fix test infrastructure EventStore connection (ESDB_CONNECTION_STRING override)
+  - Tests now use EVENTSTORE_TEST_* variables following Neo4j pattern
+- [x] Fix test_wait_for_ready_timeout flaky test
+  - Now uses definitely-unavailable port instead of assuming production Neo4j absent
 
-**Test Status After Fixes:**
+**Test Status:**
 - Unit tests (`-m "not integration"`): 977 passed, 3 skipped
-- Full suite (with valid API keys): 1091 passed, 1 failed (infra), 19 skipped
-- The 1 failing test requires EventStoreDB + Neo4j infrastructure
+- Integration tests: 115 passed, 16 skipped (architectural)
+- Full suite: All tests passing
 
-**Make Targets Required:**
-- `make test-rebuild` - Run projection rebuild test with infrastructure
-- `make test-infra-up` - Start Neo4j + EventStoreDB (existing)
-- `make test-infra-down` - Stop infrastructure (existing)
+**Completed:** 2026-01-28
 
 ---
 
@@ -309,6 +311,10 @@ Neo4j (sole writer, materialized view)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-01-28 | TC.10 complete | All infrastructure tests passing, event env vars fixed |
+| 2026-01-28 | Added project_id to InterviewCreatedData | Handler needs project_id in event data, not just envelope |
+| 2026-01-28 | Made Neo4jMapStorage.initialize() no-op | M3.0 single-writer: projection service is sole Neo4j writer |
+| 2026-01-28 | Use EVENTSTORE_TEST_* vars in test fixtures | Follow Neo4j pattern; ignore production .env values |
 | 2026-01-26 | TC.10 phase for infrastructure tests | Projection rebuild test needs dedicated Make target and infra |
 | 2026-01-26 | Fixed mock bugs in unit tests | Neo4j session mock used wrong pattern; pipeline fixture mocked wrong method |
 | 2026-01-26 | Added integration markers to 26 live API tests | Proper skipping when running unit tests without API keys |

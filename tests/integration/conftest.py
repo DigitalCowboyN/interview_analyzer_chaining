@@ -200,7 +200,8 @@ def setup_test_environment(monkeypatch):
     - NEO4J_TEST_HOST, NEO4J_TEST_PORT (for URI construction)
     - NEO4J_TEST_USER
     - NEO4J_TEST_PASSWORD
-    - EVENTSTORE_HOST, EVENTSTORE_PORT (for connection string)
+    - ESDB_CONNECTION_STRING (full connection string)
+    - EVENTSTORE_HOST, EVENTSTORE_PORT (for connection string construction)
     """
     environment = detect_environment()
 
@@ -222,20 +223,43 @@ def setup_test_environment(monkeypatch):
     monkeypatch.setenv("NEO4J_TEST_USER", os.getenv("NEO4J_TEST_USER", "neo4j"))
     monkeypatch.setenv("NEO4J_TEST_PASSWORD", os.getenv("NEO4J_TEST_PASSWORD", "testpassword"))
 
+    # EventStoreDB Test Configuration
+    # Follow Neo4j pattern: check for test-specific override first, then construct
+    # based on environment. Ignore production ESDB_CONNECTION_STRING from .env.
+    esdb_test_connection_string = os.getenv("EVENTSTORE_TEST_CONNECTION_STRING")
+    if not esdb_test_connection_string:
+        if environment == "docker":
+            # Inside Docker container - use service names
+            esdb_host = os.getenv("EVENTSTORE_TEST_HOST", "eventstore")
+            esdb_port = os.getenv("EVENTSTORE_TEST_PORT", "2113")
+        else:
+            # Host or CI - use localhost with exposed port (from docker-compose.yml)
+            esdb_host = os.getenv("EVENTSTORE_TEST_HOST", "localhost")
+            esdb_port = os.getenv("EVENTSTORE_TEST_PORT", "2113")
+        esdb_test_connection_string = f"esdb://{esdb_host}:{esdb_port}?tls=false"
+
+    # Override the production env var so app uses test connection
+    monkeypatch.setenv("ESDB_CONNECTION_STRING", esdb_test_connection_string)
+
     print(f"Test environment configured for {environment} context")
     print(f"  Neo4j Test URI: {neo4j_test_uri}")
+    print(f"  EventStoreDB: {esdb_test_connection_string}")
 
-    # Force connection manager to reinitialize with new environment
-    # We'll let the connection manager handle this naturally rather than forcing it
+    # Force connection managers to reinitialize with new environment
     Neo4jConnectionManager._driver = None
+
+    # Reset the global EventStore client so it picks up the new connection string
+    import src.events.store as store_module
+    store_module._global_client = None
 
     yield  # Test runs here
 
-    # Cleanup: Reset driver state for next test
+    # Cleanup: Reset driver/client state for next test
     try:
         Neo4jConnectionManager._driver = None
+        store_module._global_client = None
     except Exception as e:
-        print(f"Warning: Error resetting driver after test: {e}")
+        print(f"Warning: Error resetting connections after test: {e}")
 
 
 # Utility fixtures for specific test scenarios
