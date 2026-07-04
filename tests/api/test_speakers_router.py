@@ -66,8 +66,10 @@ def test_merge_speaker_domain_error_returns_409(client):
 def test_reattribute_fragment_returns_202(client):
     sentence = MagicMock()
     sentence.version = 2
+    interview_repo = make_repo(make_interview_mock())
     repo = make_repo(sentence)
-    with patch("src.api.routers.speakers.get_sentence_repository", return_value=repo):
+    with patch("src.api.routers.speakers.get_interview_repository", return_value=interview_repo), \
+         patch("src.api.routers.speakers.get_sentence_repository", return_value=repo):
         resp = client.post(
             f"/speakers/{IID}/fragments/3/reattribute", json={"new_speaker_id": SP2}
         )
@@ -76,12 +78,37 @@ def test_reattribute_fragment_returns_202(client):
 
 
 def test_reattribute_missing_fragment_returns_404(client):
+    interview_repo = make_repo(make_interview_mock())
     repo = make_repo(None)
-    with patch("src.api.routers.speakers.get_sentence_repository", return_value=repo):
+    with patch("src.api.routers.speakers.get_interview_repository", return_value=interview_repo), \
+         patch("src.api.routers.speakers.get_sentence_repository", return_value=repo):
         resp = client.post(
             f"/speakers/{IID}/fragments/3/reattribute", json={"new_speaker_id": SP2}
         )
     assert resp.status_code == 404
+
+
+def test_reattribute_missing_interview_returns_404(client):
+    interview_repo = make_repo(None)
+    sentence_repo = make_repo(MagicMock())
+    with patch("src.api.routers.speakers.get_interview_repository", return_value=interview_repo), \
+         patch("src.api.routers.speakers.get_sentence_repository", return_value=sentence_repo):
+        resp = client.post(
+            f"/speakers/{IID}/fragments/3/reattribute", json={"new_speaker_id": SP2}
+        )
+    assert resp.status_code == 404
+    sentence_repo.load.assert_not_awaited()
+
+
+def test_rename_domain_error_returns_409(client):
+    interview = make_interview_mock()
+    interview.rename_speaker.side_effect = ValueError("Unknown speaker")
+    repo = make_repo(interview)
+    with patch("src.api.routers.speakers.get_interview_repository", return_value=repo):
+        resp = client.post(
+            f"/speakers/{IID}/{SP1}/rename", json={"new_display_name": "Dana"}
+        )
+    assert resp.status_code == 409
 
 
 def test_split_speaker_creates_and_reattributes(client):
@@ -114,3 +141,29 @@ def test_remove_stitch_returns_202(client):
         )
     assert resp.status_code == 202
     interview.remove_stitch.assert_called_once()
+
+
+def test_split_fragment_404_after_first_success_still_persists_speaker(client):
+    # Append-only log: speaker creation is saved before fragment loop; a
+    # missing fragment mid-loop returns 404 but does not roll back the speaker
+    # (documented partial-application semantics).
+    interview = make_interview_mock()
+    interview_repo = make_repo(interview)
+    sentence = MagicMock()
+    sentence.version = 1
+    sentence_repo = MagicMock()
+    sentence_repo.load = AsyncMock(side_effect=[sentence, None])
+    sentence_repo.save = AsyncMock()
+    with patch("src.api.routers.speakers.get_interview_repository", return_value=interview_repo), \
+         patch("src.api.routers.speakers.get_sentence_repository", return_value=sentence_repo):
+        resp = client.post(
+            f"/speakers/{IID}/split",
+            json={
+                "new_handle": "S3",
+                "new_display_name": "Third Voice",
+                "fragment_indices": [1, 2],
+            },
+        )
+    assert resp.status_code == 404
+    interview_repo.save.assert_awaited_once()  # speaker creation persisted
+    sentence.reattribute_speaker.assert_called_once()  # first fragment applied

@@ -18,7 +18,7 @@ from src.events.envelope import Actor, ActorType
 from src.events.repository import get_interview_repository, get_sentence_repository
 from src.utils.logger import get_logger
 
-router = APIRouter(tags=["Speakers"])
+router = APIRouter(tags=["speakers"])
 logger = get_logger()
 
 HUMAN = Actor(actor_type=ActorType.HUMAN, user_id="api")
@@ -133,6 +133,9 @@ async def split_speaker(interview_id: str, body: SplitSpeakerRequest):
 @router.post("/speakers/{interview_id}/fragments/{index}/reattribute", status_code=202)
 async def reattribute_fragment(interview_id: str, index: int, body: ReattributeRequest):
     """Human correction: this fragment was said by someone else."""
+    # interview_id is load-bearing for UUID derivation; verify it exists so a
+    # fabricated id cannot reattribute an unrelated sentence.
+    await _load_interview(interview_id)
     sentence_repo = get_sentence_repository()
     sentence = await sentence_repo.load(_fragment_uuid(interview_id, index))
     if sentence is None:
