@@ -1,0 +1,61 @@
+# Speaker inference over a window of unlabeled transcript fragments.
+# The transcript has NO speaker labels; speakers must be inferred from
+# conversational cues (questions vs answers, first-person content, verbal tics).
+speaker_window:
+  prompt: |
+    You are analyzing a raw conversation transcript that has NO speaker labels.
+    The fragments below are numbered and appear in as-spoken order. Multiple people
+    are talking, sometimes interrupting or talking over one another.
+
+    Assign every fragment a provisional speaker handle (S1, S2, S3, ...). Use cues
+    such as: who asks vs answers questions, first-person statements about roles or
+    work, greetings and responses, and consistent verbal habits. Use the SAME handle
+    for the same person throughout this window. Do not invent more speakers than
+    the dialogue supports.
+
+    For each fragment provide a confidence between 0.0 and 1.0.
+
+    Format: {{"assignments": [{{"index": <int>, "speaker": "<handle>", "confidence": <float>}}, ...]}}
+
+    Every fragment index must appear exactly once.
+
+    Fragments:
+    """
+    {fragments}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+# Stitching pass: group fragments into utterances (continuous thoughts) and
+# detect interruptions. The fragment sequence is never modified; this only
+# proposes grouping and interruption relationships.
+stitch_window:
+  prompt: |
+    You are analyzing a conversation transcript. Each numbered fragment below is
+    prefixed with its speaker handle. People sometimes interrupt each other, so a
+    speaker's single continuous thought (an "utterance") may be split across
+    NON-ADJACENT fragments, with other speakers' fragments in between.
+
+    Group the fragments into utterances:
+      - Consecutive fragments by the same speaker that express one thought belong
+        to the same utterance.
+      - If a speaker is interrupted and then RESUMES the same thought, include the
+        resumption fragments in the SAME utterance (this is the important case).
+      - A genuine topic change by the same speaker starts a new utterance.
+
+    Also report interruptions: cases where one utterance breaks into another
+    before it finishes.
+
+    Format:
+    {{"utterances": [{{"speaker": "<handle>", "fragment_indices": [<int>, ...], "confidence": <float>}}, ...],
+      "interruptions": [{{"interrupting": <utterance list index>, "interrupted": <utterance list index>, "at_index": <fragment index>}}, ...]}}
+
+    Every fragment index must appear in exactly one utterance. fragment_indices
+    must be in ascending order. Confidence is between 0.0 and 1.0.
+
+    Fragments:
+    """
+    {fragments}
+    """
+
+    Provide your response explicitly formatted as JSON.
