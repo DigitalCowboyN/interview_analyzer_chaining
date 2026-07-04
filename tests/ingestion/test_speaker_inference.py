@@ -79,3 +79,40 @@ async def test_invalid_window_response_skipped_not_fatal():
 def test_overlap_must_be_smaller_than_window():
     with pytest.raises(ValueError, match="overlap"):
         SpeakerInferenceService(window_size=10, overlap=10)
+
+
+@pytest.mark.asyncio
+async def test_reconcile_tie_goes_to_insertion_order():
+    # Local handle X votes equally for S1 and S2 in the overlap; the tie
+    # resolves to the first-voted global handle (dict insertion order). This
+    # pins the deterministic behavior.
+    service = SpeakerInferenceService(window_size=4, overlap=2)
+    fragments = frags(6)
+    responses = [
+        window_response([0, 1, 2, 3], ["S1", "S2", "S1", "S2"]),
+        window_response([0, 1, 2, 3], ["X", "X", "X", "Y"]),  # local for frags 2-5
+    ]
+    with patch("src.ingestion.speaker_inference.agent") as mock_agent:
+        mock_agent.call_model = AsyncMock(side_effect=responses)
+        result = await service.infer(fragments)
+    # X tied S1:1 vs S2:1 -> S1 (first vote encountered); Y is a new handle.
+    assert [a.handle for a in result.assignments] == ["S1", "S2", "S1", "S2", "S1", "Y"]
+    assert result.handles == ["S1", "S2", "Y"]
+
+
+@pytest.mark.asyncio
+async def test_three_window_chain_reconciles_through_remapped_globals():
+    # Window 3's local handles must map through globals established when
+    # window 2's locals were themselves remapped (no phantom speakers).
+    service = SpeakerInferenceService(window_size=4, overlap=2)
+    fragments = frags(8)
+    responses = [
+        window_response([0, 1, 2, 3], ["S1", "S2", "S1", "S2"]),
+        window_response([0, 1, 2, 3], ["A", "B", "A", "B"]),  # frags 2-5
+        window_response([0, 1, 2, 3], ["P", "Q", "P", "Q"]),  # frags 4-7
+    ]
+    with patch("src.ingestion.speaker_inference.agent") as mock_agent:
+        mock_agent.call_model = AsyncMock(side_effect=responses)
+        result = await service.infer(fragments)
+    assert result.handles == ["S1", "S2"]
+    assert [a.handle for a in result.assignments] == ["S1", "S2"] * 4
