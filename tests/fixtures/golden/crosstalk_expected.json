@@ -1,0 +1,37 @@
+{
+  "_comment": "Hand-verified against crosstalk_excerpt.txt. S1 = interviewer (joins late, apologizes, thanks participant); S2 = participant. Assignments are the recorded mock LLM window response; 'expected' holds structural assertions.",
+  "speaker_window_response": {
+    "assignments": [
+      {"index": 0, "speaker": "S1", "confidence": 0.8},
+      {"index": 1, "speaker": "S1", "confidence": 0.85},
+      {"index": 2, "speaker": "S2", "confidence": 0.9},
+      {"index": 3, "speaker": "S2", "confidence": 0.6},
+      {"index": 4, "speaker": "S2", "confidence": 0.8},
+      {"index": 5, "speaker": "S2", "confidence": 0.75},
+      {"index": 6, "speaker": "S1", "confidence": 0.8},
+      {"index": 7, "speaker": "S1", "confidence": 0.7},
+      {"index": 8, "speaker": "S2", "confidence": 0.85},
+      {"index": 9, "speaker": "S1", "confidence": 0.85},
+      {"index": 10, "speaker": "S1", "confidence": 0.8},
+      {"index": 11, "speaker": "S1", "confidence": 0.9},
+      {"index": 12, "speaker": "S1", "confidence": 0.8},
+      {"index": 13, "speaker": "S2", "confidence": 0.9},
+      {"index": 14, "speaker": "S2", "confidence": 0.85},
+      {"index": 15, "speaker": "S2", "confidence": 0.85},
+      {"index": 16, "speaker": "S1", "confidence": 0.85},
+      {"index": 17, "speaker": "S1", "confidence": 0.85},
+      {"index": 18, "speaker": "S1", "confidence": 0.7},
+      {"index": 19, "speaker": "S1", "confidence": 0.9},
+      {"index": 20, "speaker": "S1", "confidence": 0.7}
+    ]
+  },
+  "stitch_window_response": {"utterances": [], "interruptions": []},
+  "expected": {
+    "fragment_count": 21,
+    "speaker_count": 2,
+    "utterance_count": 7,
+    "min_utterances": 6,
+    "low_confidence_count": 1,
+    "every_fragment_attributed": true
+  }
+}
