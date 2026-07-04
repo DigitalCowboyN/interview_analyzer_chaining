@@ -71,7 +71,7 @@ class SpeakerCreatedData(BaseModel):
     display_name: str = Field(..., description="Human-readable name (initially the handle)")
     provisional: bool = Field(..., description="True when inferred rather than confirmed")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Inference confidence")
-    method: str = Field(..., description="'parsed' | 'inference' | 'human'")
+    method: str = Field(..., description="'parsed' | 'inference'")
 
 
 class SpeakerRenamedData(BaseModel):

@@ -58,3 +58,23 @@ def test_rename_unknown_speaker_rejected():
     i = make_interview()
     with pytest.raises(ValueError, match="Unknown speaker"):
         i.rename_speaker(SP1, "Nobody")
+
+
+def test_rename_already_merged_speaker_rejected():
+    i = make_interview()
+    i.add_speaker(SP1, "S1", "S1", True, 0.8, "inference")
+    i.add_speaker(SP2, "S2", "S2", True, 0.6, "inference")
+    i.merge_speakers(surviving_speaker_id=SP1, merged_speaker_id=SP2)
+    with pytest.raises(ValueError, match="already been merged"):
+        i.rename_speaker(SP2, "Retired Speaker")
+
+
+def test_merge_with_already_merged_speaker_rejected():
+    i = make_interview()
+    i.add_speaker(SP1, "S1", "S1", True, 0.8, "inference")
+    i.add_speaker(SP2, "S2", "S2", True, 0.6, "inference")
+    sp3 = "55555555-5555-5555-5555-555555555550"
+    i.add_speaker(sp3, "S3", "S3", True, 0.7, "inference")
+    i.merge_speakers(surviving_speaker_id=SP1, merged_speaker_id=SP2)
+    with pytest.raises(ValueError, match="already been merged"):
+        i.merge_speakers(surviving_speaker_id=SP2, merged_speaker_id=sp3)

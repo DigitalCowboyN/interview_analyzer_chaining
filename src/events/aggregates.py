@@ -407,6 +407,8 @@ class Interview(AggregateRoot):
         """Human correction: give a provisional speaker a real name."""
         if speaker_id not in self.speakers:
             raise ValueError(f"Unknown speaker: {speaker_id}")
+        if self.speakers[speaker_id]["merged_into"] is not None:
+            raise ValueError(f"Speaker {speaker_id} has already been merged")
 
         data = SpeakerRenamedData(
             speaker_id=speaker_id,
@@ -429,7 +431,7 @@ class Interview(AggregateRoot):
         for sid in (surviving_speaker_id, merged_speaker_id):
             if sid not in self.speakers:
                 raise ValueError(f"Unknown speaker: {sid}")
-            if self.speakers[sid]["merged_into"]:
+            if self.speakers[sid]["merged_into"] is not None:
                 raise ValueError(f"Speaker {sid} has already been merged")
 
         data = SpeakerMergedData(
