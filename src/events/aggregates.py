@@ -10,7 +10,12 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .envelope import Actor, EventEnvelope
-from .interview_events import InterviewStatus
+from .interview_events import (
+    InterviewStatus,
+    SpeakerCreatedData,
+    SpeakerMergedData,
+    SpeakerRenamedData,
+)
 from .sentence_events import (
     EditorType,
     SentenceStatus,
@@ -154,6 +159,9 @@ class Interview(AggregateRoot):
         self.created_at: Optional[datetime] = None
         self.updated_at: Optional[datetime] = None
 
+        # Conversation structure (Layer 1): speakers keyed by speaker_id
+        self.speakers: Dict[str, Dict[str, Any]] = {}
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the interview's state."""
         if event.event_type == "InterviewCreated":
@@ -166,6 +174,12 @@ class Interview(AggregateRoot):
             self._apply_interview_archived(event)
         elif event.event_type == "InterviewDeleted":
             self._apply_interview_deleted(event)
+        elif event.event_type == "SpeakerCreated":
+            self._apply_speaker_created(event)
+        elif event.event_type == "SpeakerRenamed":
+            self._apply_speaker_renamed(event)
+        elif event.event_type == "SpeakerMerged":
+            self._apply_speaker_merged(event)
         else:
             raise ValueError(f"Unknown event type for Interview: {event.event_type}")
 
@@ -209,6 +223,31 @@ class Interview(AggregateRoot):
         """Apply InterviewDeleted event."""
         # In event sourcing, we don't actually delete the aggregate
         # but we can mark it as deleted in the state
+        self.updated_at = event.occurred_at
+
+    def _apply_speaker_created(self, event: EventEnvelope) -> None:
+        """Apply SpeakerCreated event."""
+        data = event.data
+        self.speakers[data["speaker_id"]] = {
+            "handle": data["handle"],
+            "display_name": data["display_name"],
+            "provisional": data["provisional"],
+            "merged_into": None,
+        }
+        self.updated_at = event.occurred_at
+
+    def _apply_speaker_renamed(self, event: EventEnvelope) -> None:
+        """Apply SpeakerRenamed event (human correction; confirms the speaker)."""
+        data = event.data
+        speaker = self.speakers[data["speaker_id"]]
+        speaker["display_name"] = data["new_display_name"]
+        speaker["provisional"] = False
+        self.updated_at = event.occurred_at
+
+    def _apply_speaker_merged(self, event: EventEnvelope) -> None:
+        """Apply SpeakerMerged event."""
+        data = event.data
+        self.speakers[data["merged_speaker_id"]]["merged_into"] = data["surviving_speaker_id"]
         self.updated_at = event.occurred_at
 
     # Command methods (business logic)
@@ -301,6 +340,77 @@ class Interview(AggregateRoot):
         return self._add_event(
             event_type="StatusChanged",
             data={"from_status": self.status.value, "to_status": new_status.value, "reason": reason},
+            **envelope_kwargs,
+        )
+
+    def add_speaker(
+        self,
+        speaker_id: str,
+        handle: str,
+        display_name: str,
+        provisional: bool,
+        confidence: float,
+        method: str,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Register a speaker discovered by parsing or inference."""
+        if self.version < 0:
+            raise ValueError("Interview must be created before adding speakers")
+        if speaker_id in self.speakers:
+            raise ValueError(f"Speaker {speaker_id} already exists")
+
+        data = SpeakerCreatedData(
+            speaker_id=speaker_id,
+            handle=handle,
+            display_name=display_name,
+            provisional=provisional,
+            confidence=confidence,
+            method=method,
+        )
+
+        return self._add_event(
+            event_type="SpeakerCreated",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def rename_speaker(self, speaker_id: str, new_display_name: str, **envelope_kwargs) -> EventEnvelope:
+        """Human correction: give a provisional speaker a real name."""
+        if speaker_id not in self.speakers:
+            raise ValueError(f"Unknown speaker: {speaker_id}")
+
+        data = SpeakerRenamedData(
+            speaker_id=speaker_id,
+            old_display_name=self.speakers[speaker_id]["display_name"],
+            new_display_name=new_display_name,
+        )
+
+        return self._add_event(
+            event_type="SpeakerRenamed",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def merge_speakers(
+        self, surviving_speaker_id: str, merged_speaker_id: str, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Human correction: two provisional handles were the same person."""
+        if surviving_speaker_id == merged_speaker_id:
+            raise ValueError("Cannot merge a speaker into itself")
+        for sid in (surviving_speaker_id, merged_speaker_id):
+            if sid not in self.speakers:
+                raise ValueError(f"Unknown speaker: {sid}")
+            if self.speakers[sid]["merged_into"]:
+                raise ValueError(f"Speaker {sid} has already been merged")
+
+        data = SpeakerMergedData(
+            surviving_speaker_id=surviving_speaker_id,
+            merged_speaker_id=merged_speaker_id,
+        )
+
+        return self._add_event(
+            event_type="SpeakerMerged",
+            data=data.model_dump(),
             **envelope_kwargs,
         )
 
