@@ -15,6 +15,11 @@ from src.projections.handlers.sentence_handlers import (
     SentenceCreatedHandler,
     SentenceEditedHandler,
 )
+from src.projections.handlers.utterance_handlers import (
+    InterruptionRecordedHandler,
+    StitchRemovedHandler,
+    UtteranceIdentifiedHandler,
+)
 from src.projections.handlers.speaker_handlers import (
     SpeakerAttributedHandler,
     SpeakerCreatedHandler,
@@ -62,6 +67,11 @@ def create_handler_registry(
     registry.register("SpeakerMerged", SpeakerMergedHandler(parked_events_manager))
     registry.register("SpeakerAttributed", SpeakerAttributedHandler(parked_events_manager))
     registry.register("SpeakerReattributed", SpeakerReattributedHandler(parked_events_manager))
+
+    # Register Utterance handlers (Layer 1 stitching overlay)
+    registry.register("UtteranceIdentified", UtteranceIdentifiedHandler(parked_events_manager))
+    registry.register("InterruptionRecorded", InterruptionRecordedHandler(parked_events_manager))
+    registry.register("StitchRemoved", StitchRemovedHandler(parked_events_manager))
 
     registered_types = registry.get_registered_types()
     logger.info(f"Handler registry initialized with {len(registered_types)} handlers: {registered_types}")
