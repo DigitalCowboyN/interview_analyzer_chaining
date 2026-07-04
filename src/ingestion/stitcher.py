@@ -86,9 +86,13 @@ class Stitcher:
     def _baseline_groups(
         self, fragments: List[RawFragment], handle_by_seq: Dict[int, str]
     ) -> List[Tuple[str, List[int], float]]:
-        """Group consecutive same-speaker fragments: [(handle, [seq, ...], confidence)]."""
+        """Group consecutive same-speaker fragments: [(handle, [seq, ...], confidence)].
+
+        Fragments are sorted by sequence_order first, so callers may pass them
+        in any order.
+        """
         groups: List[Tuple[str, List[int], float]] = []
-        for frag in fragments:
+        for frag in sorted(fragments, key=lambda f: f.sequence_order):
             handle = handle_by_seq.get(frag.sequence_order, "S?")
             if groups and groups[-1][0] == handle:
                 groups[-1][1].append(frag.sequence_order)
@@ -103,6 +107,11 @@ class Stitcher:
         groups: List[Tuple[str, List[int], float]],
     ) -> Tuple[List[Tuple[str, List[int], float]], List[Interruption]]:
         """Ask the LLM for cross-interruption merges and interruption edges."""
+        if len(fragments) > self.window_size * 10:
+            logger.warning(
+                f"Stitch refinement prompt spans {len(fragments)} fragments "
+                f"(> {self.window_size * 10}); prompt size is unbounded"
+            )
         numbered = "\n".join(
             f"{f.sequence_order}: [{handle_by_seq.get(f.sequence_order, 'S?')}] {f.text}"
             for f in fragments
@@ -118,7 +127,11 @@ class Stitcher:
 
         valid_seqs = set(handle_by_seq) & {f.sequence_order for f in fragments}
         merged: List[Tuple[str, List[int], float]] = []
-        for proposal in response.utterances:
+        # Track which merged entry each LLM proposal produced, so interruption
+        # ordinals (which index the proposal list) can be remapped after the
+        # merged list is re-sorted by first sequence order.
+        entry_by_proposal: Dict[int, Tuple[str, List[int], float]] = {}
+        for prop_index, proposal in enumerate(response.utterances):
             seqs = proposal.fragment_indices
             if (
                 seqs != sorted(seqs)
@@ -128,7 +141,9 @@ class Stitcher:
             ):
                 logger.warning(f"Dropping invalid utterance proposal: {proposal}")
                 continue
-            merged.append((proposal.speaker, seqs, proposal.confidence))
+            entry = (proposal.speaker, seqs, proposal.confidence)
+            entry_by_proposal[prop_index] = entry
+            merged.append(entry)
 
         # Fragments not covered by valid proposals keep their baseline groups.
         covered = {s for _, seqs, _ in merged for s in seqs}
@@ -137,22 +152,25 @@ class Stitcher:
             if remaining:
                 merged.append((handle, remaining, confidence))
         merged.sort(key=lambda g: g[1][0])
+        position_of = {id(entry): pos for pos, entry in enumerate(merged)}
 
         interruptions = []
         for prop in response.interruptions:
-            if not (prop.interrupting < len(merged) and prop.interrupted < len(merged)):
-                logger.warning(f"Dropping interruption with out-of-range ordinal: {prop}")
+            interrupting = entry_by_proposal.get(prop.interrupting)
+            interrupted = entry_by_proposal.get(prop.interrupted)
+            if interrupting is None or interrupted is None:
+                logger.warning(f"Dropping interruption referencing dropped/unknown proposal: {prop}")
                 continue
             # The interruption point must lie within the interrupted utterance's
             # span, else the proposal is incoherent.
-            interrupted_seqs = merged[prop.interrupted][1]
+            interrupted_seqs = interrupted[1]
             if not (interrupted_seqs[0] <= prop.at_index <= interrupted_seqs[-1]):
                 logger.warning(f"Dropping interruption outside interrupted span: {prop}")
                 continue
             interruptions.append(
                 Interruption(
-                    interrupting_ordinal=prop.interrupting,
-                    interrupted_ordinal=prop.interrupted,
+                    interrupting_ordinal=position_of[id(interrupting)],
+                    interrupted_ordinal=position_of[id(interrupted)],
                     at_sequence_order=prop.at_index,
                 )
             )

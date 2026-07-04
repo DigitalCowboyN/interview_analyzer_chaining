@@ -88,3 +88,44 @@ def test_baseline_method_needs_no_llm():
     assert groups == [[0, 1], [2]]
     assert all(u.confidence == 1.0 for u in result.utterances)
     assert result.interruptions == []
+
+
+@pytest.mark.asyncio
+async def test_interruption_ordinals_remap_after_sort():
+    # LLM returns proposals in reverse order; after the merged list is sorted
+    # by first sequence order, interruption ordinals must point at the same
+    # utterances, not the same positions.
+    fragments, assignments = make_inputs(["S1", "S2", "S1"])
+    llm_response = {
+        "utterances": [
+            {"speaker": "S2", "fragment_indices": [1], "confidence": 0.9},
+            {"speaker": "S1", "fragment_indices": [0, 2], "confidence": 0.8},
+        ],
+        "interruptions": [{"interrupting": 0, "interrupted": 1, "at_index": 1}],
+    }
+    stitcher = Stitcher()
+    with patch("src.ingestion.stitcher.agent") as mock_agent:
+        mock_agent.call_model = AsyncMock(return_value=llm_response)
+        result = await stitcher.stitch(fragments, assignments)
+    assert [u.handle for u in result.utterances] == ["S1", "S2"]
+    intr = result.interruptions[0]
+    assert result.utterances[intr.interrupting_ordinal].handle == "S2"
+    assert result.utterances[intr.interrupted_ordinal].handle == "S1"
+    assert intr.at_sequence_order == 1
+
+
+@pytest.mark.asyncio
+async def test_interruption_referencing_dropped_proposal_is_dropped():
+    fragments, assignments = make_inputs(["S1", "S2"])
+    llm_response = {
+        "utterances": [
+            {"speaker": "S1", "fragment_indices": [0, 1], "confidence": 0.8},  # invalid: mixed
+            {"speaker": "S2", "fragment_indices": [1], "confidence": 0.9},
+        ],
+        "interruptions": [{"interrupting": 1, "interrupted": 0, "at_index": 1}],
+    }
+    stitcher = Stitcher()
+    with patch("src.ingestion.stitcher.agent") as mock_agent:
+        mock_agent.call_model = AsyncMock(return_value=llm_response)
+        result = await stitcher.stitch(fragments, assignments)
+    assert result.interruptions == []
