@@ -45,6 +45,8 @@ class SentenceCreatedData(BaseModel):
     speaker: Optional[str] = Field(None, description="Speaker identifier if available")
     start_ms: Optional[int] = Field(None, ge=0, description="Start time in milliseconds")
     end_ms: Optional[int] = Field(None, ge=0, description="End time in milliseconds")
+    start_char: Optional[int] = Field(None, ge=0, description="Offset into immutable source text")
+    end_char: Optional[int] = Field(None, gt=0, description="End offset into immutable source text")
 
 
 class SentenceEditedData(BaseModel):
@@ -88,6 +90,21 @@ class SentenceDeletedData(BaseModel):
     """Data payload for SentenceDeleted event."""
 
     reason: Optional[str] = Field(None, description="Reason for deletion")
+
+
+class SpeakerAttributedData(BaseModel):
+    """Data payload for SpeakerAttributed event (system inference or parsed label)."""
+
+    speaker_id: str = Field(..., description="UUID of the attributed Speaker")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Attribution confidence")
+    method: str = Field(..., description="How attribution was made: 'parsed' | 'inference'")
+
+
+class SpeakerReattributedData(BaseModel):
+    """Data payload for SpeakerReattributed event (human correction; locks attribution)."""
+
+    old_speaker_id: Optional[str] = Field(None, description="Previously attributed Speaker UUID")
+    new_speaker_id: str = Field(..., description="Corrected Speaker UUID")
 
 
 class AnalysisGeneratedData(BaseModel):
@@ -140,6 +157,8 @@ def create_sentence_created_event(
     speaker: Optional[str] = None,
     start_ms: Optional[int] = None,
     end_ms: Optional[int] = None,
+    start_char: Optional[int] = None,
+    end_char: Optional[int] = None,
     **envelope_kwargs
 ) -> EventEnvelope:
     """
@@ -160,7 +179,14 @@ def create_sentence_created_event(
         EventEnvelope: Complete event ready for storage
     """
     data = SentenceCreatedData(
-        interview_id=interview_id, index=index, text=text, speaker=speaker, start_ms=start_ms, end_ms=end_ms
+        interview_id=interview_id,
+        index=index,
+        text=text,
+        speaker=speaker,
+        start_ms=start_ms,
+        end_ms=end_ms,
+        start_char=start_char,
+        end_char=end_char,
     )
 
     return EventEnvelope(

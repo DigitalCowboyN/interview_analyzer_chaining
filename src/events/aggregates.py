@@ -335,6 +335,13 @@ class Sentence(AggregateRoot):
         self.overridden_fields: Dict[str, Any] = {}
         self.override_note: Optional[str] = None
 
+        # Map grounding and speaker attribution (Layer 1)
+        self.start_char: Optional[int] = None
+        self.end_char: Optional[int] = None
+        self.speaker_id: Optional[str] = None
+        self.speaker_confidence: Optional[float] = None
+        self.speaker_locked: bool = False
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the sentence's state."""
         if event.event_type == "SentenceCreated":
@@ -349,6 +356,10 @@ class Sentence(AggregateRoot):
             self._apply_analysis_overridden(event)
         elif event.event_type == "AnalysisCleared":
             self._apply_analysis_cleared(event)
+        elif event.event_type == "SpeakerAttributed":
+            self._apply_speaker_attributed(event)
+        elif event.event_type == "SpeakerReattributed":
+            self._apply_speaker_reattributed(event)
         else:
             raise ValueError(f"Unknown event type for Sentence: {event.event_type}")
 
@@ -361,6 +372,8 @@ class Sentence(AggregateRoot):
         self.speaker = data.get("speaker")
         self.start_ms = data.get("start_ms")
         self.end_ms = data.get("end_ms")
+        self.start_char = data.get("start_char")
+        self.end_char = data.get("end_char")
         self.status = SentenceStatus.CREATED
         self.created_at = event.occurred_at
         self.updated_at = event.occurred_at
@@ -418,6 +431,19 @@ class Sentence(AggregateRoot):
         self.override_note = None
         self.updated_at = event.occurred_at
 
+    def _apply_speaker_attributed(self, event: EventEnvelope) -> None:
+        """Apply SpeakerAttributed event."""
+        self.speaker_id = event.data.get("speaker_id")
+        self.speaker_confidence = event.data.get("confidence")
+        self.updated_at = event.occurred_at
+
+    def _apply_speaker_reattributed(self, event: EventEnvelope) -> None:
+        """Apply SpeakerReattributed event (human correction locks attribution)."""
+        self.speaker_id = event.data.get("new_speaker_id")
+        self.speaker_confidence = 1.0
+        self.speaker_locked = True
+        self.updated_at = event.occurred_at
+
     # Command methods (business logic)
     def create(
         self,
@@ -427,6 +453,8 @@ class Sentence(AggregateRoot):
         speaker: Optional[str] = None,
         start_ms: Optional[int] = None,
         end_ms: Optional[int] = None,
+        start_char: Optional[int] = None,
+        end_char: Optional[int] = None,
         **envelope_kwargs,
     ) -> EventEnvelope:
         """
@@ -439,6 +467,8 @@ class Sentence(AggregateRoot):
             speaker: Speaker identifier if available
             start_ms: Start time in milliseconds
             end_ms: End time in milliseconds
+            start_char: Offset into the immutable source text
+            end_char: End offset into the immutable source text
             **envelope_kwargs: Additional envelope fields
 
         Returns:
@@ -456,6 +486,8 @@ class Sentence(AggregateRoot):
                 "speaker": speaker,
                 "start_ms": start_ms,
                 "end_ms": end_ms,
+                "start_char": start_char,
+                "end_char": end_char,
             },
             **envelope_kwargs,
         )
@@ -481,6 +513,32 @@ class Sentence(AggregateRoot):
         return self._add_event(
             event_type="SentenceEdited",
             data={"old_text": self.text, "new_text": new_text, "editor_type": editor_type.value},
+            **envelope_kwargs,
+        )
+
+    def attribute_speaker(
+        self, speaker_id: str, confidence: float, method: str, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Attribute this fragment to a speaker (system inference or parsed label)."""
+        if self.version < 0:
+            raise ValueError("Sentence must be created before attributing a speaker")
+        if self.speaker_locked:
+            raise ValueError("Speaker attribution is locked by a human correction")
+
+        return self._add_event(
+            event_type="SpeakerAttributed",
+            data={"speaker_id": speaker_id, "confidence": confidence, "method": method},
+            **envelope_kwargs,
+        )
+
+    def reattribute_speaker(self, new_speaker_id: str, **envelope_kwargs) -> EventEnvelope:
+        """Human correction of speaker attribution; locks against system overwrite."""
+        if self.version < 0:
+            raise ValueError("Sentence must be created before reattributing a speaker")
+
+        return self._add_event(
+            event_type="SpeakerReattributed",
+            data={"old_speaker_id": self.speaker_id, "new_speaker_id": new_speaker_id},
             **envelope_kwargs,
         )
 
