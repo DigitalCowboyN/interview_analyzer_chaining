@@ -8,11 +8,13 @@ An event-sourced system for processing interview transcripts with AI-powered mul
 
 ## What It Does
 
-1. **Ingests** interview transcripts (text files)
-2. **Segments** text into sentences using spaCy NLP
-3. **Analyzes** each sentence across 7 dimensions via LLM (function, structure, purpose, topics, keywords)
-4. **Stores** results in EventStoreDB (source of truth) and Neo4j (graph queries)
-5. **Exposes** REST API for querying and user corrections
+1. **Ingests** interview transcripts (text files — labeled or raw unlabeled prose)
+2. **Segments** text into offset-grounded fragments using spaCy NLP (the map: every fragment ties back to exact source positions)
+3. **Attributes** speakers (parsed from labels, or inferred with confidence when absent — fully correctable)
+4. **Stitches** interrupted utterances via relationship overlay (verbatim text untouched; interruptions become queryable data)
+5. **Analyzes** each sentence across 7 dimensions via LLM (function, structure, purpose, topics, keywords)
+6. **Stores** results in EventStoreDB (source of truth) and Neo4j (graph queries)
+7. **Exposes** REST API for querying and user corrections (edits, speakers, stitches)
 
 ## Architecture
 

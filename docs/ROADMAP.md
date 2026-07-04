@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-01-28
+**Last Updated:** 2026-07-04
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -20,16 +20,47 @@
 | M3.0 | ✅ Complete | Remove Dual-Write + neo4j 6.x |
 | **TC** | ✅ Complete | Test Coverage Improvement (90.1%) + Phase 9 Cleanup |
 | **TC.10** | ✅ Complete | Test Fixes + Infrastructure Integration |
-| M3.1 | 📋 Planned | Vector Search |
+| **M4.1** | ✅ Complete | Layer 1: Ingestion, Map, Speaker Genesis & Stitching |
+| M4.2 | 📋 Planned | Layer 2: Extractor Registry (core enrichment) |
+| M4.3 | 📋 Planned | Layer 3: Lens Engine (meeting_minutes first) |
+| M4.4 | 📋 Planned | Layer 5: OKF Export + richer queries |
+| M3.1 | 📋 Planned | Vector Search (folds into Layer 2 embeddings) |
 | M3.2 | 📋 Planned | AI Agent Upgrade (openai 2.x) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M3.1 Planning
-**Tests:** 977 unit + 115 integration passing, 19 skipped | **Coverage:** 87.9% (unit) / 56.7% (integration)
+**Current Phase:** M4.2 Planning (Layer 2 — see docs/superpowers/specs/2026-07-04-mine-layers-design.md)
+**Tests:** 1060 unit + 115 integration passing | **Coverage:** 88.7% (unit)
 
 ---
 
 ## Milestone Checklist
+
+### M4.1: Layer 1 — Ingestion, Map, Speaker Genesis & Stitching ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-04-mine-layers-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-04-layer1-ingestion-map-speakers-stitching.md`
+
+- [x] Offset-preserving segmentation (`segment_text_with_offsets`)
+- [x] Ingestion package: format detector (labeled/flat) + normalizer producing
+      offset-grounded fragments (`source[start:end] == fragment` invariant)
+- [x] Sentence aggregate: `start_char`/`end_char` + correctable speaker
+      attribution (`SpeakerAttributed`/`SpeakerReattributed`, human lock)
+- [x] Interview aggregate: speaker lifecycle (`SpeakerCreated`/`Renamed`/`Merged`)
+      and stitching overlay (`UtteranceIdentified`/`InterruptionRecorded`/`StitchRemoved`)
+- [x] Windowed LLM speaker inference with deterministic overlap reconciliation
+- [x] Stitcher: baseline grouping + LLM refinement (invalid proposals degrade
+      to baseline; transcript text never rewritten)
+- [x] Ingestion orchestrator + upgraded map (.jsonl with offsets, speaker,
+      confidence, utterance per fragment); `python -m src.ingestion <file>`
+- [x] Projection handlers: Speaker + Utterance nodes (`HAS_PARTICIPANT`,
+      `SPOKEN_BY`, `SPOKE`, `PART_OF_UTTERANCE`, `INTERRUPTS`)
+- [x] Correction API: rename/merge/split speakers, reattribute fragments,
+      remove stitches (202 + version; human events lock fields)
+- [x] Golden crosstalk fixture (deterministic, recorded LLM responses)
+
+**Completed:** 2026-07-04
+
+---
 
 ### M2.9: User Edit API ✅ COMPLETE
 
@@ -126,6 +157,9 @@
 ---
 
 ### M3.1: Vector Search 📋 PLANNED
+
+> Note: vector search builds on the Layer 1 fragment/utterance nodes (M4.1)
+> and is expected to fold into Layer 2's embedding extractors (M4.2).
 
 - [ ] Store sentence embeddings in Neo4j
 - [ ] Semantic similarity search endpoints
@@ -311,6 +345,9 @@ Neo4j (sole writer, materialized view)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-07-04 | M4.1 (Layer 1) complete: speakers, utterances, offset-grounded map | Spec: docs/superpowers/specs/2026-07-04-mine-layers-design.md |
+| 2026-07-04 | Stitching is an overlay, never a rewrite | Interview must be viewable as-spoken; interpretation is additive + correctable |
+| 2026-07-04 | Speaker inference reconciles windows by deterministic overlap voting | LLM-based reconciliation deferred until golden evaluation demands it |
 | 2026-01-28 | TC.10 complete | All infrastructure tests passing, event env vars fixed |
 | 2026-01-28 | Added project_id to InterviewCreatedData | Handler needs project_id in event data, not just envelope |
 | 2026-01-28 | Made Neo4jMapStorage.initialize() no-op | M3.0 single-writer: projection service is sole Neo4j writer |

@@ -169,6 +169,36 @@ Extracted keywords (overall and domain-specific).
 |----------|------|-------------|
 | `text` | string | Keyword text |
 
+### `:Speaker` (Layer 1 / M4.1)
+
+A conversation participant — parsed from labels or inferred (provisional) and
+correctable via the speakers API.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `speaker_id` | string | Deterministic UUID (uuid5 of `interview:speaker:handle`) |
+| `handle` | string | Stable short handle (`S1`, `S2`, … or parsed label) |
+| `display_name` | string | Human-readable name (rename clears `provisional`) |
+| `provisional` | boolean | True when inferred rather than confirmed |
+| `confidence` | float | Inference confidence (0–1) |
+| `method` | string | `parsed` \| `inference` \| `human` |
+| `interview_id` | string | Owning interview |
+| `merged_into` | string? | Surviving speaker id when merged away |
+
+### `:Utterance` (Layer 1 / M4.1)
+
+A speaker's continuous thought, possibly spanning non-adjacent fragments
+(stitching overlay — the fragment sequence itself is never modified).
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `utterance_id` | string | Deterministic UUID (uuid5 of `interview:utterance:ordinal`) |
+| `interview_id` | string | Owning interview |
+| `confidence` | float | Stitching confidence (0–1) |
+
+**New `:Sentence` properties (Layer 1):** `start_char` / `end_char` — offsets
+into the immutable source text such that `source[start_char:end_char] == text`.
+
 ## Relationship Types
 
 ### `:PART_OF_FILE`
@@ -186,6 +216,20 @@ Links sentences in sequence order.
 ```
 (:Sentence)-[:FOLLOWS]->(:Sentence)
 ```
+
+### Layer 1 relationships (M4.1)
+
+```
+(:Interview)-[:HAS_PARTICIPANT]->(:Speaker)
+(:Sentence)-[:SPOKEN_BY {confidence, method, locked}]->(:Speaker)
+(:Speaker)-[:SPOKE]->(:Utterance)
+(:Sentence)-[:PART_OF_UTTERANCE {position}]->(:Utterance)
+(:Utterance)-[:INTERRUPTS {at_fragment_id}]->(:Utterance)
+```
+
+`SPOKEN_BY.locked = true` marks a human correction that system regeneration
+must not overwrite. `INTERRUPTS` records where one utterance broke into
+another, enabling the as-spoken visualization with interruption edges.
 
 **Note:** Points from current sentence to *previous* sentence (sentence N follows sentence N-1).
 
@@ -345,3 +389,11 @@ While Neo4j is the read model, EventStoreDB holds the authoritative event stream
 | `SentenceEdited` | `Sentence-{id}` | User edited text |
 | `AnalysisGenerated` | `Sentence-{id}` | AI analysis completed |
 | `AnalysisOverridden` | `Sentence-{id}` | User corrected analysis |
+| `SpeakerCreated` | `Interview-{id}` | Speaker parsed or inferred (Layer 1) |
+| `SpeakerRenamed` | `Interview-{id}` | Human named a provisional speaker |
+| `SpeakerMerged` | `Interview-{id}` | Human merged two speaker handles |
+| `SpeakerAttributed` | `Sentence-{id}` | Fragment attributed to a speaker (system) |
+| `SpeakerReattributed` | `Sentence-{id}` | Human corrected attribution (locks) |
+| `UtteranceIdentified` | `Interview-{id}` | Stitched utterance overlay identified |
+| `InterruptionRecorded` | `Interview-{id}` | One utterance broke into another |
+| `StitchRemoved` | `Interview-{id}` | Human removed a wrong stitch |
