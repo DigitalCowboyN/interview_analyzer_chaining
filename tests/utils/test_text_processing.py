@@ -8,6 +8,7 @@ import pytest
 
 # Module to test
 from src.utils import text_processing
+from src.utils.text_processing import segment_text_with_offsets
 
 # Test cases for segment_text
 VALID_TEXT_CASES = [
@@ -94,3 +95,21 @@ def test_spacy_model_loading_failure(mock_logger, mock_spacy_load):
         pytest.skip(
             "Testing import-time exception logging is difficult without reloading. Skipping direct log check."
         )
+
+
+class TestSegmentTextWithOffsets:
+    def test_offsets_recover_exact_text(self):
+        text = "Well, hey, how are you doing?  Are you able to hear me? Yep."
+        fragments = segment_text_with_offsets(text)
+        assert len(fragments) == 3
+        for frag_text, start, end in fragments:
+            assert text[start:end] == frag_text
+
+    def test_empty_text_returns_empty_list(self):
+        assert segment_text_with_offsets("") == []
+
+    def test_whitespace_is_stripped_but_offsets_point_at_content(self):
+        text = "  Hello there.   How are you?  "
+        fragments = segment_text_with_offsets(text)
+        assert fragments[0][0] == "Hello there."
+        assert text[fragments[0][1]:fragments[0][2]] == "Hello there."
