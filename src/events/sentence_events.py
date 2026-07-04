@@ -173,6 +173,8 @@ def create_sentence_created_event(
         speaker: Speaker identifier if available
         start_ms: Start time in milliseconds
         end_ms: End time in milliseconds
+        start_char: Offset into the immutable source text
+        end_char: End offset into the immutable source text
         **envelope_kwargs: Additional envelope fields (actor, correlation_id, etc.)
 
     Returns:

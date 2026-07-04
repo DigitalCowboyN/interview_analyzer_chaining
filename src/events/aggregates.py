@@ -11,7 +11,12 @@ from typing import Any, Dict, List, Optional
 
 from .envelope import Actor, EventEnvelope
 from .interview_events import InterviewStatus
-from .sentence_events import EditorType, SentenceStatus
+from .sentence_events import (
+    EditorType,
+    SentenceStatus,
+    SpeakerAttributedData,
+    SpeakerReattributedData,
+)
 
 
 class AggregateRoot(ABC):
@@ -525,9 +530,13 @@ class Sentence(AggregateRoot):
         if self.speaker_locked:
             raise ValueError("Speaker attribution is locked by a human correction")
 
+        # Validate through the payload model so out-of-range confidence is
+        # rejected at command time, not just at (optional) deserialization.
+        data = SpeakerAttributedData(speaker_id=speaker_id, confidence=confidence, method=method)
+
         return self._add_event(
             event_type="SpeakerAttributed",
-            data={"speaker_id": speaker_id, "confidence": confidence, "method": method},
+            data=data.model_dump(),
             **envelope_kwargs,
         )
 
@@ -536,9 +545,13 @@ class Sentence(AggregateRoot):
         if self.version < 0:
             raise ValueError("Sentence must be created before reattributing a speaker")
 
+        data = SpeakerReattributedData(
+            old_speaker_id=self.speaker_id, new_speaker_id=new_speaker_id
+        )
+
         return self._add_event(
             event_type="SpeakerReattributed",
-            data={"old_speaker_id": self.speaker_id, "new_speaker_id": new_speaker_id},
+            data=data.model_dump(),
             **envelope_kwargs,
         )
 
