@@ -85,3 +85,12 @@ async def test_flat_ingestion_uses_inference_and_counts_low_confidence(tmp_path:
     assert result.low_confidence_count == 1  # the 0.5 assignment
     assert sp_agent.call_model.await_count == 1
     assert st_agent.call_model.await_count == 1
+
+    map_file = tmp_path / "maps" / "raw_map.jsonl"
+    assert map_file.exists()
+    entries = [json.loads(line) for line in map_file.read_text().splitlines()]
+    assert len(entries) == 3
+    for entry in entries:
+        assert flat[entry["start_char"]:entry["end_char"]] == entry["sentence"]
+        assert entry["speaker_id"] is not None
+        assert entry["utterance_id"] is not None

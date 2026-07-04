@@ -138,6 +138,8 @@ class IngestionOrchestrator:
                 handles.append("S?")
             provisional, method = False, "parsed"
             confidences = {h: 1.0 for h in handles}
+            if "S?" in confidences:
+                confidences["S?"] = 0.0  # unknown speaker is a guess, not a parse
         else:
             result: SpeakerInferenceResult = await self.inference.infer(transcript.fragments)
             handles = result.handles
@@ -228,6 +230,13 @@ class IngestionOrchestrator:
         """Emit UtteranceIdentified and InterruptionRecorded events."""
         utterance_ids: Dict[int, str] = {}
         for utt in stitch.utterances:
+            speaker_id = speaker_ids.get(utt.handle)
+            if speaker_id is None:
+                logger.warning(
+                    f"Skipping utterance {utt.ordinal}: no speaker registered for "
+                    f"handle {utt.handle!r}"
+                )
+                continue
             utterance_id = str(
                 uuid.uuid5(
                     uuid.NAMESPACE_DNS, f"{interview.aggregate_id}:utterance:{utt.ordinal}"
@@ -236,13 +245,19 @@ class IngestionOrchestrator:
             utterance_ids[utt.ordinal] = utterance_id
             interview.identify_utterance(
                 utterance_id,
-                speaker_id=speaker_ids[utt.handle],
+                speaker_id=speaker_id,
                 fragment_ids=[fragment_uuids[s] for s in utt.sequence_orders],
                 confidence=utt.confidence,
                 actor=actor,
                 correlation_id=correlation_id,
             )
         for intr in stitch.interruptions:
+            if (
+                intr.interrupting_ordinal not in utterance_ids
+                or intr.interrupted_ordinal not in utterance_ids
+            ):
+                logger.warning(f"Skipping interruption referencing skipped utterance: {intr}")
+                continue
             interview.record_interruption(
                 interrupting_utterance_id=utterance_ids[intr.interrupting_ordinal],
                 interrupted_utterance_id=utterance_ids[intr.interrupted_ordinal],
