@@ -1,0 +1,237 @@
+# Design: The Mine — Layered Enrichment & Retrieval Architecture (Layers 0–5)
+
+**Date:** 2026-07-04
+**Status:** Approved by owner (pending spec review)
+**Builds on:** M3.0 single-writer event-sourced architecture (ESDB → projection service → Neo4j)
+
+## Purpose
+
+The system's goal: take an unstructured interview or meeting transcript and explode it
+into a dataset much larger than the source, so it can be mined, rotated, and filtered
+for different reporting purposes (persona research, usability findings, meeting
+minutes/decisions/action items, and purposes not yet known).
+
+This design keeps the event-sourced core (its strongest asset) and grows the system in
+five layers. Each layer is a new set of event types + projection handlers, so each
+ships independently and historical data can be re-enriched by replaying the event log.
+
+## Guiding decisions (agreed with owner)
+
+1. **Lens architecture** — a purpose-neutral core that always runs, plus pluggable
+   lens profiles for specific reporting purposes. Not one vertical hardcoded.
+2. **Preserve, never rewrite** — the transcript is stored verbatim; all interpretation
+   (speakers, stitching, classifications) is additive, grounded, and correctable.
+3. **Focused calls, not one-shots** — each enrichment dimension is its own focused
+   LLM call with its own prompt, response schema, and confidence. Expanding the set of
+   calls is good; collapsing them into do-everything calls is explicitly rejected.
+4. **The map is the coordinate system** — every downstream artifact grounds to stable
+   fragment IDs + character offsets in the immutable source.
+5. **Mixed input formats** — ingestion detects and normalizes; worst case is fully
+   unlabeled flat text requiring speaker inference from nothing.
+6. **Primary consumption (first phases):** OKF report bundles + richer structured
+   queries; ask-the-corpus GraphRAG retrieval follows as a later phase.
+
+## Layer 0: Input boundary (out of scope)
+
+A separate system produces the raw interview text. This system is **not** responsible
+for audio processing, transcription, or diarization — text arrives as an input, and we
+assume it arrives in a bad state: potentially one long undifferentiated string of
+sentences, no speaker labels, dialogue disjointed by crosstalk and interruptions.
+
+Reference example: `data/input/GMT20231026-210203_Recording.txt` — a real transcript
+exhibiting exactly this (continuous string, unlabeled interleaved speakers, rapid
+overlapping exchanges).
+
+Contract: **text in, nothing assumed.**
+
+## Layer 1: Ingestion, the Map, speaker genesis, and stitching
+
+Pipeline order: normalize → segment fragments with offsets → build map →
+speaker inference pass → stitching pass. Each pass emits events; each is
+independently correctable by the end user.
+
+### The Map (upgraded conversation map)
+
+- Source text stored immutably, content-hashed.
+- Segmentation produces **fragments**: contiguous runs of speech in source order. A
+  fragment is often an incomplete sentence in crosstalk-heavy transcripts.
+- Every fragment: stable ID + `start_char`/`end_char` offsets into the source.
+- `sequence_order` reflects as-spoken order and is immutable; the `FOLLOWS` chain
+  always represents verbatim order.
+- All downstream extractions reference map IDs + spans, never raw text.
+
+### Format detection & normalization
+
+Labeled formats (Zoom/Teams/Otter exports, `Speaker:` prefixes) are parsed directly —
+speaker modeling is a parsing problem. Unlabeled flat text falls through to inference.
+Interview front matter (participants, date, project, method) is captured as
+OKF-compatible YAML and stored via `InterviewMetadataUpdated`; known participants seed
+speaker inference. The Interview aggregate gets a proper UUID identity (replacing
+filename-as-key).
+
+### Speaker genesis (inference from nothing)
+
+1. Windowed LLM pass proposes speaker boundaries and provisional handles (S1, S2, …)
+   with per-assignment confidence.
+2. Whole-document consistency pass reconciles handles across windows using linguistic
+   fingerprints (question-asking patterns, first-person content, verbal tics).
+3. Events: `SpeakerCreated` (provisional: true), `FragmentAttributed`
+   (speaker, confidence, actor: system).
+
+Corrections (follow existing edit-protection rules — user events survive
+regeneration): `SpeakerRenamed`, `SpeakerMerged`, `SpeakerSplit`,
+`FragmentReattributed`.
+
+### Stitching (overlay, never rewrite)
+
+A second LLM pass identifies utterance continuity across interruptions and emits
+**relationship data only** — the fragment sequence is untouched:
+
+- `UtteranceIdentified` — one speaker's continuous thought spanning 1..n fragments.
+- Fragment→Utterance membership with ordinal (`PART_OF_UTTERANCE {position}`).
+- `INTERRUPTS` — utterance B broke into utterance A between specific fragments.
+- `OVERLAPS` — where the source shows simultaneous speech.
+
+This enables two visualizations later: linear as-spoken (interruption edges crossing
+the timeline — the realistic view) and stitched-by-utterance (each person's complete
+thought). Stitches carry confidence; corrections: `StitchCorrected`, `StitchRemoved`.
+
+### Error handling
+
+Low-confidence attributions and stitches are committed with their confidence values,
+not parked — a visible wrong guess the user can correct beats a gap. Confidence
+thresholds are config; "all attributions below 0.7" is a queryable review worklist.
+
+## Layer 2: Core enrichment — the Extractor Registry
+
+The existing 7-call pattern is kept and formalized as the template for all enrichment.
+Each dimension is a registered, focused extractor:
+
+```yaml
+extractor:
+  name: sentence_purpose
+  prompt_file: prompts/core/purpose.yaml
+  response_model: SentencePurposeResponse   # Pydantic, schema-enforced
+  context_needs: [observer_context]
+  scope: fragment            # fragment | utterance | segment | document
+  target_field: purpose
+```
+
+### Improvements to the existing 7 (keep every call, strengthen each)
+
+- Schema-enforced structured outputs (API-level) replace "please respond in JSON";
+  Pydantic validation becomes a backstop, not a coin flip.
+- Numeric confidence (0–1) replaces string confidence.
+- Speaker- and utterance-aware context: ContextBuilder upgrade so windows show
+  `[S1]:` labels and can supply the stitched utterance a fragment belongs to.
+- Optional spaCy cross-check on function/structure types — flags disagreement as a
+  review signal; does not replace the LLM calls.
+
+### New focused extractors (expansion, same pattern)
+
+- `entity_mentions` — people, orgs, products, tools; span-grounded (char offsets
+  within the fragment, LangExtract-style traceability).
+- `claim_extraction` — utterance-scoped: what the speaker asserts, commits to, asks.
+- Embeddings per fragment and per utterance (not an LLM call) in Neo4j vector
+  indexes — realizes planned M3.1.
+
+Scopes matter: some extractors run per-fragment (as today), some per-utterance
+(claims — enabled by stitching), some per-segment/document. The registry handles
+fan-out.
+
+## Layer 3: Lens engine
+
+A lens is a declarative YAML profile contributing extractors to the same registry,
+plus mapping rules to graph node types:
+
+```yaml
+lens: meeting_minutes
+version: 2
+extractors: [objectives, decisions, action_items, followups]
+few_shot_examples: prompts/lenses/meeting/examples.yaml
+projects_to: [Objective, Decision, ActionItem, FollowUp]
+```
+
+- Core extractors always run; lens extractors run when a lens is applied — at ingest
+  or any time later, replayed from the event log (a new lens can run over every
+  interview ever ingested with zero upstream re-processing).
+- Results emit `LensExtractionGenerated {lens, version, ...}`; lens outputs version
+  independently; re-running an improved lens supersedes cleanly.
+- User corrections (`LensExtractionOverridden`) follow existing edit-protection rules.
+
+First lens: **meeting_minutes** (exercises speakers hardest — action items need
+owners). Second: **persona** (re-expresses the current UX taxonomy plus claims: pain
+points, goals, behaviors, notable quotes).
+
+## Layer 4: Graph schema v2
+
+New projections; existing Sentence/Topic/Keyword nodes remain — fragments are the
+grounding layer everything points into.
+
+| Node | Key relationships |
+|------|-------------------|
+| `Interview` (UUID, front-matter props) | `HAS_PARTICIPANT` → Speaker |
+| `Speaker` (provisional flag, display name) | `SPOKE` → Utterance |
+| `Utterance` (stitched thought) | `PART_OF_UTTERANCE` ← Fragment; `INTERRUPTS` → Utterance |
+| `Fragment` (today's Sentence + offsets) | `FOLLOWS` (as-spoken, unchanged) |
+| `Segment` (topic episode) | `CONTAINS` → Fragment |
+| `Entity` (canonical) | `MENTIONED_IN` ← Fragment (with span); `ALIAS_OF` |
+| `Claim` | `MADE_BY` → Speaker; `SUPPORTED_BY` → Fragment spans |
+| Lens nodes (`Decision`, `ActionItem`, …) | `OWNED_BY`/`DECIDED_BY` → Speaker; `SUPPORTED_BY` → Fragment |
+
+Entity resolution (canonicalizing "the dashboard" / "our analytics dashboard") uses
+`neo4j-graphrag-python` resolution utilities — a borrowed component, not an adopted
+pipeline (adopting its pipeline would bypass event sourcing and is rejected).
+
+## Layer 5: Consumption
+
+1. **OKF exporter** — a projection rendering purpose-filtered subgraphs into Open
+   Knowledge Format bundles (Google Cloud OKF v0.1: markdown + YAML frontmatter,
+   `type` required; markdown links as graph edges). One directory per export;
+   `index.md` carries interview front matter; one file per Decision/ActionItem/
+   insight; `SUPPORTED_BY` rendered as quoted verbatim fragments with source
+   references. Git-versionable, agent-consumable. OKF's role is confined to front
+   matter (ingest) and export bundles (egress) — not internal storage.
+2. **Richer REST queries** — decisions-by-meeting, pain-points-by-speaker,
+   low-confidence review worklists.
+3. **GraphRAG retrieval** (later phase) — `neo4j-graphrag-python` hybrid retrievers
+   (vector + fulltext + Cypher) over the vector indexes and graph.
+
+## Build order
+
+Layer 1 → Layer 2 → Layer 3 (meeting lens) → Layer 5 (OKF export) → Layer 4
+refinements (entity resolution) → GraphRAG retrieval.
+
+Each phase = new events + projection handlers, independently shippable and testable
+in the established unit/integration pattern.
+
+## Testing strategy
+
+- Standard unit + integration coverage per the existing pattern (aggregates, handlers,
+  projections).
+- **Golden-transcript fixtures** for LLM-dependent passes (speaker genesis,
+  stitching): a small corpus of messy crosstalk transcripts (seeded from
+  `data/input/GMT20231026-210203_Recording.txt`) with hand-verified expected
+  structures, so inference-quality regressions are caught deterministically.
+- Extractor registry tested with mocked agents (existing pattern in
+  `tests/agents/`).
+
+## Rejected alternatives
+
+- **Adopting `neo4j-graphrag-python`'s construction pipeline wholesale** — writes
+  directly to Neo4j, bypassing event sourcing; loses edit protection, replay, and
+  lens re-runs. Borrow retrievers/resolution utilities only.
+- **Reporting-first thin slice** (OKF export over current data) — exports would lack
+  speakers/decisions/entities; proves plumbing without advancing the mine.
+- **Collapsing the 7 calls into one structured mega-call** — rejected by owner:
+  focused calls give per-dimension confidence, failure isolation, tunability, and
+  correctability.
+- **Rewriting/reflowing disjointed transcripts** — rejected: interpretation must be
+  an overlay so the interview can be seen as it actually happened.
+
+## Research references
+
+- [Google Cloud: Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing) (v0.1, June 2026)
+- [LangExtract](https://github.com/google/langextract) — span-grounded structured extraction
+- [neo4j-graphrag-python](https://neo4j.com/docs/neo4j-graphrag-python/current/) — retrievers, entity resolution, Neo4j 2026.01 SEARCH support
+- [Awesome-GraphRAG](https://github.com/DEEP-PolyU/Awesome-GraphRAG) — survey of the GraphRAG landscape
