@@ -41,20 +41,22 @@ def _parse_labeled(text: str) -> Tuple[List[RawFragment], List[str]]:
 
     current_label: Optional[str] = None
     for line in text.splitlines(keepends=True):
-        stripped = line.strip()
-        m = SPEAKER_LINE_RE.match(stripped) if stripped else None
+        # Match against the line itself (leading whitespace removed, offset
+        # tracked) so match spans give exact source positions. A secondary
+        # substring search would mis-ground speech that repeats the speaker
+        # prefix (e.g. "A: A").
+        lead = len(line) - len(line.lstrip())
+        content = line.lstrip().rstrip("\n\r")
+        m = SPEAKER_LINE_RE.match(content) if content.strip() else None
         if m:
             current_label = m.group(1)
             if current_label not in labels:
                 labels.append(current_label)
-            # Offset of the speech portion within the source line
-            speech = m.group(2)
-            speech_offset = offset + line.index(speech)
-            _append_segments(fragments, speech, speech_offset, current_label, order)
-        elif stripped:
+            speech_offset = offset + lead + m.start(2)
+            _append_segments(fragments, m.group(2), speech_offset, current_label, order)
+        elif content.strip():
             # Continuation line of the current speaker's speech
-            line_offset = offset + line.index(stripped[0])
-            _append_segments(fragments, stripped, line_offset, current_label, order)
+            _append_segments(fragments, content, offset + lead, current_label, order)
         order = len(fragments)
         offset += len(line)
 
