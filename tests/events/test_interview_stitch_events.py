@@ -66,3 +66,11 @@ def test_replay_reconstructs_utterance_state():
     assert replayed.utterances[U1]["removed"] is True
     assert replayed.speakers[SP1]["handle"] == "S1"
     assert replayed.version == source.version
+
+
+def test_remove_stitch_twice_raises():
+    i = make_interview_with_speaker()
+    i.identify_utterance(U1, SP1, FRAGS, 0.75)
+    i.remove_stitch(U1, reason="wrong")
+    with pytest.raises(ValueError, match="already removed"):
+        i.remove_stitch(U1, reason="second attempt")

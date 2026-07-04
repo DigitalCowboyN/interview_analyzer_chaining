@@ -506,6 +506,8 @@ class Interview(AggregateRoot):
         """Human correction: an identified utterance was wrong; remove the overlay."""
         if utterance_id not in self.utterances:
             raise ValueError(f"Unknown utterance: {utterance_id}")
+        if self.utterances[utterance_id].get("removed"):
+            raise ValueError(f"Utterance {utterance_id} stitch already removed")
 
         data = StitchRemovedData(utterance_id=utterance_id, reason=reason)
 
