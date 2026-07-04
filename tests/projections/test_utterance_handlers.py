@@ -77,3 +77,20 @@ def test_utterance_handlers_registered_in_bootstrap():
     registry = create_handler_registry(parked_events_manager=MagicMock())
     for event_type in ("UtteranceIdentified", "InterruptionRecorded", "StitchRemoved"):
         assert registry.has_handler(event_type), event_type
+
+
+@pytest.mark.asyncio
+async def test_utterance_identified_raises_when_no_writes_applied():
+    # Zero counters signal the Speaker MATCH found nothing (out-of-order
+    # delivery); the handler must raise so retry/park logic engages.
+    handler = UtteranceIdentifiedHandler()
+    tx = AsyncMock()
+    counters = MagicMock(nodes_created=0, properties_set=0, relationships_created=0)
+    summary = MagicMock(counters=counters)
+    tx.run.return_value.consume = AsyncMock(return_value=summary)
+    event = make_event(
+        "UtteranceIdentified",
+        {"utterance_id": U1, "speaker_id": SP1, "fragment_ids": [F1], "confidence": 0.75},
+    )
+    with pytest.raises(ValueError, match="no writes applied"):
+        await handler.apply(tx, event)

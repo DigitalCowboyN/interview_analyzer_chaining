@@ -15,17 +15,17 @@ from src.projections.handlers.sentence_handlers import (
     SentenceCreatedHandler,
     SentenceEditedHandler,
 )
-from src.projections.handlers.utterance_handlers import (
-    InterruptionRecordedHandler,
-    StitchRemovedHandler,
-    UtteranceIdentifiedHandler,
-)
 from src.projections.handlers.speaker_handlers import (
     SpeakerAttributedHandler,
     SpeakerCreatedHandler,
     SpeakerMergedHandler,
     SpeakerReattributedHandler,
     SpeakerRenamedHandler,
+)
+from src.projections.handlers.utterance_handlers import (
+    InterruptionRecordedHandler,
+    StitchRemovedHandler,
+    UtteranceIdentifiedHandler,
 )
 from src.projections.parked_events import ParkedEventsManager
 

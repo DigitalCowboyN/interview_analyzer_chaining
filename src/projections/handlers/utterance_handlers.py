@@ -28,7 +28,7 @@ class UtteranceIdentifiedHandler(BaseProjectionHandler):
         MERGE (s)-[p:PART_OF_UTTERANCE]->(u)
         SET p.position = frag.position
         """
-        await tx.run(
+        result = await tx.run(
             query,
             utterance_id=data["utterance_id"],
             speaker_id=data["speaker_id"],
@@ -36,6 +36,20 @@ class UtteranceIdentifiedHandler(BaseProjectionHandler):
             confidence=data["confidence"],
             fragments=fragments,
         )
+        summary = await result.consume()
+        counters = summary.counters
+        if (
+            counters.nodes_created == 0
+            and counters.properties_set == 0
+            and counters.relationships_created == 0
+        ):
+            # Initial MATCH found no Speaker: likely out-of-order delivery.
+            # Raise so the base class retries and eventually parks the event
+            # instead of silently consuming it.
+            raise ValueError(
+                f"UtteranceIdentified {data['utterance_id']}: no writes applied "
+                f"(Speaker {data['speaker_id']} not yet projected?)"
+            )
         logger.info(f"Applied UtteranceIdentified for utterance {data['utterance_id']}")
 
 
@@ -62,9 +76,10 @@ class StitchRemovedHandler(BaseProjectionHandler):
     """Human correction: removes an utterance overlay node entirely."""
 
     async def apply(self, tx, event: EventEnvelope):
+        utterance_id = event.data["utterance_id"]
         query = """
         MATCH (u:Utterance {utterance_id: $utterance_id})
         DETACH DELETE u
         """
-        await tx.run(query, utterance_id=event.data["utterance_id"])
-        logger.info(f"Applied StitchRemoved for utterance {event.data['utterance_id']}")
+        await tx.run(query, utterance_id=utterance_id)
+        logger.info(f"Applied StitchRemoved for utterance {utterance_id}")

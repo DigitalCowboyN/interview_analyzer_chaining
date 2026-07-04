@@ -80,7 +80,6 @@ class SpeakerMergedHandler(BaseProjectionHandler):
             MERGE (surviving)-[:SPOKE]->(u)
             DELETE sp
         }
-        RETURN merged.speaker_id AS merged_id
         """
         await tx.run(
             query,
