@@ -38,3 +38,17 @@ def test_prompts_file_has_required_keys():
     prompts = load_yaml("prompts/ingestion_prompts.yaml")
     assert "{fragments}" in prompts["speaker_window"]["prompt"]
     assert "{fragments}" in prompts["stitch_window"]["prompt"]
+
+
+def test_negative_confidence_rejected():
+    with pytest.raises(ValidationError):
+        SpeakerWindowResponse.model_validate(
+            {"assignments": [{"index": 0, "speaker": "S1", "confidence": -0.1}]}
+        )
+
+
+def test_empty_fragment_indices_rejected():
+    with pytest.raises(ValidationError):
+        StitchWindowResponse.model_validate(
+            {"utterances": [{"speaker": "S1", "fragment_indices": [], "confidence": 0.5}]}
+        )
