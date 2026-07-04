@@ -7,7 +7,7 @@ including creation, updates, status changes, and archival.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -87,6 +87,30 @@ class SpeakerMergedData(BaseModel):
 
     surviving_speaker_id: str = Field(..., description="Speaker that remains")
     merged_speaker_id: str = Field(..., description="Speaker merged away")
+
+
+class UtteranceIdentifiedData(BaseModel):
+    """Data payload for UtteranceIdentified event (stitching overlay)."""
+
+    utterance_id: str = Field(..., description="Deterministic UUID of the utterance")
+    speaker_id: str = Field(..., description="Speaker whose continuous thought this is")
+    fragment_ids: List[str] = Field(..., description="Ordered fragment UUIDs composing the utterance")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Stitching confidence")
+
+
+class InterruptionRecordedData(BaseModel):
+    """Data payload for InterruptionRecorded event."""
+
+    interrupting_utterance_id: str = Field(..., description="Utterance that broke in")
+    interrupted_utterance_id: str = Field(..., description="Utterance that was broken into")
+    at_fragment_id: str = Field(..., description="First fragment of the interruption")
+
+
+class StitchRemovedData(BaseModel):
+    """Data payload for StitchRemoved event (human correction)."""
+
+    utterance_id: str = Field(..., description="Utterance whose stitch is removed")
+    reason: Optional[str] = Field(None, description="Why the stitch was wrong")
 
 
 def create_interview_created_event(

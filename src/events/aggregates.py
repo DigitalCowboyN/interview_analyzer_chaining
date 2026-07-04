@@ -11,10 +11,13 @@ from typing import Any, Dict, List, Optional
 
 from .envelope import Actor, EventEnvelope
 from .interview_events import (
+    InterruptionRecordedData,
     InterviewStatus,
     SpeakerCreatedData,
     SpeakerMergedData,
     SpeakerRenamedData,
+    StitchRemovedData,
+    UtteranceIdentifiedData,
 )
 from .sentence_events import (
     EditorType,
@@ -159,8 +162,9 @@ class Interview(AggregateRoot):
         self.created_at: Optional[datetime] = None
         self.updated_at: Optional[datetime] = None
 
-        # Conversation structure (Layer 1): speakers keyed by speaker_id
+        # Conversation structure (Layer 1): speakers and utterances keyed by id
         self.speakers: Dict[str, Dict[str, Any]] = {}
+        self.utterances: Dict[str, Dict[str, Any]] = {}
 
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the interview's state."""
@@ -180,6 +184,12 @@ class Interview(AggregateRoot):
             self._apply_speaker_renamed(event)
         elif event.event_type == "SpeakerMerged":
             self._apply_speaker_merged(event)
+        elif event.event_type == "UtteranceIdentified":
+            self._apply_utterance_identified(event)
+        elif event.event_type == "InterruptionRecorded":
+            self._apply_interruption_recorded(event)
+        elif event.event_type == "StitchRemoved":
+            self._apply_stitch_removed(event)
         else:
             raise ValueError(f"Unknown event type for Interview: {event.event_type}")
 
@@ -248,6 +258,25 @@ class Interview(AggregateRoot):
         """Apply SpeakerMerged event."""
         data = event.data
         self.speakers[data["merged_speaker_id"]]["merged_into"] = data["surviving_speaker_id"]
+        self.updated_at = event.occurred_at
+
+    def _apply_utterance_identified(self, event: EventEnvelope) -> None:
+        """Apply UtteranceIdentified event."""
+        data = event.data
+        self.utterances[data["utterance_id"]] = {
+            "speaker_id": data["speaker_id"],
+            "fragment_ids": list(data["fragment_ids"]),
+            "removed": False,
+        }
+        self.updated_at = event.occurred_at
+
+    def _apply_interruption_recorded(self, event: EventEnvelope) -> None:
+        """Apply InterruptionRecorded event (relationship only; no state to mutate)."""
+        self.updated_at = event.occurred_at
+
+    def _apply_stitch_removed(self, event: EventEnvelope) -> None:
+        """Apply StitchRemoved event (human correction)."""
+        self.utterances[event.data["utterance_id"]]["removed"] = True
         self.updated_at = event.occurred_at
 
     # Command methods (business logic)
@@ -410,6 +439,76 @@ class Interview(AggregateRoot):
 
         return self._add_event(
             event_type="SpeakerMerged",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def identify_utterance(
+        self,
+        utterance_id: str,
+        speaker_id: str,
+        fragment_ids: List[str],
+        confidence: float,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Record a stitched utterance: one speaker's continuous thought (overlay only)."""
+        if self.version < 0:
+            raise ValueError("Interview must be created before identifying utterances")
+        if speaker_id not in self.speakers:
+            raise ValueError(f"Unknown speaker: {speaker_id}")
+        if not fragment_ids:
+            raise ValueError("Utterance requires at least one fragment")
+        if utterance_id in self.utterances:
+            raise ValueError(f"Utterance {utterance_id} already identified")
+
+        data = UtteranceIdentifiedData(
+            utterance_id=utterance_id,
+            speaker_id=speaker_id,
+            fragment_ids=fragment_ids,
+            confidence=confidence,
+        )
+
+        return self._add_event(
+            event_type="UtteranceIdentified",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def record_interruption(
+        self,
+        interrupting_utterance_id: str,
+        interrupted_utterance_id: str,
+        at_fragment_id: str,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Record that one utterance broke into another."""
+        for uid in (interrupting_utterance_id, interrupted_utterance_id):
+            if uid not in self.utterances:
+                raise ValueError(f"Unknown utterance: {uid}")
+
+        data = InterruptionRecordedData(
+            interrupting_utterance_id=interrupting_utterance_id,
+            interrupted_utterance_id=interrupted_utterance_id,
+            at_fragment_id=at_fragment_id,
+        )
+
+        return self._add_event(
+            event_type="InterruptionRecorded",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def remove_stitch(
+        self, utterance_id: str, reason: Optional[str] = None, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Human correction: an identified utterance was wrong; remove the overlay."""
+        if utterance_id not in self.utterances:
+            raise ValueError(f"Unknown utterance: {utterance_id}")
+
+        data = StitchRemovedData(utterance_id=utterance_id, reason=reason)
+
+        return self._add_event(
+            event_type="StitchRemoved",
             data=data.model_dump(),
             **envelope_kwargs,
         )
