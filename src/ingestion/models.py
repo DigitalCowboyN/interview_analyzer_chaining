@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class TranscriptFormat(str, Enum):
@@ -23,6 +23,12 @@ class RawFragment(BaseModel):
     speaker_label: Optional[str] = Field(
         None, description="Speaker label parsed from the source, if the format had one"
     )
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> "RawFragment":
+        if self.end_char <= self.start_char:
+            raise ValueError("end_char must be > start_char")
+        return self
 
 
 class NormalizedTranscript(BaseModel):
