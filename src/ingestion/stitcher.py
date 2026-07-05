@@ -131,6 +131,7 @@ class Stitcher:
         # ordinals (which index the proposal list) can be remapped after the
         # merged list is re-sorted by first sequence order.
         entry_by_proposal: Dict[int, Tuple[str, List[int], float]] = {}
+        claimed: set = set()
         for prop_index, proposal in enumerate(response.utterances):
             seqs = proposal.fragment_indices
             if (
@@ -141,6 +142,12 @@ class Stitcher:
             ):
                 logger.warning(f"Dropping invalid utterance proposal: {proposal}")
                 continue
+            if claimed & set(seqs):
+                # Proposals must be disjoint: a fragment in two utterances would
+                # project conflicting PART_OF_UTTERANCE memberships.
+                logger.warning(f"Dropping overlapping utterance proposal: {proposal}")
+                continue
+            claimed.update(seqs)
             entry = (proposal.speaker, seqs, proposal.confidence)
             entry_by_proposal[prop_index] = entry
             merged.append(entry)

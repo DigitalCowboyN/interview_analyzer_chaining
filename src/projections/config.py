@@ -49,6 +49,13 @@ SUBSCRIPTION_CONFIG: Dict[str, Dict] = {
             "StatusChanged",
             "InterviewArchived",
             "InterviewDeleted",
+            # Layer 1 (M4.1): speaker lifecycle + stitching overlay
+            "SpeakerCreated",
+            "SpeakerRenamed",
+            "SpeakerMerged",
+            "UtteranceIdentified",
+            "InterruptionRecorded",
+            "StitchRemoved",
         ],
     },
     "sentence": {
@@ -66,6 +73,9 @@ SUBSCRIPTION_CONFIG: Dict[str, Dict] = {
             "SentenceUntagged",
             "SentenceStatusChanged",
             "SentenceDeleted",
+            # Layer 1 (M4.1): correctable speaker attribution
+            "SpeakerAttributed",
+            "SpeakerReattributed",
         ],
     },
 }

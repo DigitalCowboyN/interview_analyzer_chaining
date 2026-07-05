@@ -136,17 +136,31 @@ def test_remove_stitch_returns_202(client):
     interview = make_interview_mock()
     repo = make_repo(interview)
     with patch("src.api.routers.speakers.get_interview_repository", return_value=repo):
-        resp = client.request(
-            "DELETE", f"/stitches/{IID}/{U1}", json={"reason": "not a continuation"}
-        )
+        resp = client.delete(f"/stitches/{IID}/{U1}?reason=not+a+continuation")
     assert resp.status_code == 202
     interview.remove_stitch.assert_called_once()
+    assert interview.remove_stitch.call_args.kwargs["reason"] == "not a continuation"
 
 
-def test_split_fragment_404_after_first_success_still_persists_speaker(client):
-    # Append-only log: speaker creation is saved before fragment loop; a
-    # missing fragment mid-loop returns 404 but does not roll back the speaker
-    # (documented partial-application semantics).
+def test_actor_user_id_comes_from_header(client):
+    interview = make_interview_mock()
+    repo = make_repo(interview)
+    with patch("src.api.routers.speakers.get_interview_repository", return_value=repo):
+        resp = client.post(
+            f"/speakers/{IID}/{SP1}/rename",
+            json={"new_display_name": "Dana"},
+            headers={"X-User-ID": "nathan"},
+        )
+    assert resp.status_code == 202
+    actor = interview.rename_speaker.call_args.kwargs["actor"]
+    assert actor.user_id == "nathan"
+    assert actor.actor_type == "human"
+
+
+def test_split_missing_fragment_aborts_before_any_event(client):
+    # All fragments are loaded before any event is appended: a missing
+    # fragment returns 404 with NOTHING persisted (the log cannot be rolled
+    # back, so validation happens up front).
     interview = make_interview_mock()
     interview_repo = make_repo(interview)
     sentence = MagicMock()
@@ -165,5 +179,7 @@ def test_split_fragment_404_after_first_success_still_persists_speaker(client):
             },
         )
     assert resp.status_code == 404
-    interview_repo.save.assert_awaited_once()  # speaker creation persisted
-    sentence.reattribute_speaker.assert_called_once()  # first fragment applied
+    interview.add_speaker.assert_not_called()
+    interview_repo.save.assert_not_awaited()
+    sentence.reattribute_speaker.assert_not_called()
+    sentence_repo.save.assert_not_awaited()

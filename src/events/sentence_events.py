@@ -95,6 +95,9 @@ class SentenceDeletedData(BaseModel):
 class SpeakerAttributedData(BaseModel):
     """Data payload for SpeakerAttributed event (system inference or parsed label)."""
 
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
     speaker_id: str = Field(..., description="UUID of the attributed Speaker")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Attribution confidence")
     method: str = Field(..., description="How attribution was made: 'parsed' | 'inference'")
@@ -103,6 +106,9 @@ class SpeakerAttributedData(BaseModel):
 class SpeakerReattributedData(BaseModel):
     """Data payload for SpeakerReattributed event (human correction; locks attribution)."""
 
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
     old_speaker_id: Optional[str] = Field(None, description="Previously attributed Speaker UUID")
     new_speaker_id: str = Field(..., description="Corrected Speaker UUID")
 

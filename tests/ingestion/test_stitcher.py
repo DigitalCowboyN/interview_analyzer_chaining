@@ -129,3 +129,23 @@ async def test_interruption_referencing_dropped_proposal_is_dropped():
         mock_agent.call_model = AsyncMock(return_value=llm_response)
         result = await stitcher.stitch(fragments, assignments)
     assert result.interruptions == []
+
+
+@pytest.mark.asyncio
+async def test_overlapping_proposals_first_wins_rest_dropped():
+    fragments, assignments = make_inputs(["S1", "S1", "S1"])
+    llm_response = {
+        "utterances": [
+            {"speaker": "S1", "fragment_indices": [0, 1], "confidence": 0.8},
+            {"speaker": "S1", "fragment_indices": [1, 2], "confidence": 0.7},  # overlaps 1
+        ],
+        "interruptions": [],
+    }
+    stitcher = Stitcher()
+    with patch("src.ingestion.stitcher.agent") as mock_agent:
+        mock_agent.call_model = AsyncMock(return_value=llm_response)
+        result = await stitcher.stitch(fragments, assignments)
+    groups = [u.sequence_orders for u in result.utterances]
+    # First proposal accepted; overlapping one dropped; fragment 2 falls back
+    # to its baseline group.
+    assert groups == [[0, 1], [2]]

@@ -122,3 +122,37 @@ def test_handlers_registered_in_bootstrap():
         "SpeakerReattributed",
     ):
         assert registry.has_handler(event_type), event_type
+
+
+@pytest.mark.asyncio
+async def test_speaker_attributed_raises_when_no_writes_applied():
+    # Zero write counters mean the Sentence or Speaker MATCH found nothing
+    # (out-of-order delivery); raise so retry/park engages.
+    from unittest.mock import MagicMock
+
+    handler = SpeakerAttributedHandler()
+    tx = AsyncMock()
+    counters = MagicMock(nodes_created=0, properties_set=0, relationships_created=0)
+    tx.run.return_value.consume = AsyncMock(return_value=MagicMock(counters=counters))
+    event = make_event(
+        "SpeakerAttributed", AggregateType.SENTENCE, SENT,
+        {"speaker_id": SP1, "confidence": 0.72, "method": "inference"},
+    )
+    with pytest.raises(ValueError, match="no writes applied"):
+        await handler.apply(tx, event)
+
+
+def test_all_registered_event_types_are_subscription_allowed():
+    # Drift guard: a handler registered in bootstrap but missing from the
+    # subscription allowlists would never receive events in the running
+    # service (the subscription manager acks and skips unlisted types).
+    from unittest.mock import MagicMock
+
+    from src.projections.bootstrap import create_handler_registry
+    from src.projections.config import get_all_allowed_event_types
+
+    registry = create_handler_registry(parked_events_manager=MagicMock())
+    registered = set(registry.get_registered_types())
+    allowed = set(get_all_allowed_event_types())
+    missing = registered - allowed
+    assert not missing, f"Registered handlers unreachable by subscriptions: {missing}"

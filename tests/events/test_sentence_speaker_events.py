@@ -89,3 +89,13 @@ def test_replay_reconstructs_speaker_state():
     assert replayed.speaker_confidence == 1.0
     assert replayed.speaker_locked is True
     assert replayed.version == source.version
+
+
+def test_attribution_events_carry_interview_id_for_lane_routing():
+    # Projection lane routing partitions Sentence-stream events by
+    # data["interview_id"]; events without it are dropped at routing.
+    s = make_sentence()
+    attributed = s.attribute_speaker("33333333-3333-3333-3333-333333333333", 0.7, "inference")
+    assert attributed.data["interview_id"] == "22222222-2222-2222-2222-222222222222"
+    reattributed = s.reattribute_speaker("44444444-4444-4444-4444-444444444444")
+    assert reattributed.data["interview_id"] == "22222222-2222-2222-2222-222222222222"

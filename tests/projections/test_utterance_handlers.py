@@ -27,10 +27,16 @@ def make_event(event_type, data, version=3):
     )
 
 
+def mock_matched(tx, matched):
+    """Mock the RETURN count(s) AS matched record."""
+    tx.run.return_value.single = AsyncMock(return_value={"matched": matched})
+
+
 @pytest.mark.asyncio
 async def test_utterance_identified_links_fragments_with_position():
     handler = UtteranceIdentifiedHandler()
     tx = AsyncMock()
+    mock_matched(tx, 2)
     event = make_event(
         "UtteranceIdentified",
         {"utterance_id": U1, "speaker_id": SP1, "fragment_ids": [F1, F2], "confidence": 0.75},
@@ -80,17 +86,31 @@ def test_utterance_handlers_registered_in_bootstrap():
 
 
 @pytest.mark.asyncio
-async def test_utterance_identified_raises_when_no_writes_applied():
-    # Zero counters signal the Speaker MATCH found nothing (out-of-order
+async def test_utterance_identified_raises_when_speaker_missing():
+    # No result row means the Speaker MATCH found nothing (out-of-order
     # delivery); the handler must raise so retry/park logic engages.
     handler = UtteranceIdentifiedHandler()
     tx = AsyncMock()
-    counters = MagicMock(nodes_created=0, properties_set=0, relationships_created=0)
-    summary = MagicMock(counters=counters)
-    tx.run.return_value.consume = AsyncMock(return_value=summary)
+    tx.run.return_value.single = AsyncMock(return_value=None)
     event = make_event(
         "UtteranceIdentified",
         {"utterance_id": U1, "speaker_id": SP1, "fragment_ids": [F1], "confidence": 0.75},
     )
     with pytest.raises(ValueError, match="no writes applied"):
+        await handler.apply(tx, event)
+
+
+@pytest.mark.asyncio
+async def test_utterance_identified_raises_when_fragments_partially_missing():
+    # On projection rebuild the interview stream races ahead of the sentence
+    # stream; if some fragments are not yet projected the handler must raise
+    # rather than seal a partial overlay behind the version guard.
+    handler = UtteranceIdentifiedHandler()
+    tx = AsyncMock()
+    mock_matched(tx, 1)
+    event = make_event(
+        "UtteranceIdentified",
+        {"utterance_id": U1, "speaker_id": SP1, "fragment_ids": [F1, F2], "confidence": 0.75},
+    )
+    with pytest.raises(ValueError, match="only 1/2 fragments matched"):
         await handler.apply(tx, event)

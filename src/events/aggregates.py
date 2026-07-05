@@ -287,6 +287,7 @@ class Interview(AggregateRoot):
         language: Optional[str] = None,
         started_at: Optional[datetime] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        project_id: Optional[str] = None,
         **envelope_kwargs,
     ) -> EventEnvelope:
         """
@@ -298,6 +299,8 @@ class Interview(AggregateRoot):
             language: Language of the interview content
             started_at: When the interview was conducted
             metadata: Additional interview metadata
+            project_id: Project/tenant ID; carried in BOTH the event data (the
+                projection handler reads it there) and the envelope (queryable)
             **envelope_kwargs: Additional envelope fields
 
         Returns:
@@ -314,7 +317,9 @@ class Interview(AggregateRoot):
                 "language": language,
                 "started_at": started_at.isoformat() if started_at else None,
                 "metadata": metadata or {},
+                "project_id": project_id,
             },
+            project_id=project_id,
             **envelope_kwargs,
         )
 
@@ -745,7 +750,14 @@ class Sentence(AggregateRoot):
 
         # Validate through the payload model so out-of-range confidence is
         # rejected at command time, not just at (optional) deserialization.
-        data = SpeakerAttributedData(speaker_id=speaker_id, confidence=confidence, method=method)
+        # interview_id rides in the payload because projection lane routing
+        # partitions Sentence-stream events by data["interview_id"].
+        data = SpeakerAttributedData(
+            interview_id=self.interview_id,
+            speaker_id=speaker_id,
+            confidence=confidence,
+            method=method,
+        )
 
         return self._add_event(
             event_type="SpeakerAttributed",
@@ -759,7 +771,9 @@ class Sentence(AggregateRoot):
             raise ValueError("Sentence must be created before reattributing a speaker")
 
         data = SpeakerReattributedData(
-            old_speaker_id=self.speaker_id, new_speaker_id=new_speaker_id
+            interview_id=self.interview_id,
+            old_speaker_id=self.speaker_id,
+            new_speaker_id=new_speaker_id,
         )
 
         return self._add_event(

@@ -2,7 +2,7 @@
 
 An event-sourced system for processing interview transcripts with AI-powered multi-dimensional sentence analysis.
 
-> **Status:** M2.8 Complete (Production Ready) | **Tests:** 691 passing | **Coverage:** 72.2%
+> **Status:** M4.1 Complete (Layer 1: speakers, utterances, offset-grounded map) | **Tests:** 1060+ passing | **Coverage:** 88.7%
 >
 > See [ROADMAP.md](docs/ROADMAP.md) for milestones and [docs/architecture/](docs/architecture/) for detailed diagrams.
 
@@ -19,17 +19,16 @@ An event-sourced system for processing interview transcripts with AI-powered mul
 ## Architecture
 
 ```
-User Upload / Edit API
+Transcript Ingestion / Edit & Correction APIs
     ↓
-Pipeline / Command Handlers
-    ├──→ EventStoreDB (events) ← Source of Truth
-    └──→ Neo4j (direct write)  ← Temporary (M3.0 removes)
+Aggregates (Interview, Sentence)
+    └──→ EventStoreDB (events only) ← Source of Truth
 
 EventStoreDB
     ↓
-Projection Service (12 lanes)
+Projection Service (12 lanes, sole Neo4j writer)
     ↓
-Neo4j (read model)
+Neo4j (read model: fragments, speakers, utterances, analysis)
 ```
 
 **Key Patterns:** Event Sourcing, CQRS, async/await throughout

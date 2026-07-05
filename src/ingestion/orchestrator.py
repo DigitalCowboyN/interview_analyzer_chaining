@@ -138,8 +138,6 @@ class IngestionOrchestrator:
                 handles.append("S?")
             provisional, method = False, "parsed"
             confidences = {h: 1.0 for h in handles}
-            if "S?" in confidences:
-                confidences["S?"] = 0.0  # unknown speaker is a guess, not a parse
         else:
             result: SpeakerInferenceResult = await self.inference.infer(transcript.fragments)
             handles = result.handles
@@ -157,13 +155,16 @@ class IngestionOrchestrator:
             speaker_id = str(
                 uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview.aggregate_id}:speaker:{handle}")
             )
+            # The unknown-speaker placeholder is always a guess, regardless of
+            # how the rest of the transcript's speakers were resolved.
+            is_unknown = handle == "S?"
             interview.add_speaker(
                 speaker_id,
                 handle=handle,
                 display_name=handle,
-                provisional=provisional,
-                confidence=round(confidences[handle], 4),
-                method=method,
+                provisional=True if is_unknown else provisional,
+                confidence=0.0 if is_unknown else round(confidences[handle], 4),
+                method="inference" if is_unknown else method,
                 actor=actor,
                 correlation_id=correlation_id,
             )

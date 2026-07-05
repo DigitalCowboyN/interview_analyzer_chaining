@@ -27,6 +27,7 @@ class UtteranceIdentifiedHandler(BaseProjectionHandler):
         MATCH (s:Sentence {aggregate_id: frag.id})
         MERGE (s)-[p:PART_OF_UTTERANCE]->(u)
         SET p.position = frag.position
+        RETURN count(s) AS matched
         """
         result = await tx.run(
             query,
@@ -36,19 +37,22 @@ class UtteranceIdentifiedHandler(BaseProjectionHandler):
             confidence=data["confidence"],
             fragments=fragments,
         )
-        summary = await result.consume()
-        counters = summary.counters
-        if (
-            counters.nodes_created == 0
-            and counters.properties_set == 0
-            and counters.relationships_created == 0
-        ):
-            # Initial MATCH found no Speaker: likely out-of-order delivery.
-            # Raise so the base class retries and eventually parks the event
-            # instead of silently consuming it.
+        record = await result.single()
+        # Interview and Sentence events arrive on independent subscriptions, so
+        # on rebuild this event can precede SpeakerCreated/SentenceCreated.
+        # Missing Speaker -> zero rows; missing fragments -> matched < expected.
+        # Raise either way so base-class retry/park engages instead of the
+        # version guard permanently sealing a partial overlay.
+        if record is None:
             raise ValueError(
                 f"UtteranceIdentified {data['utterance_id']}: no writes applied "
                 f"(Speaker {data['speaker_id']} not yet projected?)"
+            )
+        matched = record["matched"]
+        if matched < len(fragments):
+            raise ValueError(
+                f"UtteranceIdentified {data['utterance_id']}: only {matched}/"
+                f"{len(fragments)} fragments matched (fragments not yet projected?)"
             )
         logger.info(f"Applied UtteranceIdentified for utterance {data['utterance_id']}")
 

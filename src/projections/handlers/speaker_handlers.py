@@ -9,6 +9,27 @@ from .base_handler import BaseProjectionHandler
 logger = logging.getLogger(__name__)
 
 
+def _raise_if_no_writes(summary, event_type: str, aggregate_id: str) -> None:
+    """Raise when a MATCH-anchored write query touched nothing.
+
+    Sentence and Speaker nodes are projected from independent subscriptions;
+    zero writes means a MATCH found nothing (out-of-order delivery). Raising
+    lets base-class retry/park engage instead of silently consuming the event.
+    SET always fires on successful matches, so idempotent replays still count
+    properties_set > 0 and do not raise.
+    """
+    counters = summary.counters
+    if (
+        counters.nodes_created == 0
+        and counters.properties_set == 0
+        and counters.relationships_created == 0
+    ):
+        raise ValueError(
+            f"{event_type} for {aggregate_id}: no writes applied "
+            f"(referenced nodes not yet projected?)"
+        )
+
+
 class SpeakerCreatedHandler(BaseProjectionHandler):
     """Creates Speaker node and links it to its Interview."""
 
@@ -104,13 +125,14 @@ class SpeakerAttributedHandler(BaseProjectionHandler):
         MERGE (s)-[r:SPOKEN_BY]->(sp)
         SET r.confidence = $confidence, r.method = $method, r.locked = false
         """
-        await tx.run(
+        result = await tx.run(
             query,
             aggregate_id=event.aggregate_id,
             speaker_id=data["speaker_id"],
             confidence=data["confidence"],
             method=data["method"],
         )
+        _raise_if_no_writes(await result.consume(), "SpeakerAttributed", event.aggregate_id)
 
 
 class SpeakerReattributedHandler(BaseProjectionHandler):
@@ -126,8 +148,9 @@ class SpeakerReattributedHandler(BaseProjectionHandler):
         MERGE (s)-[r:SPOKEN_BY]->(sp)
         SET r.confidence = 1.0, r.method = 'human', r.locked = true
         """
-        await tx.run(
+        result = await tx.run(
             query,
             aggregate_id=event.aggregate_id,
             new_speaker_id=data["new_speaker_id"],
         )
+        _raise_if_no_writes(await result.consume(), "SpeakerReattributed", event.aggregate_id)
