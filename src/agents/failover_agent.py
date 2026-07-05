@@ -31,8 +31,13 @@ def _is_availability_error(exc: Exception) -> bool:
     name = type(exc).__name__
     if any(marker in name for marker in _AVAILABILITY_ERROR_NAMES):
         return True
-    # ConnectionError/TimeoutError cover network failures; RuntimeError is the
-    # ClaudeCodeAgent's CLI-failure signal.
+    # ConnectionError/TimeoutError cover network failures. RuntimeError is the
+    # ClaudeCodeAgent CLI-failure signal — DELIBERATE TRADEOFF: this also
+    # treats a plain RuntimeError from any other provider as an availability
+    # failure (failover instead of loud propagation). The SDK providers raise
+    # typed API errors, so plain RuntimeError from them indicates a bug; if
+    # that ever becomes a debugging hazard, narrow this to the claude_code
+    # provider. ValueError/TypeError/etc. still propagate immediately.
     return isinstance(exc, (ConnectionError, TimeoutError, RuntimeError))
 
 
@@ -74,7 +79,8 @@ class FailoverAgent(BaseLLMAgent):
                     f"({type(exc).__name__}); failing over"
                 )
                 last_error = exc
-        assert last_error is not None  # loop ran at least once (ctor guard)
+        if last_error is None:  # pragma: no cover — ctor guarantees >=1 provider
+            raise RuntimeError("BUG: chain exhausted with no error recorded")
         raise last_error
 
     async def call_model(

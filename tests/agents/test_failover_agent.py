@@ -99,3 +99,15 @@ def test_factory_builds_chain_from_config():
         agent = get_failover_agent({"llm": {"chain": ["anthropic", "claude_code"]}})
     assert [c.args[0] for c in create.call_args_list] == ["anthropic", "claude_code"]
     assert len(agent.providers) == 2
+
+
+def test_factory_falls_back_to_single_provider():
+    from unittest.mock import patch
+
+    from src.agents.failover_agent import get_failover_agent
+
+    fake = MagicMock()
+    with patch("src.agents.agent_factory.AgentFactory.create_agent", return_value=fake) as create:
+        agent = get_failover_agent({"llm": {"provider": "anthropic"}})
+    assert [c.args[0] for c in create.call_args_list] == ["anthropic"]
+    assert len(agent.providers) == 1
