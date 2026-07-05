@@ -1,7 +1,7 @@
 # Design: The Mine — Layered Enrichment & Retrieval Architecture (Layers 0–5)
 
-**Date:** 2026-07-04
-**Status:** Approved by owner (pending spec review)
+**Date:** 2026-07-04 (updated 2026-07-05)
+**Status:** Approved. **Layer 1 (M4.1) SHIPPED** — merged to main via PR #1 on 2026-07-05.
 **Builds on:** M3.0 single-writer event-sourced architecture (ESDB → projection service → Neo4j)
 
 ## Purpose
@@ -101,6 +101,30 @@ thought). Stitches carry confidence; corrections: `StitchCorrected`, `StitchRemo
 Low-confidence attributions and stitches are committed with their confidence values,
 not parked — a visible wrong guess the user can correct beats a gap. Confidence
 thresholds are config; "all attributions below 0.7" is a queryable review worklist.
+
+### Layer 1 completion notes (2026-07-05, as shipped in M4.1)
+
+Delivered per plan (`docs/superpowers/plans/2026-07-04-layer1-ingestion-map-speakers-stitching.md`),
+with these as-built notes that later layers should treat as current reality:
+
+- **Entry point:** `python -m src.ingestion <file>` (IngestionOrchestrator). The legacy
+  `src/pipeline.py` flow is untouched and runs in parallel; Layer 2 must decide its fate.
+- **Deferred from Layer 1** (unchanged intentions): `OVERLAPS` edges, OKF front-matter
+  capture (→ Layer 5 era), `StitchCorrected` as a distinct event (remove + re-identify
+  covers v1), LLM-based window reconciliation (deterministic overlap voting shipped),
+  live-LLM golden evaluation for prompt tuning.
+- **Corrections shipped:** rename/merge/split speakers, reattribute fragments, remove
+  stitches — 202+version, `X-User-ID` provenance, human events lock fields.
+- **Hard lesson → standing checklist item:** a new event type is NOT delivered until
+  (1) handler registered in bootstrap, (2) event type added to the subscription
+  allowlists in `src/projections/config.py`, (3) Sentence-stream payloads carry
+  `interview_id` for lane routing, (4) handlers raise (not no-op) when cross-stream
+  MATCH targets aren't projected yet. A drift-guard unit test now enforces (1)+(2);
+  an integration smoke test (`tests/integration/test_layer1_projection_smoke.py`)
+  covers the path end-to-end. Every later layer inherits this checklist.
+- **Environment note:** the 26 live-LLM integration tests fail on provider quota
+  (OpenAI 429 insufficient_quota) as of 2026-07-05 — Layer 2's enrichment work needs
+  working provider credit.
 
 ## Layer 2: Core enrichment — the Extractor Registry
 
