@@ -27,7 +27,7 @@ Usage:
 
 import asyncio
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from openai import APIError, AsyncOpenAI
 
@@ -81,7 +81,9 @@ class OpenAIAgent(BaseLLMAgent):
             config.get("openai_api", {}).get("retry", {}).get("backoff_factor", 2)
         )
 
-    async def call_model(self, function_prompt: str) -> Dict[str, Any]:
+    async def call_model(
+        self, function_prompt: str, schema: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Asynchronously calls the configured OpenAI model with a prompt.
 
@@ -91,6 +93,9 @@ class OpenAIAgent(BaseLLMAgent):
         Args:
             function_prompt (str): The prompt string to send to the OpenAI model.
                                    This prompt should instruct the model to return JSON.
+            schema (Optional[Dict[str, Any]]): JSON Schema to enforce at the API level
+                                   (Responses API json_schema text format). None keeps
+                                   the legacy json_object mode.
 
         Returns:
             Dict[str, Any]: The parsed JSON response from the model as a dictionary.
@@ -107,6 +112,18 @@ class OpenAIAgent(BaseLLMAgent):
         last_exception = None  # Store last exception for re-raising
         output_message = ""  # Initialize for use in exception logging
 
+        if schema is not None:
+            text_format = {
+                "format": {
+                    "type": "json_schema",
+                    "name": "extraction",
+                    "strict": True,
+                    "schema": schema,
+                }
+            }
+        else:
+            text_format = {"format": {"type": "json_object"}}
+
         while attempt < self.retry_attempts:
             try:
                 # Make the asynchronous API call.
@@ -121,7 +138,7 @@ class OpenAIAgent(BaseLLMAgent):
                     input=function_prompt,
                     max_output_tokens=self.max_tokens,
                     temperature=self.temperature,
-                    text={"format": {"type": "json_object"}},
+                    text=text_format,
                 )
 
                 # Extract the 'output' part of the response.
