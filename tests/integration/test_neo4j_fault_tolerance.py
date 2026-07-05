@@ -42,14 +42,15 @@ from src.io.neo4j_map_storage import Neo4jMapStorage
 # Projection service is now the sole writer to Neo4j
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
-# M2.8: Skip all fault tolerance tests - test Neo4j but EventStoreDB is source of truth
+# M3.0: Skip all fault tolerance tests - Neo4j is a rebuildable materialized view.
+# EventStoreDB is the source of truth; Neo4j fault tolerance is not critical.
+# Rewrite these 11 tests for EventStoreDB fault tolerance in M3.1 (tracked in ROADMAP.md).
 pytestmark = [
     pytest.mark.neo4j,
     pytest.mark.integration,
     pytest.mark.skip(
-        reason="M2.8: Tests target Neo4j fault tolerance, but EventStoreDB is the source of truth. "
-               "Neo4j can be rebuilt from events. Focus should be on EventStoreDB fault tolerance. "
-               "Consider rewriting for EventStoreDB in M2.9 or projection service in M3.0."
+        reason="M3.1: Rewrite for EventStoreDB fault tolerance. Neo4j is a rebuildable "
+               "materialized view in M3.0 single-writer architecture."
     ),
 ]
 

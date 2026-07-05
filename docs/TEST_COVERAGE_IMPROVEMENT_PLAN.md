@@ -2,7 +2,7 @@
 
 > **Created:** 2026-01-18
 > **Updated:** 2026-01-26
-> **Current Coverage:** 90.1% (1091 tests passing, 19 skipped) ✅ STRETCH GOAL MET
+> **Current Coverage:** 90.1% (1096 tests passing, 15 skipped) ✅ STRETCH GOAL MET
 > **Target Coverage:** 90%+ (stretch goal)
 
 ---
@@ -569,10 +569,10 @@ tests/
 | Metric | Start | Current | Target |
 |--------|-------|---------|--------|
 | Overall Coverage | 66.8% | **90.1%** ✅ | 90%+ |
-| Tests Passing | 554 | **1091** ✅ | 1050+ |
-| Tests Skipped | 54 | **19** ✅ | <10 |
-| Tests Failing | N/A | **1** (infra) | 0 |
-| E2E Tests | 6 | 6 | 15+ |
+| Tests Passing | 554 | **1096** ✅ | 1050+ |
+| Tests Skipped | 54 | **15** ✅ | <10 |
+| Tests Failing | N/A | **0** ✅ | 0 |
+| E2E Tests | 6 | 12 | 15+ |
 
 ### Coverage by Module (Current State)
 
@@ -670,7 +670,7 @@ await handler.handle(event)
 
 ### P9.3: Fault Tolerance Tests ✅ DEFERRED
 **File:** `tests/integration/test_neo4j_fault_tolerance.py`
-**Tests:** 7 | **Action:** KEEP SKIPPED | **Status:** Deferred
+**Tests:** 11 | **Action:** KEEP SKIPPED → Rewrite in M3.1 | **Status:** Deferred
 
 **Rationale for deferral:**
 1. EventStoreDB client library handles connection retry internally
@@ -687,11 +687,11 @@ await handler.handle(event)
 - `tests/projections/test_parked_events_unit.py` (20 tests, 100% coverage)
 - `tests/projections/test_subscription_manager.py` (checkpoint recovery)
 
-**Keep skipped until:** Production deployment reveals specific fault scenarios to test
+**Keep skipped until:** M3.1 — rewrite for EventStoreDB fault tolerance (tracked in ROADMAP.md)
 
-### P9.4: Defer Performance Benchmarks to Production Baseline 📋 PLANNED
+### P9.4: Defer Performance Benchmarks to Production Baseline ✅ DEFERRED
 **File:** `tests/integration/test_neo4j_performance_benchmarks.py`
-**Tests:** 7 | **Action:** DEFER | **Effort:** N/A
+**Tests:** 7 | **Action:** DEFER → Re-baseline in M3.3 | **Effort:** N/A
 
 **Why defer:**
 - Current baselines were established pre-M2.8
@@ -699,72 +699,62 @@ await handler.handle(event)
 - Event emission + projection overhead is intentional
 - Should re-baseline from production metrics, not synthetic tests
 
-**When to revisit:**
-- After production deployment provides real-world performance data
-- When establishing SLOs for projection throughput
-- Consider measuring projection latency, not direct write speed
+**Keep skipped until:** M3.3 — re-establish baselines for single-writer architecture (tracked in ROADMAP.md)
 
-### P9.5: Performance Test Configuration ✅ DOCUMENTED
+### P9.5: Performance Test Configuration ✅ FIXED (2026-01-31)
 **File:** `tests/integration/test_performance.py`
-**Tests:** 2 | **Action:** KEEP SKIPPED | **Status:** Documented
+**Tests:** 2 | **Action:** UNSKIPPED | **Status:** Both passing
 
-These are performance tests (not correctness tests) with known configuration issues:
+Both tests fixed and unskipped:
 
-1. `test_concurrent_projection_processing` - Flaky due to test order sensitivity
-   - **Issue:** Shared state pollution from other tests
-   - **Skip reason:** Already documented in code
-   - **Future fix:** Requires better test isolation infrastructure
+1. `test_concurrent_projection_processing` — Root cause was `NEO4J_URI` not overridden in
+   `setup_test_environment`, so handlers connected to production Neo4j. Fixed by adding
+   `NEO4J_URI`/`NEO4J_USER`/`NEO4J_PASSWORD` overrides pointing to test database.
 
-2. `test_concurrent_file_processing` - test_mode not propagated
-   - **Issue:** Pipeline writes to production Neo4j, test verifies against test Neo4j
-   - **Skip reason:** Already documented in code
-   - **Future fix:** Add test_mode to PipelineOrchestrator (requires refactoring)
+2. `test_concurrent_file_processing` — Same Neo4j connection issue, plus test verified Neo4j
+   state immediately after pipeline (M3.0: pipeline only emits events). Fixed by adding
+   projection handler replay before Neo4j verification.
 
-**Rationale for keeping skipped:**
-- Performance tests, not correctness tests
-- Coverage already at 90%+
-- Other performance tests in the file ARE running and passing
-- Fixing requires infrastructure changes beyond Phase 9 scope
-
-### P9.6: Keep Projection Rebuild Tests (Already Correct) ✅ DONE
+### P9.6: Projection Rebuild Tests ✅ FIXED (2026-01-31)
 **File:** `tests/integration/test_projection_rebuild.py`
-**Tests:** 2 | **Action:** KEEP | **Status:** Correct
+**Tests:** 2 | **Action:** NOW PASSING | **Status:** Fixed
 
-These tests already use the correct pattern:
+These tests use the correct M3.0 pattern:
 - Pipeline processes file → creates events only
 - Events processed through projection handlers → creates Neo4j state
 - Delete Neo4j → Replay events → Verify state rebuilt correctly
 
-**Current skip reason:** Requires valid OpenAI API key (conditional skip is correct)
+**Previous skip:** `OPENAI_API_KEY` not found in `os.environ` (key was in `.env` but not loaded).
+**Fix:** Added `_load_env_file()` to `tests/conftest.py` to load `.env` before imports.
+Tests now run automatically when infrastructure is available.
 
 ### Summary Table
 
 | Sub-Phase | File | Tests | Action | Priority | Status |
 |-----------|------|-------|--------|----------|--------|
-| P9.1 | test_neo4j_analysis_writer_lifecycle.py | 11 | DELETE | High | ✅ |
-| P9.2 | test_neo4j_data_integrity.py | 8 | REFACTOR | High | ✅ |
-| P9.3 | test_neo4j_fault_tolerance.py | 7 | KEEP SKIPPED | Medium | ✅ |
-| P9.4 | test_neo4j_performance_benchmarks.py | 7 | DEFER | Low | ✅ |
-| P9.5 | test_performance.py | 2 | DOCUMENTED | Medium | ✅ |
-| P9.6 | test_projection_rebuild.py | 2 | KEEP | N/A | ✅ |
-| | **Total** | **37** | | | |
+| P9.1 | test_neo4j_analysis_writer_lifecycle.py | 11 | DELETE | High | ✅ Deleted |
+| P9.2 | test_neo4j_data_integrity.py | 8 | REFACTOR | High | ✅ Refactored |
+| P9.3 | test_neo4j_fault_tolerance.py | 11 | KEEP SKIPPED → M3.1 | Medium | ✅ Deferred |
+| P9.4 | test_neo4j_performance_benchmarks.py | 7 | DEFER → M3.3 | Low | ✅ Deferred |
+| P9.5 | test_performance.py | 2 | UNSKIPPED | Medium | ✅ Fixed |
+| P9.6 | test_projection_rebuild.py | 2 | UNSKIPPED | N/A | ✅ Fixed |
+| | **Total** | **41** | | | |
 
 **Phase 9 outcome:**
 - 11 tests deleted (test_neo4j_analysis_writer_lifecycle.py removed)
 - 8 tests refactored (data integrity now uses projection handlers)
-- 7 tests kept skipped (fault tolerance - covered by projection tests)
-- 7 tests deferred (performance baselines - wait for production data)
-- 2 tests documented (configuration issues - performance tests, not correctness)
-- 2 tests kept as-is (projection rebuild - conditional skip is correct)
-- Skipped tests reduced from 44 to ~33 (removed deprecated, refactored data integrity)
+- 11 tests kept skipped (fault tolerance — rewrite for ESDB in M3.1)
+- 7 tests deferred (performance baselines — re-baseline in M3.3)
+- 2 tests unskipped (performance tests — Neo4j connection + M3.0 update, 2026-01-31)
+- 2 tests unskipped (projection rebuild — .env loading fix, 2026-01-31)
 
 ---
 
-## Phase 10: Test Fixes & Infrastructure Integration ⏳ IN PROGRESS
+## Phase 10: Test Fixes & Infrastructure Integration ✅ COMPLETE
 
 **Goal:** Fix remaining test issues and enable infrastructure-dependent tests
 **Priority:** P0 - Blocking test suite stability
-**Status:** In Progress (2026-01-26)
+**Status:** Complete (2026-01-31)
 
 ### P10.1: Fix Mock Bugs in Unit Tests ✅ COMPLETE
 
@@ -809,38 +799,15 @@ sentence_analyzer.classify_sentence = mock_classify_sentence
 
 **Result:** 26 live API tests now properly skipped when running `pytest -m "not integration"`.
 
-### P10.3: Infrastructure Test - Projection Rebuild 📋 IN PROGRESS
+### P10.3: Infrastructure Test - Projection Rebuild ✅ COMPLETE
 
 **File:** `tests/integration/test_projection_rebuild.py`
-**Tests:** 2 | **Status:** 1 failing (requires infrastructure)
+**Tests:** 2 | **Status:** Both passing
 
-**Test:** `test_projection_service_rebuilds_neo4j_from_events`
+Fixed by loading `.env` in `tests/conftest.py` so `OPENAI_API_KEY` is available.
+`make test-rebuild` target added in TC.10.
 
-**What it tests:**
-1. Pipeline processes file → emits events to EventStoreDB
-2. Projection handlers process events → create Neo4j state
-3. Delete all Neo4j nodes
-4. Replay events through projection handlers
-5. Verify Neo4j state is correctly rebuilt
-
-**Infrastructure Required:**
-- EventStoreDB running on `localhost:2113` or `eventstore:2113`
-- Neo4j test database running on `localhost:7688`
-- Valid OpenAI API key (for pipeline processing)
-
-**Make Target Needed:**
-```makefile
-# Run projection rebuild test specifically
-.PHONY: test-rebuild
-test-rebuild: test-infra-up
-	@echo "Running projection rebuild test..."
-	$(PYTHON) -m pytest tests/integration/test_projection_rebuild.py -v
-	@if [ "$(KEEP_SERVICES)" = "0" ]; then $(MAKE) test-infra-down; fi
-```
-
-### P10.4: Verify Make Targets 📋 PLANNED
-
-Ensure all test Make targets work correctly:
+### P10.4: Verify Make Targets ✅ COMPLETE
 
 | Target | Purpose | Status |
 |--------|---------|--------|
@@ -849,7 +816,18 @@ Ensure all test Make targets work correctly:
 | `make test-infra-up` | Start Neo4j + ESDB | ✅ Works |
 | `make test-infra-down` | Stop infrastructure | ✅ Works |
 | `make test-integration-full` | Full integration cycle | ✅ Works |
-| `make test-rebuild` | Projection rebuild test | 📋 Needs adding |
+| `make test-rebuild` | Projection rebuild test | ✅ Works |
+
+### P10.5: Fix Performance & Rebuild Test Configuration ✅ COMPLETE (2026-01-31)
+
+**Fixes applied:**
+1. **NEO4J_URI override in `setup_test_environment`** — Handlers calling `get_driver()` without
+   `test_mode` now connect to test Neo4j instead of production.
+2. **`.env` loading in `tests/conftest.py`** — API keys available to all tests without manual export.
+3. **M3.0 update to `test_concurrent_file_processing`** — Added projection handler replay before
+   Neo4j verification (pipeline only emits events in M3.0).
+
+**Result:** 4 previously-skipped tests now passing (2 performance + 2 projection rebuild).
 
 ### Summary
 
@@ -857,12 +835,16 @@ Ensure all test Make targets work correctly:
 |-----------|-------------|--------|
 | P10.1 | Fix mock bugs in unit tests | ✅ Complete |
 | P10.2 | Add integration markers to live API tests | ✅ Complete |
-| P10.3 | Enable projection rebuild test | 📋 In Progress |
-| P10.4 | Verify Make targets | 📋 Planned |
+| P10.3 | Enable projection rebuild test | ✅ Complete |
+| P10.4 | Verify Make targets | ✅ Complete |
+| P10.5 | Fix performance & rebuild test configuration | ✅ Complete |
 
-**Test Results After Phase 10 Fixes:**
+**Test Results After Phase 10:**
 - Unit tests (`-m "not integration"`): **977 passed**, 3 skipped
-- Full suite (with valid API keys): **1091 passed**, 1 failed (infra), 19 skipped
+- Integration tests: **119 passed**, 12 skipped (architectural)
+- Full suite: All tests passing, 0 failures
+
+**Completed:** 2026-01-31
 
 ---
 
@@ -881,8 +863,7 @@ Ensure all test Make targets work correctly:
 3. **P7 Integration** - Modernize tests for event-sourced architecture
 4. **P8 E2E** - Validate complete user workflows
 
-### Skipped Test Categories (54 total)
-- **M2.8 Architecture Changes** (~35): Tests assume direct Neo4j writes
-- **Performance Baselines** (~8): Outdated for event-sourced flow
-- **Environment-Specific** (~6): Windows permissions, Docker detection
-- **Optional Dependencies** (~5): openpyxl, psutil not installed
+### Skipped Test Categories (15 total)
+- **Architectural — fault tolerance** (11): `test_neo4j_fault_tolerance.py` — rewrite for ESDB in M3.1
+- **Architectural — performance baselines** (1): `test_neo4j_performance_benchmarks.py` module-level skip — re-baseline in M3.3 (covers 7 tests)
+- **Optional dependencies** (3): `openpyxl` (2 tests), import-time logging (1 test)

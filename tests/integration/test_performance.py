@@ -198,11 +198,6 @@ class TestProjectionPerformance:
         print(f"  - Average: {(projection_lag / 100) * 1000:.2f}ms per event")
         print(f"  - Throughput: {100 / projection_lag:.2f} events/sec")
 
-    @pytest.mark.skip(
-        reason="Flaky test: Passes individually but fails in full suite due to test order sensitivity. "
-               "Likely shared state pollution from other tests. EventStoreDB cleanup fixture in place "
-               "for future fix. This is a performance test, not a correctness test."
-    )
     async def test_concurrent_projection_processing(
         self,
         clean_test_database,
@@ -336,11 +331,6 @@ class TestLoadTesting:
         # In practice, we rely on EventStoreDB's guarantees
         print("  - Event loss validation: Assuming EventStoreDB guarantees (not verified)")
 
-    @pytest.mark.skip(
-        reason="Test configuration issue: Pipeline writes to production Neo4j (via Neo4jConnectionManager.get_session()) "
-               "but test verification reads from test Neo4j (test_mode=True). "
-               "Fix: Add test_mode parameter propagation to PipelineOrchestrator and Neo4jMapStorage."
-    )
     async def test_concurrent_file_processing(
         self,
         clean_test_database,
@@ -397,6 +387,37 @@ class TestLoadTesting:
         print("\n✓ Concurrent file processing:")
         print(f"  - 10 files processed in {elapsed_time:.2f}s")
         print(f"  - Average: {elapsed_time / 10:.2f}s per file")
+
+        # M3.0: Pipeline only emits events. Process through projection handlers
+        # to create Neo4j state before verification.
+        from src.projections.handlers.interview_handlers import InterviewCreatedHandler
+        from src.projections.handlers.sentence_handlers import SentenceCreatedHandler
+
+        interview_handler = InterviewCreatedHandler()
+        sentence_handler = SentenceCreatedHandler()
+
+        for i in range(10):
+            file_name = f"concurrent_test_{i}.txt"
+            interview_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"file:{file_name}"))
+            interview_stream = f"Interview-{interview_id}"
+            try:
+                events = await clean_event_store.read_stream(interview_stream)
+                for event in events:
+                    if event.event_type == "InterviewCreated":
+                        await interview_handler.handle(event)
+            except Exception:
+                pass
+
+            for j in range(3):
+                sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{j}"))
+                sentence_stream = f"Sentence-{sentence_id}"
+                try:
+                    events = await clean_event_store.read_stream(sentence_stream)
+                    for event in events:
+                        if event.event_type == "SentenceCreated":
+                            await sentence_handler.handle(event)
+                except Exception:
+                    pass
 
         # Verify data in Neo4j (spot check)
         driver = await Neo4jConnectionManager.get_driver(test_mode=True)
