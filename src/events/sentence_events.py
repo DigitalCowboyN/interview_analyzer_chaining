@@ -113,6 +113,17 @@ class SpeakerReattributedData(BaseModel):
     new_speaker_id: str = Field(..., description="Corrected Speaker UUID")
 
 
+class EmbeddingGeneratedData(BaseModel):
+    """Data payload for EmbeddingGenerated event (Layer 2, fragment scope)."""
+
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
+    model: str = Field(..., description="Embedding model name (vector space tag)")
+    dim: int = Field(..., gt=0, description="Vector dimensionality")
+    vector_b64: str = Field(..., description="Base64 little-endian float32 vector")
+
+
 class EntitiesExtractedData(BaseModel):
     """Data payload for EntitiesExtracted event (Layer 2 enrichment)."""
 

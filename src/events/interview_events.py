@@ -113,6 +113,15 @@ class StitchRemovedData(BaseModel):
     reason: Optional[str] = Field(None, description="Why the stitch was wrong")
 
 
+class UtteranceEmbeddingGeneratedData(BaseModel):
+    """Data payload for UtteranceEmbeddingGenerated event (Layer 2)."""
+
+    utterance_id: str = Field(..., description="Utterance the embedding is for")
+    model: str = Field(..., description="Embedding model name (vector space tag)")
+    dim: int = Field(..., gt=0, description="Vector dimensionality")
+    vector_b64: str = Field(..., description="Base64 little-endian float32 vector")
+
+
 class ClaimExtractedData(BaseModel):
     """Data payload for ClaimExtracted event (Layer 2, utterance-scoped)."""
 

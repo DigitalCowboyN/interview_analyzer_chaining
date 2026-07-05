@@ -58,6 +58,7 @@ SUBSCRIPTION_CONFIG: Dict[str, Dict] = {
             "StitchRemoved",
             # Layer 2 (M4.2): enrichment
             "ClaimExtracted",
+            "UtteranceEmbeddingGenerated",
         ],
     },
     "sentence": {
@@ -80,6 +81,7 @@ SUBSCRIPTION_CONFIG: Dict[str, Dict] = {
             "SpeakerReattributed",
             # Layer 2 (M4.2): enrichment
             "EntitiesExtracted",
+            "EmbeddingGenerated",
         ],
     },
 }

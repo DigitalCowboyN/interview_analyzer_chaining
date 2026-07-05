@@ -49,6 +49,12 @@ embedding:
   model_name: "all-MiniLM-L6-v2"
   embedding_dim: 384
 
+embeddings:
+  provider: "openai"  # "openai" | "local" — config-pinned; switching = re-embed via replay
+  openai:
+    model_name: "text-embedding-3-small"
+    embedding_dim: 1536
+
 clustering:
   algorithm: "HDBSCAN"
   hdbscan:
