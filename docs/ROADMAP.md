@@ -29,7 +29,7 @@
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** M4.2 Planning (Layer 2 — see docs/superpowers/specs/2026-07-04-mine-layers-design.md)
-**Tests:** 1067 unit passing | **Coverage:** 88.7% (unit)
+**Tests:** 1066 unit passing | **Coverage:** 88.7% (unit)
 
 ---
 
