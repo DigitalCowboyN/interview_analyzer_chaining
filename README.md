@@ -2,32 +2,33 @@
 
 An event-sourced system for processing interview transcripts with AI-powered multi-dimensional sentence analysis.
 
-> **Status:** M2.8 Complete (Production Ready) | **Tests:** 691 passing | **Coverage:** 72.2%
+> **Status:** M4.1 Complete (Layer 1: speakers, utterances, offset-grounded map) | **Tests:** 1060+ passing | **Coverage:** 88.7%
 >
 > See [ROADMAP.md](docs/ROADMAP.md) for milestones and [docs/architecture/](docs/architecture/) for detailed diagrams.
 
 ## What It Does
 
-1. **Ingests** interview transcripts (text files)
-2. **Segments** text into sentences using spaCy NLP
-3. **Analyzes** each sentence across 7 dimensions via LLM (function, structure, purpose, topics, keywords)
-4. **Stores** results in EventStoreDB (source of truth) and Neo4j (graph queries)
-5. **Exposes** REST API for querying and user corrections
+1. **Ingests** interview transcripts (text files — labeled or raw unlabeled prose)
+2. **Segments** text into offset-grounded fragments using spaCy NLP (the map: every fragment ties back to exact source positions)
+3. **Attributes** speakers (parsed from labels, or inferred with confidence when absent — fully correctable)
+4. **Stitches** interrupted utterances via relationship overlay (verbatim text untouched; interruptions become queryable data)
+5. **Analyzes** each sentence across 7 dimensions via LLM (function, structure, purpose, topics, keywords)
+6. **Stores** results in EventStoreDB (source of truth) and Neo4j (graph queries)
+7. **Exposes** REST API for querying and user corrections (edits, speakers, stitches)
 
 ## Architecture
 
 ```
-User Upload / Edit API
+Transcript Ingestion / Edit & Correction APIs
     ↓
-Pipeline / Command Handlers
-    ├──→ EventStoreDB (events) ← Source of Truth
-    └──→ Neo4j (direct write)  ← Temporary (M3.0 removes)
+Aggregates (Interview, Sentence)
+    └──→ EventStoreDB (events only) ← Source of Truth
 
 EventStoreDB
     ↓
-Projection Service (12 lanes)
+Projection Service (12 lanes, sole Neo4j writer)
     ↓
-Neo4j (read model)
+Neo4j (read model: fragments, speakers, utterances, analysis)
 ```
 
 **Key Patterns:** Event Sourcing, CQRS, async/await throughout

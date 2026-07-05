@@ -7,7 +7,7 @@ including creation, updates, status changes, and archival.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -61,6 +61,56 @@ class InterviewDeletedData(BaseModel):
     """Data payload for InterviewDeleted event (rare; prefer Archive)."""
 
     reason: Optional[str] = Field(None, description="Reason for deletion")
+
+
+class SpeakerCreatedData(BaseModel):
+    """Data payload for SpeakerCreated event."""
+
+    speaker_id: str = Field(..., description="Deterministic UUID of the speaker")
+    handle: str = Field(..., description="Stable short handle, e.g. 'S1' or parsed label")
+    display_name: str = Field(..., description="Human-readable name (initially the handle)")
+    provisional: bool = Field(..., description="True when inferred rather than confirmed")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Inference confidence")
+    method: str = Field(..., description="'parsed' | 'inference'")
+
+
+class SpeakerRenamedData(BaseModel):
+    """Data payload for SpeakerRenamed event (human correction)."""
+
+    speaker_id: str = Field(..., description="UUID of the speaker")
+    old_display_name: str = Field(..., description="Previous display name")
+    new_display_name: str = Field(..., description="New display name")
+
+
+class SpeakerMergedData(BaseModel):
+    """Data payload for SpeakerMerged event (human correction: two handles, one person)."""
+
+    surviving_speaker_id: str = Field(..., description="Speaker that remains")
+    merged_speaker_id: str = Field(..., description="Speaker merged away")
+
+
+class UtteranceIdentifiedData(BaseModel):
+    """Data payload for UtteranceIdentified event (stitching overlay)."""
+
+    utterance_id: str = Field(..., description="Deterministic UUID of the utterance")
+    speaker_id: str = Field(..., description="Speaker whose continuous thought this is")
+    fragment_ids: List[str] = Field(..., description="Ordered fragment UUIDs composing the utterance")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Stitching confidence")
+
+
+class InterruptionRecordedData(BaseModel):
+    """Data payload for InterruptionRecorded event."""
+
+    interrupting_utterance_id: str = Field(..., description="Utterance that broke in")
+    interrupted_utterance_id: str = Field(..., description="Utterance that was broken into")
+    at_fragment_id: str = Field(..., description="First fragment of the interruption")
+
+
+class StitchRemovedData(BaseModel):
+    """Data payload for StitchRemoved event (human correction)."""
+
+    utterance_id: str = Field(..., description="Utterance whose stitch is removed")
+    reason: Optional[str] = Field(None, description="Why the stitch was wrong")
 
 
 def create_interview_created_event(

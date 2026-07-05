@@ -10,8 +10,21 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .envelope import Actor, EventEnvelope
-from .interview_events import InterviewStatus
-from .sentence_events import EditorType, SentenceStatus
+from .interview_events import (
+    InterruptionRecordedData,
+    InterviewStatus,
+    SpeakerCreatedData,
+    SpeakerMergedData,
+    SpeakerRenamedData,
+    StitchRemovedData,
+    UtteranceIdentifiedData,
+)
+from .sentence_events import (
+    EditorType,
+    SentenceStatus,
+    SpeakerAttributedData,
+    SpeakerReattributedData,
+)
 
 
 class AggregateRoot(ABC):
@@ -149,6 +162,10 @@ class Interview(AggregateRoot):
         self.created_at: Optional[datetime] = None
         self.updated_at: Optional[datetime] = None
 
+        # Conversation structure (Layer 1): speakers and utterances keyed by id
+        self.speakers: Dict[str, Dict[str, Any]] = {}
+        self.utterances: Dict[str, Dict[str, Any]] = {}
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the interview's state."""
         if event.event_type == "InterviewCreated":
@@ -161,6 +178,18 @@ class Interview(AggregateRoot):
             self._apply_interview_archived(event)
         elif event.event_type == "InterviewDeleted":
             self._apply_interview_deleted(event)
+        elif event.event_type == "SpeakerCreated":
+            self._apply_speaker_created(event)
+        elif event.event_type == "SpeakerRenamed":
+            self._apply_speaker_renamed(event)
+        elif event.event_type == "SpeakerMerged":
+            self._apply_speaker_merged(event)
+        elif event.event_type == "UtteranceIdentified":
+            self._apply_utterance_identified(event)
+        elif event.event_type == "InterruptionRecorded":
+            self._apply_interruption_recorded(event)
+        elif event.event_type == "StitchRemoved":
+            self._apply_stitch_removed(event)
         else:
             raise ValueError(f"Unknown event type for Interview: {event.event_type}")
 
@@ -206,6 +235,50 @@ class Interview(AggregateRoot):
         # but we can mark it as deleted in the state
         self.updated_at = event.occurred_at
 
+    def _apply_speaker_created(self, event: EventEnvelope) -> None:
+        """Apply SpeakerCreated event."""
+        data = event.data
+        self.speakers[data["speaker_id"]] = {
+            "handle": data["handle"],
+            "display_name": data["display_name"],
+            "provisional": data["provisional"],
+            "merged_into": None,
+        }
+        self.updated_at = event.occurred_at
+
+    def _apply_speaker_renamed(self, event: EventEnvelope) -> None:
+        """Apply SpeakerRenamed event (human correction; confirms the speaker)."""
+        data = event.data
+        speaker = self.speakers[data["speaker_id"]]
+        speaker["display_name"] = data["new_display_name"]
+        speaker["provisional"] = False
+        self.updated_at = event.occurred_at
+
+    def _apply_speaker_merged(self, event: EventEnvelope) -> None:
+        """Apply SpeakerMerged event."""
+        data = event.data
+        self.speakers[data["merged_speaker_id"]]["merged_into"] = data["surviving_speaker_id"]
+        self.updated_at = event.occurred_at
+
+    def _apply_utterance_identified(self, event: EventEnvelope) -> None:
+        """Apply UtteranceIdentified event."""
+        data = event.data
+        self.utterances[data["utterance_id"]] = {
+            "speaker_id": data["speaker_id"],
+            "fragment_ids": list(data["fragment_ids"]),
+            "removed": False,
+        }
+        self.updated_at = event.occurred_at
+
+    def _apply_interruption_recorded(self, event: EventEnvelope) -> None:
+        """Apply InterruptionRecorded event (relationship only; no state to mutate)."""
+        self.updated_at = event.occurred_at
+
+    def _apply_stitch_removed(self, event: EventEnvelope) -> None:
+        """Apply StitchRemoved event (human correction)."""
+        self.utterances[event.data["utterance_id"]]["removed"] = True
+        self.updated_at = event.occurred_at
+
     # Command methods (business logic)
     def create(
         self,
@@ -214,6 +287,7 @@ class Interview(AggregateRoot):
         language: Optional[str] = None,
         started_at: Optional[datetime] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        project_id: Optional[str] = None,
         **envelope_kwargs,
     ) -> EventEnvelope:
         """
@@ -225,6 +299,8 @@ class Interview(AggregateRoot):
             language: Language of the interview content
             started_at: When the interview was conducted
             metadata: Additional interview metadata
+            project_id: Project/tenant ID; carried in BOTH the event data (the
+                projection handler reads it there) and the envelope (queryable)
             **envelope_kwargs: Additional envelope fields
 
         Returns:
@@ -233,15 +309,22 @@ class Interview(AggregateRoot):
         if self.version >= 0:
             raise ValueError("Interview has already been created")
 
+        data = {
+            "title": title,
+            "source": source,
+            "language": language,
+            "started_at": started_at.isoformat() if started_at else None,
+            "metadata": metadata or {},
+        }
+        # Omit the key when absent so the projection handler's
+        # data.get("project_id", "default") fallback still applies.
+        if project_id is not None:
+            data["project_id"] = project_id
+
         return self._add_event(
             event_type="InterviewCreated",
-            data={
-                "title": title,
-                "source": source,
-                "language": language,
-                "started_at": started_at.isoformat() if started_at else None,
-                "metadata": metadata or {},
-            },
+            data=data,
+            project_id=project_id,
             **envelope_kwargs,
         )
 
@@ -299,6 +382,151 @@ class Interview(AggregateRoot):
             **envelope_kwargs,
         )
 
+    def add_speaker(
+        self,
+        speaker_id: str,
+        handle: str,
+        display_name: str,
+        provisional: bool,
+        confidence: float,
+        method: str,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Register a speaker discovered by parsing or inference."""
+        if self.version < 0:
+            raise ValueError("Interview must be created before adding speakers")
+        if speaker_id in self.speakers:
+            raise ValueError(f"Speaker {speaker_id} already exists")
+
+        data = SpeakerCreatedData(
+            speaker_id=speaker_id,
+            handle=handle,
+            display_name=display_name,
+            provisional=provisional,
+            confidence=confidence,
+            method=method,
+        )
+
+        return self._add_event(
+            event_type="SpeakerCreated",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def rename_speaker(self, speaker_id: str, new_display_name: str, **envelope_kwargs) -> EventEnvelope:
+        """Human correction: give a provisional speaker a real name."""
+        if speaker_id not in self.speakers:
+            raise ValueError(f"Unknown speaker: {speaker_id}")
+        if self.speakers[speaker_id]["merged_into"] is not None:
+            raise ValueError(f"Speaker {speaker_id} has already been merged")
+
+        data = SpeakerRenamedData(
+            speaker_id=speaker_id,
+            old_display_name=self.speakers[speaker_id]["display_name"],
+            new_display_name=new_display_name,
+        )
+
+        return self._add_event(
+            event_type="SpeakerRenamed",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def merge_speakers(
+        self, surviving_speaker_id: str, merged_speaker_id: str, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Human correction: two provisional handles were the same person."""
+        if surviving_speaker_id == merged_speaker_id:
+            raise ValueError("Cannot merge a speaker into itself")
+        for sid in (surviving_speaker_id, merged_speaker_id):
+            if sid not in self.speakers:
+                raise ValueError(f"Unknown speaker: {sid}")
+            if self.speakers[sid]["merged_into"] is not None:
+                raise ValueError(f"Speaker {sid} has already been merged")
+
+        data = SpeakerMergedData(
+            surviving_speaker_id=surviving_speaker_id,
+            merged_speaker_id=merged_speaker_id,
+        )
+
+        return self._add_event(
+            event_type="SpeakerMerged",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def identify_utterance(
+        self,
+        utterance_id: str,
+        speaker_id: str,
+        fragment_ids: List[str],
+        confidence: float,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Record a stitched utterance: one speaker's continuous thought (overlay only)."""
+        if self.version < 0:
+            raise ValueError("Interview must be created before identifying utterances")
+        if speaker_id not in self.speakers:
+            raise ValueError(f"Unknown speaker: {speaker_id}")
+        if not fragment_ids:
+            raise ValueError("Utterance requires at least one fragment")
+        if utterance_id in self.utterances:
+            raise ValueError(f"Utterance {utterance_id} already identified")
+
+        data = UtteranceIdentifiedData(
+            utterance_id=utterance_id,
+            speaker_id=speaker_id,
+            fragment_ids=fragment_ids,
+            confidence=confidence,
+        )
+
+        return self._add_event(
+            event_type="UtteranceIdentified",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def record_interruption(
+        self,
+        interrupting_utterance_id: str,
+        interrupted_utterance_id: str,
+        at_fragment_id: str,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Record that one utterance broke into another."""
+        for uid in (interrupting_utterance_id, interrupted_utterance_id):
+            if uid not in self.utterances:
+                raise ValueError(f"Unknown utterance: {uid}")
+
+        data = InterruptionRecordedData(
+            interrupting_utterance_id=interrupting_utterance_id,
+            interrupted_utterance_id=interrupted_utterance_id,
+            at_fragment_id=at_fragment_id,
+        )
+
+        return self._add_event(
+            event_type="InterruptionRecorded",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def remove_stitch(
+        self, utterance_id: str, reason: Optional[str] = None, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Human correction: an identified utterance was wrong; remove the overlay."""
+        if utterance_id not in self.utterances:
+            raise ValueError(f"Unknown utterance: {utterance_id}")
+        if self.utterances[utterance_id].get("removed"):
+            raise ValueError(f"Utterance {utterance_id} stitch already removed")
+
+        data = StitchRemovedData(utterance_id=utterance_id, reason=reason)
+
+        return self._add_event(
+            event_type="StitchRemoved",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
 
 class Sentence(AggregateRoot):
     """
@@ -335,6 +563,13 @@ class Sentence(AggregateRoot):
         self.overridden_fields: Dict[str, Any] = {}
         self.override_note: Optional[str] = None
 
+        # Map grounding and speaker attribution (Layer 1)
+        self.start_char: Optional[int] = None
+        self.end_char: Optional[int] = None
+        self.speaker_id: Optional[str] = None
+        self.speaker_confidence: Optional[float] = None
+        self.speaker_locked: bool = False
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the sentence's state."""
         if event.event_type == "SentenceCreated":
@@ -349,6 +584,10 @@ class Sentence(AggregateRoot):
             self._apply_analysis_overridden(event)
         elif event.event_type == "AnalysisCleared":
             self._apply_analysis_cleared(event)
+        elif event.event_type == "SpeakerAttributed":
+            self._apply_speaker_attributed(event)
+        elif event.event_type == "SpeakerReattributed":
+            self._apply_speaker_reattributed(event)
         else:
             raise ValueError(f"Unknown event type for Sentence: {event.event_type}")
 
@@ -361,6 +600,8 @@ class Sentence(AggregateRoot):
         self.speaker = data.get("speaker")
         self.start_ms = data.get("start_ms")
         self.end_ms = data.get("end_ms")
+        self.start_char = data.get("start_char")
+        self.end_char = data.get("end_char")
         self.status = SentenceStatus.CREATED
         self.created_at = event.occurred_at
         self.updated_at = event.occurred_at
@@ -418,6 +659,19 @@ class Sentence(AggregateRoot):
         self.override_note = None
         self.updated_at = event.occurred_at
 
+    def _apply_speaker_attributed(self, event: EventEnvelope) -> None:
+        """Apply SpeakerAttributed event."""
+        self.speaker_id = event.data.get("speaker_id")
+        self.speaker_confidence = event.data.get("confidence")
+        self.updated_at = event.occurred_at
+
+    def _apply_speaker_reattributed(self, event: EventEnvelope) -> None:
+        """Apply SpeakerReattributed event (human correction locks attribution)."""
+        self.speaker_id = event.data.get("new_speaker_id")
+        self.speaker_confidence = 1.0
+        self.speaker_locked = True
+        self.updated_at = event.occurred_at
+
     # Command methods (business logic)
     def create(
         self,
@@ -427,6 +681,8 @@ class Sentence(AggregateRoot):
         speaker: Optional[str] = None,
         start_ms: Optional[int] = None,
         end_ms: Optional[int] = None,
+        start_char: Optional[int] = None,
+        end_char: Optional[int] = None,
         **envelope_kwargs,
     ) -> EventEnvelope:
         """
@@ -439,6 +695,8 @@ class Sentence(AggregateRoot):
             speaker: Speaker identifier if available
             start_ms: Start time in milliseconds
             end_ms: End time in milliseconds
+            start_char: Offset into the immutable source text
+            end_char: End offset into the immutable source text
             **envelope_kwargs: Additional envelope fields
 
         Returns:
@@ -456,6 +714,8 @@ class Sentence(AggregateRoot):
                 "speaker": speaker,
                 "start_ms": start_ms,
                 "end_ms": end_ms,
+                "start_char": start_char,
+                "end_char": end_char,
             },
             **envelope_kwargs,
         )
@@ -481,6 +741,49 @@ class Sentence(AggregateRoot):
         return self._add_event(
             event_type="SentenceEdited",
             data={"old_text": self.text, "new_text": new_text, "editor_type": editor_type.value},
+            **envelope_kwargs,
+        )
+
+    def attribute_speaker(
+        self, speaker_id: str, confidence: float, method: str, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Attribute this fragment to a speaker (system inference or parsed label)."""
+        if self.version < 0:
+            raise ValueError("Sentence must be created before attributing a speaker")
+        if self.speaker_locked:
+            raise ValueError("Speaker attribution is locked by a human correction")
+
+        # Validate through the payload model so out-of-range confidence is
+        # rejected at command time, not just at (optional) deserialization.
+        # interview_id rides in the payload because projection lane routing
+        # partitions Sentence-stream events by data["interview_id"].
+        data = SpeakerAttributedData(
+            interview_id=self.interview_id,
+            speaker_id=speaker_id,
+            confidence=confidence,
+            method=method,
+        )
+
+        return self._add_event(
+            event_type="SpeakerAttributed",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def reattribute_speaker(self, new_speaker_id: str, **envelope_kwargs) -> EventEnvelope:
+        """Human correction of speaker attribution; locks against system overwrite."""
+        if self.version < 0:
+            raise ValueError("Sentence must be created before reattributing a speaker")
+
+        data = SpeakerReattributedData(
+            interview_id=self.interview_id,
+            old_speaker_id=self.speaker_id,
+            new_speaker_id=new_speaker_id,
+        )
+
+        return self._add_event(
+            event_type="SpeakerReattributed",
+            data=data.model_dump(),
             **envelope_kwargs,
         )
 

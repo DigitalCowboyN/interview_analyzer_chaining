@@ -101,16 +101,16 @@ class TestCreateHandlerRegistry:
         )
 
     @patch("src.projections.bootstrap.get_event_store_client")
-    def test_create_handler_registry_registers_exactly_seven_handlers(
+    def test_create_handler_registry_registers_all_handlers(
         self, mock_get_client
     ):
-        """Registry should have exactly 7 handlers registered."""
+        """Registry should have exactly 15 handlers registered (7 core + 5 speaker + 3 utterance)."""
         mock_get_client.return_value = MagicMock()
 
         registry = create_handler_registry()
 
         registered_types = registry.get_registered_types()
-        assert len(registered_types) == 7
+        assert len(registered_types) == 15
 
     @patch("src.projections.bootstrap.get_event_store_client")
     def test_create_handler_registry_uses_provided_parked_events_manager(
@@ -173,7 +173,7 @@ class TestCreateHandlerRegistry:
             create_handler_registry()
 
         assert "Handler registry initialized" in caplog.text
-        assert "7 handlers" in caplog.text
+        assert "15 handlers" in caplog.text
 
     @patch("src.projections.bootstrap.get_event_store_client")
     def test_create_handler_registry_returns_new_instance_each_call(
@@ -204,6 +204,14 @@ class TestCreateHandlerRegistry:
             "SentenceEdited",
             "AnalysisGenerated",
             "AnalysisOverridden",
+            "SpeakerCreated",
+            "SpeakerRenamed",
+            "SpeakerMerged",
+            "SpeakerAttributed",
+            "SpeakerReattributed",
+            "UtteranceIdentified",
+            "InterruptionRecorded",
+            "StitchRemoved",
         }
         registered_types = set(registry.get_registered_types())
 

@@ -1,5 +1,5 @@
 # src/utils/text_processing.py
-from typing import List
+from typing import List, Tuple
 
 import spacy
 
@@ -51,3 +51,29 @@ def segment_text(text: str) -> List[str]:
     sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
     logger.debug(f"Segmented text into {len(sentences)} sentences.")
     return sentences
+
+
+def segment_text_with_offsets(text: str) -> List[Tuple[str, int, int]]:
+    """
+    Segment text into fragments with character offsets into the source.
+
+    Returns a list of (fragment_text, start_char, end_char) tuples where
+    text[start_char:end_char] == fragment_text. Whitespace is stripped from
+    fragments; offsets point at the stripped content.
+    """
+    if nlp is None:
+        logger.error("spaCy model not loaded. Cannot segment text.")
+        return []
+    if not text:
+        return []
+
+    doc = nlp(text)
+    fragments: List[Tuple[str, int, int]] = []
+    for sent in doc.sents:
+        stripped = sent.text.strip()
+        if not stripped:
+            continue
+        leading_ws = len(sent.text) - len(sent.text.lstrip())
+        start = sent.start_char + leading_ws
+        fragments.append((stripped, start, start + len(stripped)))
+    return fragments

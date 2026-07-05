@@ -20,6 +20,7 @@ from src.api.routers import edits as edits_router
 
 # --- Add router imports ---
 from src.api.routers import files as files_router
+from src.api.routers import speakers as speakers_router
 from src.config import config
 from src.pipeline import run_pipeline
 from src.utils.logger import get_logger
@@ -39,6 +40,7 @@ app = FastAPI(
 app.include_router(files_router.router)
 app.include_router(analysis_router.router)
 app.include_router(edits_router.router)
+app.include_router(speakers_router.router)
 # ------------------------------
 
 
