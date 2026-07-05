@@ -87,16 +87,16 @@ def test_utterance_handlers_registered_in_bootstrap():
 
 @pytest.mark.asyncio
 async def test_utterance_identified_raises_when_speaker_missing():
-    # No result row means the Speaker MATCH found nothing (out-of-order
-    # delivery); the handler must raise so retry/park logic engages.
+    # A missing Speaker yields matched == 0 (the ungrouped count() aggregation
+    # still returns one row); the handler must raise so retry/park engages.
     handler = UtteranceIdentifiedHandler()
     tx = AsyncMock()
-    tx.run.return_value.single = AsyncMock(return_value=None)
+    mock_matched(tx, 0)
     event = make_event(
         "UtteranceIdentified",
         {"utterance_id": U1, "speaker_id": SP1, "fragment_ids": [F1], "confidence": 0.75},
     )
-    with pytest.raises(ValueError, match="no writes applied"):
+    with pytest.raises(ValueError, match="only 0/1 fragments matched"):
         await handler.apply(tx, event)
 
 

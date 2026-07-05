@@ -309,16 +309,21 @@ class Interview(AggregateRoot):
         if self.version >= 0:
             raise ValueError("Interview has already been created")
 
+        data = {
+            "title": title,
+            "source": source,
+            "language": language,
+            "started_at": started_at.isoformat() if started_at else None,
+            "metadata": metadata or {},
+        }
+        # Omit the key when absent so the projection handler's
+        # data.get("project_id", "default") fallback still applies.
+        if project_id is not None:
+            data["project_id"] = project_id
+
         return self._add_event(
             event_type="InterviewCreated",
-            data={
-                "title": title,
-                "source": source,
-                "language": language,
-                "started_at": started_at.isoformat() if started_at else None,
-                "metadata": metadata or {},
-                "project_id": project_id,
-            },
+            data=data,
             project_id=project_id,
             **envelope_kwargs,
         )

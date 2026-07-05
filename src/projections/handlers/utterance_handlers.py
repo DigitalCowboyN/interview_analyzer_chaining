@@ -40,19 +40,16 @@ class UtteranceIdentifiedHandler(BaseProjectionHandler):
         record = await result.single()
         # Interview and Sentence events arrive on independent subscriptions, so
         # on rebuild this event can precede SpeakerCreated/SentenceCreated.
-        # Missing Speaker -> zero rows; missing fragments -> matched < expected.
-        # Raise either way so base-class retry/park engages instead of the
-        # version guard permanently sealing a partial overlay.
-        if record is None:
-            raise ValueError(
-                f"UtteranceIdentified {data['utterance_id']}: no writes applied "
-                f"(Speaker {data['speaker_id']} not yet projected?)"
-            )
-        matched = record["matched"]
+        # A missing Speaker yields matched == 0 (the aggregation still returns
+        # one row); missing fragments yield matched < expected. Raise either
+        # way so base-class retry/park engages instead of the version guard
+        # permanently sealing a partial overlay.
+        matched = record["matched"] if record is not None else 0
         if matched < len(fragments):
             raise ValueError(
                 f"UtteranceIdentified {data['utterance_id']}: only {matched}/"
-                f"{len(fragments)} fragments matched (fragments not yet projected?)"
+                f"{len(fragments)} fragments matched (Speaker {data['speaker_id']} "
+                f"or fragments not yet projected?)"
             )
         logger.info(f"Applied UtteranceIdentified for utterance {data['utterance_id']}")
 
