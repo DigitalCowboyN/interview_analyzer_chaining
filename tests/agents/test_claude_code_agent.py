@@ -84,3 +84,30 @@ def test_provider_and_model_names():
     agent = make_agent()
     assert agent.get_provider_name() == "claude_code"
     assert agent.get_model_name() == "claude-code/haiku"
+
+
+@pytest.mark.asyncio
+async def test_timeout_kills_and_reaps_process():
+    agent = make_agent()
+    proc = make_proc()
+    proc.kill = lambda: None
+    import asyncio as asyncio_mod
+
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)), \
+         patch("asyncio.wait_for", AsyncMock(side_effect=asyncio_mod.TimeoutError())):
+        with pytest.raises(RuntimeError, match="timed out"):
+            await agent.call_model("classify this")
+    # After kill, pipes are drained/child reaped via a follow-up communicate()
+    proc.communicate.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_argv_order_is_cli_valid():
+    agent = make_agent()
+    proc = make_proc(stdout=cli_envelope("{}"))
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)) as spawn:
+        await agent.call_model("hello")
+    argv = spawn.call_args.args
+    assert argv[1] == "-p"
+    assert argv[2] == "hello"
+    assert list(argv[3:5]) == ["--output-format", "json"]

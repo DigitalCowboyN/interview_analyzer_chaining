@@ -56,6 +56,9 @@ class ClaudeCodeAgent(BaseLLMAgent):
             )
         except asyncio.TimeoutError:
             proc.kill()
+            # Drain pipes and reap the child so transports close deterministically
+            # (repeated timeouts must not leak file descriptors).
+            await proc.communicate()
             raise RuntimeError(f"claude CLI timed out after {self.timeout}s")
 
         if proc.returncode != 0:
