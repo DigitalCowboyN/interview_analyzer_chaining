@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-07-04
+**Last Updated:** 2026-07-05
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -29,7 +29,7 @@
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** M4.2 Planning (Layer 2 — see docs/superpowers/specs/2026-07-04-mine-layers-design.md)
-**Tests:** 1060 unit + 115 integration passing | **Coverage:** 88.7% (unit)
+**Tests:** 1067 unit passing | **Coverage:** 88.7% (unit)
 
 ---
 
@@ -149,7 +149,7 @@
 
 **Test Status:**
 - Unit tests (`-m "not integration"`): 977 passed, 3 skipped
-- Integration tests: 115 passed, 16 skipped (architectural)
+- Integration tests: 119 passed, 12 skipped (architectural)
 - Full suite: All tests passing
 
 **Completed:** 2026-01-28
@@ -165,8 +165,11 @@
 - [ ] Semantic similarity search endpoints
 - [ ] Vector-based clustering for topics
 - [ ] Enhanced keyword/topic extraction
+- [ ] Rewrite 11 fault tolerance tests for EventStoreDB (`test_neo4j_fault_tolerance.py`)
+- [ ] Update 11 data integrity tests for eventual consistency (`test_neo4j_data_integrity.py`)
 
 **Dependencies:** M3.0 complete (neo4j 6.x required)
+**Skipped tests addressed:** 11 fault tolerance (rewrite for ESDB)
 
 ---
 
@@ -187,9 +190,11 @@
 - [ ] Upgrade pytest-cov 6.0.0 → 7.x
 - [ ] Upgrade redis 6.2.0 → 7.x
 - [ ] Upgrade isort 5.13.2 → 7.x
-- [ ] Update performance baselines
+- [ ] Re-establish performance baselines for M3.0 single-writer architecture
+- [ ] Unskip 7 performance benchmark tests (`test_neo4j_performance_benchmarks.py`)
 
 **Dependencies:** M3.0 complete
+**Skipped tests addressed:** 7 performance benchmarks (re-baseline for single-writer)
 
 ---
 
@@ -308,7 +313,8 @@
 - [x] Remove deprecated Neo4jAnalysisWriter direct write code
 - [x] Remove graph_persistence tests (14 tests)
 - [ ] Update 11 data integrity tests for eventual consistency (M3.1)
-- [ ] Rewrite 5 fault tolerance tests for EventStoreDB (M3.1)
+- [ ] Rewrite 11 fault tolerance tests for EventStoreDB (M3.1)
+- [ ] Re-baseline 7 performance benchmark tests for single-writer (M3.3)
 
 ### Future Improvements (Unprioritized)
 - [ ] Prometheus metrics exporter (currently in-memory)
@@ -319,6 +325,28 @@
 - [ ] Neo4j query optimization for bulk operations
 - [ ] Circuit breaker for Neo4j connection failures
 - [ ] Event archival/compaction strategy
+
+---
+
+## Skipped Tests Inventory
+
+**Total skipped: 15** (3 unit + 12 integration)
+
+### Unit (3 skipped)
+
+| Test | Reason | Milestone |
+|------|--------|-----------|
+| `test_helpers.py` (2 tests) | `openpyxl` not installed | N/A — optional dependency |
+| `test_text_processing.py` (1 test) | Import-time exception logging untestable without reload | N/A — test limitation |
+
+### Integration (12 skipped)
+
+| Test File | Tests | Reason | Milestone |
+|-----------|-------|--------|-----------|
+| `test_neo4j_fault_tolerance.py` | 11 | M2.8: Neo4j fault tolerance irrelevant; ESDB is source of truth | **M3.1** |
+| `test_neo4j_performance_benchmarks.py` | 1 | `psutil` not installed for memory benchmark | N/A — optional dependency |
+
+**Note:** `test_neo4j_performance_benchmarks.py` has a module-level skip covering all 7 tests, but pytest only counts it as 1 skip in the summary. The 7 tests are tracked under M3.3 for re-baselining.
 
 ---
 
@@ -348,6 +376,10 @@ Neo4j (sole writer, materialized view)
 | 2026-07-04 | M4.1 (Layer 1) complete: speakers, utterances, offset-grounded map | Spec: docs/superpowers/specs/2026-07-04-mine-layers-design.md |
 | 2026-07-04 | Stitching is an overlay, never a rewrite | Interview must be viewable as-spoken; interpretation is additive + correctable |
 | 2026-07-04 | Speaker inference reconciles windows by deterministic overlap voting | LLM-based reconciliation deferred until golden evaluation demands it |
+| 2026-01-31 | Unskipped 4 integration tests | Fixed Neo4j connection (NEO4J_URI override), .env loading, M3.0 test update |
+| 2026-01-31 | Fixed performance test Neo4j connection | Override NEO4J_URI in setup_test_environment so handlers use test DB |
+| 2026-01-31 | Added .env loading to root conftest | API keys from .env now available for all tests without manual export |
+| 2026-01-31 | Updated test_concurrent_file_processing for M3.0 | Added projection handler replay before Neo4j verification |
 | 2026-01-28 | TC.10 complete | All infrastructure tests passing, event env vars fixed |
 | 2026-01-28 | Added project_id to InterviewCreatedData | Handler needs project_id in event data, not just envelope |
 | 2026-01-28 | Made Neo4jMapStorage.initialize() no-op | M3.0 single-writer: projection service is sole Neo4j writer |

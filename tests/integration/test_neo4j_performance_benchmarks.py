@@ -41,15 +41,15 @@ except ImportError:
 from src.io.neo4j_analysis_writer import Neo4jAnalysisWriter
 from src.io.neo4j_map_storage import Neo4jMapStorage
 
-# M2.8: Skip all performance benchmarks - baselines outdated, re-establish from production
+# M3.0: Skip all performance benchmarks - baselines from pre-M3.0 dual-write architecture.
+# Re-establish baselines for single-writer architecture in M3.3 (tracked in ROADMAP.md).
 pytestmark = [
     pytest.mark.neo4j,
     pytest.mark.integration,
     pytest.mark.slow,
     pytest.mark.skip(
-        reason="M2.8: Performance baselines outdated for dual-write architecture. M2.8 intentionally "
-               "adds overhead (event emission + Neo4j). Re-establish baselines from production data "
-               "after deployment. Update tests in M2.9 or re-baseline for M3.0 single-writer."
+        reason="M3.3: Re-establish performance baselines for M3.0 single-writer architecture. "
+               "Current baselines are from pre-M3.0 dual-write pattern."
     ),
 ]
 

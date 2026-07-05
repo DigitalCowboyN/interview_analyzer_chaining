@@ -223,6 +223,12 @@ def setup_test_environment(monkeypatch):
     monkeypatch.setenv("NEO4J_TEST_USER", os.getenv("NEO4J_TEST_USER", "neo4j"))
     monkeypatch.setenv("NEO4J_TEST_PASSWORD", os.getenv("NEO4J_TEST_PASSWORD", "testpassword"))
 
+    # Also override production Neo4j vars so handlers (which call get_driver without test_mode)
+    # connect to the test database during integration tests
+    monkeypatch.setenv("NEO4J_URI", neo4j_test_uri)
+    monkeypatch.setenv("NEO4J_USER", os.getenv("NEO4J_TEST_USER", "neo4j"))
+    monkeypatch.setenv("NEO4J_PASSWORD", os.getenv("NEO4J_TEST_PASSWORD", "testpassword"))
+
     # EventStoreDB Test Configuration
     # Follow Neo4j pattern: check for test-specific override first, then construct
     # based on environment. Ignore production ESDB_CONNECTION_STRING from .env.
