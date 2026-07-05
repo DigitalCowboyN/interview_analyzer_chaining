@@ -113,6 +113,20 @@ class SpeakerReattributedData(BaseModel):
     new_speaker_id: str = Field(..., description="Corrected Speaker UUID")
 
 
+class EntitiesExtractedData(BaseModel):
+    """Data payload for EntitiesExtracted event (Layer 2 enrichment)."""
+
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
+    entities: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Span-grounded mentions: {text, entity_type, start, end, confidence}",
+    )
+    model: str = Field(..., description="Model that extracted the entities")
+    provider: str = Field(..., description="Provider that served the call")
+
+
 class AnalysisGeneratedData(BaseModel):
     """Data payload for AnalysisGenerated event."""
 

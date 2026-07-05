@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from .envelope import Actor, EventEnvelope
 from .interview_events import (
+    ClaimExtractedData,
     InterruptionRecordedData,
     InterviewStatus,
     SpeakerCreatedData,
@@ -21,6 +22,7 @@ from .interview_events import (
 )
 from .sentence_events import (
     EditorType,
+    EntitiesExtractedData,
     SentenceStatus,
     SpeakerAttributedData,
     SpeakerReattributedData,
@@ -166,6 +168,9 @@ class Interview(AggregateRoot):
         self.speakers: Dict[str, Dict[str, Any]] = {}
         self.utterances: Dict[str, Dict[str, Any]] = {}
 
+        # Enrichment (Layer 2): claims keyed by claim_id
+        self.claims: Dict[str, Dict[str, Any]] = {}
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the interview's state."""
         if event.event_type == "InterviewCreated":
@@ -190,6 +195,8 @@ class Interview(AggregateRoot):
             self._apply_interruption_recorded(event)
         elif event.event_type == "StitchRemoved":
             self._apply_stitch_removed(event)
+        elif event.event_type == "ClaimExtracted":
+            self._apply_claim_extracted(event)
         else:
             raise ValueError(f"Unknown event type for Interview: {event.event_type}")
 
@@ -277,6 +284,18 @@ class Interview(AggregateRoot):
     def _apply_stitch_removed(self, event: EventEnvelope) -> None:
         """Apply StitchRemoved event (human correction)."""
         self.utterances[event.data["utterance_id"]]["removed"] = True
+        self.updated_at = event.occurred_at
+
+    def _apply_claim_extracted(self, event: EventEnvelope) -> None:
+        """Apply ClaimExtracted event (Layer 2 enrichment)."""
+        data = event.data
+        self.claims[data["claim_id"]] = {
+            "utterance_id": data["utterance_id"],
+            "speaker_id": data["speaker_id"],
+            "text": data["text"],
+            "kind": data["kind"],
+            "confidence": data["confidence"],
+        }
         self.updated_at = event.occurred_at
 
     # Command methods (business logic)
@@ -527,6 +546,48 @@ class Interview(AggregateRoot):
             **envelope_kwargs,
         )
 
+    def record_claim(
+        self,
+        claim_id: str,
+        utterance_id: str,
+        text: str,
+        kind: str,
+        confidence: float,
+        model: str,
+        provider: str,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Record a claim extracted from an utterance (Layer 2 enrichment).
+
+        The speaker is derived from the utterance — a claim is always made by
+        whoever spoke the utterance it came from.
+        """
+        if self.version < 0:
+            raise ValueError("Interview must be created before recording claims")
+        if utterance_id not in self.utterances:
+            raise ValueError(f"Unknown utterance: {utterance_id}")
+        if self.utterances[utterance_id].get("removed"):
+            raise ValueError(f"Utterance {utterance_id} has been removed")
+        if claim_id in self.claims:
+            raise ValueError(f"Claim {claim_id} already recorded")
+
+        data = ClaimExtractedData(
+            claim_id=claim_id,
+            utterance_id=utterance_id,
+            speaker_id=self.utterances[utterance_id]["speaker_id"],
+            text=text,
+            kind=kind,
+            confidence=confidence,
+            model=model,
+            provider=provider,
+        )
+
+        return self._add_event(
+            event_type="ClaimExtracted",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
 
 class Sentence(AggregateRoot):
     """
@@ -574,6 +635,7 @@ class Sentence(AggregateRoot):
         self.dimension_confidences: Dict[str, float] = {}
         self.flags: Dict[str, str] = {}
         self.analysis_provider: Optional[str] = None
+        self.entities: List[Dict[str, Any]] = []
 
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the sentence's state."""
@@ -593,6 +655,8 @@ class Sentence(AggregateRoot):
             self._apply_speaker_attributed(event)
         elif event.event_type == "SpeakerReattributed":
             self._apply_speaker_reattributed(event)
+        elif event.event_type == "EntitiesExtracted":
+            self._apply_entities_extracted(event)
         else:
             raise ValueError(f"Unknown event type for Sentence: {event.event_type}")
 
@@ -678,6 +742,11 @@ class Sentence(AggregateRoot):
         self.speaker_id = event.data.get("new_speaker_id")
         self.speaker_confidence = 1.0
         self.speaker_locked = True
+        self.updated_at = event.occurred_at
+
+    def _apply_entities_extracted(self, event: EventEnvelope) -> None:
+        """Apply EntitiesExtracted event (re-extraction replaces the set)."""
+        self.entities = list(event.data.get("entities", []))
         self.updated_at = event.occurred_at
 
     # Command methods (business logic)
@@ -774,6 +843,30 @@ class Sentence(AggregateRoot):
 
         return self._add_event(
             event_type="SpeakerAttributed",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def record_entities(
+        self, entities: List[Dict[str, Any]], model: str, provider: str, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Record span-grounded entity mentions (Layer 2 enrichment).
+
+        interview_id rides in the payload because projection lane routing
+        partitions Sentence-stream events by data["interview_id"].
+        """
+        if self.version < 0:
+            raise ValueError("Sentence must be created before recording entities")
+
+        data = EntitiesExtractedData(
+            interview_id=self.interview_id,
+            entities=entities,
+            model=model,
+            provider=provider,
+        )
+
+        return self._add_event(
+            event_type="EntitiesExtracted",
             data=data.model_dump(),
             **envelope_kwargs,
         )

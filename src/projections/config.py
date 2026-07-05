@@ -56,6 +56,8 @@ SUBSCRIPTION_CONFIG: Dict[str, Dict] = {
             "UtteranceIdentified",
             "InterruptionRecorded",
             "StitchRemoved",
+            # Layer 2 (M4.2): enrichment
+            "ClaimExtracted",
         ],
     },
     "sentence": {
@@ -76,6 +78,8 @@ SUBSCRIPTION_CONFIG: Dict[str, Dict] = {
             # Layer 1 (M4.1): correctable speaker attribution
             "SpeakerAttributed",
             "SpeakerReattributed",
+            # Layer 2 (M4.2): enrichment
+            "EntitiesExtracted",
         ],
     },
 }
