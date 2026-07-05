@@ -189,6 +189,9 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
             model_version: $model_version,
             confidence: $confidence,
             raw_ref: $raw_ref,
+            provider: $provider,
+            dimension_confidences: $dimension_confidences_json,
+            flags: $flags_json,
             is_overridden: false,
             created_at: datetime($created_at)
         })
@@ -197,14 +200,25 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
 
         analysis_id = f"{event.aggregate_id}-analysis-{event.version}"
 
+        import json as json_mod
+
+        dimension_confidences = data.get("dimension_confidences") or None
+        flags = data.get("flags") or None
         await tx.run(
             query_analysis,
             aggregate_id=event.aggregate_id,
             analysis_id=analysis_id,
             model=data.get("model", "unknown"),
-            model_version=data.get("model_version", "unknown"),
+            # Payload key is "version" (AnalysisGeneratedData); accept the
+            # historical "model_version" spelling as a fallback.
+            model_version=data.get("version") or data.get("model_version", "unknown"),
             confidence=data.get("confidence"),
             raw_ref=data.get("raw_ref"),
+            provider=data.get("provider"),
+            dimension_confidences_json=(
+                json_mod.dumps(dimension_confidences) if dimension_confidences else None
+            ),
+            flags_json=json_mod.dumps(flags) if flags else None,
             created_at=event.occurred_at.isoformat(),
         )
 

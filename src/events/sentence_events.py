@@ -126,6 +126,13 @@ class AnalysisGeneratedData(BaseModel):
     domain_keywords: List[str] = Field(default_factory=list, description="Domain-specific keywords")
     confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Analysis confidence score")
     raw_ref: Optional[str] = Field(None, description="Reference to raw analysis data")
+    dimension_confidences: Dict[str, float] = Field(
+        default_factory=dict, description="Per-dimension numeric confidence (0-1)"
+    )
+    flags: Dict[str, str] = Field(
+        default_factory=dict, description="Review flags (e.g., spaCy disagreement)"
+    )
+    provider: Optional[str] = Field(None, description="Provider that served the calls")
 
 
 class AnalysisRegeneratedData(BaseModel):

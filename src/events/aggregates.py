@@ -570,6 +570,11 @@ class Sentence(AggregateRoot):
         self.speaker_confidence: Optional[float] = None
         self.speaker_locked: bool = False
 
+        # Enrichment v2 (Layer 2)
+        self.dimension_confidences: Dict[str, float] = {}
+        self.flags: Dict[str, str] = {}
+        self.analysis_provider: Optional[str] = None
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the sentence's state."""
         if event.event_type == "SentenceCreated":
@@ -624,6 +629,9 @@ class Sentence(AggregateRoot):
         self.domain_keywords = data.get("domain_keywords", [])
         self.confidence = data.get("confidence")
         self.raw_ref = data.get("raw_ref")
+        self.dimension_confidences = data.get("dimension_confidences", {})
+        self.flags = data.get("flags", {})
+        self.analysis_provider = data.get("provider")
         self.status = SentenceStatus.ANALYZED
         self.updated_at = event.occurred_at
 
@@ -797,6 +805,9 @@ class Sentence(AggregateRoot):
         domain_keywords: Optional[List[str]] = None,
         confidence: Optional[float] = None,
         raw_ref: Optional[str] = None,
+        dimension_confidences: Optional[Dict[str, float]] = None,
+        flags: Optional[Dict[str, str]] = None,
+        provider: Optional[str] = None,
         **envelope_kwargs,
     ) -> EventEnvelope:
         """
@@ -811,6 +822,9 @@ class Sentence(AggregateRoot):
             domain_keywords: Domain-specific keywords
             confidence: Analysis confidence score
             raw_ref: Reference to raw analysis data
+            dimension_confidences: Per-dimension numeric confidence (0-1)
+            flags: Review flags (e.g., spaCy disagreement, invalid responses)
+            provider: Provider that served the calls (chain provenance)
             **envelope_kwargs: Additional envelope fields
 
         Returns:
@@ -819,18 +833,26 @@ class Sentence(AggregateRoot):
         if self.version < 0:
             raise ValueError("Sentence must be created before generating analysis")
 
+        # Validate through the payload model (command-time bounds enforcement).
+        from .sentence_events import AnalysisGeneratedData
+
+        data = AnalysisGeneratedData(
+            model=model,
+            version=model_version,
+            classification=classification,
+            keywords=keywords or [],
+            topics=topics or [],
+            domain_keywords=domain_keywords or [],
+            confidence=confidence,
+            raw_ref=raw_ref,
+            dimension_confidences=dimension_confidences or {},
+            flags=flags or {},
+            provider=provider,
+        )
+
         return self._add_event(
             event_type="AnalysisGenerated",
-            data={
-                "model": model,
-                "version": model_version,
-                "classification": classification,
-                "keywords": keywords or [],
-                "topics": topics or [],
-                "domain_keywords": domain_keywords or [],
-                "confidence": confidence,
-                "raw_ref": raw_ref,
-            },
+            data=data.model_dump(),
             **envelope_kwargs,
         )
 
