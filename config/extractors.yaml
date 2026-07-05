@@ -40,5 +40,4 @@ extractors:
   - name: claims
     prompt_key: claims
     response_model: ClaimsResult
-    context_needs: [utterance_context]
-    scope: utterance
+    scope: utterance  # {sentence} carries the utterance text; no {context} used

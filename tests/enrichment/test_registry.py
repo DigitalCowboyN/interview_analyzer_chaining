@@ -46,7 +46,13 @@ def test_prompts_exist_for_every_extractor():
 
 
 def test_prompt_placeholders_format_cleanly():
-    """Every prompt must .format() with only the placeholders its spec implies."""
+    """Every prompt must .format() with exactly the contract's placeholders.
+
+    Executor contract: {sentence} is always supplied; {context} only when
+    context_needs is non-empty; {domain_keywords} only for that extractor.
+    Using keyword-strict formatting (no extra kwargs) catches both undeclared
+    placeholders (KeyError) and misleading context_needs declarations.
+    """
     from src.utils.helpers import load_yaml
 
     prompts = load_yaml("prompts/core_extractors.yaml")
@@ -58,6 +64,8 @@ def test_prompt_placeholders_format_cleanly():
             kwargs["domain_keywords"] = "ECU, CAN"
         formatted = prompts[spec.prompt_key]["prompt"].format(**kwargs)
         assert "{sentence}" not in formatted
+        if not spec.context_needs:
+            assert "{context}" not in prompts[spec.prompt_key]["prompt"]
 
 
 def test_disabled_extractors_filtered(tmp_path):

@@ -7,7 +7,14 @@ from pydantic import BaseModel, Field
 
 
 class ExtractorSpec(BaseModel):
-    """One declared, focused extractor (one LLM call per unit of its scope)."""
+    """One declared, focused extractor (one LLM call per unit of its scope).
+
+    Prompt-placeholder contract: the executor ALWAYS supplies `{sentence}`
+    (the unit's text — fragment text or utterance text depending on scope).
+    `context_needs` names the single context key whose value is supplied as
+    `{context}`; empty means the prompt uses no `{context}` placeholder.
+    `domain_keywords` extractors additionally receive `{domain_keywords}`.
+    """
 
     name: str
     prompt_key: str

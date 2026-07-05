@@ -24,3 +24,9 @@ def test_empty_labels_not_flagged():
 
 def test_case_insensitive_agreement():
     assert syntax_flags("Close the door!", "Exclamatory", "Simple") == {}
+
+
+def test_imperative_branch_fires():
+    flags = syntax_flags("Save the file.", "declarative", "simple")
+    assert "function_type_disagreement" in flags
+    assert "imperative" in flags["function_type_disagreement"]
