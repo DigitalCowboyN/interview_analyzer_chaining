@@ -49,6 +49,12 @@ async def test_ingested_interview_projects_speaker_utterance_subgraph(tmp_path):
         sid = str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{result.interview_id}:{index}"))
         events.extend(await sentence_repo.event_store.read_stream(f"Sentence-{sid}"))
 
+    # Replay in commit order (approximates $all ordering): sentence fragments
+    # land before the utterance overlay that references them. Note: replaying
+    # streams naively (interview stream first) trips the out-of-order guard in
+    # UtteranceIdentifiedHandler by design — the running service handles that
+    # case with retry/park.
+    events.sort(key=lambda e: e.occurred_at)
     for event in events:
         handler = registry.get_handler(event.event_type)
         if handler:
