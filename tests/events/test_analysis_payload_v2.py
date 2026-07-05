@@ -47,3 +47,29 @@ def test_replay_reconstructs_v2_state():
     assert replayed.dimension_confidences == {"purpose": 0.7}
     assert replayed.flags == {"x": "y"}
     assert replayed.analysis_provider == "claude_code"
+
+
+def test_regenerate_preserves_v2_state():
+    """AnalysisRegenerated does not carry v2 fields, but must not clobber them —
+    they persist from the prior AnalysisGenerated (regen implies a prior gen)."""
+    from src.events.sentence_events import EditorType  # noqa: F401 (import parity)
+
+    s = make_sentence()
+    s.generate_analysis(
+        model="m", model_version="m4.2", classification={"purpose": "Q"},
+        dimension_confidences={"purpose": 0.7}, flags={"x": "y"}, provider="anthropic",
+    )
+    # Simulate a regeneration event applied on top.
+    from src.events.envelope import AggregateType, EventEnvelope
+
+    regen = EventEnvelope(
+        event_type="AnalysisRegenerated",
+        aggregate_type=AggregateType.SENTENCE,
+        aggregate_id=s.aggregate_id,
+        version=s.version + 1,
+        data={"model": "m2", "reason": "retune", "classification": {"purpose": "Statement"}},
+    )
+    s.apply_event(regen)
+    assert s.classification == {"purpose": "Statement"}  # regen updated
+    assert s.dimension_confidences == {"purpose": 0.7}  # v2 state preserved
+    assert s.analysis_provider == "anthropic"
