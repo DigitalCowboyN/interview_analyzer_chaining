@@ -9,6 +9,7 @@ directory through the event-sourced Layer 1/Layer 2 path.
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -73,16 +74,20 @@ def main():
     metrics_tracker.reset()
     metrics_tracker.start_pipeline_timer()
     logger.info("Starting batch ingest + enrich")
+    failed = False
     try:
         asyncio.run(_batch_ingest_enrich(args.input_dir, args.map_dir, args.project_id))
         logger.info("Batch processing completed.")
     except Exception as e:
         logger.critical(f"Batch processing failed: {e}", exc_info=True)
         metrics_tracker.increment_errors()
+        failed = True
     finally:
         metrics_tracker.stop_pipeline_timer()
         summary = metrics_tracker.get_summary()
         logger.info(f"Execution Summary: {json.dumps(summary, indent=2)}")
+    if failed:
+        sys.exit(1)  # non-zero exit so CI/scripts detect batch failure
 
 
 if __name__ == "__main__":

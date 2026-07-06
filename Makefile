@@ -136,7 +136,7 @@ help:
 	@echo "  run                  Run application (API)"
 	@echo "  run-api              Run FastAPI server (local)"
 	@echo "  run-worker           Run Celery worker (local)"
-	@echo "  run-pipeline         Run processing pipeline"
+	@echo "  ingest FILE=<path>   Ingest + enrich a transcript (Layer 1+2)"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint                 Run flake8 linter"

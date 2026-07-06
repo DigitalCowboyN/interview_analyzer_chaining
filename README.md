@@ -2,7 +2,7 @@
 
 An event-sourced system for processing interview transcripts with AI-powered multi-dimensional sentence analysis.
 
-> **Status:** M4.1 Complete (Layer 1: speakers, utterances, offset-grounded map) | **Tests:** 1060+ passing | **Coverage:** 88.7%
+> **Status:** M4.2 Complete (Layer 2: extractor registry, provider chain, entities/claims/embeddings) | **Tests:** 984 passing | **Coverage:** 88.8%
 >
 > See [ROADMAP.md](docs/ROADMAP.md) for milestones and [docs/architecture/](docs/architecture/) for detailed diagrams.
 
@@ -12,9 +12,12 @@ An event-sourced system for processing interview transcripts with AI-powered mul
 2. **Segments** text into offset-grounded fragments using spaCy NLP (the map: every fragment ties back to exact source positions)
 3. **Attributes** speakers (parsed from labels, or inferred with confidence when absent — fully correctable)
 4. **Stitches** interrupted utterances via relationship overlay (verbatim text untouched; interruptions become queryable data)
-5. **Analyzes** each sentence across 7 dimensions via LLM (function, structure, purpose, topics, keywords)
-6. **Stores** results in EventStoreDB (source of truth) and Neo4j (graph queries)
-7. **Exposes** REST API for querying and user corrections (edits, speakers, stitches)
+5. **Enriches** via a registry of focused extractors — one LLM call per dimension (function, structure, purpose, topics, keywords, entities, claims), each schema-enforced with numeric confidence, behind a provider failover chain (Anthropic Haiku → Claude Code → OpenAI)
+6. **Embeds** fragments and utterances into per-model Neo4j vector indexes for semantic search
+7. **Stores** everything as events in EventStoreDB (source of truth); the projection service is Neo4j's sole writer
+8. **Exposes** REST API for querying and user corrections (edits, speakers, stitches)
+
+**Run it:** `python -m src.ingestion <file> --enrich` (ingest + enrich in one shot), or `make ingest FILE=<path>`.
 
 ## Architecture
 
