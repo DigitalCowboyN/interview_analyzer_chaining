@@ -10,6 +10,7 @@ import re
 
 from src.enrichment.embedder import decode_vector
 from src.events.envelope import EventEnvelope
+from src.utils.neo4j_driver import Neo4jConnectionManager
 
 from .base_handler import BaseProjectionHandler
 from .speaker_handlers import _raise_if_no_writes
@@ -21,29 +22,40 @@ def _sanitize(model: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "_", model)
 
 
+async def _ensure_vector_index(ensured: set, label: str, prefix: str, model: str, dim: int):
+    """Create a per-model vector index in AUTO-COMMIT.
+
+    Neo4j forbids schema DDL inside a data-write transaction, so the index is
+    created on its own session — never on the event's `tx`. Idempotent
+    (IF NOT EXISTS); tracked per model so a handler serving multiple models
+    (e.g. during replay of a re-embedding) creates every needed index.
+    """
+    if model in ensured:
+        return
+    name = f"{prefix}_{_sanitize(model)}"
+    async with await Neo4jConnectionManager.get_session() as session:
+        await session.run(
+            f"CREATE VECTOR INDEX {name} IF NOT EXISTS "
+            f"FOR (n:{label}) ON n.embedding "
+            "OPTIONS {indexConfig: {"
+            "`vector.dimensions`: $dim, `vector.similarity_function`: 'cosine'}}",
+            dim=dim,
+        )
+    ensured.add(model)
+
+
 class EmbeddingGeneratedHandler(BaseProjectionHandler):
     """Writes a fragment embedding onto its Sentence node."""
 
     def __init__(self, parked_events_manager=None):
         super().__init__(parked_events_manager)
-        self._index_ensured = False
-
-    async def _ensure_index(self, tx, model: str, dim: int):
-        if self._index_ensured:
-            return
-        name = f"fragment_embedding_{_sanitize(model)}"
-        await tx.run(
-            f"CREATE VECTOR INDEX {name} IF NOT EXISTS "
-            "FOR (s:Sentence) ON s.embedding "
-            "OPTIONS {indexConfig: {"
-            "`vector.dimensions`: $dim, `vector.similarity_function`: 'cosine'}}",
-            dim=dim,
-        )
-        self._index_ensured = True
+        self._ensured_models: set = set()
 
     async def apply(self, tx, event: EventEnvelope):
         data = event.data
-        await self._ensure_index(tx, data["model"], data["dim"])
+        await _ensure_vector_index(
+            self._ensured_models, "Sentence", "fragment_embedding", data["model"], data["dim"]
+        )
         vector = decode_vector(data["vector_b64"])
         query = """
         MATCH (s:Sentence {aggregate_id: $aggregate_id})
@@ -64,24 +76,13 @@ class UtteranceEmbeddingGeneratedHandler(BaseProjectionHandler):
 
     def __init__(self, parked_events_manager=None):
         super().__init__(parked_events_manager)
-        self._index_ensured = False
-
-    async def _ensure_index(self, tx, model: str, dim: int):
-        if self._index_ensured:
-            return
-        name = f"utterance_embedding_{_sanitize(model)}"
-        await tx.run(
-            f"CREATE VECTOR INDEX {name} IF NOT EXISTS "
-            "FOR (u:Utterance) ON u.embedding "
-            "OPTIONS {indexConfig: {"
-            "`vector.dimensions`: $dim, `vector.similarity_function`: 'cosine'}}",
-            dim=dim,
-        )
-        self._index_ensured = True
+        self._ensured_models: set = set()
 
     async def apply(self, tx, event: EventEnvelope):
         data = event.data
-        await self._ensure_index(tx, data["model"], data["dim"])
+        await _ensure_vector_index(
+            self._ensured_models, "Utterance", "utterance_embedding", data["model"], data["dim"]
+        )
         vector = decode_vector(data["vector_b64"])
         query = """
         MATCH (u:Utterance {utterance_id: $utterance_id})

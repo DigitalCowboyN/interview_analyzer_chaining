@@ -13,7 +13,7 @@ F1 = "77777777-7777-7777-7777-777777777771"
 @pytest.mark.asyncio
 async def test_embedding_written_with_model_tag():
     handler = EmbeddingGeneratedHandler()
-    handler._index_ensured = True  # skip index DDL in unit test
+    handler._ensured_models = {"text-embedding-3-small", "m"}  # skip index DDL in unit test
     tx = AsyncMock()
     counters = MagicMock(nodes_created=0, properties_set=3, relationships_created=0)
     tx.run.return_value.consume = AsyncMock(return_value=MagicMock(counters=counters))
@@ -38,7 +38,7 @@ async def test_embedding_written_with_model_tag():
 @pytest.mark.asyncio
 async def test_embedding_raises_when_sentence_missing():
     handler = EmbeddingGeneratedHandler()
-    handler._index_ensured = True
+    handler._ensured_models = {"m"}
     tx = AsyncMock()
     counters = MagicMock(nodes_created=0, properties_set=0, relationships_created=0)
     tx.run.return_value.consume = AsyncMock(return_value=MagicMock(counters=counters))
@@ -62,3 +62,23 @@ def test_embedding_events_in_bootstrap_and_allowlists():
     for event_type in ("EmbeddingGenerated", "UtteranceEmbeddingGenerated"):
         assert registry.has_handler(event_type)
         assert event_type in allowed
+
+
+@pytest.mark.asyncio
+async def test_utterance_embedding_raises_when_utterance_missing():
+    from src.projections.handlers.embedding_handlers import UtteranceEmbeddingGeneratedHandler
+
+    handler = UtteranceEmbeddingGeneratedHandler()
+    handler._ensured_models = {"m"}
+    tx = AsyncMock()
+    counters = MagicMock(nodes_created=0, properties_set=0, relationships_created=0)
+    tx.run.return_value.consume = AsyncMock(return_value=MagicMock(counters=counters))
+    event = EventEnvelope(
+        event_type="UtteranceEmbeddingGenerated",
+        aggregate_type=AggregateType.INTERVIEW,
+        aggregate_id=IID,
+        version=3,
+        data={"utterance_id": "u-1", "model": "m", "dim": 3, "vector_b64": encode_vector([0.1, 0.2, 0.3])},
+    )
+    with pytest.raises(ValueError, match="no writes applied"):
+        await handler.apply(tx, event)
