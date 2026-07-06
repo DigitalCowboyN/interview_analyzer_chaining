@@ -7,6 +7,8 @@ enrichment (the task name is preserved for queue compatibility).
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from src.tasks import _run_pipeline_for_file_core
 
 
@@ -47,7 +49,7 @@ class TestRunPipelineForFileTask:
         with patch(
             "src.ingestion.orchestrator.IngestionOrchestrator", return_value=ingest_instance
         ):
-            try:
+            with pytest.raises(FileNotFoundError):
                 _run_pipeline_for_file_core(
                     input_file_path_str="/data/input/nope.txt",
                     output_dir_str="/data/output",
@@ -55,6 +57,3 @@ class TestRunPipelineForFileTask:
                     config_dict={},
                     task_id="t-2",
                 )
-                assert False, "expected FileNotFoundError"
-            except FileNotFoundError:
-                pass

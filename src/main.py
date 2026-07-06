@@ -1,32 +1,25 @@
 """
 main.py
 
-This module serves as the entry point for the
-Enriched Sentence Analysis Pipeline.
-It handles command-line arguments for input
-and output directories and initiates
-the pipeline processing.
+Entry point for the Interview Analyzer. Serves the FastAPI app (uvicorn) and
+provides a batch CLI that ingests + enriches every transcript in the input
+directory through the event-sourced Layer 1/Layer 2 path.
 """
 
 import argparse
 import asyncio
-import json  # Import json for logging summary
+import json
 from pathlib import Path
 
 from fastapi import FastAPI
 
 from src.api.routers import analysis as analysis_router
 from src.api.routers import edits as edits_router
-
-# --- Add router imports ---
 from src.api.routers import files as files_router
 from src.api.routers import speakers as speakers_router
 from src.config import config
-from src.pipeline import run_pipeline
 from src.utils.logger import get_logger
-from src.utils.metrics import metrics_tracker  # Import metrics tracker
-
-# -------------------------
+from src.utils.metrics import metrics_tracker
 
 logger = get_logger()
 
@@ -36,12 +29,10 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# --- Include the routers ---
 app.include_router(files_router.router)
 app.include_router(analysis_router.router)
 app.include_router(edits_router.router)
 app.include_router(speakers_router.router)
-# ------------------------------
 
 
 @app.get("/", tags=["Health Check"])
@@ -50,92 +41,48 @@ async def read_root():
     return {"status": "ok"}
 
 
+async def _batch_ingest_enrich(input_dir: Path, map_dir: Path, project_id: str) -> None:
+    """Ingest + enrich every .txt transcript in input_dir."""
+    from src.enrichment.orchestrator import EnrichmentOrchestrator
+    from src.ingestion.orchestrator import IngestionOrchestrator
+
+    ingest = IngestionOrchestrator(project_id=project_id, map_dir=map_dir)
+    enrich = EnrichmentOrchestrator()
+    files = sorted(input_dir.glob("*.txt"))
+    logger.info(f"Batch processing {len(files)} transcript(s) from {input_dir}")
+    for file_path in files:
+        result = await ingest.ingest_file(file_path)
+        await enrich.enrich_interview(result.interview_id)
+        logger.info(f"Processed {file_path.name} -> interview {result.interview_id}")
+
+
 def main():
-    """
-    Main function to execute the Enriched Sentence Analysis Pipeline.
-
-    Parses command-line arguments for input/output directories (using defaults
-    from configuration if not provided). Resets and manages metrics tracking
-    (start/stop timer). Initiates the asynchronous `run_pipeline` function.
-    Logs a final summary of execution metrics upon completion or failure.
-
-    Command-line arguments override configuration defaults.
-
-    Args:
-        None (arguments are parsed from `sys.argv` via `argparse`).
-
-    Returns:
-        None
-
-    Raises:
-        SystemExit: If argument parsing fails.
-        Exception: If `run_pipeline` encounters a critical, unhandled error.
-    """
-    # Create an argument parser to handle command-line arguments
-    parser = argparse.ArgumentParser(description="Enriched Sentence Analysis Pipeline")
+    """Batch CLI: ingest + enrich every transcript in the input directory."""
+    parser = argparse.ArgumentParser(description="Interview Analyzer batch ingest + enrich")
     parser.add_argument(
-        "--input_dir",
-        type=Path,
-        default=Path(config["paths"]["input_dir"]),
-        help="Path to the input directory containing transcript files",
+        "--input_dir", type=Path, default=Path(config["paths"]["input_dir"]),
+        help="Directory of transcript files to process",
     )
     parser.add_argument(
-        "--output_dir",
-        type=Path,
-        default=Path(config["paths"]["output_dir"]),
-        help="Path to the directory for saving output analysis JSON files",
+        "--map_dir", type=Path, default=Path(config["paths"].get("map_dir", "data/maps")),
+        help="Directory for map files (.jsonl)",
     )
-    # Add an argument for map_dir
-    parser.add_argument(
-        "--map_dir",
-        type=Path,
-        default=Path(config["paths"].get("map_dir", "data/maps")),
-        # Use get with default
-        help="Path to directory for saving intermediate map files (.jsonl)",
-    )
-    # Parse the command-line arguments
+    parser.add_argument("--project-id", default="default-project")
     args = parser.parse_args()
 
-    # --- Use map_dir from args ---
-    # Ensure map_dir key exists in config["paths"]
-    # map_dir_path = Path(config["paths"].get("map_dir", "data/maps"))
-    # Add an argument for map_dir to be command-line configurable
-    # parser.add_argument(
-    #     "--map_dir",
-    #     type=Path,
-    #     default=map_dir_path,
-    #     help="Path to the directory for saving map files",
-    # )
-    # args = parser.parse_args() # Re-parse if adding new arg
-    # map_dir_to_use = args.map_dir
-    # map_dir_to_use = map_dir_path # Using config value for now
-    map_dir_to_use = args.map_dir  # Use the parsed argument
-
-    # Reset and start metrics tracking
     metrics_tracker.reset()
     metrics_tracker.start_pipeline_timer()
-
-    # Log the start of the pipeline execution
-    logger.info("Starting the Enriched Sentence Analysis Pipeline")
+    logger.info("Starting batch ingest + enrich")
     try:
-        # Pass the necessary arguments to run_pipeline
-        asyncio.run(
-            run_pipeline(
-                input_dir=args.input_dir,
-                output_dir=args.output_dir,
-                map_dir=map_dir_to_use,  # Pass map directory
-                config_dict=config,  # Pass the loaded config object
-            )
-        )
-        logger.info("Pipeline execution completed.")
+        asyncio.run(_batch_ingest_enrich(args.input_dir, args.map_dir, args.project_id))
+        logger.info("Batch processing completed.")
     except Exception as e:
-        logger.critical(f"Pipeline execution failed: {e}", exc_info=True)
-        metrics_tracker.increment_errors()  # Track pipeline-level errors
+        logger.critical(f"Batch processing failed: {e}", exc_info=True)
+        metrics_tracker.increment_errors()
     finally:
-        # Stop timer and log metrics summary
         metrics_tracker.stop_pipeline_timer()
         summary = metrics_tracker.get_summary()
-        logger.info(f"Pipeline Execution Summary: {json.dumps(summary, indent=2)}")
+        logger.info(f"Execution Summary: {json.dumps(summary, indent=2)}")
 
 
 if __name__ == "__main__":

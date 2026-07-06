@@ -225,6 +225,11 @@ run-projection:
 	@echo "Starting projection service (standalone)..."
 	$(PYTHON) -m src.run_projection_service
 
+.PHONY: ingest
+ingest:
+	@echo "Ingesting + enriching $(FILE)..."
+	$(PYTHON) -m src.ingestion $(FILE) --enrich
+
 .PHONY: projection-up
 projection-up:
 	@echo "Starting projection service via docker-compose..."

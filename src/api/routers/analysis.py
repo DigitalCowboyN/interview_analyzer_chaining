@@ -111,7 +111,7 @@ async def trigger_analysis(
             _ingest_and_enrich,
             file_path=input_file_path,
             map_dir=map_dir_str,
-            project_id="default-project",
+            project_id=config_dict.get("project_id", "default-project"),
             task_id=task_id,
         )
 
