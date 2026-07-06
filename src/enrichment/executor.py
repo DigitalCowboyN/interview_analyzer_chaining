@@ -43,6 +43,7 @@ class FragmentEnrichment(BaseModel):
 class UtteranceEnrichment(BaseModel):
     utterance_id: str
     claims: List[Dict[str, Any]] = Field(default_factory=list)
+    flags: Dict[str, str] = Field(default_factory=dict)
     provider: str = ""
     model: str = ""
 
@@ -92,10 +93,17 @@ class EnrichmentExecutor:
         self, frag: FragmentView, context: Dict[str, str]
     ) -> FragmentEnrichment:
         out = FragmentEnrichment(index=frag.index)
+        # return_exceptions=True so a single provider error (timeout, exhausted
+        # chain) flags that one dimension instead of failing the whole fragment.
         results = await asyncio.gather(
-            *(self._run_spec(spec, frag.text, context) for spec in self.fragment_specs)
+            *(self._run_spec(spec, frag.text, context) for spec in self.fragment_specs),
+            return_exceptions=True,
         )
         for spec, call_result in zip(self.fragment_specs, results):
+            if isinstance(call_result, BaseException):
+                logger.warning(f"{spec.name}: call failed ({type(call_result).__name__})")
+                out.flags[f"{spec.name}_call_error"] = type(call_result).__name__
+                continue
             out.provider, out.model = call_result.provider, call_result.model
             try:
                 parsed = spec.resolve_model().model_validate(call_result.data)
@@ -134,8 +142,9 @@ class EnrichmentExecutor:
                     parsed = spec.resolve_model().model_validate(call_result.data)
                 except ValidationError:
                     logger.warning(f"{spec.name}: invalid response for utterance {uid}")
+                    out.flags[f"{spec.name}_invalid_response"] = "validation failed"
                     continue
-                out.claims = list(parsed.model_dump()["claims"])
+                out.claims.extend(parsed.model_dump()["claims"])
             return out
 
         return list(

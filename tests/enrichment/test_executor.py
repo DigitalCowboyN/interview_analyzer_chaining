@@ -122,3 +122,36 @@ async def test_domain_keywords_receives_configured_list():
     calls = [c.args[0] for c in executor.agent.call.call_args_list]
     domain_prompt = next(p for p in calls if "domain-specific list" in p)
     assert "ECU" in domain_prompt
+
+
+@pytest.mark.asyncio
+async def test_invalid_utterance_response_flagged():
+    bad = dict(RESPONSES)
+    bad["claims"] = {"claims": [{"text": "x", "kind": "not_a_kind", "confidence": 0.5}]}  # invalid kind
+    executor = make_executor(make_agent(bad))
+    results = await executor.enrich_utterances({"u-1": "The complete utterance here."})
+    assert results[0].claims == []
+    assert "claims_invalid_response" in results[0].flags
+
+
+@pytest.mark.asyncio
+async def test_provider_call_error_flags_one_dimension_not_fatal():
+    from src.agents.failover_agent import CallResult
+
+    agent = MagicMock()
+
+    async def call(prompt, schema=None):
+        if "sentence's purpose" in prompt:
+            raise RuntimeError("provider exhausted")
+        for key, marker in MARKERS.items():
+            if marker in prompt:
+                return CallResult(data=RESPONSES[key], provider="anthropic", model="haiku")
+        raise AssertionError
+
+    agent.call = AsyncMock(side_effect=call)
+    executor = make_executor(agent)
+    fragments = [FragmentView(index=0, text="Can you hear me?", speaker_handle="S1")]
+    results = await executor.enrich_fragments(fragments, [CONTEXT])
+    assert "purpose" not in results[0].classification
+    assert "purpose_call_error" in results[0].flags
+    assert results[0].classification["function_type"] == "interrogative"  # others survived
