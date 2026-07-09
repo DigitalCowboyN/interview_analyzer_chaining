@@ -75,6 +75,11 @@
   MENTIONS edge collapses duplicate mentions of one entity per fragment;
   embedder dim not validated against emitted vectors; EntitiesExtracted
   provider not materialized in graph; batch CLI aborts on first failing file.
+- From the fix-wave re-review: strict-schema test recursion doesn't descend
+  into inline `properties`/`items` (covered today via `$defs` hoisting);
+  zero-claim utterances re-extract on every unforced resume (retry semantics,
+  but unbounded); fully-failed fragments still consume embedding compute
+  before being discarded.
 
 ---
 

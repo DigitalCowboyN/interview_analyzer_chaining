@@ -9,6 +9,7 @@ its body now runs Layer 1 ingestion followed by Layer 2 enrichment.
 
 import asyncio
 from pathlib import Path
+from typing import Optional
 
 from src.celery_app import celery_app
 from src.utils.logger import get_logger
@@ -18,7 +19,7 @@ logger = get_logger()
 
 async def _ingest_and_enrich(
     input_file_path_str: str, map_dir_str: str, project_id: str, task_id: str,
-    config_dict: dict = None,
+    config_dict: Optional[dict] = None,
 ):
     """Layer 1 ingestion then Layer 2 enrichment for a single file."""
     from src.enrichment.orchestrator import EnrichmentOrchestrator
