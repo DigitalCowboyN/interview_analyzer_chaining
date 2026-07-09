@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-07-05
+**Last Updated:** 2026-07-06
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -21,19 +21,67 @@
 | **TC** | ✅ Complete | Test Coverage Improvement (90.1%) + Phase 9 Cleanup |
 | **TC.10** | ✅ Complete | Test Fixes + Infrastructure Integration |
 | **M4.1** | ✅ Complete | Layer 1: Ingestion, Map, Speaker Genesis & Stitching |
-| M4.2 | 📋 Planned | Layer 2: Extractor Registry (core enrichment) |
+| **M4.2** | ✅ Complete | Layer 2: Extractor Registry, Provider Chain, Entities/Claims/Embeddings |
+| **M3.1** | ✅ Complete | Vector Search (delivered as Layer 2 embeddings + per-model indexes) |
 | M4.3 | 📋 Planned | Layer 3: Lens Engine (meeting_minutes first) |
 | M4.4 | 📋 Planned | Layer 5: OKF Export + richer queries |
-| M3.1 | 📋 Planned | Vector Search (folds into Layer 2 embeddings) |
-| M3.2 | 📋 Planned | AI Agent Upgrade (openai 2.x) |
+| M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M4.2 Planning (Layer 2 — see docs/superpowers/specs/2026-07-04-mine-layers-design.md)
-**Tests:** 1066 unit passing | **Coverage:** 88.7% (unit)
+**Current Phase:** M4.3 Planning (Layer 3 Lens Engine — see docs/superpowers/specs/2026-07-04-mine-layers-design.md)
+**Tests:** 984 unit passing | **Coverage:** 88.8% (unit). ~200 legacy pipeline tests retired in M4.2.
 
 ---
 
 ## Milestone Checklist
+
+### M4.2: Layer 2 — Extractor Registry & Core Enrichment ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-04-mine-layers-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-05-layer2-extractor-registry.md`
+
+- [x] Agent layer: API-level structured outputs (`call_model(prompt, schema=)` —
+      OpenAI json_schema, Anthropic forced tool-use)
+- [x] Provider strategy: `ClaudeCodeAgent` (headless `claude -p`) + `FailoverAgent`
+      chain (Anthropic Haiku → Claude Code → OpenAI); Anthropic primary
+- [x] Extractor registry (`config/extractors.yaml`) + ported prompts with numeric
+      confidence; the 7 focused calls kept, never merged
+- [x] GraphContextBuilder: speaker-labeled + utterance-aware contexts
+- [x] spaCy cross-check flags (function/structure disagreement as review signal)
+- [x] New extractors: entity mentions (span-grounded), claims (utterance-scoped)
+- [x] Embeddings: `Embedder` protocol (OpenAI + local sentence-transformers,
+      config-pinned), events with inline base64 vectors, per-model Neo4j vector indexes
+- [x] AnalysisGenerated v2 (dimension confidences, flags, provider provenance)
+- [x] Projections: Entity/Claim/embedding handlers + allowlists + drift guard
+- [x] Enrichment orchestrator (resume-aware) + `python -m src.enrichment` CLI +
+      ingest `--enrich` chaining
+- [x] API `/analysis/` + Celery task rewired to ingest+enrich
+- [x] Legacy pipeline retired (pipeline.py, sentence_analyzer, context_builder,
+      analysis_service, pipeline_event_emitter, llm_responses; ~200 tests)
+- [x] Golden/parity assertions; Layer 2 projection smoke test
+
+**Completed:** 2026-07-06 (final-review fix wave 2026-07-09)
+
+**Deferred to M4.3 entry (from the M4.2 final review — tracked debt):**
+- Per-model embedding property (`embedding_<model>`) or single-index +
+  mandatory `embedding_model` filter — today all per-model vector indexes
+  target the shared `embedding` property (cross-contamination risk only when
+  two models share dimensions).
+- FailoverAgent chain construction is all-or-nothing (one missing API key
+  kills the whole chain); skip unconstructible providers with a warning.
+- Delete now-dead `src/io/local_storage.py` writers + `config.yaml`
+  `classification` block ("registry is the only path" made literal).
+- Per-dimension provider provenance (currently last-successful-call per unit);
+  MENTIONS edge collapses duplicate mentions of one entity per fragment;
+  embedder dim not validated against emitted vectors; EntitiesExtracted
+  provider not materialized in graph; batch CLI aborts on first failing file.
+- From the fix-wave re-review: strict-schema test recursion doesn't descend
+  into inline `properties`/`items` (covered today via `$defs` hoisting);
+  zero-claim utterances re-extract on every unforced resume (retry semantics,
+  but unbounded); fully-failed fragments still consume embedding compute
+  before being discarded.
+
+---
 
 ### M4.1: Layer 1 — Ingestion, Map, Speaker Genesis & Stitching ✅ COMPLETE
 
@@ -373,6 +421,11 @@ Neo4j (sole writer, materialized view)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-07-06 | M4.2 (Layer 2) complete; legacy pipeline retired | Registry is the sole enrichment path; ~200 legacy tests removed |
+| 2026-07-06 | Generalized provider strategy (interface + config chain) | Anthropic Haiku primary → Claude Code harness → OpenAI; embeddings config-pinned, model-tagged, never silently switched |
+| 2026-07-06 | Embeddings ride as events with inline base64 vectors | Preserves single-writer + replay purity; direct Neo4j writes rejected |
+| 2026-07-06 | Bumped anthropic model claude-3-haiku-20240307 → claude-haiku-4-5-20251001 | Old model retired (not_found_error); verified live |
+| 2026-07-06 | Vector-index DDL runs in its own auto-commit session | Neo4j forbids schema DDL inside a data-write transaction |
 | 2026-07-04 | M4.1 (Layer 1) complete: speakers, utterances, offset-grounded map | Spec: docs/superpowers/specs/2026-07-04-mine-layers-design.md |
 | 2026-07-04 | Stitching is an overlay, never a rewrite | Interview must be viewable as-spoken; interpretation is additive + correctable |
 | 2026-07-04 | Speaker inference reconciles windows by deterministic overlap voting | LLM-based reconciliation deferred until golden evaluation demands it |

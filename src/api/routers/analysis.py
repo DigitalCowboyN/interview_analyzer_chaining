@@ -12,10 +12,9 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 
 # Import necessary schemas
 from src.api.schemas import AnalysisTriggerRequest, AnalysisTriggerResponse
-
-# Import the core pipeline function (adjust path if necessary)
-# from src.pipeline import run_pipeline
-# Import logger
+from src.config import config
+from src.enrichment.orchestrator import EnrichmentOrchestrator
+from src.ingestion.orchestrator import IngestionOrchestrator
 from src.utils.logger import get_logger
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
@@ -23,7 +22,19 @@ router = APIRouter(prefix="/analysis", tags=["Analysis"])
 logger = get_logger()
 
 
-# Endpoint implementation will go here
+async def _ingest_and_enrich(file_path: Path, map_dir: str, project_id: str, task_id: str) -> None:
+    """Background job: Layer 1 ingestion then Layer 2 enrichment."""
+    try:
+        ingest = IngestionOrchestrator(project_id=project_id, map_dir=Path(map_dir))
+        result = await ingest.ingest_file(file_path)
+        logger.info(f"[Task {task_id}] Ingested interview {result.interview_id}")
+        enrich_result = await EnrichmentOrchestrator().enrich_interview(result.interview_id)
+        logger.info(
+            f"[Task {task_id}] Enriched interview {result.interview_id}: "
+            f"{enrich_result.fragments_enriched} fragments"
+        )
+    except Exception as e:  # background task: log, do not crash the worker
+        logger.error(f"[Task {task_id}] ingest+enrich failed: {e}", exc_info=True)
 
 
 @router.post(
@@ -64,12 +75,9 @@ async def trigger_analysis(
         f"[Task {task_id}] Received analysis trigger request for: {request.input_filename}"
     )
     try:
-        # Import locally to avoid potential circular dependencies at module level
-        from src.config import config
-        from src.pipeline import run_pipeline
-
         config_dict: Dict[str, Any] = config
         input_dir_str = config_dict.get("paths", {}).get("input_dir", "./data/input")
+        map_dir_str = config_dict.get("paths", {}).get("map_dir", "./data/maps")
         input_dir = Path(input_dir_str)
         input_file_path = input_dir / request.input_filename
 
@@ -95,19 +103,16 @@ async def trigger_analysis(
                 detail=f"Input file not found: {request.input_filename}",
             )
 
-        # --- Schedule Pipeline in Background ---
+        # --- Schedule ingest + enrich in Background ---
         logger.info(
-            f"[Task {task_id}] Scheduling background analysis task for {input_file_path}..."
+            f"[Task {task_id}] Scheduling background ingest+enrich task for {input_file_path}..."
         )
         background_tasks.add_task(
-            run_pipeline,
-            task_id=task_id,  # Pass the task_id
-            input_dir=input_dir_str,  # Pass arguments needed by run_pipeline
-            specific_file=request.input_filename,
-            # Pass other necessary args if run_pipeline's signature changes
-            # output_dir=config.get("paths",{}).get("output_dir"),
-            # map_dir=config.get("paths",{}).get("map_dir"),
-            # config=config.config # Pass the actual config dict if needed
+            _ingest_and_enrich,
+            file_path=input_file_path,
+            map_dir=map_dir_str,
+            project_id=config_dict.get("project_id", "default-project"),
+            task_id=task_id,
         )
 
         return AnalysisTriggerResponse(

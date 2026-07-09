@@ -1,7 +1,7 @@
 # Design: The Mine — Layered Enrichment & Retrieval Architecture (Layers 0–5)
 
-**Date:** 2026-07-04
-**Status:** Approved by owner (pending spec review)
+**Date:** 2026-07-04 (updated 2026-07-05)
+**Status:** Approved. **Layer 1 (M4.1) SHIPPED** — merged to main via PR #1 on 2026-07-05.
 **Builds on:** M3.0 single-writer event-sourced architecture (ESDB → projection service → Neo4j)
 
 ## Purpose
@@ -102,6 +102,30 @@ Low-confidence attributions and stitches are committed with their confidence val
 not parked — a visible wrong guess the user can correct beats a gap. Confidence
 thresholds are config; "all attributions below 0.7" is a queryable review worklist.
 
+### Layer 1 completion notes (2026-07-05, as shipped in M4.1)
+
+Delivered per plan (`docs/superpowers/plans/2026-07-04-layer1-ingestion-map-speakers-stitching.md`),
+with these as-built notes that later layers should treat as current reality:
+
+- **Entry point:** `python -m src.ingestion <file>` (IngestionOrchestrator). The legacy
+  `src/pipeline.py` flow is untouched and runs in parallel; Layer 2 must decide its fate.
+- **Deferred from Layer 1** (unchanged intentions): `OVERLAPS` edges, OKF front-matter
+  capture (→ Layer 5 era), `StitchCorrected` as a distinct event (remove + re-identify
+  covers v1), LLM-based window reconciliation (deterministic overlap voting shipped),
+  live-LLM golden evaluation for prompt tuning.
+- **Corrections shipped:** rename/merge/split speakers, reattribute fragments, remove
+  stitches — 202+version, `X-User-ID` provenance, human events lock fields.
+- **Hard lesson → standing checklist item:** a new event type is NOT delivered until
+  (1) handler registered in bootstrap, (2) event type added to the subscription
+  allowlists in `src/projections/config.py`, (3) Sentence-stream payloads carry
+  `interview_id` for lane routing, (4) handlers raise (not no-op) when cross-stream
+  MATCH targets aren't projected yet. A drift-guard unit test now enforces (1)+(2);
+  an integration smoke test (`tests/integration/test_layer1_projection_smoke.py`)
+  covers the path end-to-end. Every later layer inherits this checklist.
+- **Environment note:** the 26 live-LLM integration tests fail on provider quota
+  (OpenAI 429 insufficient_quota) as of 2026-07-05 — Layer 2's enrichment work needs
+  working provider credit.
+
 ## Layer 2: Core enrichment — the Extractor Registry
 
 The existing 7-call pattern is kept and formalized as the template for all enrichment.
@@ -130,14 +154,55 @@ extractor:
 ### New focused extractors (expansion, same pattern)
 
 - `entity_mentions` — people, orgs, products, tools; span-grounded (char offsets
-  within the fragment, LangExtract-style traceability).
-- `claim_extraction` — utterance-scoped: what the speaker asserts, commits to, asks.
+  within the fragment, LangExtract-style traceability). Emits `EntitiesExtracted`;
+  projects `Entity` nodes + `MENTIONS {start, end}` edges. Canonicalization/resolution
+  remains Layer 4; surface form + type stored now.
+- `claim_extraction` — utterance-scoped (the stitching payoff): what the speaker
+  asserts, commits to, asks. Emits `ClaimExtracted`; projects `Claim` nodes with
+  `MADE_BY` → Speaker and `SUPPORTED_BY` → fragments.
 - Embeddings per fragment and per utterance (not an LLM call) in Neo4j vector
-  indexes — realizes planned M3.1.
+  indexes — realizes planned M3.1. Vectors ride as `EmbeddingGenerated` events with
+  the vector inline (base64 float32): keeps single-writer and replay purity; the
+  direct-write alternative was rejected as breaking the architecture's core rule.
 
 Scopes matter: some extractors run per-fragment (as today), some per-utterance
 (claims — enabled by stitching), some per-segment/document. The registry handles
 fan-out.
+
+### Provider strategy (M4.2 decision — the baseline config pattern)
+
+Every model-touching capability sits behind an interface with a config-selected
+provider chain. This generalizes the old single-provider agent factory into the
+system's standing pattern:
+
+- **Chat/extraction (`BaseLLMAgent`)** — providers: Anthropic (current primary;
+  Haiku-class model for enrichment calls), OpenAI, and **Claude Code harness**
+  (headless `claude -p` subprocess as a backend — clear behavior replication; the
+  one caveat, accepted by the owner, is that it does not exercise the raw API
+  lifecycle in the interface). Per-call failover down the chain on quota/availability
+  errors (429/5xx) is safe because every event already records the model that
+  produced it.
+- **Embeddings (`Embedder`)** — providers: OpenAI (`text-embedding-3-small`) and
+  local sentence-transformers. **No silent per-call failover**: vectors from
+  different models live in incomparable spaces. The provider is config-pinned,
+  every vector is tagged `{model, dim}`, indexes are per-model, and "falling back"
+  means flipping config and re-running the embedding extractor via event replay.
+
+### M4.2 scope additions (agreed 2026-07-05)
+
+- API-level structured outputs in the agent layer (`call_model(prompt, schema=None)`;
+  OpenAI json_schema response_format, Anthropic forced tool-use) — no M3.2 dependency.
+- ContextBuilder v2: contexts rendered with `[S1]:` speaker labels from the Layer 1
+  graph, plus `utterance_context` (the full stitched thought).
+- Enrichment orchestrator: `python -m src.enrichment <interview_id>` (+ `--enrich`
+  one-shot flag on ingestion); resume-aware (skips fragments already analyzed at the
+  current extractor version); API `/analysis/` router and Celery task rewired to
+  ingest+enrich.
+- **Legacy retirement (owner decision):** after a parity check on a sample transcript,
+  delete `src/pipeline.py`, `sentence_analyzer.py`, `analysis_service.py`,
+  `pipeline_event_emitter.py`, the local .jsonl analysis writers, and their tests.
+  The registry becomes the only enrichment path. Sequenced last, gated on parity.
+- Every new event type follows the Layer 1 projection-delivery checklist.
 
 ## Layer 3: Lens engine
 

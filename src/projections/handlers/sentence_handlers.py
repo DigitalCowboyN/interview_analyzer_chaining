@@ -4,6 +4,7 @@ Handlers for Sentence-related events.
 Handles SentenceCreated, SentenceEdited, AnalysisGenerated, AnalysisOverridden, etc.
 """
 
+import json
 import logging
 from typing import List
 
@@ -181,6 +182,11 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
             logger.info(f"Deleted {summary.counters.nodes_deleted} old Analysis node(s) for sentence {event.aggregate_id}")
 
         # Then create new Analysis node
+        # v2 fields (provider, dimension_confidences, flags) live on the Analysis
+        # node alongside model/confidence/raw_ref — the consistent home for
+        # per-analysis metadata, and correct for the multi-Analysis history the
+        # handler already maintains. (The plan's text said "Sentence node"; this
+        # is a deliberate deviation — graph consumers read them off :Analysis.)
         query_analysis = """
         MATCH (s:Sentence {aggregate_id: $aggregate_id})
         CREATE (a:Analysis {
@@ -189,6 +195,9 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
             model_version: $model_version,
             confidence: $confidence,
             raw_ref: $raw_ref,
+            provider: $provider,
+            dimension_confidences: $dimension_confidences_json,
+            flags: $flags_json,
             is_overridden: false,
             created_at: datetime($created_at)
         })
@@ -197,14 +206,23 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
 
         analysis_id = f"{event.aggregate_id}-analysis-{event.version}"
 
+        dimension_confidences = data.get("dimension_confidences") or None
+        flags = data.get("flags") or None
         await tx.run(
             query_analysis,
             aggregate_id=event.aggregate_id,
             analysis_id=analysis_id,
             model=data.get("model", "unknown"),
-            model_version=data.get("model_version", "unknown"),
+            # Payload key is "version" (AnalysisGeneratedData); accept the
+            # historical "model_version" spelling as a fallback.
+            model_version=data.get("version") or data.get("model_version", "unknown"),
             confidence=data.get("confidence"),
             raw_ref=data.get("raw_ref"),
+            provider=data.get("provider"),
+            dimension_confidences_json=(
+                json.dumps(dimension_confidences) if dimension_confidences else None
+            ),
+            flags_json=json.dumps(flags) if flags else None,
             created_at=event.occurred_at.isoformat(),
         )
 

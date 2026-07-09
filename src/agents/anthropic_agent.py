@@ -28,7 +28,7 @@ Usage:
 
 import asyncio
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from anthropic import AsyncAnthropic, APIError, RateLimitError
 
@@ -98,7 +98,9 @@ class AnthropicAgent(BaseLLMAgent):
             "Return only the JSON object requested in the prompt."
         )
 
-    async def call_model(self, function_prompt: str) -> Dict[str, Any]:
+    async def call_model(
+        self, function_prompt: str, schema: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Call Anthropic Claude with a prompt and return parsed JSON.
 
@@ -106,10 +108,12 @@ class AnthropicAgent(BaseLLMAgent):
         - Messages API instead of Responses API
         - System/user message separation
         - Different response structure
-        - JSON format enforcement via prompt engineering
+        - JSON format enforcement via prompt engineering (schema=None) or
+          forced tool-use with an input_schema (schema given)
 
         Args:
             function_prompt: User prompt requesting JSON output
+            schema: Optional JSON Schema enforced via forced tool-use
 
         Returns:
             Dict[str, Any]: Parsed JSON response or {} on error (graceful degradation)
@@ -130,7 +134,7 @@ class AnthropicAgent(BaseLLMAgent):
                 )
 
                 # Make async API call with Messages API
-                response = await self.client.messages.create(
+                create_kwargs: Dict[str, Any] = dict(
                     model=self.model,
                     max_tokens=self.max_tokens,
                     temperature=self.temperature,
@@ -140,22 +144,48 @@ class AnthropicAgent(BaseLLMAgent):
                             "role": "user",
                             "content": function_prompt
                         }
-                    ]
+                    ],
                 )
+                if schema is not None:
+                    create_kwargs["tools"] = [
+                        {
+                            "name": "extraction",
+                            "description": "Return the extraction result.",
+                            "input_schema": schema,
+                        }
+                    ]
+                    create_kwargs["tool_choice"] = {"type": "tool", "name": "extraction"}
 
-                # Extract text from response (less nesting than OpenAI)
+                response = await self.client.messages.create(**create_kwargs)
+
+                # Extract from response
                 if not response.content:
                     raise ValueError("No content received from Anthropic API.")
 
-                # Anthropic response: response.content[0].text (direct access)
-                output_message = response.content[0].text.strip()
-                logger.debug(f"Raw output message: {output_message}")
+                if schema is not None:
+                    # Forced tool-use: the result is the tool_use block's input.
+                    parsed_response = None
+                    for block in response.content:
+                        if getattr(block, "type", None) == "tool_use":
+                            parsed_response = dict(block.input)
+                            break
+                    if parsed_response is None:
+                        logger.warning(
+                            "Anthropic response missing tool_use block despite forced "
+                            "tool_choice; returning {}"
+                        )
+                        metrics_tracker.increment_errors()
+                        return {}
+                else:
+                    # Anthropic response: response.content[0].text (direct access)
+                    output_message = response.content[0].text.strip()
+                    logger.debug(f"Raw output message: {output_message}")
 
-                if not output_message:
-                    raise ValueError("Received empty response from Anthropic API.")
+                    if not output_message:
+                        raise ValueError("Received empty response from Anthropic API.")
 
-                # Parse JSON
-                parsed_response = json.loads(output_message)
+                    # Parse JSON
+                    parsed_response = json.loads(output_message)
 
                 # --- Metrics Tracking ---
                 metrics_tracker.increment_api_calls()

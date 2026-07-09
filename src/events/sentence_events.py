@@ -6,7 +6,7 @@ including creation, editing, analysis generation, overrides, and tagging.
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -52,6 +52,9 @@ class SentenceCreatedData(BaseModel):
 class SentenceEditedData(BaseModel):
     """Data payload for SentenceEdited event."""
 
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
     old_text: str = Field(..., description="Previous sentence text")
     new_text: str = Field(..., description="Updated sentence text")
     editor_type: EditorType = Field(..., description="Type of editor that made the change")
@@ -113,10 +116,38 @@ class SpeakerReattributedData(BaseModel):
     new_speaker_id: str = Field(..., description="Corrected Speaker UUID")
 
 
+class EmbeddingGeneratedData(BaseModel):
+    """Data payload for EmbeddingGenerated event (Layer 2, fragment scope)."""
+
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
+    model: str = Field(..., description="Embedding model name (vector space tag)")
+    dim: int = Field(..., gt=0, description="Vector dimensionality")
+    vector_b64: str = Field(..., description="Base64 little-endian float32 vector")
+
+
+class EntitiesExtractedData(BaseModel):
+    """Data payload for EntitiesExtracted event (Layer 2 enrichment)."""
+
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
+    entities: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Span-grounded mentions: {text, entity_type, start, end, confidence}",
+    )
+    model: str = Field(..., description="Model that extracted the entities")
+    provider: str = Field(..., description="Provider that served the call")
+
+
 class AnalysisGeneratedData(BaseModel):
     """Data payload for AnalysisGenerated event."""
 
-    model: str = Field(..., description="AI model used for analysis")
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
+    model: str = Field(..., min_length=1, description="AI model used for analysis")
     version: str = Field(..., description="Model version")
     classification: Dict[str, Any] = Field(
         ..., description="Classification results (function_type, structure_type, purpose)"
@@ -126,11 +157,21 @@ class AnalysisGeneratedData(BaseModel):
     domain_keywords: List[str] = Field(default_factory=list, description="Domain-specific keywords")
     confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Analysis confidence score")
     raw_ref: Optional[str] = Field(None, description="Reference to raw analysis data")
+    dimension_confidences: Dict[str, Annotated[float, Field(ge=0.0, le=1.0)]] = Field(
+        default_factory=dict, description="Per-dimension numeric confidence (0-1)"
+    )
+    flags: Dict[str, str] = Field(
+        default_factory=dict, description="Review flags (e.g., spaCy disagreement)"
+    )
+    provider: Optional[str] = Field(None, description="Provider that served the calls")
 
 
 class AnalysisRegeneratedData(BaseModel):
     """Data payload for AnalysisRegenerated event."""
 
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
     model: str = Field(..., description="AI model used for re-analysis")
     reason: str = Field(..., description="Reason for regeneration")
     delta: Optional[Dict[str, Any]] = Field(None, description="Changes from previous analysis")
@@ -144,6 +185,9 @@ class AnalysisRegeneratedData(BaseModel):
 class AnalysisOverriddenData(BaseModel):
     """Data payload for AnalysisOverridden event."""
 
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
     fields_overridden: Dict[str, Any] = Field(..., description="Fields that were manually overridden")
     note: Optional[str] = Field(None, description="Note explaining the override")
 
@@ -151,6 +195,9 @@ class AnalysisOverriddenData(BaseModel):
 class AnalysisClearedData(BaseModel):
     """Data payload for AnalysisCleared event."""
 
+    interview_id: Optional[str] = Field(
+        None, description="Parent interview UUID (required for projection lane routing)"
+    )
     reason: Optional[str] = Field(None, description="Reason for clearing analysis")
 
 

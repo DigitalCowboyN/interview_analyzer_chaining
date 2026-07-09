@@ -22,6 +22,12 @@ from src.projections.handlers.speaker_handlers import (
     SpeakerReattributedHandler,
     SpeakerRenamedHandler,
 )
+from src.projections.handlers.claim_handlers import ClaimExtractedHandler
+from src.projections.handlers.embedding_handlers import (
+    EmbeddingGeneratedHandler,
+    UtteranceEmbeddingGeneratedHandler,
+)
+from src.projections.handlers.entity_handlers import EntitiesExtractedHandler
 from src.projections.handlers.utterance_handlers import (
     InterruptionRecordedHandler,
     StitchRemovedHandler,
@@ -72,6 +78,14 @@ def create_handler_registry(
     registry.register("UtteranceIdentified", UtteranceIdentifiedHandler(parked_events_manager))
     registry.register("InterruptionRecorded", InterruptionRecordedHandler(parked_events_manager))
     registry.register("StitchRemoved", StitchRemovedHandler(parked_events_manager))
+
+    # Register enrichment handlers (Layer 2)
+    registry.register("EntitiesExtracted", EntitiesExtractedHandler(parked_events_manager))
+    registry.register("ClaimExtracted", ClaimExtractedHandler(parked_events_manager))
+    registry.register("EmbeddingGenerated", EmbeddingGeneratedHandler(parked_events_manager))
+    registry.register(
+        "UtteranceEmbeddingGenerated", UtteranceEmbeddingGeneratedHandler(parked_events_manager)
+    )
 
     registered_types = registry.get_registered_types()
     logger.info(f"Handler registry initialized with {len(registered_types)} handlers: {registered_types}")

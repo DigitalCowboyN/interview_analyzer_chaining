@@ -1,0 +1,215 @@
+# Core extractor prompts (Layer 2 / M4.2).
+# Ported from prompts/task_prompts.yaml with option lists preserved verbatim;
+# Format lines demand numeric confidence (0-1). Context windows render speaker
+# labels like [S1]; prompts note this where context is used.
+
+function_type:
+  prompt: |
+    Determine the function type of the sentence provided.
+
+    Options:
+      - declarative
+      - interrogative
+      - imperative
+      - exclamatory
+
+    Format: {{"function_type": "<type>", "confidence": <number between 0 and 1>}}
+
+    Sentence: "{sentence}"
+
+    Provide your response explicitly formatted as JSON.
+
+structure_type:
+  prompt: |
+    Classify the structure type of the given sentence.
+
+    Options:
+      - simple
+      - compound
+      - complex
+      - compound-complex
+
+    Format: {{"structure_type": "<type>", "confidence": <number between 0 and 1>}}
+
+    Sentence: "{sentence}"
+
+    Provide your response explicitly formatted as JSON.
+
+purpose:
+  prompt: |
+    Given the sentence and its surrounding context, identify the sentence's purpose
+    from the perspective of an outside observer. Speaker labels like [S1] identify
+    who is talking; the target sentence is marked with >>> <<<.
+
+    Options:
+      - Statement
+      - Query
+      - Exclamation
+      - Answer
+      - Commentary
+      - Observation
+      - Retraction
+      - Mockery
+      - Objection
+      - Clarification
+      - Conclusion
+      - Confession
+      - Speculation
+      - Recitation
+      - Correction
+      - Explanation
+      - Qualification
+      - Threat
+      - Warning
+      - Advisory
+      - Request
+      - Addendum
+      - Musing
+      - Amendment
+
+    Format: {{"purpose": "<Purpose>", "confidence": <number between 0 and 1>}}
+
+    Sentence: "{sentence}"
+    Context:
+    """
+    {context}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+topic_level_1:
+  prompt: |
+    Classify the topic of the given sentence based on its immediate surrounding
+    context. Speaker labels like [S1] identify who is talking; the target sentence
+    is marked with >>> <<<.
+
+    Options:
+      - goals
+      - tools
+      - processes
+      - experiences
+      - observations
+      - pain points
+      - responsibilities
+      - collaborations
+      - reporting
+      - managing
+      - mentoring
+      - strategy
+      - operations
+      - small talk
+      - niceties
+
+    Format: {{"topic_level_1": "<topic>", "confidence": <number between 0 and 1>}}
+
+    Sentence: "{sentence}"
+    Context:
+    """
+    {context}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+topic_level_3:
+  prompt: |
+    Classify the topic of the sentence considering a broader context. Speaker
+    labels like [S1] identify who is talking; the target sentence is marked
+    with >>> <<<.
+
+    Options:
+      - goals
+      - tools
+      - processes
+      - experiences
+      - observations
+      - pain points
+      - responsibilities
+      - collaborations
+      - reporting
+      - managing
+      - mentoring
+      - strategy
+      - operations
+      - small talk
+      - niceties
+
+    Format: {{"topic_level_3": "<topic>", "confidence": <number between 0 and 1>}}
+
+    Sentence: "{sentence}"
+    Context:
+    """
+    {context}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+overall_keywords:
+  prompt: |
+    Provide up to 6 keywords that best represent the main topics of conversation
+    based on the surrounding context. Speaker labels like [S1] identify who is
+    talking.
+
+    Format: {{"overall_keywords": ["keyword1", "keyword2", ...]}}
+
+    The sentence under analysis: "{sentence}"
+    Context:
+    """
+    {context}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+domain_keywords:
+  prompt: |
+    Identify any domain-specific keywords present in the sentence from the provided
+    domain-specific list below. Include up to 6 keywords found.
+
+    Domain-specific list:
+    {domain_keywords}
+
+    Sentence: "{sentence}"
+
+    Explicitly respond in JSON format with the key 'domain_keywords', and ensure the
+    value is an array of strings. If no keywords found, explicitly return an empty
+    array [].
+
+    Example response:
+    {{"domain_keywords": ["keyword1", "keyword2"]}}
+
+    Provide your response explicitly formatted as JSON.
+
+entity_mentions:
+  prompt: |
+    Identify entity mentions in the sentence: people, organizations, products,
+    tools. For each entity report its exact character span WITHIN THE SENTENCE
+    (0-based start offset, exclusive end offset) such that
+    sentence[start:end] == text. Do not include pronouns.
+
+    Format: {{"entities": [{{"text": "<exact substring>", "entity_type": "person|organization|product|tool|other", "start": <int>, "end": <int>, "confidence": <number between 0 and 1>}}]}}
+
+    If there are no entities, return {{"entities": []}}.
+
+    Sentence: "{sentence}"
+
+    Provide your response explicitly formatted as JSON.
+
+claims:
+  prompt: |
+    The following is one speaker's complete utterance from a conversation.
+    Extract the claims it makes. A claim is one of:
+      - assertion: a statement of fact or belief about the world
+      - commitment: something the speaker commits to doing
+      - request: something the speaker asks another party to do
+
+    Ignore small talk and filler. Quote or closely paraphrase the utterance.
+
+    Format: {{"claims": [{{"text": "<claim>", "kind": "assertion|commitment|request", "confidence": <number between 0 and 1>}}]}}
+
+    If there are no claims, return {{"claims": []}}.
+
+    Utterance:
+    """
+    {sentence}
+    """
+
+    Provide your response explicitly formatted as JSON.

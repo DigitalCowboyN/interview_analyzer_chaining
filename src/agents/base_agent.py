@@ -12,7 +12,7 @@ Key responsibilities:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class BaseLLMAgent(ABC):
@@ -35,9 +35,16 @@ class BaseLLMAgent(ABC):
         pass
 
     @abstractmethod
-    async def call_model(self, function_prompt: str) -> Dict[str, Any]:
+    async def call_model(
+        self, function_prompt: str, schema: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Call the LLM with a prompt and return parsed JSON response.
+
+        When `schema` (a JSON Schema dict, e.g. from Model.model_json_schema())
+        is provided, providers enforce it at the API level where supported
+        (OpenAI json_schema text format; Anthropic forced tool-use). When None,
+        behavior is the legacy prompt-engineering JSON contract.
 
         This is the core method that all sentence analysis flows through.
         The pipeline makes 7 concurrent calls per sentence to analyze:

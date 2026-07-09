@@ -1,0 +1,43 @@
+# Declared enrichment extractors (Layer 2 / M4.2).
+# Each is one focused LLM call per unit of its scope — never merged.
+extractors:
+  - name: function_type
+    prompt_key: function_type
+    response_model: FunctionTypeResult
+    scope: fragment
+  - name: structure_type
+    prompt_key: structure_type
+    response_model: StructureTypeResult
+    scope: fragment
+  - name: purpose
+    prompt_key: purpose
+    response_model: PurposeResult
+    context_needs: [observer_context]
+    scope: fragment
+  - name: topic_level_1
+    prompt_key: topic_level_1
+    response_model: TopicLevel1Result
+    context_needs: [immediate_context]
+    scope: fragment
+  - name: topic_level_3
+    prompt_key: topic_level_3
+    response_model: TopicLevel3Result
+    context_needs: [broader_context]
+    scope: fragment
+  - name: overall_keywords
+    prompt_key: overall_keywords
+    response_model: OverallKeywordsResult
+    context_needs: [overall_context]
+    scope: fragment
+  - name: domain_keywords
+    prompt_key: domain_keywords
+    response_model: DomainKeywordsResult
+    scope: fragment
+  - name: entity_mentions
+    prompt_key: entity_mentions
+    response_model: EntityMentionsResult
+    scope: fragment
+  - name: claims
+    prompt_key: claims
+    response_model: ClaimsResult
+    scope: utterance  # {sentence} carries the utterance text; no {context} used

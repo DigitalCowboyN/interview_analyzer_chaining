@@ -231,6 +231,28 @@ Links sentences in sequence order.
 must not overwrite. `INTERRUPTS` records where one utterance broke into
 another, enabling the as-spoken visualization with interruption edges.
 
+### Layer 2 enrichment (M4.2)
+
+Nodes: `:Entity {surface (lowercased key), entity_type}`;
+`:Claim {claim_id, text, kind, confidence, model, provider, interview_id}`.
+Fragment/utterance embeddings are node properties
+(`:Sentence.embedding`, `:Utterance.embedding`) tagged with
+`embedding_model` / `embedding_dim`, each backed by a per-model Neo4j vector
+index (`fragment_embedding_<model>`, `utterance_embedding_<model>`, cosine).
+Per-analysis metadata (provider, dimension_confidences, flags) lives on the
+`:Analysis` node.
+
+```
+(:Sentence)-[:MENTIONS {text, start, end, confidence}]->(:Entity)
+(:Claim)-[:MADE_BY]->(:Speaker)
+(:Claim)-[:SUPPORTED_BY]->(:Sentence)
+```
+
+`MENTIONS` spans are character offsets within the fragment text (surface form
+preserved on the edge; the `:Entity` node keys on the lowercased surface for
+coarse resolution — full canonicalization is Layer 4). `SUPPORTED_BY` fans a
+claim out to every fragment of the utterance it came from.
+
 **Note:** Points from current sentence to *previous* sentence (sentence N follows sentence N-1).
 
 ### `:HAS_FUNCTION_TYPE`
@@ -397,3 +419,7 @@ While Neo4j is the read model, EventStoreDB holds the authoritative event stream
 | `UtteranceIdentified` | `Interview-{id}` | Stitched utterance overlay identified |
 | `InterruptionRecorded` | `Interview-{id}` | One utterance broke into another |
 | `StitchRemoved` | `Interview-{id}` | Human removed a wrong stitch |
+| `EntitiesExtracted` | `Sentence-{id}` | Span-grounded entity mentions (Layer 2) |
+| `EmbeddingGenerated` | `Sentence-{id}` | Fragment embedding (base64 vector, Layer 2) |
+| `ClaimExtracted` | `Interview-{id}` | Utterance-scoped claim (Layer 2) |
+| `UtteranceEmbeddingGenerated` | `Interview-{id}` | Utterance embedding (Layer 2) |

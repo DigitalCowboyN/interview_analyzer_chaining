@@ -57,12 +57,14 @@ class AgentFactory:
         """Initialize provider registry with lazy imports."""
         if not cls._providers:
             # Import here to avoid circular dependencies
-            from .openai_agent import OpenAIAgent
             from .anthropic_agent import AnthropicAgent
+            from .claude_code_agent import ClaudeCodeAgent
+            from .openai_agent import OpenAIAgent
 
             cls._providers = {
                 "openai": OpenAIAgent,
                 "anthropic": AnthropicAgent,
+                "claude_code": ClaudeCodeAgent,
             }
 
     @classmethod

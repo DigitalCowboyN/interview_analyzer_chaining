@@ -11,16 +11,20 @@ from typing import Any, Dict, List, Optional
 
 from .envelope import Actor, EventEnvelope
 from .interview_events import (
+    ClaimExtractedData,
     InterruptionRecordedData,
     InterviewStatus,
     SpeakerCreatedData,
     SpeakerMergedData,
     SpeakerRenamedData,
     StitchRemovedData,
+    UtteranceEmbeddingGeneratedData,
     UtteranceIdentifiedData,
 )
 from .sentence_events import (
     EditorType,
+    EmbeddingGeneratedData,
+    EntitiesExtractedData,
     SentenceStatus,
     SpeakerAttributedData,
     SpeakerReattributedData,
@@ -166,6 +170,10 @@ class Interview(AggregateRoot):
         self.speakers: Dict[str, Dict[str, Any]] = {}
         self.utterances: Dict[str, Dict[str, Any]] = {}
 
+        # Enrichment (Layer 2): claims keyed by claim_id; utterance embeddings
+        self.claims: Dict[str, Dict[str, Any]] = {}
+        self.utterance_embeddings: Dict[str, Dict[str, Any]] = {}
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the interview's state."""
         if event.event_type == "InterviewCreated":
@@ -190,6 +198,10 @@ class Interview(AggregateRoot):
             self._apply_interruption_recorded(event)
         elif event.event_type == "StitchRemoved":
             self._apply_stitch_removed(event)
+        elif event.event_type == "ClaimExtracted":
+            self._apply_claim_extracted(event)
+        elif event.event_type == "UtteranceEmbeddingGenerated":
+            self._apply_utterance_embedding_generated(event)
         else:
             raise ValueError(f"Unknown event type for Interview: {event.event_type}")
 
@@ -277,6 +289,27 @@ class Interview(AggregateRoot):
     def _apply_stitch_removed(self, event: EventEnvelope) -> None:
         """Apply StitchRemoved event (human correction)."""
         self.utterances[event.data["utterance_id"]]["removed"] = True
+        self.updated_at = event.occurred_at
+
+    def _apply_claim_extracted(self, event: EventEnvelope) -> None:
+        """Apply ClaimExtracted event (Layer 2 enrichment)."""
+        data = event.data
+        self.claims[data["claim_id"]] = {
+            "utterance_id": data["utterance_id"],
+            "speaker_id": data["speaker_id"],
+            "text": data["text"],
+            "kind": data["kind"],
+            "confidence": data["confidence"],
+        }
+        self.updated_at = event.occurred_at
+
+    def _apply_utterance_embedding_generated(self, event: EventEnvelope) -> None:
+        """Apply UtteranceEmbeddingGenerated event (state stores tag, not vector)."""
+        data = event.data
+        self.utterance_embeddings[data["utterance_id"]] = {
+            "model": data["model"],
+            "dim": data["dim"],
+        }
         self.updated_at = event.occurred_at
 
     # Command methods (business logic)
@@ -527,6 +560,67 @@ class Interview(AggregateRoot):
             **envelope_kwargs,
         )
 
+    def record_claim(
+        self,
+        claim_id: str,
+        utterance_id: str,
+        text: str,
+        kind: str,
+        confidence: float,
+        model: str,
+        provider: str,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Record a claim extracted from an utterance (Layer 2 enrichment).
+
+        The speaker is derived from the utterance — a claim is always made by
+        whoever spoke the utterance it came from.
+        """
+        if self.version < 0:
+            raise ValueError("Interview must be created before recording claims")
+        if utterance_id not in self.utterances:
+            raise ValueError(f"Unknown utterance: {utterance_id}")
+        if self.utterances[utterance_id].get("removed"):
+            raise ValueError(f"Utterance {utterance_id} has been removed")
+        if claim_id in self.claims:
+            raise ValueError(f"Claim {claim_id} already recorded")
+
+        data = ClaimExtractedData(
+            claim_id=claim_id,
+            utterance_id=utterance_id,
+            speaker_id=self.utterances[utterance_id]["speaker_id"],
+            text=text,
+            kind=kind,
+            confidence=confidence,
+            model=model,
+            provider=provider,
+        )
+
+        return self._add_event(
+            event_type="ClaimExtracted",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def record_utterance_embedding(
+        self, utterance_id: str, model: str, dim: int, vector_b64: str, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Record an utterance embedding (Layer 2). Vector rides in the event."""
+        if self.version < 0:
+            raise ValueError("Interview must be created before recording embeddings")
+        if utterance_id not in self.utterances:
+            raise ValueError(f"Unknown utterance: {utterance_id}")
+
+        data = UtteranceEmbeddingGeneratedData(
+            utterance_id=utterance_id, model=model, dim=dim, vector_b64=vector_b64
+        )
+
+        return self._add_event(
+            event_type="UtteranceEmbeddingGenerated",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
 
 class Sentence(AggregateRoot):
     """
@@ -570,6 +664,14 @@ class Sentence(AggregateRoot):
         self.speaker_confidence: Optional[float] = None
         self.speaker_locked: bool = False
 
+        # Enrichment v2 (Layer 2)
+        self.dimension_confidences: Dict[str, float] = {}
+        self.flags: Dict[str, str] = {}
+        self.analysis_provider: Optional[str] = None
+        self.entities: List[Dict[str, Any]] = []
+        self.embedding_model: Optional[str] = None
+        self.embedding_dim: Optional[int] = None
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the sentence's state."""
         if event.event_type == "SentenceCreated":
@@ -588,6 +690,10 @@ class Sentence(AggregateRoot):
             self._apply_speaker_attributed(event)
         elif event.event_type == "SpeakerReattributed":
             self._apply_speaker_reattributed(event)
+        elif event.event_type == "EntitiesExtracted":
+            self._apply_entities_extracted(event)
+        elif event.event_type == "EmbeddingGenerated":
+            self._apply_embedding_generated(event)
         else:
             raise ValueError(f"Unknown event type for Sentence: {event.event_type}")
 
@@ -624,6 +730,9 @@ class Sentence(AggregateRoot):
         self.domain_keywords = data.get("domain_keywords", [])
         self.confidence = data.get("confidence")
         self.raw_ref = data.get("raw_ref")
+        self.dimension_confidences = data.get("dimension_confidences", {})
+        self.flags = data.get("flags", {})
+        self.analysis_provider = data.get("provider")
         self.status = SentenceStatus.ANALYZED
         self.updated_at = event.occurred_at
 
@@ -670,6 +779,17 @@ class Sentence(AggregateRoot):
         self.speaker_id = event.data.get("new_speaker_id")
         self.speaker_confidence = 1.0
         self.speaker_locked = True
+        self.updated_at = event.occurred_at
+
+    def _apply_entities_extracted(self, event: EventEnvelope) -> None:
+        """Apply EntitiesExtracted event (re-extraction replaces the set)."""
+        self.entities = list(event.data.get("entities", []))
+        self.updated_at = event.occurred_at
+
+    def _apply_embedding_generated(self, event: EventEnvelope) -> None:
+        """Apply EmbeddingGenerated event (state stores tag, not vector)."""
+        self.embedding_model = event.data.get("model")
+        self.embedding_dim = event.data.get("dim")
         self.updated_at = event.occurred_at
 
     # Command methods (business logic)
@@ -740,7 +860,12 @@ class Sentence(AggregateRoot):
 
         return self._add_event(
             event_type="SentenceEdited",
-            data={"old_text": self.text, "new_text": new_text, "editor_type": editor_type.value},
+            data={
+                "interview_id": self.interview_id,  # lane routing key
+                "old_text": self.text,
+                "new_text": new_text,
+                "editor_type": editor_type.value,
+            },
             **envelope_kwargs,
         )
 
@@ -766,6 +891,50 @@ class Sentence(AggregateRoot):
 
         return self._add_event(
             event_type="SpeakerAttributed",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def record_entities(
+        self, entities: List[Dict[str, Any]], model: str, provider: str, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Record span-grounded entity mentions (Layer 2 enrichment).
+
+        interview_id rides in the payload because projection lane routing
+        partitions Sentence-stream events by data["interview_id"].
+        """
+        if self.version < 0:
+            raise ValueError("Sentence must be created before recording entities")
+
+        data = EntitiesExtractedData(
+            interview_id=self.interview_id,
+            entities=entities,
+            model=model,
+            provider=provider,
+        )
+
+        return self._add_event(
+            event_type="EntitiesExtracted",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def record_embedding(
+        self, model: str, dim: int, vector_b64: str, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Record a fragment embedding (Layer 2). Vector rides in the event.
+
+        interview_id rides in the payload for projection lane routing.
+        """
+        if self.version < 0:
+            raise ValueError("Sentence must be created before recording an embedding")
+
+        data = EmbeddingGeneratedData(
+            interview_id=self.interview_id, model=model, dim=dim, vector_b64=vector_b64
+        )
+
+        return self._add_event(
+            event_type="EmbeddingGenerated",
             data=data.model_dump(),
             **envelope_kwargs,
         )
@@ -797,6 +966,9 @@ class Sentence(AggregateRoot):
         domain_keywords: Optional[List[str]] = None,
         confidence: Optional[float] = None,
         raw_ref: Optional[str] = None,
+        dimension_confidences: Optional[Dict[str, float]] = None,
+        flags: Optional[Dict[str, str]] = None,
+        provider: Optional[str] = None,
         **envelope_kwargs,
     ) -> EventEnvelope:
         """
@@ -811,6 +983,9 @@ class Sentence(AggregateRoot):
             domain_keywords: Domain-specific keywords
             confidence: Analysis confidence score
             raw_ref: Reference to raw analysis data
+            dimension_confidences: Per-dimension numeric confidence (0-1)
+            flags: Review flags (e.g., spaCy disagreement, invalid responses)
+            provider: Provider that served the calls (chain provenance)
             **envelope_kwargs: Additional envelope fields
 
         Returns:
@@ -819,18 +994,27 @@ class Sentence(AggregateRoot):
         if self.version < 0:
             raise ValueError("Sentence must be created before generating analysis")
 
+        # Validate through the payload model (command-time bounds enforcement).
+        from .sentence_events import AnalysisGeneratedData
+
+        data = AnalysisGeneratedData(
+            interview_id=self.interview_id,  # lane routing key
+            model=model,
+            version=model_version,
+            classification=classification,
+            keywords=keywords or [],
+            topics=topics or [],
+            domain_keywords=domain_keywords or [],
+            confidence=confidence,
+            raw_ref=raw_ref,
+            dimension_confidences=dimension_confidences or {},
+            flags=flags or {},
+            provider=provider,
+        )
+
         return self._add_event(
             event_type="AnalysisGenerated",
-            data={
-                "model": model,
-                "version": model_version,
-                "classification": classification,
-                "keywords": keywords or [],
-                "topics": topics or [],
-                "domain_keywords": domain_keywords or [],
-                "confidence": confidence,
-                "raw_ref": raw_ref,
-            },
+            data=data.model_dump(),
             **envelope_kwargs,
         )
 
@@ -853,6 +1037,10 @@ class Sentence(AggregateRoot):
 
         return self._add_event(
             event_type="AnalysisOverridden",
-            data={"fields_overridden": fields_overridden, "note": note},
+            data={
+                "interview_id": self.interview_id,  # lane routing key
+                "fields_overridden": fields_overridden,
+                "note": note,
+            },
             **envelope_kwargs,
         )
