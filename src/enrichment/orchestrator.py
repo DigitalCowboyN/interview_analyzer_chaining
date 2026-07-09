@@ -93,19 +93,26 @@ class EnrichmentOrchestrator:
             for fid in u["fragment_ids"]
         }
 
-        fragment_views = [
+        # Context windows must see EVERY fragment (skipped neighbors included);
+        # only the to-enrich subset is sent to the executor. Building windows
+        # from the subset would corrupt prompts exactly in resume mode.
+        all_views = [
             FragmentView(
                 index=s.index,
                 text=s.text,
                 speaker_handle=speaker_handle.get(s.speaker_id, "S?"),
                 utterance_id=utterance_of_fragment.get(s.aggregate_id),
             )
-            for s in to_enrich
+            for s in sorted(all_sentences.values(), key=lambda s: s.index)
         ]
         utterance_texts = self._utterance_texts(interview, all_sentences)
-        contexts = GraphContextBuilder(
+        all_contexts = GraphContextBuilder(
             self.config.get("preprocessing", {}).get("context_windows", {})
-        ).build_all(fragment_views, utterance_texts)
+        ).build_all(all_views, utterance_texts)
+
+        enrich_indices = {s.index for s in to_enrich}
+        fragment_views = [v for v in all_views if v.index in enrich_indices]
+        contexts = [all_contexts[pos] for pos, v in enumerate(all_views) if v.index in enrich_indices]
 
         executor = self._build_executor()
         embedder = get_embedder(self.config)
@@ -115,7 +122,7 @@ class EnrichmentOrchestrator:
             actor, correlation_id,
         )
         claims_count, utt_embeddings = await self._emit_utterance_results(
-            executor, embedder, interview, utterance_texts, actor, correlation_id,
+            executor, embedder, interview, utterance_texts, actor, correlation_id, force,
         )
         await interview_repo.save(interview)
 
@@ -165,6 +172,15 @@ class EnrichmentOrchestrator:
 
         for enrichment, vector in zip(enrichments, vectors):
             sentence = by_index[enrichment.index]
+            if not enrichment.model:
+                # Every call for this fragment failed (total provider outage).
+                # Emit NOTHING so analysis_model stays None and the fragment is
+                # retried on the next run instead of being sealed as analyzed.
+                logger.warning(
+                    f"Fragment {enrichment.index}: all extractor calls failed "
+                    f"({list(enrichment.flags)}); leaving un-analyzed for retry"
+                )
+                continue
             confidences = list(enrichment.dimension_confidences.values())
             mean_conf = sum(confidences) / len(confidences) if confidences else None
             sentence.generate_analysis(
@@ -196,41 +212,62 @@ class EnrichmentOrchestrator:
 
     async def _emit_utterance_results(
         self, executor, embedder, interview, utterance_texts, actor, correlation_id,
+        force: bool = False,
     ):
         claims_count = 0
         utt_embeddings = 0
+
+        # Resume-awareness (utterance side): skip utterances that already have
+        # claims / embeddings unless forced — a re-run must never crash on the
+        # deterministic claim_id or burn LLM calls on finished work.
+        claimed_utterances = {c["utterance_id"] for c in interview.claims.values()}
+        to_extract = {
+            uid: text
+            for uid, text in utterance_texts.items()
+            if force or uid not in claimed_utterances
+        }
         if not utterance_texts:
             return claims_count, utt_embeddings
 
-        enrichments = await executor.enrich_utterances(utterance_texts)
-        for enrichment in enrichments:
-            for ordinal, claim in enumerate(enrichment.claims):
-                claim_id = str(
-                    uuid.uuid5(
-                        uuid.NAMESPACE_DNS,
-                        f"{interview.aggregate_id}:claim:{enrichment.utterance_id}:{ordinal}",
+        if to_extract:
+            enrichments = await executor.enrich_utterances(to_extract)
+            for enrichment in enrichments:
+                for ordinal, claim in enumerate(enrichment.claims):
+                    claim_id = str(
+                        uuid.uuid5(
+                            uuid.NAMESPACE_DNS,
+                            f"{interview.aggregate_id}:claim:{enrichment.utterance_id}:{ordinal}",
+                        )
                     )
-                )
-                interview.record_claim(
-                    claim_id,
-                    enrichment.utterance_id,
-                    claim["text"],
-                    claim["kind"],
-                    claim["confidence"],
-                    enrichment.model,
-                    enrichment.provider,
-                    actor=actor,
-                    correlation_id=correlation_id,
-                )
-                claims_count += 1
+                    if claim_id in interview.claims:
+                        # Deterministic id already recorded (forced re-run):
+                        # idempotent skip, never a crash.
+                        logger.info(f"Claim {claim_id} already recorded; skipping")
+                        continue
+                    interview.record_claim(
+                        claim_id,
+                        enrichment.utterance_id,
+                        claim["text"],
+                        claim["kind"],
+                        claim["confidence"],
+                        enrichment.model,
+                        enrichment.provider,
+                        actor=actor,
+                        correlation_id=correlation_id,
+                    )
+                    claims_count += 1
 
-        # Embed each utterance's joined text.
-        uids = list(utterance_texts.keys())
-        vectors = await embedder.embed([utterance_texts[u] for u in uids])
-        for uid, vector in zip(uids, vectors):
-            interview.record_utterance_embedding(
-                uid, model=embedder.model_name, dim=embedder.dim,
-                vector_b64=encode_vector(vector), actor=actor, correlation_id=correlation_id,
-            )
-            utt_embeddings += 1
+        # Embed each utterance's joined text (skip already-embedded unless forced).
+        uids = [
+            uid for uid in utterance_texts
+            if force or uid not in interview.utterance_embeddings
+        ]
+        if uids:
+            vectors = await embedder.embed([utterance_texts[u] for u in uids])
+            for uid, vector in zip(uids, vectors):
+                interview.record_utterance_embedding(
+                    uid, model=embedder.model_name, dim=embedder.dim,
+                    vector_b64=encode_vector(vector), actor=actor, correlation_id=correlation_id,
+                )
+                utt_embeddings += 1
         return claims_count, utt_embeddings

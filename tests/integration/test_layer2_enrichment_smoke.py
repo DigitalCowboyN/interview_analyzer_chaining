@@ -96,10 +96,12 @@ async def test_enriched_interview_projects_entity_claim_embedding_subgraph(tmp_p
             WITH count(e) AS entity_count
             MATCH (c:Claim)-[:MADE_BY]->(:Speaker)
             WITH entity_count, count(DISTINCT c) AS claim_count
-            MATCH (s2:Sentence) WHERE s2.embedding IS NOT NULL AND s2.embedding_model = 'smoke-embed'
+            MATCH (i:Interview {interview_id: $iid})-[:HAS_SENTENCE]->(s2:Sentence)
+            WHERE s2.embedding IS NOT NULL AND s2.embedding_model = 'smoke-embed'
             RETURN entity_count, claim_count, count(DISTINCT s2) AS embedded
             """,
             f0=str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{interview_id}:0")),
+            iid=interview_id,
         )
         record = await res.single()
         assert record["entity_count"] >= 1

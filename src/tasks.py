@@ -17,7 +17,8 @@ logger = get_logger()
 
 
 async def _ingest_and_enrich(
-    input_file_path_str: str, map_dir_str: str, project_id: str, task_id: str
+    input_file_path_str: str, map_dir_str: str, project_id: str, task_id: str,
+    config_dict: dict = None,
 ):
     """Layer 1 ingestion then Layer 2 enrichment for a single file."""
     from src.enrichment.orchestrator import EnrichmentOrchestrator
@@ -26,7 +27,9 @@ async def _ingest_and_enrich(
     ingest = IngestionOrchestrator(project_id=project_id, map_dir=Path(map_dir_str))
     result = await ingest.ingest_file(Path(input_file_path_str))
     logger.info(f"[Task {task_id}] Ingested interview {result.interview_id}")
-    enrich_result = await EnrichmentOrchestrator().enrich_interview(result.interview_id)
+    # Empty dict falls back to global config; a populated dict is honored.
+    enrich = EnrichmentOrchestrator(config_dict=config_dict or None)
+    enrich_result = await enrich.enrich_interview(result.interview_id)
     logger.info(
         f"[Task {task_id}] Enriched {result.interview_id}: "
         f"{enrich_result.fragments_enriched} fragments"
@@ -56,6 +59,7 @@ def _run_pipeline_for_file_core(
                 map_dir_str=map_dir_str,
                 project_id=project_id,
                 task_id=task_id,
+                config_dict=config_dict,
             )
         )
         logger.info(f"[Task {task_id}] Successfully processed: {input_file_path_str}")

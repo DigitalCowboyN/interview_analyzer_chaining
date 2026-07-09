@@ -136,7 +136,14 @@ class EnrichmentExecutor:
         async def one(uid: str, text: str) -> UtteranceEnrichment:
             out = UtteranceEnrichment(utterance_id=uid)
             for spec in self.utterance_specs:
-                call_result = await self._run_spec(spec, text, {})
+                try:
+                    call_result = await self._run_spec(spec, text, {})
+                except Exception as exc:
+                    # Same isolation policy as the fragment path: one exhausted
+                    # chain flags this utterance's dimension, never aborts the run.
+                    logger.warning(f"{spec.name}: call failed for utterance {uid} ({type(exc).__name__})")
+                    out.flags[f"{spec.name}_call_error"] = type(exc).__name__
+                    continue
                 out.provider, out.model = call_result.provider, call_result.model
                 try:
                     parsed = spec.resolve_model().model_validate(call_result.data)

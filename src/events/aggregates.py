@@ -606,6 +606,8 @@ class Interview(AggregateRoot):
         self, utterance_id: str, model: str, dim: int, vector_b64: str, **envelope_kwargs
     ) -> EventEnvelope:
         """Record an utterance embedding (Layer 2). Vector rides in the event."""
+        if self.version < 0:
+            raise ValueError("Interview must be created before recording embeddings")
         if utterance_id not in self.utterances:
             raise ValueError(f"Unknown utterance: {utterance_id}")
 
@@ -858,7 +860,12 @@ class Sentence(AggregateRoot):
 
         return self._add_event(
             event_type="SentenceEdited",
-            data={"old_text": self.text, "new_text": new_text, "editor_type": editor_type.value},
+            data={
+                "interview_id": self.interview_id,  # lane routing key
+                "old_text": self.text,
+                "new_text": new_text,
+                "editor_type": editor_type.value,
+            },
             **envelope_kwargs,
         )
 
@@ -991,6 +998,7 @@ class Sentence(AggregateRoot):
         from .sentence_events import AnalysisGeneratedData
 
         data = AnalysisGeneratedData(
+            interview_id=self.interview_id,  # lane routing key
             model=model,
             version=model_version,
             classification=classification,
@@ -1029,6 +1037,10 @@ class Sentence(AggregateRoot):
 
         return self._add_event(
             event_type="AnalysisOverridden",
-            data={"fields_overridden": fields_overridden, "note": note},
+            data={
+                "interview_id": self.interview_id,  # lane routing key
+                "fields_overridden": fields_overridden,
+                "note": note,
+            },
             **envelope_kwargs,
         )
