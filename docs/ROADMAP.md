@@ -60,7 +60,21 @@
       analysis_service, pipeline_event_emitter, llm_responses; ~200 tests)
 - [x] Golden/parity assertions; Layer 2 projection smoke test
 
-**Completed:** 2026-07-06
+**Completed:** 2026-07-06 (final-review fix wave 2026-07-09)
+
+**Deferred to M4.3 entry (from the M4.2 final review — tracked debt):**
+- Per-model embedding property (`embedding_<model>`) or single-index +
+  mandatory `embedding_model` filter — today all per-model vector indexes
+  target the shared `embedding` property (cross-contamination risk only when
+  two models share dimensions).
+- FailoverAgent chain construction is all-or-nothing (one missing API key
+  kills the whole chain); skip unconstructible providers with a warning.
+- Delete now-dead `src/io/local_storage.py` writers + `config.yaml`
+  `classification` block ("registry is the only path" made literal).
+- Per-dimension provider provenance (currently last-successful-call per unit);
+  MENTIONS edge collapses duplicate mentions of one entity per fragment;
+  embedder dim not validated against emitted vectors; EntitiesExtracted
+  provider not materialized in graph; batch CLI aborts on first failing file.
 
 ---
 
