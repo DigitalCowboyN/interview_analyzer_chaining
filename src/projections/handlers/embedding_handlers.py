@@ -33,10 +33,11 @@ async def _ensure_vector_index(ensured: set, label: str, prefix: str, model: str
     if model in ensured:
         return
     name = f"{prefix}_{_sanitize(model)}"
+    prop = f"embedding_{_sanitize(model)}"  # per-model property: cross-model isolation
     async with await Neo4jConnectionManager.get_session() as session:
         await session.run(
             f"CREATE VECTOR INDEX {name} IF NOT EXISTS "
-            f"FOR (n:{label}) ON n.embedding "
+            f"FOR (n:{label}) ON n.{prop} "
             "OPTIONS {indexConfig: {"
             "`vector.dimensions`: $dim, `vector.similarity_function`: 'cosine'}}",
             dim=dim,
@@ -57,9 +58,11 @@ class EmbeddingGeneratedHandler(BaseProjectionHandler):
             self._ensured_models, "Sentence", "fragment_embedding", data["model"], data["dim"]
         )
         vector = decode_vector(data["vector_b64"])
-        query = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})
-        SET s.embedding = $vector, s.embedding_model = $model, s.embedding_dim = $dim
+        prop = f"embedding_{_sanitize(data['model'])}"  # sanitized, never raw input
+        query = f"""
+        MATCH (s:Sentence {{aggregate_id: $aggregate_id}})
+        SET s.{prop} = $vector, s.embedding = $vector,
+            s.embedding_model = $model, s.embedding_dim = $dim
         """
         result = await tx.run(
             query,
@@ -84,9 +87,11 @@ class UtteranceEmbeddingGeneratedHandler(BaseProjectionHandler):
             self._ensured_models, "Utterance", "utterance_embedding", data["model"], data["dim"]
         )
         vector = decode_vector(data["vector_b64"])
-        query = """
-        MATCH (u:Utterance {utterance_id: $utterance_id})
-        SET u.embedding = $vector, u.embedding_model = $model, u.embedding_dim = $dim
+        prop = f"embedding_{_sanitize(data['model'])}"  # sanitized, never raw input
+        query = f"""
+        MATCH (u:Utterance {{utterance_id: $utterance_id}})
+        SET u.{prop} = $vector, u.embedding = $vector,
+            u.embedding_model = $model, u.embedding_dim = $dim
         """
         result = await tx.run(
             query,
