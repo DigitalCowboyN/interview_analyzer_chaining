@@ -18,6 +18,14 @@ from src.utils.neo4j_driver import Neo4jConnectionManager
 logger = get_logger()
 
 
+class ProjectionLagError(RuntimeError):
+    """The aggregate expects lens items the graph projection hasn't caught up to yet."""
+
+
+class InterviewNotFoundError(ValueError):
+    """No interview aggregate exists for the given id."""
+
+
 class ExportResult(BaseModel):
     interview_id: str
     lens: str
@@ -42,7 +50,7 @@ class OkfExporter:
         lens = load_lens(lens_name)
         interview = await get_interview_repository().load(interview_id)
         if interview is None:
-            raise ValueError(f"Interview {interview_id} not found")
+            raise InterviewNotFoundError(f"Interview {interview_id} not found")
 
         async with await Neo4jConnectionManager.get_session() as session:
             items = await reader.lens_item_rows(session, interview_id, lens.name)
@@ -93,7 +101,7 @@ class OkfExporter:
         }
         projected = {r["item_id"] for r in projected_rows}
         if expected != projected:
-            raise RuntimeError(
+            raise ProjectionLagError(
                 f"projection lag: aggregate expects {len(expected)} items for lens "
                 f"{lens_name!r}, graph has {len(projected)}; retry shortly"
             )

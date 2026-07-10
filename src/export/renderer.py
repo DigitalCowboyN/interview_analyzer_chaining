@@ -17,6 +17,14 @@ RESERVED_PROPS = {
     "provider", "interview_id", "locked", "overridden_at", "override_note",
 }
 
+# OKF frontmatter keys _render_lens_item always sets itself. An extracted lens
+# field sharing one of these names must not silently overwrite it; such keys
+# get a field_ prefix instead (mirrors src/projections/handlers/lens_handlers.py).
+_OKF_FRONTMATTER_KEYS = {
+    "type", "title", "description", "item_id", "lens", "lens_version",
+    "confidence", "model", "provider", "locked", "tags", "timestamp",
+}
+
 
 def slugify(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
@@ -216,7 +224,11 @@ def _render_lens_item(
     node_type = item["node_type"]
     item_id = item["item_id"]
     props = item.get("props") or {}
-    extracted = {k: v for k, v in props.items() if k not in RESERVED_PROPS}
+    extracted = {
+        (f"field_{k}" if k in _OKF_FRONTMATTER_KEYS else k): v
+        for k, v in props.items()
+        if k not in RESERVED_PROPS
+    }
     text = props.get("text")
     title = (text[:80] if text else None) or item_id
 

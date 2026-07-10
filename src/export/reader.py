@@ -64,6 +64,11 @@ async def lens_item_rows(
     result = await session.run(
         query, interview_id=interview_id, lens=lens, node_type=node_type,
         min_confidence=min_confidence, offset=offset,
+        # Unbounded callers (the bundler) get a 10k safety cap, not "no limit":
+        # an interview with >10k lens items for this lens would be silently
+        # truncated here, which then surfaces upstream in the bundler's
+        # OkfExporter._guard as a false "projection lag" (expected != projected)
+        # rather than the real cause (truncated read).
         limit=limit if limit is not None else 10_000,
     )
     return [dict(r) async for r in result]

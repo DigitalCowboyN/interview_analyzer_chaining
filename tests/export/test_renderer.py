@@ -156,6 +156,26 @@ def test_coerce_scalar_only_applies_to_id_field():
     assert 'ref_code: "12345"' in content or "ref_code: '12345'" in content
 
 
+def test_extracted_field_colliding_with_okf_key_does_not_shadow_it():
+    """An extracted lens field named e.g. `type` must not silently overwrite
+    the OKF-reserved frontmatter key; it survives as `field_type` instead."""
+    lens = load_lens("meeting_minutes")
+    items = [{
+        "item_id": "8888888812345678", "node_type": "Decision", "lens_version": 1,
+        "confidence": 0.9, "model": "haiku", "provider": "anthropic", "locked": False,
+        "props": {"item_id": "8888888812345678", "lens": "meeting_minutes", "node_type": "Decision",
+                  "text": "Go with X", "type": "bogus", "confidence": 0.9},
+        "speaker_links": [{"relationship": "DECIDED_BY", "speaker_id": "sp1", "display_name": "Alice Johnson"}],
+        "supporting_fragment_ids": ["f1"],
+    }]
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, items, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    content = files["decisions/decision-88888888.md"]
+    fm = yaml.safe_load(content.split("---\n")[1])
+    assert fm["type"] == "Decision"        # OKF key untouched
+    assert fm["field_type"] == "bogus"     # extracted value preserved under prefixed key
+
+
 def test_relationship_line_skips_falsy_relationship_or_display():
     lens = load_lens("meeting_minutes")
     items = [{

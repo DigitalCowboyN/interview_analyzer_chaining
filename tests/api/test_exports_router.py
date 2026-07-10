@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from src.export.bundler import InterviewNotFoundError, ProjectionLagError
 from src.main import app
 
 IID = "22222222-2222-2222-2222-222222222222"
@@ -33,9 +34,9 @@ def test_export_returns_zip(client, tmp_path):
 
 
 @pytest.mark.parametrize("exc,status", [
-    (ValueError(f"Interview {IID} not found"), 404),
+    (InterviewNotFoundError(f"Interview {IID} not found"), 404),
     (ValueError("Unknown lens: nope"), 422),
-    (RuntimeError("projection lag: retry shortly"), 409),
+    (ProjectionLagError("projection lag: retry shortly"), 409),
 ])
 def test_export_error_mapping(client, exc, status):
     with patch("src.api.routers.exports.OkfExporter.export", new=AsyncMock(side_effect=exc)):

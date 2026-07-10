@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
-from src.export.bundler import OkfExporter
+from src.export.bundler import InterviewNotFoundError, OkfExporter, ProjectionLagError
 from src.utils.logger import get_logger
 
 router = APIRouter(tags=["exports"])
@@ -21,11 +21,12 @@ async def download_bundle(interview_id: str, lens_name: str):
             result = await OkfExporter().export(
                 interview_id, lens_name, out_dir=tmp, zip_bundle=True
             )
-        except ValueError as e:
-            status = 404 if "not found" in str(e) else 422
-            raise HTTPException(status_code=status, detail=str(e))
-        except RuntimeError as e:
+        except InterviewNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ProjectionLagError as e:
             raise HTTPException(status_code=409, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
         payload = Path(result.bundle_path).read_bytes()
     filename = f"{interview_id}-{lens_name}.zip"
     return Response(

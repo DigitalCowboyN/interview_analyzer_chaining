@@ -35,7 +35,7 @@ def _match_participant(handle: str, participants: List[str]) -> Optional[str]:
     full = [p for p in participants if p.strip().lower() == needle]
     if len(full) == 1:
         return full[0]
-    first = [p for p in participants if p.split()[0].strip().lower() == needle]
+    first = [p for p in participants if p.split() and p.split()[0].strip().lower() == needle]
     if len(first) == 1:
         return first[0]
     return None
@@ -93,7 +93,12 @@ class IngestionOrchestrator:
         interview_id = str(uuid.uuid4())
 
         fm = transcript.front_matter or {}
-        participants = [p for p in fm.get("participants") or [] if isinstance(p, str)]
+        fm_participants = fm.get("participants")
+        participants = (
+            [p.strip() for p in fm_participants if isinstance(p, str) and p.strip()]
+            if isinstance(fm_participants, list)
+            else []
+        )
         started_at = _parse_fm_date(fm.get("date"))
 
         interview = Interview(interview_id)
