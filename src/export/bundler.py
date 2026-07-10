@@ -1,10 +1,11 @@
 """Bundle orchestration: guard -> read -> render (fully in memory) -> write."""
 
+import asyncio
 import shutil
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -73,13 +74,41 @@ class OkfExporter:
 
         bundle_dir = Path(out_dir) / f"{interview_id}-{lens.name}"
         log_content = self._log_entry(bundle_dir, lens, len(items), exported_at)
-        if bundle_dir.exists():
-            shutil.rmtree(bundle_dir)
+        bundle_path = await asyncio.to_thread(
+            self._write_bundle, bundle_dir, files, log_content, zip_bundle
+        )
+
+        return ExportResult(
+            interview_id=interview_id, lens=lens.name, lens_version=lens.version,
+            bundle_path=bundle_path, files_written=len(files) + 1,
+            items=len(items), claims=len(claims), entities=len(entities),
+        )
+
+    def _write_bundle(
+        self,
+        bundle_dir: Path,
+        files: List[Tuple[str, str]],
+        log_content: str,
+        zip_bundle: bool,
+    ) -> str:
+        """Write all bundle files into a staging dir, then atomically swap it in.
+
+        A failure mid-write leaves the OLD bundle intact: the write phase happens
+        entirely in a sibling `.staging` directory, and only the rename at the end
+        can destroy the previous bundle. Zipping happens after the swap.
+        """
+        staging = bundle_dir.with_name(bundle_dir.name + ".staging")
+        shutil.rmtree(staging, ignore_errors=True)
+
         for rel_path, content in files:
-            target = bundle_dir / rel_path
+            target = staging / rel_path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
-        (bundle_dir / "log.md").write_text(log_content, encoding="utf-8")
+        (staging / "log.md").write_text(log_content, encoding="utf-8")
+
+        if bundle_dir.exists():
+            shutil.rmtree(bundle_dir)
+        staging.rename(bundle_dir)
 
         bundle_path = str(bundle_dir)
         if zip_bundle:
@@ -90,11 +119,7 @@ class OkfExporter:
                         zf.write(f, f.relative_to(bundle_dir.parent))
             bundle_path = str(zip_path)
 
-        return ExportResult(
-            interview_id=interview_id, lens=lens.name, lens_version=lens.version,
-            bundle_path=bundle_path, files_written=len(files) + 1,
-            items=len(items), claims=len(claims), entities=len(entities),
-        )
+        return bundle_path
 
     def _guard(self, interview, lens_name: str, projected_rows) -> None:
         """Expected = current-version items + locked items of any version."""

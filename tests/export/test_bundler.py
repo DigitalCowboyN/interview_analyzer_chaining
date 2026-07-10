@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -124,3 +125,28 @@ async def test_reexport_same_day_groups_under_one_heading(tmp_path):
     first_ts = bullets[0][2:].split(": exported")[0]
     second_ts = bullets[1][2:].split(": exported")[0]
     assert first_ts > second_ts
+
+
+@pytest.mark.asyncio
+async def test_failed_write_preserves_previous_bundle(tmp_path, monkeypatch):
+    patches = patch_world(make_interview(), PROJECTED)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+        await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+        bundle = tmp_path / f"{IID}-meeting_minutes"
+        original_index = (bundle / "index.md").read_text()
+
+        real_write = Path.write_text
+        calls = {"n": 0}
+
+        def flaky_write(self, *a, **k):
+            calls["n"] += 1
+            if calls["n"] >= 3:
+                raise OSError("disk full")
+            return real_write(self, *a, **k)
+
+        monkeypatch.setattr(Path, "write_text", flaky_write)
+        with pytest.raises(OSError):
+            await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+        monkeypatch.setattr(Path, "write_text", real_write)
+
+    assert (bundle / "index.md").read_text() == original_index  # old bundle intact
