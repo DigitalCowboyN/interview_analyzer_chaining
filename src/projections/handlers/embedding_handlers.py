@@ -60,7 +60,7 @@ class EmbeddingGeneratedHandler(BaseProjectionHandler):
         vector = decode_vector(data["vector_b64"])
         prop = f"embedding_{_sanitize(data['model'])}"  # sanitized, never raw input
         query = f"""
-        MATCH (s:Sentence {{aggregate_id: $aggregate_id}})
+        MATCH (s:Fragment {{aggregate_id: $aggregate_id}})
         SET s.{prop} = $vector, s.embedding = $vector,
             s.embedding_model = $model, s.embedding_dim = $dim
         """

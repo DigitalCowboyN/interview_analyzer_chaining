@@ -23,7 +23,7 @@ class EntitiesExtractedHandler(BaseProjectionHandler):
         data = event.data
 
         guard_query = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})
+        MATCH (s:Fragment {aggregate_id: $aggregate_id})
         SET s.entities_extracted_at = datetime($occurred_at),
             s.entities_model = $model,
             s.entities_provider = $provider
@@ -38,7 +38,7 @@ class EntitiesExtractedHandler(BaseProjectionHandler):
         _raise_if_no_writes(await result.consume(), "EntitiesExtracted", event.aggregate_id)
 
         edges_query = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})
+        MATCH (s:Fragment {aggregate_id: $aggregate_id})
         OPTIONAL MATCH (s)-[old:MENTIONS]->(:Entity)
         DELETE old
         WITH DISTINCT s

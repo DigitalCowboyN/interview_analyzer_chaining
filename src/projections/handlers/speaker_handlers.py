@@ -89,7 +89,7 @@ class SpeakerMergedHandler(BaseProjectionHandler):
         WITH merged, surviving
         CALL {
             WITH merged, surviving
-            MATCH (s:Sentence)-[r:SPOKEN_BY]->(merged)
+            MATCH (s:Fragment)-[r:SPOKEN_BY]->(merged)
             MERGE (s)-[nr:SPOKEN_BY]->(surviving)
             SET nr.confidence = r.confidence, nr.method = r.method, nr.locked = r.locked
             DELETE r
@@ -118,7 +118,7 @@ class SpeakerAttributedHandler(BaseProjectionHandler):
     async def apply(self, tx, event: EventEnvelope):
         data = event.data
         query = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})
+        MATCH (s:Fragment {aggregate_id: $aggregate_id})
         MATCH (sp:Speaker {speaker_id: $speaker_id})
         OPTIONAL MATCH (s)-[old:SPOKEN_BY]->(:Speaker)
         DELETE old
@@ -141,7 +141,7 @@ class SpeakerReattributedHandler(BaseProjectionHandler):
     async def apply(self, tx, event: EventEnvelope):
         data = event.data
         query = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})
+        MATCH (s:Fragment {aggregate_id: $aggregate_id})
         MATCH (sp:Speaker {speaker_id: $new_speaker_id})
         OPTIONAL MATCH (s)-[old:SPOKEN_BY]->(:Speaker)
         DELETE old

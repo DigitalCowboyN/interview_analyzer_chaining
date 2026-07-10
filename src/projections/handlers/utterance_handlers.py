@@ -24,7 +24,7 @@ class UtteranceIdentifiedHandler(BaseProjectionHandler):
         MERGE (sp)-[:SPOKE]->(u)
         WITH u
         UNWIND $fragments AS frag
-        MATCH (s:Sentence {aggregate_id: frag.id})
+        MATCH (s:Fragment {aggregate_id: frag.id})
         MERGE (s)-[p:PART_OF_UTTERANCE]->(u)
         SET p.position = frag.position
         RETURN count(s) AS matched

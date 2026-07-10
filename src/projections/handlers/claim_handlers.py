@@ -22,7 +22,7 @@ class ClaimExtractedHandler(BaseProjectionHandler):
             c.model = $model, c.provider = $provider, c.interview_id = $interview_id
         MERGE (c)-[:MADE_BY]->(sp)
         WITH c, u
-        MATCH (s:Sentence)-[:PART_OF_UTTERANCE]->(u)
+        MATCH (s:Fragment)-[:PART_OF_UTTERANCE]->(u)
         MERGE (c)-[:SUPPORTED_BY]->(s)
         RETURN count(s) AS supported
         """
