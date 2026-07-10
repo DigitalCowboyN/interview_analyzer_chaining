@@ -34,16 +34,40 @@ def item_filename(node_type: str, item_id: str) -> str:
     return f"{_kebab(node_type)}-{item_id[:8]}.md"
 
 
-def _coerce_scalar(value: Any) -> Any:
-    """All-digit strings become ints so YAML doesn't quote them (id fields)."""
-    if isinstance(value, str) and value.isdigit():
+# Matches a bare "---" delimiter line, and also PyYAML's folded/quoted
+# continuation of one (e.g. "  ---" inside a folded scalar) -- both collide
+# with the "---\n" convention that consumers (including our own tests) split
+# frontmatter on, since that split matches the substring anywhere in the text.
+_BARE_DELIMITER_RE = re.compile(r"^[ \t]*---[ \t]*$", re.MULTILINE)
+
+
+_ID_FIELDS = {"id", "item_id"}
+
+
+def _coerce_scalar(key: str, value: Any) -> Any:
+    """The id field's all-digit strings become ints so YAML doesn't quote them.
+
+    Scoped to the id field only (`id` or `item_id`, whichever a given file's
+    frontmatter uses): coercing every all-digit string would silently change
+    the type of arbitrary extracted LLM props (e.g. a zip code or ref number).
+    """
+    if key in _ID_FIELDS and isinstance(value, str) and value.isdigit():
         return int(value)
     return value
 
 
 def _frontmatter(fields: Dict[str, Any]) -> str:
-    clean = {k: _coerce_scalar(v) for k, v in fields.items() if v is not None}
-    return "---\n" + yaml.safe_dump(clean, sort_keys=False, allow_unicode=True) + "---\n"
+    clean = {k: _coerce_scalar(k, v) for k, v in fields.items() if v is not None}
+    dumped = yaml.safe_dump(clean, sort_keys=False, allow_unicode=True)
+    if _BARE_DELIMITER_RE.search(dumped):
+        # A scalar contains a line that is exactly "---", which would be
+        # indistinguishable from the frontmatter delimiter to any consumer
+        # that splits on "---\n" lines. Force every scalar onto a single
+        # quoted line so no bare delimiter can survive.
+        dumped = yaml.safe_dump(
+            clean, sort_keys=False, allow_unicode=True, default_style='"', width=float("inf")
+        )
+    return "---\n" + dumped + "---\n"
 
 
 def _anchors(transcript: List[Dict[str, Any]]) -> Dict[str, str]:
@@ -225,6 +249,8 @@ def _render_lens_item(
     for link in item.get("speaker_links") or []:
         rel = link.get("relationship") or (speaker_link.get("relationship") if speaker_link else None)
         display = link.get("display_name")
+        if not rel or not display:
+            continue
         sp_slug = _speaker_slug(display)
         lines.append(f"{rel}: [{display}](/speakers/{sp_slug}.md)")
     lines.append("")
@@ -315,8 +341,18 @@ def _render_entity(entity: Dict[str, Any], anchors: Dict[str, str]) -> Tuple[str
     return f"entities/{slug}.md", "\n".join(lines) + "\n"
 
 
+_OVERVIEW_ENTRIES = [
+    ("interview.md", "Interview header, participants, and counts."),
+    ("transcript.md", "Full transcript, anchored by utterance/fragment."),
+    ("analysis.md", "Aggregated topic/keyword tallies and per-fragment analysis."),
+]
+
+
 def _render_index(sections: Dict[str, List[Tuple[str, str]]]) -> Tuple[str, str]:
-    lines = ["# Index", ""]
+    lines = ["# Index", "", "## Overview"]
+    for path, description in _OVERVIEW_ENTRIES:
+        lines.append(f"- [{path}]({path}): {description}")
+    lines.append("")
     for section, entries in sections.items():
         if not entries:
             continue

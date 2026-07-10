@@ -79,3 +79,68 @@ def test_transcript_anchors_and_index_links():
     assert "](decisions/decision-88888888.md)" in files["index.md"]  # relative link
     assert "claims/claim-c1.md" in files  # claim file named by id prefix rule
     assert "entities/ecu.md" in files
+
+
+def test_index_covers_interview_transcript_and_analysis():
+    files = render()
+    index = files["index.md"]
+    assert "](interview.md)" in index
+    assert "](transcript.md)" in index
+    assert "](analysis.md)" in index
+
+
+def test_frontmatter_survives_embedded_delimiter_line():
+    lens = load_lens("meeting_minutes")
+    tricky_text = "line one\n---\nline two"
+    items = [{
+        "item_id": "8888888812345678", "node_type": "Decision", "lens_version": 1,
+        "confidence": 0.9, "model": "haiku", "provider": "anthropic", "locked": False,
+        "props": {"item_id": "8888888812345678", "lens": "meeting_minutes", "node_type": "Decision",
+                  "text": tricky_text, "made_by": "Alice", "confidence": 0.9},
+        "speaker_links": [{"relationship": "DECIDED_BY", "speaker_id": "sp1", "display_name": "Alice Johnson"}],
+        "supporting_fragment_ids": ["f1"],
+    }]
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, items, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    content = files["decisions/decision-88888888.md"]
+    fm = yaml.safe_load(content.split("---\n")[1])
+    assert fm["description"] == tricky_text
+
+
+def test_coerce_scalar_only_applies_to_id_field():
+    lens = load_lens("meeting_minutes")
+    items = [{
+        "item_id": "8888888812345678", "node_type": "Decision", "lens_version": 1,
+        "confidence": 0.9, "model": "haiku", "provider": "anthropic", "locked": False,
+        "props": {"item_id": "8888888812345678", "lens": "meeting_minutes", "node_type": "Decision",
+                  "text": "Go with X", "ref_code": "12345", "confidence": 0.9},
+        "speaker_links": [{"relationship": "DECIDED_BY", "speaker_id": "sp1", "display_name": "Alice Johnson"}],
+        "supporting_fragment_ids": ["f1"],
+    }]
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, items, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    content = files["decisions/decision-88888888.md"]
+    fm = yaml.safe_load(content.split("---\n")[1])
+    assert fm["ref_code"] == "12345"
+    assert isinstance(fm["ref_code"], str)
+    assert 'ref_code: "12345"' in content or "ref_code: '12345'" in content
+
+
+def test_relationship_line_skips_falsy_relationship_or_display():
+    lens = load_lens("meeting_minutes")
+    items = [{
+        "item_id": "8888888812345678", "node_type": "Decision", "lens_version": 1,
+        "confidence": 0.9, "model": "haiku", "provider": "anthropic", "locked": False,
+        "props": {"item_id": "8888888812345678", "lens": "meeting_minutes", "node_type": "Decision",
+                  "text": "Go with X", "confidence": 0.9},
+        "speaker_links": [
+            {"relationship": None, "speaker_id": "sp1", "display_name": "Alice Johnson"},
+            {"relationship": "DECIDED_BY", "speaker_id": "sp2", "display_name": None},
+        ],
+        "supporting_fragment_ids": ["f1"],
+    }]
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, items, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    content = files["decisions/decision-88888888.md"]
+    assert "None:" not in content
+    assert "[None]" not in content
