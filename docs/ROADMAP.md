@@ -442,6 +442,34 @@ limitation); OKF export of lens outputs (M4.4).
 
 ## Technical Debt
 
+### Deferred Backlog (consolidated 2026-07-10 — the "come back to it" list)
+
+**M4.5-entry debt (from the M4.4 final review — burn down first, per the M4.3 pattern):**
+- [ ] Markdown escaping for LLM text in rendered link titles / analysis table cells
+      (newlines, `]`, `|` corrupt index links and tables)
+- [ ] Entity/speaker slug collisions and empty slugs (uniquify with `-2` suffix;
+      hash fallback for punctuation-only surfaces)
+- [ ] Speaker rollup queries unbounded (push pagination/caps into Cypher)
+- [ ] Exporting a never-applied lens passes the guard vacuously → give it a clear
+      422 "lens never applied" instead of a near-empty bundle
+- [ ] Exports route does sync file IO (rmtree/write/zip) on the event loop
+- [ ] Offsets-invariant-with-front-matter test parametrized for the FLAT path
+- [ ] Rollup substring name-filter behavioral test with non-empty data;
+      renderer item_path/title derivation DRY-up; bundler rmtree→write window
+      not atomic on OS/IO failure (consider temp-dir + rename staging)
+
+**Feature deferrals (each waits for a real need or its milestone):**
+- [ ] Persona lens — second lens, proves zero-per-lens-code for real (YAML + prompts)
+- [ ] Lens apply via ingest flag / API endpoint
+- [ ] Same-version `--force` full re-extraction (needs an item-clearing event;
+      CLI documents the limitation)
+- [ ] GraphRAG retrieval (next after Layer 4 — borrow `neo4j-graphrag-python`
+      retrievers only, never its construction pipeline)
+- [ ] Corpus-level / multi-interview OKF bundles; incremental/diff exports;
+      importing arbitrary OKF bundles (ingest reads front matter only)
+- [ ] Layer-1 leftovers: `OVERLAPS` edges; `StitchCorrected` as a distinct event;
+      LLM-based window reconciliation; live-LLM golden evaluation for prompt tuning
+
 ### Post-M3.0 Cleanup ✅ DONE
 - [x] Remove 27 legacy tests (test_neo4j_analysis_writer_legacy.py)
 - [x] Remove deprecated Neo4jMapStorage direct write code
