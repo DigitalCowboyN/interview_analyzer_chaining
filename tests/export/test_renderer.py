@@ -1,3 +1,4 @@
+import pytest
 import yaml
 
 from src.export.renderer import item_dir, item_filename, render_bundle, slugify
@@ -92,6 +93,35 @@ def test_index_covers_interview_transcript_and_analysis():
 def test_frontmatter_survives_embedded_delimiter_line():
     lens = load_lens("meeting_minutes")
     tricky_text = "line one\n---\nline two"
+    items = [{
+        "item_id": "8888888812345678", "node_type": "Decision", "lens_version": 1,
+        "confidence": 0.9, "model": "haiku", "provider": "anthropic", "locked": False,
+        "props": {"item_id": "8888888812345678", "lens": "meeting_minutes", "node_type": "Decision",
+                  "text": tricky_text, "made_by": "Alice", "confidence": 0.9},
+        "speaker_links": [{"relationship": "DECIDED_BY", "speaker_id": "sp1", "display_name": "Alice Johnson"}],
+        "supporting_fragment_ids": ["f1"],
+    }]
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, items, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    content = files["decisions/decision-88888888.md"]
+    fm = yaml.safe_load(content.split("---\n")[1])
+    assert fm["description"] == tricky_text
+
+
+@pytest.mark.parametrize(
+    "tricky_text",
+    [
+        "---\nleading dash line",     # bare --- as the first line
+        "starts with ---\nrest",      # --- at start of first line's content
+        "Some decision text\n---",    # bare --- as the last line
+    ],
+    ids=["leading-line", "start-of-line", "trailing-line"],
+)
+def test_frontmatter_survives_delimiter_at_scalar_boundary(tricky_text):
+    """Line-anchored detection missed cases where '---' shares a physical line
+    with a folded/quoted scalar's opening or closing quote. These are the
+    reproduced bypass variants; the substring-based check must catch all."""
+    lens = load_lens("meeting_minutes")
     items = [{
         "item_id": "8888888812345678", "node_type": "Decision", "lens_version": 1,
         "confidence": 0.9, "model": "haiku", "provider": "anthropic", "locked": False,

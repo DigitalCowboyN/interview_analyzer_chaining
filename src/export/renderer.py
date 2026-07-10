@@ -34,13 +34,6 @@ def item_filename(node_type: str, item_id: str) -> str:
     return f"{_kebab(node_type)}-{item_id[:8]}.md"
 
 
-# Matches a bare "---" delimiter line, and also PyYAML's folded/quoted
-# continuation of one (e.g. "  ---" inside a folded scalar) -- both collide
-# with the "---\n" convention that consumers (including our own tests) split
-# frontmatter on, since that split matches the substring anywhere in the text.
-_BARE_DELIMITER_RE = re.compile(r"^[ \t]*---[ \t]*$", re.MULTILINE)
-
-
 _ID_FIELDS = {"id", "item_id"}
 
 
@@ -59,11 +52,16 @@ def _coerce_scalar(key: str, value: Any) -> Any:
 def _frontmatter(fields: Dict[str, Any]) -> str:
     clean = {k: _coerce_scalar(k, v) for k, v in fields.items() if v is not None}
     dumped = yaml.safe_dump(clean, sort_keys=False, allow_unicode=True)
-    if _BARE_DELIMITER_RE.search(dumped):
-        # A scalar contains a line that is exactly "---", which would be
-        # indistinguishable from the frontmatter delimiter to any consumer
-        # that splits on "---\n" lines. Force every scalar onto a single
-        # quoted line so no bare delimiter can survive.
+    if "---" in dumped:
+        # Line-anchored detection of a bare "---" delimiter line has provable
+        # bypasses: a scalar's folded/quoted rendering can put "---" flush
+        # against an opening or closing quote on the same physical line (e.g.
+        # text starting or ending with "---"), so no single-line regex catches
+        # every case. A plain substring check over-triggers instead -- that's
+        # safe, since the fallback quoted re-dump only makes the output
+        # uglier (every scalar becomes one line, escaped), and forcing that
+        # style whenever "---" appears anywhere guarantees no physical line
+        # can ever equal the delimiter.
         dumped = yaml.safe_dump(
             clean, sort_keys=False, allow_unicode=True, default_style='"', width=float("inf")
         )
