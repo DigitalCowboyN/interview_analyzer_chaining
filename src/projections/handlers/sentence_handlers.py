@@ -41,6 +41,10 @@ class SentenceCreatedHandler(BaseProjectionHandler):
         // This allows both direct writes and projection writes to coexist
         MERGE (s:Sentence {sentence_id: $sentence_id})
 
+        // Dual-label with :Fragment (M4.5 rename). Applied unconditionally, before
+        // the version guard below, so it lands even on replays of older events.
+        SET s:Fragment
+
         // Only update if event version is newer (or not set)
         // This ensures projection service doesn't overwrite newer data
         WITH s, i
