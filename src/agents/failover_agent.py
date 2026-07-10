@@ -104,4 +104,14 @@ def get_failover_agent(config_dict: Optional[Dict[str, Any]] = None) -> Failover
     chain = cfg.get("llm", {}).get("chain")
     if not chain:
         chain = [cfg.get("llm", {}).get("provider", "anthropic")]
-    return FailoverAgent([AgentFactory.create_agent(name) for name in chain])
+    providers = []
+    for name in chain:
+        try:
+            providers.append(AgentFactory.create_agent(name))
+        except Exception as exc:
+            logger.warning(
+                f"Provider {name!r} unavailable at construction ({exc}); skipping"
+            )
+    if not providers:
+        raise ValueError(f"No usable LLM provider in chain {chain!r}")
+    return FailoverAgent(providers)

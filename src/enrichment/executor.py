@@ -92,6 +92,8 @@ class EnrichmentExecutor:
     async def _enrich_fragment(
         self, frag: FragmentView, context: Dict[str, str]
     ) -> FragmentEnrichment:
+        # out.provider reflects the LAST successful call's provider; when calls
+        # span multiple providers, flags["mixed_providers"] lists them all.
         out = FragmentEnrichment(index=frag.index)
         # return_exceptions=True so a single provider error (timeout, exhausted
         # chain) flags that one dimension instead of failing the whole fragment.
@@ -99,12 +101,14 @@ class EnrichmentExecutor:
             *(self._run_spec(spec, frag.text, context) for spec in self.fragment_specs),
             return_exceptions=True,
         )
+        providers_seen: set = set()
         for spec, call_result in zip(self.fragment_specs, results):
             if isinstance(call_result, BaseException):
                 logger.warning(f"{spec.name}: call failed ({type(call_result).__name__})")
                 out.flags[f"{spec.name}_call_error"] = type(call_result).__name__
                 continue
             out.provider, out.model = call_result.provider, call_result.model
+            providers_seen.add(call_result.provider)
             try:
                 parsed = spec.resolve_model().model_validate(call_result.data)
             except ValidationError as e:
@@ -121,6 +125,8 @@ class EnrichmentExecutor:
                 out.domain_keywords = data["domain_keywords"]
             elif spec.name == "entity_mentions":
                 out.entities = data["entities"]
+        if len(providers_seen) > 1:
+            out.flags["mixed_providers"] = ",".join(sorted(providers_seen))
         out.flags.update(
             syntax_flags(
                 frag.text,

@@ -51,10 +51,17 @@ async def _batch_ingest_enrich(input_dir: Path, map_dir: Path, project_id: str) 
     enrich = EnrichmentOrchestrator()
     files = sorted(input_dir.glob("*.txt"))
     logger.info(f"Batch processing {len(files)} transcript(s) from {input_dir}")
+    failures = []
     for file_path in files:
-        result = await ingest.ingest_file(file_path)
-        await enrich.enrich_interview(result.interview_id)
-        logger.info(f"Processed {file_path.name} -> interview {result.interview_id}")
+        try:
+            result = await ingest.ingest_file(file_path)
+            await enrich.enrich_interview(result.interview_id)
+            logger.info(f"Processed {file_path.name} -> interview {result.interview_id}")
+        except Exception as exc:
+            logger.error(f"Failed to process {file_path.name}: {exc}", exc_info=True)
+            failures.append(file_path.name)
+    if failures:
+        raise RuntimeError(f"{len(failures)} file(s) failed: {failures}")
 
 
 def main():

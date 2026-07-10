@@ -102,6 +102,25 @@ async def test_claim_extracted_raises_when_targets_missing():
         await handler.apply(tx, event)
 
 
+@pytest.mark.asyncio
+async def test_mentions_keyed_by_span_and_provider_materialized():
+    handler = EntitiesExtractedHandler()
+    tx = AsyncMock()
+    mock_write_counters(tx)
+    two_spans = [
+        {"text": "ECU", "entity_type": "product", "start": 0, "end": 3, "confidence": 0.9},
+        {"text": "ECU", "entity_type": "product", "start": 20, "end": 23, "confidence": 0.8},
+    ]
+    event = make_event(
+        "EntitiesExtracted", AggregateType.SENTENCE, F1,
+        {"interview_id": IID, "model": "haiku", "provider": "anthropic", "entities": two_spans},
+    )
+    await handler.apply(tx, event)
+    queries = [c.args[0] for c in tx.run.call_args_list]
+    assert any("entities_provider" in q for q in queries)
+    assert any("MENTIONS {start: ent.start, end: ent.end}" in q for q in queries)
+
+
 def test_new_event_types_in_bootstrap_and_allowlists():
     from src.projections.bootstrap import create_handler_registry
     from src.projections.config import get_all_allowed_event_types

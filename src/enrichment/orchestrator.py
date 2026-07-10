@@ -167,20 +167,23 @@ class EnrichmentOrchestrator:
             return entities_count, embeddings_count
 
         enrichments = await executor.enrich_fragments(fragment_views, contexts)
-        vectors = await embedder.embed([s.text for s in to_enrich])
         by_index = {s.index: s for s in to_enrich}
 
-        for enrichment, vector in zip(enrichments, vectors):
-            sentence = by_index[enrichment.index]
+        # Separate fully-failed fragments before spending embedding calls.
+        ok_enrichments = []
+        for enrichment in enrichments:
             if not enrichment.model:
-                # Every call for this fragment failed (total provider outage).
-                # Emit NOTHING so analysis_model stays None and the fragment is
-                # retried on the next run instead of being sealed as analyzed.
                 logger.warning(
                     f"Fragment {enrichment.index}: all extractor calls failed "
                     f"({list(enrichment.flags)}); leaving un-analyzed for retry"
                 )
-                continue
+            else:
+                ok_enrichments.append(enrichment)
+
+        vectors = await embedder.embed([by_index[e.index].text for e in ok_enrichments])
+
+        for enrichment, vector in zip(ok_enrichments, vectors):
+            sentence = by_index[enrichment.index]
             confidences = list(enrichment.dimension_confidences.values())
             mean_conf = sum(confidences) / len(confidences) if confidences else None
             sentence.generate_analysis(

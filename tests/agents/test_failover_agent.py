@@ -111,3 +111,35 @@ def test_factory_falls_back_to_single_provider():
         agent = get_failover_agent({"llm": {"provider": "anthropic"}})
     assert [c.args[0] for c in create.call_args_list] == ["anthropic"]
     assert len(agent.providers) == 1
+
+
+def test_factory_skips_unconstructible_providers():
+    from unittest.mock import patch
+
+    from src.agents.failover_agent import get_failover_agent
+
+    good = MagicMock()
+
+    def create(name):
+        if name == "anthropic":
+            raise ValueError("API key is not set.")
+        return good
+
+    with patch("src.agents.agent_factory.AgentFactory.create_agent", side_effect=create):
+        agent = get_failover_agent({"llm": {"chain": ["anthropic", "openai"]}})
+    assert agent.providers == [good]
+
+
+def test_factory_raises_when_no_provider_constructible():
+    from unittest.mock import patch
+
+    import pytest as _pytest
+
+    from src.agents.failover_agent import get_failover_agent
+
+    with patch(
+        "src.agents.agent_factory.AgentFactory.create_agent",
+        side_effect=ValueError("no key"),
+    ):
+        with _pytest.raises(ValueError, match="No usable LLM provider"):
+            get_failover_agent({"llm": {"chain": ["anthropic", "openai"]}})
