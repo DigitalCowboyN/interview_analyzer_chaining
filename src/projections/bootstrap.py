@@ -28,6 +28,11 @@ from src.projections.handlers.embedding_handlers import (
     UtteranceEmbeddingGeneratedHandler,
 )
 from src.projections.handlers.entity_handlers import EntitiesExtractedHandler
+from src.projections.handlers.lens_handlers import (
+    LensAppliedHandler,
+    LensExtractionGeneratedHandler,
+    LensExtractionOverriddenHandler,
+)
 from src.projections.handlers.utterance_handlers import (
     InterruptionRecordedHandler,
     StitchRemovedHandler,
@@ -85,6 +90,13 @@ def create_handler_registry(
     registry.register("EmbeddingGenerated", EmbeddingGeneratedHandler(parked_events_manager))
     registry.register(
         "UtteranceEmbeddingGenerated", UtteranceEmbeddingGeneratedHandler(parked_events_manager)
+    )
+
+    # Register lens handlers (Layer 3) — generic across all lenses
+    registry.register("LensApplied", LensAppliedHandler(parked_events_manager))
+    registry.register("LensExtractionGenerated", LensExtractionGeneratedHandler(parked_events_manager))
+    registry.register(
+        "LensExtractionOverridden", LensExtractionOverriddenHandler(parked_events_manager)
     )
 
     registered_types = registry.get_registered_types()

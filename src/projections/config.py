@@ -59,6 +59,10 @@ SUBSCRIPTION_CONFIG: Dict[str, Dict] = {
             # Layer 2 (M4.2): enrichment
             "ClaimExtracted",
             "UtteranceEmbeddingGenerated",
+            # Layer 3 (M4.3): generic lens events
+            "LensApplied",
+            "LensExtractionGenerated",
+            "LensExtractionOverridden",
         ],
     },
     "sentence": {
