@@ -287,3 +287,27 @@ def test_render_entity_escapes_mention_text_pipe():
     # exactly the escaped pipe plus the two table-delimiter pipes on either
     # side of the cell should remain -- no raw pipe from the mention text
     assert row_line.count(" | ") == 2
+
+
+def test_slug_registry_uniquifies_and_hashes():
+    from src.export.renderer import _SlugRegistry
+
+    reg = _SlugRegistry()
+    assert reg.slug_for("ECU") == "ecu"
+    assert reg.slug_for("ecu") == "ecu-2"          # collision
+    assert reg.slug_for("ECU!") == "ecu-3"          # normalizes then collides
+    hashed = reg.slug_for("!!!")
+    assert hashed.startswith("x-") and len(hashed) == 10
+
+
+def test_bundle_entity_slug_collision_yields_two_files():
+    import copy
+
+    entities = copy.deepcopy(ENTITIES) + [
+        {"surface": "ECU", "entity_type": "product", "mentions": []}
+    ]  # ENTITIES already has surface "ecu"
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS,
+                               entities, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    entity_files = [p for p in files if p.startswith("entities/")]
+    assert len(entity_files) == 2 and len(set(entity_files)) == 2
