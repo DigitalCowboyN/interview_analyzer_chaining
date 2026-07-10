@@ -1,3 +1,5 @@
+import re
+
 import pytest
 import yaml
 
@@ -229,3 +231,59 @@ def test_index_link_labels_survive_hostile_item_text():
     # the link label must not contain raw newlines or unescaped brackets
     label_line = next(ln for ln in index.splitlines() if "decision-" in ln)
     assert "\n" not in label_line and "[now]" not in label_line
+
+
+def test_link_text_truncates_before_escaping_so_escapes_never_sever():
+    """Escape-then-truncate can cut a `\\[`/`\\]` pair in half, leaving a lone
+    trailing backslash that escapes the link's closing `]` and breaks the
+    markdown link. Truncating the raw text first (then escaping) guarantees
+    the escaped result never ends mid-escape, even if it slightly exceeds
+    `limit` afterward."""
+    from src.export.renderer import _link_text
+
+    value = "x" * 79 + "[" + "y" * 20
+    label = _link_text(value)
+
+    assert not label.endswith("\\")
+    # every bracket in the label must be escaped (no unescaped `[` or `]`)
+    unescaped = re.sub(r"\\[\[\]]", "", label)
+    assert "[" not in unescaped and "]" not in unescaped
+
+    # a real markdown link built from this label must stay well-formed:
+    # the label's own escaping must not consume the link's closing `]`.
+    link = f"[{label}](/f.md)"
+    assert link.endswith("(/f.md)")
+    before_paren = link[: link.rindex("](/f.md)") + 1]
+    assert not before_paren.endswith("\\]")
+
+
+def test_render_interview_escapes_participant_display_name():
+    import copy
+
+    header = copy.deepcopy(HEADER)
+    header["participants"] = [
+        {"handle": "Bob", "display_name": "Bob [Legal]", "provisional": False}
+    ]
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(header, TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    interview = files["interview.md"]
+    label_line = next(ln for ln in interview.splitlines() if "Bob" in ln)
+    assert "\\[Legal\\]" in label_line
+    assert "[Bob [Legal]]" not in label_line
+
+
+def test_render_entity_escapes_mention_text_pipe():
+    import copy
+
+    entities = copy.deepcopy(ENTITIES)
+    entities[0]["mentions"][0]["text"] = "ECU | ABS"
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS,
+                               entities, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    content = files["entities/ecu.md"]
+    row_line = next(ln for ln in content.splitlines() if "ECU" in ln)
+    assert "\\|" in row_line
+    # exactly the escaped pipe plus the two table-delimiter pipes on either
+    # side of the cell should remain -- no raw pipe from the mention text
+    assert row_line.count(" | ") == 2

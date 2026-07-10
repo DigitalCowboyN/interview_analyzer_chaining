@@ -98,10 +98,16 @@ def _speaker_slug(display_name: Optional[str], handle: Optional[str] = None) -> 
 
 
 def _link_text(value: str, limit: int = 80) -> str:
-    """LLM/graph text used as a markdown link label: one line, brackets escaped."""
+    """LLM/graph text used as a markdown link label: one line, brackets escaped.
+
+    Truncates the raw text first, then escapes -- escaping first and
+    truncating second can sever a `\\[`/`\\]` pair at the boundary, leaving a
+    lone trailing backslash that escapes the link's closing `]` and breaks
+    the markdown link. The escaped result may run slightly past `limit`;
+    well-formedness beats exact length.
+    """
     collapsed = re.sub(r"\s+", " ", str(value)).strip()
-    escaped = collapsed.replace("[", "\\[").replace("]", "\\]")
-    return escaped[:limit]
+    return collapsed[:limit].replace("[", "\\[").replace("]", "\\]")
 
 
 def _cell(value: Any) -> str:
@@ -130,7 +136,7 @@ def _render_interview(header: Dict[str, Any]) -> Tuple[str, str]:
     for p in header.get("participants") or []:
         marker = " (provisional)" if p.get("provisional") else ""
         slug = _speaker_slug(p.get("display_name"), p.get("handle"))
-        lines.append(f"- [{p.get('display_name')}](/speakers/{slug}.md){marker}")
+        lines.append(f"- [{_link_text(p.get('display_name'))}](/speakers/{slug}.md){marker}")
     return "interview.md", "\n".join(lines) + "\n"
 
 
@@ -364,7 +370,7 @@ def _render_entity(entity: Dict[str, Any], anchors: Dict[str, str]) -> Tuple[str
     for mention in entity.get("mentions") or []:
         anchor = anchors.get(mention.get("sentence_id"))
         location = f"[{anchor}](/transcript.md#{anchor})" if anchor else ""
-        lines.append(f"| {mention.get('text')} | {mention.get('confidence')} | {location} |")
+        lines.append(f"| {_cell(mention.get('text'))} | {mention.get('confidence')} | {location} |")
     return f"entities/{slug}.md", "\n".join(lines) + "\n"
 
 
