@@ -6,7 +6,7 @@ omitted dimension plus a review flag; they never fail the run.
 """
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -40,6 +40,15 @@ class FragmentEnrichment(BaseModel):
     model: str = ""
 
 
+class SpecOutcome(BaseModel):
+    """Result of one focused spec call: validated data or a flag, never a raise."""
+
+    data: Optional[Dict[str, Any]] = None
+    flags: Dict[str, str] = Field(default_factory=dict)
+    provider: str = ""
+    model: str = ""
+
+
 class UtteranceEnrichment(BaseModel):
     utterance_id: str
     claims: List[Dict[str, Any]] = Field(default_factory=list)
@@ -60,6 +69,7 @@ class EnrichmentExecutor:
         self.agent = agent
         self.fragment_specs = [s for s in specs if s.scope == "fragment"]
         self.utterance_specs = [s for s in specs if s.scope == "utterance"]
+        self.document_specs = [s for s in specs if s.scope == "document"]
         self.prompts = prompts
         self.domain_keywords = domain_keywords
         self.semaphore = asyncio.Semaphore(concurrency)
@@ -79,6 +89,31 @@ class EnrichmentExecutor:
             schema = spec.resolve_model().model_json_schema()
             return await self.agent.call(prompt, schema=schema)
 
+    async def run_spec_on_text(
+        self, spec: ExtractorSpec, text: str, context: Optional[Dict[str, str]] = None
+    ) -> SpecOutcome:
+        """One focused, schema-enforced call for one spec over one text unit.
+
+        Call errors and invalid responses degrade to flags on the outcome
+        (`<name>_call_error` / `<name>_invalid_response`); this never raises.
+        """
+        outcome = SpecOutcome()
+        try:
+            call_result = await self._run_spec(spec, text, context or {})
+        except Exception as exc:
+            logger.warning(f"{spec.name}: call failed ({type(exc).__name__})")
+            outcome.flags[f"{spec.name}_call_error"] = type(exc).__name__
+            return outcome
+        outcome.provider, outcome.model = call_result.provider, call_result.model
+        try:
+            parsed = spec.resolve_model().model_validate(call_result.data)
+        except ValidationError as e:
+            logger.warning(f"{spec.name}: invalid response ({e.error_count()} errors)")
+            outcome.flags[f"{spec.name}_invalid_response"] = "validation failed"
+            return outcome
+        outcome.data = parsed.model_dump()
+        return outcome
+
     async def enrich_fragments(
         self, fragments: List[FragmentView], contexts: List[Dict[str, str]]
     ) -> List[FragmentEnrichment]:
@@ -95,27 +130,20 @@ class EnrichmentExecutor:
         # out.provider reflects the LAST successful call's provider; when calls
         # span multiple providers, flags["mixed_providers"] lists them all.
         out = FragmentEnrichment(index=frag.index)
-        # return_exceptions=True so a single provider error (timeout, exhausted
-        # chain) flags that one dimension instead of failing the whole fragment.
-        results = await asyncio.gather(
-            *(self._run_spec(spec, frag.text, context) for spec in self.fragment_specs),
-            return_exceptions=True,
+        # run_spec_on_text degrades errors to flags, so one provider failure
+        # loses that dimension, never the whole fragment.
+        outcomes = await asyncio.gather(
+            *(self.run_spec_on_text(spec, frag.text, context) for spec in self.fragment_specs)
         )
         providers_seen: set = set()
-        for spec, call_result in zip(self.fragment_specs, results):
-            if isinstance(call_result, BaseException):
-                logger.warning(f"{spec.name}: call failed ({type(call_result).__name__})")
-                out.flags[f"{spec.name}_call_error"] = type(call_result).__name__
+        for spec, outcome in zip(self.fragment_specs, outcomes):
+            out.flags.update(outcome.flags)
+            if outcome.provider:
+                out.provider, out.model = outcome.provider, outcome.model
+                providers_seen.add(outcome.provider)
+            if outcome.data is None:
                 continue
-            out.provider, out.model = call_result.provider, call_result.model
-            providers_seen.add(call_result.provider)
-            try:
-                parsed = spec.resolve_model().model_validate(call_result.data)
-            except ValidationError as e:
-                logger.warning(f"{spec.name}: invalid response ({e.error_count()} errors)")
-                out.flags[f"{spec.name}_invalid_response"] = "validation failed"
-                continue
-            data = parsed.model_dump()
+            data = outcome.data
             if spec.name in _CLASSIFICATION_KEYS:
                 out.classification[spec.name] = data[_CLASSIFICATION_KEYS[spec.name]]
                 out.dimension_confidences[spec.name] = data["confidence"]
@@ -142,22 +170,14 @@ class EnrichmentExecutor:
         async def one(uid: str, text: str) -> UtteranceEnrichment:
             out = UtteranceEnrichment(utterance_id=uid)
             for spec in self.utterance_specs:
-                try:
-                    call_result = await self._run_spec(spec, text, {})
-                except Exception as exc:
-                    # Same isolation policy as the fragment path: one exhausted
-                    # chain flags this utterance's dimension, never aborts the run.
-                    logger.warning(f"{spec.name}: call failed for utterance {uid} ({type(exc).__name__})")
-                    out.flags[f"{spec.name}_call_error"] = type(exc).__name__
-                    continue
-                out.provider, out.model = call_result.provider, call_result.model
-                try:
-                    parsed = spec.resolve_model().model_validate(call_result.data)
-                except ValidationError:
-                    logger.warning(f"{spec.name}: invalid response for utterance {uid}")
-                    out.flags[f"{spec.name}_invalid_response"] = "validation failed"
-                    continue
-                out.claims.extend(parsed.model_dump()["claims"])
+                # Same isolation policy as the fragment path: one exhausted
+                # chain flags this utterance's dimension, never aborts the run.
+                outcome = await self.run_spec_on_text(spec, text, {})
+                out.flags.update(outcome.flags)
+                if outcome.provider:
+                    out.provider, out.model = outcome.provider, outcome.model
+                if outcome.data is not None:
+                    out.claims.extend(outcome.data["claims"])
             return out
 
         return list(

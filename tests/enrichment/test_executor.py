@@ -176,3 +176,55 @@ async def test_provider_call_error_flags_one_dimension_not_fatal():
     assert "purpose" not in results[0].classification
     assert "purpose_call_error" in results[0].flags
     assert results[0].classification["function_type"] == "interrogative"  # others survived
+
+
+@pytest.mark.asyncio
+async def test_run_spec_on_text_returns_validated_outcome():
+    from src.enrichment.models import ExtractorSpec
+
+    executor = make_executor(make_agent())
+    spec = ExtractorSpec(
+        name="purpose",
+        prompt_key="purpose",
+        response_model="PurposeResult",
+        context_needs=["observer_context"],
+        scope="fragment",
+    )
+    outcome = await executor.run_spec_on_text(spec, "Can you hear me?", {"observer_context": "c"})
+    assert outcome.data == {"purpose": "Query", "confidence": 0.85}
+    assert outcome.provider == "anthropic"
+    assert outcome.flags == {}
+
+
+@pytest.mark.asyncio
+async def test_run_spec_on_text_flags_call_error():
+    from src.enrichment.models import ExtractorSpec
+
+    agent = MagicMock()
+    agent.call = AsyncMock(side_effect=RuntimeError("down"))
+    executor = make_executor(agent)
+    spec = ExtractorSpec(
+        name="purpose",
+        prompt_key="purpose",
+        response_model="PurposeResult",
+        context_needs=["observer_context"],
+        scope="fragment",
+    )
+    outcome = await executor.run_spec_on_text(spec, "text")
+    assert outcome.data is None
+    assert outcome.flags == {"purpose_call_error": "RuntimeError"}
+
+
+def test_document_scope_specs_split():
+    from src.enrichment.models import ExtractorSpec
+
+    specs = ExtractorRegistry.load("config/extractors.yaml")
+    specs.append(
+        ExtractorSpec(
+            name="objectives", prompt_key="purpose", response_model="PurposeResult", scope="document"
+        )
+    )
+    executor = EnrichmentExecutor(
+        MagicMock(), specs, load_yaml("prompts/core_extractors.yaml"), domain_keywords=[], concurrency=2
+    )
+    assert [s.name for s in executor.document_specs] == ["objectives"]
