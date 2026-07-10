@@ -118,20 +118,25 @@ def _speaker_slug(
     *,
     registry: "_SlugRegistry",
     speaker_slugs: Dict[str, str],
+    speaker_id: Optional[str] = None,
 ) -> str:
     """Slug for a speaker identity, resolved through the bundle-wide registry.
 
-    Every call site identifies a speaker the same way (display_name, falling
-    back to handle, falling back to "unknown"); caching on that identity
-    means a speaker referenced from the transcript, a lens item, a claim, and
-    the speaker file itself all resolve to the one slug the file actually
-    got, instead of each call minting its own via the registry.
+    Cached by speaker_id when the caller has one -- that's the only thing
+    that reliably distinguishes two speakers, since their display_name/handle
+    may be identical or both absent (e.g. two anonymous speakers both reduce
+    to "unknown"). Falling back to the identity string only applies when no
+    speaker_id is available at all. Every call site that resolves a speaker
+    link (transcript participants, lens items, claims, grounding
+    attributions, the speaker file itself) passes the speaker_id it knows so
+    they all agree on the one slug that speaker's file actually got.
     """
     identity = display_name or handle or "unknown"
-    slug = speaker_slugs.get(identity)
+    cache_key = speaker_id if speaker_id is not None else identity
+    slug = speaker_slugs.get(cache_key)
     if slug is None:
         slug = registry.slug_for(identity)
-        speaker_slugs[identity] = slug
+        speaker_slugs[cache_key] = slug
     return slug
 
 
@@ -175,7 +180,10 @@ def _render_interview(
     lines.append("## Participants")
     for p in header.get("participants") or []:
         marker = " (provisional)" if p.get("provisional") else ""
-        slug = _speaker_slug(p.get("display_name"), p.get("handle"), registry=registry, speaker_slugs=speaker_slugs)
+        slug = _speaker_slug(
+            p.get("display_name"), p.get("handle"),
+            registry=registry, speaker_slugs=speaker_slugs, speaker_id=p.get("speaker_id"),
+        )
         lines.append(f"- [{_link_text(p.get('display_name'))}](/speakers/{slug}.md){marker}")
     return "interview.md", "\n".join(lines) + "\n"
 
@@ -238,7 +246,8 @@ def _render_speaker(
     speaker_slugs: Dict[str, str],
 ) -> Tuple[str, str]:
     slug = _speaker_slug(
-        speaker.get("display_name"), speaker.get("handle"), registry=registry, speaker_slugs=speaker_slugs
+        speaker.get("display_name"), speaker.get("handle"),
+        registry=registry, speaker_slugs=speaker_slugs, speaker_id=speaker.get("speaker_id"),
     )
     fm = {
         "type": "Speaker",
@@ -261,6 +270,8 @@ def _grounding_lines(
     fallback_speaker: str,
     registry: "_SlugRegistry",
     speaker_slugs: Dict[str, str],
+    sentence_speaker_id: Optional[Dict[str, str]] = None,
+    fallback_speaker_id: Optional[str] = None,
 ) -> List[str]:
     lines = ["## Grounding"]
     for sid in supporting_fragment_ids or []:
@@ -269,7 +280,8 @@ def _grounding_lines(
             continue
         text = sentence_text.get(sid)
         speaker_display = sentence_speaker.get(sid) or fallback_speaker
-        speaker_slug = _speaker_slug(speaker_display, registry=registry, speaker_slugs=speaker_slugs)
+        sp_id = (sentence_speaker_id or {}).get(sid) or fallback_speaker_id
+        speaker_slug = _speaker_slug(speaker_display, registry=registry, speaker_slugs=speaker_slugs, speaker_id=sp_id)
         link = (
             f"[{_link_text(speaker_display)}](/speakers/{speaker_slug}.md), "
             f"[{anchor}](/transcript.md#{anchor})"
@@ -292,6 +304,7 @@ def _render_lens_item(
     anchors: Dict[str, str],
     registry: "_SlugRegistry",
     speaker_slugs: Dict[str, str],
+    sentence_speaker_id: Optional[Dict[str, str]] = None,
 ) -> Tuple[str, str]:
     node_type = item["node_type"]
     item_id = item["item_id"]
@@ -333,12 +346,15 @@ def _render_lens_item(
         display = link.get("display_name")
         if not rel or not display:
             continue
-        sp_slug = _speaker_slug(display, registry=registry, speaker_slugs=speaker_slugs)
+        sp_slug = _speaker_slug(
+            display, registry=registry, speaker_slugs=speaker_slugs, speaker_id=link.get("speaker_id")
+        )
         lines.append(f"{rel}: [{_link_text(display)}](/speakers/{sp_slug}.md)")
     lines.append("")
 
     speaker_links = item.get("speaker_links") or []
     fallback_speaker = speaker_links[0].get("display_name") if speaker_links else "Unknown"
+    fallback_speaker_id = speaker_links[0].get("speaker_id") if speaker_links else None
 
     lines.extend(
         _grounding_lines(
@@ -349,6 +365,8 @@ def _render_lens_item(
             fallback_speaker,
             registry,
             speaker_slugs,
+            sentence_speaker_id,
+            fallback_speaker_id,
         )
     )
 
@@ -363,6 +381,7 @@ def _render_claim(
     anchors: Dict[str, str],
     registry: "_SlugRegistry",
     speaker_slugs: Dict[str, str],
+    sentence_speaker_id: Optional[Dict[str, str]] = None,
 ) -> Tuple[str, str]:
     claim_id = claim["claim_id"]
     text = claim.get("text")
@@ -386,10 +405,13 @@ def _render_claim(
         lines.append("")
 
     speaker_display = claim.get("speaker") or "Unknown"
-    speaker_slug = _speaker_slug(speaker_display, registry=registry, speaker_slugs=speaker_slugs)
+    claim_speaker_id = claim.get("speaker_id")
+    speaker_slug = _speaker_slug(
+        speaker_display, registry=registry, speaker_slugs=speaker_slugs, speaker_id=claim_speaker_id
+    )
 
     lines.append("## Relationships")
-    if claim.get("speaker_id"):
+    if claim_speaker_id:
         lines.append(f"MADE_BY: [{_link_text(speaker_display)}](/speakers/{speaker_slug}.md)")
     lines.append("")
 
@@ -402,6 +424,8 @@ def _render_claim(
             speaker_display,
             registry,
             speaker_slugs,
+            sentence_speaker_id,
+            claim_speaker_id,
         )
     )
 
@@ -465,6 +489,7 @@ def render_bundle(
     anchors = _anchors(transcript)
     sentence_text = {row["sentence_id"]: row.get("text", "") for row in transcript}
     sentence_speaker = {row["sentence_id"]: row.get("speaker") for row in transcript}
+    sentence_speaker_id = {row["sentence_id"]: row.get("speaker_id") for row in transcript}
     speaker_by_id = {sp["speaker_id"]: sp for sp in speakers}
 
     # One registry for the whole bundle: speakers and entities share a slug
@@ -515,13 +540,16 @@ def render_bundle(
 
     for item, path, title in item_refs:
         _, content = _render_lens_item(
-            item, lens, exported_at, sentence_text, sentence_speaker, anchors, registry, speaker_slugs
+            item, lens, exported_at, sentence_text, sentence_speaker, anchors, registry, speaker_slugs,
+            sentence_speaker_id,
         )
         files.append((path, content))
         index_sections.setdefault(item_dir(item["node_type"]), []).append((path, title))
 
     for claim in claims:
-        path, content = _render_claim(claim, sentence_text, sentence_speaker, anchors, registry, speaker_slugs)
+        path, content = _render_claim(
+            claim, sentence_text, sentence_speaker, anchors, registry, speaker_slugs, sentence_speaker_id
+        )
         files.append((path, content))
         index_sections.setdefault("claims", []).append((path, claim.get("text") or claim["claim_id"]))
 

@@ -10,7 +10,7 @@ HEADER = {
     "interview_id": "iid-1", "title": "Q3 Vendor Selection", "source": "m.txt",
     "started_at": "2026-07-01T00:00:00", "project_id": "telemetry",
     "metadata": {"front_matter": {"participants": ["Alice Johnson"]}},
-    "participants": [{"handle": "Alice", "display_name": "Alice Johnson", "provisional": False}],
+    "participants": [{"speaker_id": "sp1", "handle": "Alice", "display_name": "Alice Johnson", "provisional": False}],
     "fragment_count": 2, "utterance_count": 1,
     "lens": "meeting_minutes", "lens_version": 1,
 }
@@ -311,3 +311,55 @@ def test_bundle_entity_slug_collision_yields_two_files():
                                entities, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
     entity_files = [p for p in files if p.startswith("entities/")]
     assert len(entity_files) == 2 and len(set(entity_files)) == 2
+
+
+def test_speaker_slug_keyed_by_id_not_identity_string():
+    """Two distinct speakers who both lack a display_name/handle (both reduce
+    to identity string "unknown") must not collapse onto one cache entry: each
+    speaker_id gets its own registry slug, its own file, and claims by either
+    speaker must link to that speaker's own file -- not overwrite it."""
+    header = {
+        "interview_id": "iid-2", "title": "Anon Session", "source": "m.txt",
+        "started_at": "2026-07-01T00:00:00", "project_id": "telemetry",
+        "metadata": {"front_matter": {}},
+        "participants": [],
+        "fragment_count": 2, "utterance_count": 1,
+        "lens": "meeting_minutes", "lens_version": 1,
+    }
+    transcript = [
+        {"sentence_id": "f1", "sequence_order": 0, "text": "First speaker line.",
+         "speaker_id": "spA", "speaker": None, "utterance_id": "u-a"},
+        {"sentence_id": "f2", "sequence_order": 1, "text": "Second speaker line.",
+         "speaker_id": "spB", "speaker": None, "utterance_id": "u-b"},
+    ]
+    speakers = [
+        {"speaker_id": "spA", "handle": None, "display_name": None, "provisional": False},
+        {"speaker_id": "spB", "handle": None, "display_name": None, "provisional": False},
+    ]
+    claims = [
+        {"claim_id": "cB", "text": "Second speaker's claim", "kind": "commitment",
+         "confidence": 0.8, "model": "haiku", "provider": "anthropic", "speaker_id": "spB",
+         "speaker": None, "supporting_fragment_ids": ["f2"]},
+    ]
+    lens = load_lens("meeting_minutes")
+    files_list = render_bundle(
+        header, transcript, speakers, [], claims, [], [], lens, exported_at="2026-07-10T12:00:00+00:00"
+    )
+    files = dict(files_list)
+
+    # No path collisions anywhere in the bundle.
+    assert len(files_list) == len(files)
+
+    # Both anonymous speakers get their own file.
+    assert "speakers/unknown.md" in files
+    assert "speakers/unknown-2.md" in files
+
+    # spA's file must actually belong to spA (id in frontmatter), likewise spB.
+    fm_a = yaml.safe_load(files["speakers/unknown.md"].split("---\n")[1])
+    fm_b = yaml.safe_load(files["speakers/unknown-2.md"].split("---\n")[1])
+    assert {fm_a["id"], fm_b["id"]} == {"spA", "spB"}
+
+    # The claim (made by spB) links to spB's own file, whichever slug that is.
+    claim_content = files["claims/claim-cB.md"]
+    slug_for_b = "unknown" if fm_a["id"] == "spB" else "unknown-2"
+    assert f"MADE_BY: [Unknown](/speakers/{slug_for_b}.md)" in claim_content
