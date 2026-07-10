@@ -97,6 +97,104 @@ async def entity_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     return [dict(r) async for r in result]
 
 
+async def worklist_rows(
+    session,
+    project_id: Optional[str] = None,
+    threshold: float = 0.7,
+    limit: int = 50,
+    offset: int = 0,
+) -> Dict[str, List[Dict[str, Any]]]:
+    lens_item_query = """
+    MATCH (n:LensItem)
+    WHERE ($project_id IS NULL OR EXISTS {
+        MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
+              (:Interview {interview_id: n.interview_id}) })
+      AND (n.confidence < $threshold
+           OR any(k IN keys(n) WHERE k ENDS WITH '_unresolved'))
+    RETURN n.interview_id AS interview_id, n.item_id AS item_id,
+           n.node_type AS node_type, n.lens AS lens, n.confidence AS confidence,
+           CASE WHEN n.confidence < $threshold THEN 'low_confidence'
+                ELSE 'unresolved_reference' END AS reason
+    ORDER BY n.confidence ASC SKIP $offset LIMIT $limit
+    """
+    claim_query = """
+    MATCH (c:Claim)
+    WHERE ($project_id IS NULL OR EXISTS {
+        MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
+              (:Interview {interview_id: c.interview_id}) })
+      AND c.confidence < $threshold
+    RETURN c.interview_id AS interview_id, c.claim_id AS claim_id,
+           c.text AS text, c.kind AS kind, c.confidence AS confidence,
+           'low_confidence' AS reason
+    ORDER BY c.confidence ASC SKIP $offset LIMIT $limit
+    """
+    lens_result = await session.run(
+        lens_item_query, project_id=project_id, threshold=threshold,
+        offset=offset, limit=limit,
+    )
+    lens_items = [dict(r) async for r in lens_result]
+    claim_result = await session.run(
+        claim_query, project_id=project_id, threshold=threshold,
+        offset=offset, limit=limit,
+    )
+    claims = [dict(r) async for r in claim_result]
+    return {"lens_items": lens_items, "claims": claims}
+
+
+def _group_rollup_row(groups: Dict[str, Dict[str, Any]], display_name: str) -> Dict[str, Any]:
+    return groups.setdefault(
+        display_name, {"display_name": display_name, "items": [], "claims": []}
+    )
+
+
+async def speaker_rollup_rows(
+    session,
+    project_id: Optional[str] = None,
+    name: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
+    items_query = """
+    MATCH (n:LensItem)-[r]->(sp:Speaker)
+    WHERE sp.merged_into IS NULL AND type(r) <> 'SUPPORTED_BY'
+      AND ($project_id IS NULL OR EXISTS {
+        MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
+              (:Interview {interview_id: n.interview_id}) })
+    RETURN sp.display_name AS display_name, n.node_type AS node_type,
+           type(r) AS relationship, n.text AS text,
+           n.interview_id AS interview_id, n.item_id AS item_id
+    """
+    claims_query = """
+    MATCH (c:Claim)-[:MADE_BY]->(sp:Speaker)
+    WHERE sp.merged_into IS NULL
+      AND ($project_id IS NULL OR EXISTS {
+        MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
+              (:Interview {interview_id: c.interview_id}) })
+    RETURN sp.display_name AS display_name, c.text AS text, c.kind AS kind,
+           c.interview_id AS interview_id, c.claim_id AS claim_id
+    """
+    groups: Dict[str, Dict[str, Any]] = {}
+
+    items_result = await session.run(items_query, project_id=project_id)
+    async for r in items_result:
+        row = dict(r)
+        display_name = row.pop("display_name")
+        _group_rollup_row(groups, display_name)["items"].append(row)
+
+    claims_result = await session.run(claims_query, project_id=project_id)
+    async for r in claims_result:
+        row = dict(r)
+        display_name = row.pop("display_name")
+        _group_rollup_row(groups, display_name)["claims"].append(row)
+
+    display_names = sorted(groups)
+    if name is not None:
+        needle = name.lower()
+        display_names = [dn for dn in display_names if needle in dn.lower()]
+    paginated = display_names[offset:offset + limit]
+    return [groups[dn] for dn in paginated]
+
+
 async def analysis_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     query = """
     MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)

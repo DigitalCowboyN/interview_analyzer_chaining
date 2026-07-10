@@ -49,3 +49,21 @@ async def test_analysis_rows_takes_latest_analysis():
     await reader.analysis_rows(session, IID)
     query = session.run.call_args[0][0]
     assert "HAS_ANALYSIS" in query and "created_at DESC" in query
+
+
+@pytest.mark.asyncio
+async def test_worklist_rows_filters_and_reasons():
+    session = make_session([])
+    result = await reader.worklist_rows(session, threshold=0.6)
+    assert set(result) == {"lens_items", "claims"}
+    lens_query = session.run.call_args_list[0][0][0]
+    assert "_unresolved" in lens_query and "confidence < $threshold" in lens_query
+
+
+@pytest.mark.asyncio
+async def test_rollup_groups_by_display_name():
+    session = make_session([])
+    rows = await reader.speaker_rollup_rows(session, name="Alice Johnson")
+    assert rows == []
+    query = session.run.call_args_list[0][0][0]
+    assert "display_name" in query and "merged_into IS NULL" in query
