@@ -19,13 +19,14 @@ class ExtractorSpec(BaseModel):
     name: str
     prompt_key: str
     response_model: str
+    response_module: str = "src.models.extractor_responses"
     context_needs: List[str] = Field(default_factory=list)
     scope: Literal["fragment", "utterance", "document"] = "fragment"
     enabled: bool = True
 
     def resolve_model(self) -> type:
-        """Resolve the response_model name against src.models.extractor_responses."""
-        module = importlib.import_module("src.models.extractor_responses")
+        """Resolve the response_model name against response_module."""
+        module = importlib.import_module(self.response_module)
         model = getattr(module, self.response_model, None)
         if model is None:
             raise ValueError(f"Unknown response model: {self.response_model}")

@@ -135,6 +135,27 @@ async def test_invalid_utterance_response_flagged():
 
 
 @pytest.mark.asyncio
+async def test_mixed_providers_flagged():
+    calls = {"n": 0}
+
+    agent = MagicMock()
+
+    async def call(prompt, schema=None):
+        for key, marker in MARKERS.items():
+            if marker in prompt:
+                calls["n"] += 1
+                provider = "anthropic" if calls["n"] % 2 else "openai"
+                return CallResult(data=RESPONSES[key], provider=provider, model="m")
+        raise AssertionError
+
+    agent.call = AsyncMock(side_effect=call)
+    executor = make_executor(agent)
+    fragments = [FragmentView(index=0, text="Can you hear me?", speaker_handle="S1")]
+    results = await executor.enrich_fragments(fragments, [CONTEXT])
+    assert "mixed_providers" in results[0].flags
+
+
+@pytest.mark.asyncio
 async def test_provider_call_error_flags_one_dimension_not_fatal():
     from src.agents.failover_agent import CallResult
 
@@ -155,3 +176,55 @@ async def test_provider_call_error_flags_one_dimension_not_fatal():
     assert "purpose" not in results[0].classification
     assert "purpose_call_error" in results[0].flags
     assert results[0].classification["function_type"] == "interrogative"  # others survived
+
+
+@pytest.mark.asyncio
+async def test_run_spec_on_text_returns_validated_outcome():
+    from src.enrichment.models import ExtractorSpec
+
+    executor = make_executor(make_agent())
+    spec = ExtractorSpec(
+        name="purpose",
+        prompt_key="purpose",
+        response_model="PurposeResult",
+        context_needs=["observer_context"],
+        scope="fragment",
+    )
+    outcome = await executor.run_spec_on_text(spec, "Can you hear me?", {"observer_context": "c"})
+    assert outcome.data == {"purpose": "Query", "confidence": 0.85}
+    assert outcome.provider == "anthropic"
+    assert outcome.flags == {}
+
+
+@pytest.mark.asyncio
+async def test_run_spec_on_text_flags_call_error():
+    from src.enrichment.models import ExtractorSpec
+
+    agent = MagicMock()
+    agent.call = AsyncMock(side_effect=RuntimeError("down"))
+    executor = make_executor(agent)
+    spec = ExtractorSpec(
+        name="purpose",
+        prompt_key="purpose",
+        response_model="PurposeResult",
+        context_needs=["observer_context"],
+        scope="fragment",
+    )
+    outcome = await executor.run_spec_on_text(spec, "text")
+    assert outcome.data is None
+    assert outcome.flags == {"purpose_call_error": "RuntimeError"}
+
+
+def test_document_scope_specs_split():
+    from src.enrichment.models import ExtractorSpec
+
+    specs = ExtractorRegistry.load("config/extractors.yaml")
+    specs.append(
+        ExtractorSpec(
+            name="objectives", prompt_key="purpose", response_model="PurposeResult", scope="document"
+        )
+    )
+    executor = EnrichmentExecutor(
+        MagicMock(), specs, load_yaml("prompts/core_extractors.yaml"), domain_keywords=[], concurrency=2
+    )
+    assert [s.name for s in executor.document_specs] == ["objectives"]

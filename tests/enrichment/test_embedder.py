@@ -52,3 +52,31 @@ async def test_openai_embedder_calls_api():
     embedder.client.embeddings.create = AsyncMock(return_value=MagicMock(data=[item]))
     vectors = await embedder.embed(["hello"])
     assert vectors == [[0.1, 0.2, 0.3]]
+
+
+@pytest.mark.asyncio
+async def test_embedder_rejects_wrong_dim():
+    from src.enrichment.embedder import OpenAIEmbedder
+
+    embedder = OpenAIEmbedder.__new__(OpenAIEmbedder)
+    embedder.model_name = "text-embedding-3-small"
+    embedder.dim = 4  # API returns 3 -> mismatch
+    embedder.client = MagicMock()
+    item = MagicMock(embedding=[0.1, 0.2, 0.3])
+    embedder.client.embeddings.create = AsyncMock(return_value=MagicMock(data=[item]))
+    with pytest.raises(ValueError, match="dim"):
+        await embedder.embed(["hello"])
+
+
+@pytest.mark.asyncio
+async def test_openai_embedder_passes_dimensions_param():
+    from src.enrichment.embedder import OpenAIEmbedder
+
+    embedder = OpenAIEmbedder.__new__(OpenAIEmbedder)
+    embedder.model_name = "text-embedding-3-small"
+    embedder.dim = 3
+    embedder.client = MagicMock()
+    item = MagicMock(embedding=[0.1, 0.2, 0.3])
+    embedder.client.embeddings.create = AsyncMock(return_value=MagicMock(data=[item]))
+    await embedder.embed(["hello"])
+    assert embedder.client.embeddings.create.call_args.kwargs["dimensions"] == 3

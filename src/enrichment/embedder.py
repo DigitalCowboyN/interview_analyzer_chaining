@@ -25,6 +25,13 @@ def decode_vector(s: str) -> List[float]:
     return list(struct.unpack(f"<{len(raw) // 4}f", raw))
 
 
+def _validate_dims(vectors: List[List[float]], dim: int) -> None:
+    """A misconfigured embedding_dim would silently create a wrong-dim index."""
+    for v in vectors:
+        if len(v) != dim:
+            raise ValueError(f"Embedder returned dim {len(v)}, configured dim {dim}")
+
+
 class Embedder(Protocol):
     model_name: str
     dim: int
@@ -41,8 +48,12 @@ class OpenAIEmbedder:
         self.client = AsyncOpenAI(api_key=api_key)
 
     async def embed(self, texts: List[str]) -> List[List[float]]:
-        response = await self.client.embeddings.create(model=self.model_name, input=texts)
-        return [item.embedding for item in response.data]
+        response = await self.client.embeddings.create(
+            model=self.model_name, input=texts, dimensions=self.dim
+        )
+        vectors = [item.embedding for item in response.data]
+        _validate_dims(vectors, self.dim)
+        return vectors
 
 
 class LocalEmbedder:
@@ -60,8 +71,10 @@ class LocalEmbedder:
 
     async def embed(self, texts: List[str]) -> List[List[float]]:
         model = await asyncio.to_thread(self._load)
-        vectors = await asyncio.to_thread(model.encode, texts)
-        return [list(map(float, v)) for v in vectors]
+        raw = await asyncio.to_thread(model.encode, texts)
+        vectors = [list(map(float, v)) for v in raw]
+        _validate_dims(vectors, self.dim)
+        return vectors
 
 
 def get_embedder(config_dict: Optional[Dict[str, Any]] = None) -> Embedder:

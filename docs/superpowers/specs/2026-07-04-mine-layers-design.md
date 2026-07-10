@@ -228,6 +228,41 @@ First lens: **meeting_minutes** (exercises speakers hardest — action items nee
 owners). Second: **persona** (re-expresses the current UX taxonomy plus claims: pain
 points, goals, behaviors, notable quotes).
 
+### M4.3 design decisions (agreed 2026-07-09 — "Approach A: fully generic engine")
+
+- **One generic event, one generic handler, zero per-lens code.**
+  `LensExtractionGenerated` (Interview stream) carries
+  `{lens, lens_version, node_type, item_id, fields: {…}, supporting_fragment_ids,
+  confidence, model, provider}`. A single `LensExtractionHandler` MERGEs a node
+  labeled from `node_type` — **validated against the lens YAML's declared
+  `projects_to` set, never raw string interpolation from LLM output** — sets
+  `fields` as flat properties, links `SUPPORTED_BY` → fragments plus lens
+  metadata properties. Adding a lens = one YAML + prompts; no Python, no new
+  allowlist entries, no new handlers. (Typed per-node events were rejected:
+  they structurally defeat "new lens with zero code"; export-only lens outputs
+  were rejected: nothing queryable, nothing to correct.)
+- **Lens extractors are ordinary `ExtractorSpec`s** run by the M4.2 executor —
+  focused calls, own prompts/response models, scopes fragment/utterance/
+  **document** (document scope implemented in this milestone; objectives need
+  whole-transcript context).
+- **Declarative per-type mappings in the lens YAML** cover typed-projection
+  needs without code: e.g. `speaker_link: {field: owner, relationship: OWNED_BY}`
+  resolves an extracted owner handle/name to the interview's Speaker and links it.
+- **Deterministic item ids**: `uuid5(interview:lens:node_type:source_unit:ordinal)`.
+  Re-running a bumped `lens_version` supersedes prior items (old nodes for that
+  lens+interview replaced at projection); re-running the same version is
+  idempotent (skip existing ids).
+- **Corrections**: `LensExtractionOverridden` follows the Layer 1 lock pattern
+  (human edits to a lens item survive lens re-runs).
+- **Trigger surface v1 (owner decision): CLI only** — `python -m src.lens
+  <interview_id> <lens_name>`; ingest-flag and API endpoint deferred.
+- **Debt first (owner decision):** the M4.2-exit debt list (ROADMAP M4.2
+  section) is burned down as the opening tasks of the M4.3 plan, before lens
+  work begins.
+- meeting_minutes v1 extractors: `objectives` (document scope),
+  `decisions` + `action_items` (utterance scope, speaker-linked),
+  `followups` (utterance scope).
+
 ## Layer 4: Graph schema v2
 
 New projections; existing Sentence/Topic/Keyword nodes remain — fragments are the

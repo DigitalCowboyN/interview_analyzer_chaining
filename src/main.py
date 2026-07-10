@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from src.api.routers import analysis as analysis_router
 from src.api.routers import edits as edits_router
 from src.api.routers import files as files_router
+from src.api.routers import lenses as lenses_router
 from src.api.routers import speakers as speakers_router
 from src.config import config
 from src.utils.logger import get_logger
@@ -34,6 +35,7 @@ app.include_router(files_router.router)
 app.include_router(analysis_router.router)
 app.include_router(edits_router.router)
 app.include_router(speakers_router.router)
+app.include_router(lenses_router.router)
 
 
 @app.get("/", tags=["Health Check"])
@@ -51,10 +53,17 @@ async def _batch_ingest_enrich(input_dir: Path, map_dir: Path, project_id: str) 
     enrich = EnrichmentOrchestrator()
     files = sorted(input_dir.glob("*.txt"))
     logger.info(f"Batch processing {len(files)} transcript(s) from {input_dir}")
+    failures = []
     for file_path in files:
-        result = await ingest.ingest_file(file_path)
-        await enrich.enrich_interview(result.interview_id)
-        logger.info(f"Processed {file_path.name} -> interview {result.interview_id}")
+        try:
+            result = await ingest.ingest_file(file_path)
+            await enrich.enrich_interview(result.interview_id)
+            logger.info(f"Processed {file_path.name} -> interview {result.interview_id}")
+        except Exception as exc:
+            logger.error(f"Failed to process {file_path.name}: {exc}", exc_info=True)
+            failures.append(file_path.name)
+    if failures:
+        raise RuntimeError(f"{len(failures)} file(s) failed: {failures}")
 
 
 def main():

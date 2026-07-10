@@ -1,0 +1,73 @@
+objectives:
+  prompt: |
+    The full transcript of a meeting follows, speaker-labeled (labels like [S1]
+    identify who is talking). Extract the meeting's OBJECTIVES — what the
+    participants convened to accomplish — as short statements. An objective is
+    a purpose of the meeting itself ("review the Q3 roadmap", "decide on the
+    vendor"), not an outcome or a task that emerged from it.
+
+    Format: {{"objectives": [{{"text": "<the objective>", "confidence": <number between 0 and 1>}}]}}
+    If there are no discernible objectives, return {{"objectives": []}}.
+
+    Transcript:
+    """
+    {sentence}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+decisions:
+  prompt: |
+    The following is one speaker's complete utterance from a meeting.
+    Extract any DECISIONS it contains — a decision is a resolved choice or
+    commitment on behalf of the group ("we'll go with X", "let's not do Y").
+    Statements of opinion or open questions are NOT decisions.
+
+    If the utterance attributes the decision to a person by name or handle,
+    set made_by to that exact string; otherwise set made_by to null.
+
+    Format: {{"decisions": [{{"text": "<the decision>", "made_by": "<name or null>", "confidence": <number between 0 and 1>}}]}}
+    If there are no decisions, return {{"decisions": []}}.
+
+    Utterance:
+    """
+    {sentence}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+action_items:
+  prompt: |
+    The following is one speaker's complete utterance from a meeting.
+    Extract any ACTION ITEMS — concrete tasks someone is expected to do after
+    the meeting. Include the owner when stated or clearly implied (the speaker
+    volunteering counts: use their words like "I'll..." -> owner is the speaker,
+    set owner to "SELF"). Include a due reference if one is stated (verbatim,
+    e.g. "Friday", "next sprint"); otherwise null.
+
+    Format: {{"action_items": [{{"text": "<the task>", "owner": "<name, SELF, or null>", "due": "<text or null>", "confidence": <number between 0 and 1>}}]}}
+    If there are none, return {{"action_items": []}}.
+
+    Utterance:
+    """
+    {sentence}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+followups:
+  prompt: |
+    The following is one speaker's complete utterance from a meeting.
+    Extract any FOLLOW-UPS — topics explicitly deferred to a later
+    conversation ("let's take that offline", "we'll revisit this next week").
+    A follow-up defers discussion; it is not a concrete task with an owner.
+
+    Format: {{"followups": [{{"text": "<the deferred topic>", "confidence": <number between 0 and 1>}}]}}
+    If there are none, return {{"followups": []}}.
+
+    Utterance:
+    """
+    {sentence}
+    """
+
+    Provide your response explicitly formatted as JSON.

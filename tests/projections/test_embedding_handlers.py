@@ -82,3 +82,22 @@ async def test_utterance_embedding_raises_when_utterance_missing():
     )
     with pytest.raises(ValueError, match="no writes applied"):
         await handler.apply(tx, event)
+
+
+@pytest.mark.asyncio
+async def test_embedding_written_to_per_model_property():
+    handler = EmbeddingGeneratedHandler()
+    handler._ensured_models = {"text-embedding-3-small"}
+    tx = AsyncMock()
+    counters = MagicMock(nodes_created=0, properties_set=4, relationships_created=0)
+    tx.run.return_value.consume = AsyncMock(return_value=MagicMock(counters=counters))
+    event = EventEnvelope(
+        event_type="EmbeddingGenerated", aggregate_type=AggregateType.SENTENCE,
+        aggregate_id=F1, version=3,
+        data={"interview_id": IID, "model": "text-embedding-3-small", "dim": 3,
+              "vector_b64": encode_vector([0.1, 0.2, 0.3])},
+    )
+    await handler.apply(tx, event)
+    query = tx.run.call_args[0][0]
+    assert "embedding_text_embedding_3_small = $vector" in query  # per-model property
+    assert "s.embedding = $vector" in query  # convenience property kept

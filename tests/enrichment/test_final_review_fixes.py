@@ -24,6 +24,10 @@ def _assert_strict(schema: dict, path: str = "$"):
         assert props <= set(schema.get("required", [])), f"{path} has optional props"
     for name, sub in schema.get("$defs", {}).items():
         _assert_strict(sub, f"{path}.$defs.{name}")
+    for name, sub in schema.get("properties", {}).items():
+        _assert_strict(sub, f"{path}.properties.{name}")
+    if "items" in schema:
+        _assert_strict(schema["items"], f"{path}.items")
 
 
 def test_every_registered_schema_is_openai_strict_compliant():

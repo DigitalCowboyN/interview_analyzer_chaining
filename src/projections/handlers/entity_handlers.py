@@ -25,13 +25,15 @@ class EntitiesExtractedHandler(BaseProjectionHandler):
         guard_query = """
         MATCH (s:Sentence {aggregate_id: $aggregate_id})
         SET s.entities_extracted_at = datetime($occurred_at),
-            s.entities_model = $model
+            s.entities_model = $model,
+            s.entities_provider = $provider
         """
         result = await tx.run(
             guard_query,
             aggregate_id=event.aggregate_id,
             occurred_at=event.occurred_at.isoformat(),
             model=data.get("model"),
+            provider=data.get("provider"),
         )
         _raise_if_no_writes(await result.consume(), "EntitiesExtracted", event.aggregate_id)
 
@@ -42,9 +44,8 @@ class EntitiesExtractedHandler(BaseProjectionHandler):
         WITH DISTINCT s
         UNWIND $entities AS ent
         MERGE (e:Entity {surface: toLower(ent.text), entity_type: ent.entity_type})
-        MERGE (s)-[m:MENTIONS]->(e)
-        SET m.text = ent.text, m.start = ent.start, m.end = ent.end,
-            m.confidence = ent.confidence
+        MERGE (s)-[m:MENTIONS {start: ent.start, end: ent.end}]->(e)
+        SET m.text = ent.text, m.confidence = ent.confidence
         """
         await tx.run(
             edges_query,
