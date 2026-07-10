@@ -213,11 +213,9 @@
 - [ ] Semantic similarity search endpoints
 - [ ] Vector-based clustering for topics
 - [ ] Enhanced keyword/topic extraction
-- [ ] Rewrite 11 fault tolerance tests for EventStoreDB (`test_neo4j_fault_tolerance.py`)
 - [ ] Update 11 data integrity tests for eventual consistency (`test_neo4j_data_integrity.py`)
 
 **Dependencies:** M3.0 complete (neo4j 6.x required)
-**Skipped tests addressed:** 11 fault tolerance (rewrite for ESDB)
 
 ---
 
@@ -239,10 +237,8 @@
 - [ ] Upgrade redis 6.2.0 → 7.x
 - [ ] Upgrade isort 5.13.2 → 7.x
 - [ ] Re-establish performance baselines for M3.0 single-writer architecture
-- [ ] Unskip 7 performance benchmark tests (`test_neo4j_performance_benchmarks.py`)
 
 **Dependencies:** M3.0 complete
-**Skipped tests addressed:** 7 performance benchmarks (re-baseline for single-writer)
 
 ---
 
@@ -361,10 +357,11 @@
 - [x] Remove deprecated Neo4jAnalysisWriter direct write code
 - [x] Remove graph_persistence tests (14 tests)
 - [ ] Update 11 data integrity tests for eventual consistency (M3.1)
-- [ ] Rewrite 11 fault tolerance tests for EventStoreDB (M3.1)
-- [ ] Re-baseline 7 performance benchmark tests for single-writer (M3.3)
+- [x] Delete dead `src/io/` (legacy storage protocols/writers) and its tests (M4.3)
 
 ### Future Improvements (Unprioritized)
+- [ ] Rewrite fault-tolerance suite for EventStoreDB (legacy `test_neo4j_fault_tolerance.py` deleted in M4.3 — it imported the removed `src/io` modules; an ESDB-native rewrite is fresh work)
+- [ ] Re-baseline performance benchmarks for single-writer (legacy `test_neo4j_performance_benchmarks.py` deleted in M4.3 for the same reason)
 - [ ] Prometheus metrics exporter (currently in-memory)
 - [ ] WebSocket for real-time Neo4j updates
 - [ ] CLI tool for replaying parked events
@@ -378,7 +375,7 @@
 
 ## Skipped Tests Inventory
 
-**Total skipped: 15** (3 unit + 12 integration)
+**Total skipped: 3** (3 unit + 0 integration)
 
 ### Unit (3 skipped)
 
@@ -387,14 +384,9 @@
 | `test_helpers.py` (2 tests) | `openpyxl` not installed | N/A — optional dependency |
 | `test_text_processing.py` (1 test) | Import-time exception logging untestable without reload | N/A — test limitation |
 
-### Integration (12 skipped)
+### Integration (0 skipped)
 
-| Test File | Tests | Reason | Milestone |
-|-----------|-------|--------|-----------|
-| `test_neo4j_fault_tolerance.py` | 11 | M2.8: Neo4j fault tolerance irrelevant; ESDB is source of truth | **M3.1** |
-| `test_neo4j_performance_benchmarks.py` | 1 | `psutil` not installed for memory benchmark | N/A — optional dependency |
-
-**Note:** `test_neo4j_performance_benchmarks.py` has a module-level skip covering all 7 tests, but pytest only counts it as 1 skip in the summary. The 7 tests are tracked under M3.3 for re-baselining.
+The long-skipped legacy suites (`test_neo4j_fault_tolerance.py`, `test_neo4j_performance_benchmarks.py`) were deleted in M4.3 — they imported the removed `src/io` modules. ESDB-native rewrites are tracked under Future Improvements.
 
 ---
 

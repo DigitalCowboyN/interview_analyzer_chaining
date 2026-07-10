@@ -65,22 +65,6 @@ pipeline:
   num_analysis_workers: 10
   num_concurrent_files: 4
 
-classification:
-  local:
-    prompt_files:
-      no_context: "prompts/task_prompts.yaml"
-      with_context: "prompts/task_prompts.yaml"
-    confidence_threshold: 0.6
-    context_aggregation_method: "neighboring_sentences"
-  global:
-    prompt_file: "prompts/task_prompts.yaml"
-    confidence_threshold: 0.6
-    context_aggregation_method: "representative_sentences"
-    summary_sentence_count: 3
-  final:
-    final_weight_local: 0.6
-    final_weight_global: 0.4
-
 additional:
   use_weighted_context: true
   visualize_embeddings: true
