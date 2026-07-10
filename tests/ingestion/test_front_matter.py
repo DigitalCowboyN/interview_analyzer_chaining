@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from src.ingestion.front_matter import parse_front_matter
@@ -51,3 +53,23 @@ def test_normalize_without_front_matter_unchanged():
     assert transcript.front_matter is None
     for frag in transcript.fragments:
         assert text[frag.start_char:frag.end_char] == frag.text
+
+
+def test_unquoted_dates_are_normalized_to_json_safe_strings():
+    text = (
+        "---\n"
+        "title: Q3 Vendor Selection\n"
+        "date: 2026-07-01\n"
+        "milestones:\n"
+        "  - name: kickoff\n"
+        "    when: 2026-06-01\n"
+        "nested:\n"
+        "  reviewed: 2026-07-05\n"
+        "---\n"
+        "Alice: We will go with vendor X.\n"
+    )
+    fm, _ = parse_front_matter(text)
+    json.dumps(fm)  # must not raise TypeError
+    assert fm["date"] == "2026-07-01"
+    assert fm["milestones"][0]["when"] == "2026-06-01"
+    assert fm["nested"]["reviewed"] == "2026-07-05"
