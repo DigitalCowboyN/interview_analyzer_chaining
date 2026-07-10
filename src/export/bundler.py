@@ -1,0 +1,137 @@
+"""Bundle orchestration: guard -> read -> render (fully in memory) -> write."""
+
+import shutil
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel
+
+from src.events.repository import get_interview_repository
+from src.export import reader
+from src.export.renderer import render_bundle
+from src.lens.models import load_lens
+from src.utils.logger import get_logger
+from src.utils.neo4j_driver import Neo4jConnectionManager
+
+logger = get_logger()
+
+
+class ExportResult(BaseModel):
+    interview_id: str
+    lens: str
+    lens_version: int
+    bundle_path: str
+    files_written: int
+    items: int
+    claims: int
+    entities: int
+
+
+class OkfExporter:
+    def __init__(self, config_dict: Optional[Dict[str, Any]] = None):
+        from src.config import config as global_config
+
+        self.config = config_dict if config_dict is not None else global_config
+
+    async def export(
+        self, interview_id: str, lens_name: str,
+        out_dir: str = "exports", zip_bundle: bool = False,
+    ) -> ExportResult:
+        lens = load_lens(lens_name)
+        interview = await get_interview_repository().load(interview_id)
+        if interview is None:
+            raise ValueError(f"Interview {interview_id} not found")
+
+        async with await Neo4jConnectionManager.get_session() as session:
+            items = await reader.lens_item_rows(session, interview_id, lens.name)
+            self._guard(interview, lens.name, items)
+            transcript = await reader.transcript_rows(session, interview_id)
+            speakers = await reader.speaker_rows(session, interview_id)
+            claims = await reader.claim_rows(session, interview_id)
+            entities = await reader.entity_rows(session, interview_id)
+            analysis = await reader.analysis_rows(session, interview_id)
+
+        header = self._header(interview, lens)
+        exported_at = datetime.now(timezone.utc).isoformat()
+        files = render_bundle(
+            header, transcript, speakers, items, claims, entities, analysis, lens, exported_at
+        )
+
+        bundle_dir = Path(out_dir) / f"{interview_id}-{lens.name}"
+        log_content = self._log_entry(bundle_dir, lens, len(items), exported_at)
+        if bundle_dir.exists():
+            shutil.rmtree(bundle_dir)
+        for rel_path, content in files:
+            target = bundle_dir / rel_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+        (bundle_dir / "log.md").write_text(log_content, encoding="utf-8")
+
+        bundle_path = str(bundle_dir)
+        if zip_bundle:
+            zip_path = bundle_dir.with_suffix(".zip")
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for f in sorted(bundle_dir.rglob("*")):
+                    if f.is_file():
+                        zf.write(f, f.relative_to(bundle_dir.parent))
+            bundle_path = str(zip_path)
+
+        return ExportResult(
+            interview_id=interview_id, lens=lens.name, lens_version=lens.version,
+            bundle_path=bundle_path, files_written=len(files) + 1,
+            items=len(items), claims=len(claims), entities=len(entities),
+        )
+
+    def _guard(self, interview, lens_name: str, projected_rows) -> None:
+        """Expected = current-version items + locked items of any version."""
+        current = interview.lens_runs.get(lens_name)
+        expected = {
+            iid for iid, v in interview.lens_items.items()
+            if v["lens"] == lens_name and (v["lens_version"] == current or v["locked"])
+        }
+        projected = {r["item_id"] for r in projected_rows}
+        if expected != projected:
+            raise RuntimeError(
+                f"projection lag: aggregate expects {len(expected)} items for lens "
+                f"{lens_name!r}, graph has {len(projected)}; retry shortly"
+            )
+
+    def _header(self, interview, lens) -> Dict[str, Any]:
+        metadata = interview.metadata or {}
+        participants = [
+            {"speaker_id": sid, **sp}
+            for sid, sp in interview.speakers.items()
+            if sp.get("merged_into") is None
+        ]
+        utterance_count = sum(
+            1 for u in interview.utterances.values() if not u.get("removed")
+        )
+        started_at = interview.started_at
+        return {
+            "interview_id": interview.aggregate_id,
+            "title": interview.title,
+            "source": interview.source,
+            "started_at": started_at.isoformat() if started_at else None,
+            "project_id": metadata.get("front_matter", {}).get("project"),
+            "metadata": metadata,
+            "participants": participants,
+            "fragment_count": metadata.get("fragment_count"),
+            "utterance_count": utterance_count,
+            "lens": lens.name,
+            "lens_version": lens.version,
+        }
+
+    def _log_entry(self, bundle_dir: Path, lens, item_count: int, exported_at: str) -> str:
+        """Prepend a new dated entry to the existing log.md, newest-first."""
+        log_path = bundle_dir / "log.md"
+        existing = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
+        date = exported_at.split("T")[0]
+        entry = (
+            f"## {date}\n\n"
+            f"- {exported_at}: exported {item_count} items from {lens.name} v{lens.version}\n"
+        )
+        if existing:
+            return entry + "\n" + existing
+        return entry
