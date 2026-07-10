@@ -1,0 +1,35 @@
+name: meeting_minutes
+version: 1
+prompts_file: prompts/lens_meeting_minutes.yaml
+projects_to:
+  Objective: {}
+  Decision:
+    speaker_link: {field: made_by, relationship: DECIDED_BY}
+  ActionItem:
+    speaker_link: {field: owner, relationship: OWNED_BY}
+  FollowUp: {}
+extractors:
+  - name: objectives
+    prompt_key: objectives
+    response_model: ObjectivesResult
+    scope: document
+    node_type: Objective
+    items_field: objectives
+  - name: decisions
+    prompt_key: decisions
+    response_model: DecisionsResult
+    scope: utterance
+    node_type: Decision
+    items_field: decisions
+  - name: action_items
+    prompt_key: action_items
+    response_model: ActionItemsResult
+    scope: utterance
+    node_type: ActionItem
+    items_field: action_items
+  - name: followups
+    prompt_key: followups
+    response_model: FollowupsResult
+    scope: utterance
+    node_type: FollowUp
+    items_field: followups
