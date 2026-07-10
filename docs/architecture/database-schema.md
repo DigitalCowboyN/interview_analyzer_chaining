@@ -235,23 +235,46 @@ another, enabling the as-spoken visualization with interruption edges.
 
 Nodes: `:Entity {surface (lowercased key), entity_type}`;
 `:Claim {claim_id, text, kind, confidence, model, provider, interview_id}`.
-Fragment/utterance embeddings are node properties
-(`:Sentence.embedding`, `:Utterance.embedding`) tagged with
-`embedding_model` / `embedding_dim`, each backed by a per-model Neo4j vector
-index (`fragment_embedding_<model>`, `utterance_embedding_<model>`, cosine).
+Fragment/utterance embeddings are stored on per-model node properties
+(`embedding_<sanitized_model>`), each backed by a per-model Neo4j vector index
+(`fragment_embedding_<model>`, `utterance_embedding_<model>`, cosine) targeting
+ITS property — cross-model isolation even when two models share dimensions.
+The generic `embedding` / `embedding_model` / `embedding_dim` convenience
+properties remain (latest write wins) for simple queries.
 Per-analysis metadata (provider, dimension_confidences, flags) lives on the
 `:Analysis` node.
 
 ```
-(:Sentence)-[:MENTIONS {text, start, end, confidence}]->(:Entity)
+(:Sentence)-[:MENTIONS {start, end, text, confidence}]->(:Entity)
 (:Claim)-[:MADE_BY]->(:Speaker)
 (:Claim)-[:SUPPORTED_BY]->(:Sentence)
 ```
 
-`MENTIONS` spans are character offsets within the fragment text (surface form
-preserved on the edge; the `:Entity` node keys on the lowercased surface for
-coarse resolution — full canonicalization is Layer 4). `SUPPORTED_BY` fans a
-claim out to every fragment of the utterance it came from.
+`MENTIONS` edges are keyed by their `{start, end}` span (character offsets
+within the fragment text) — two mentions of one entity in one fragment are two
+edges. The `:Entity` node keys on the lowercased surface for coarse
+resolution — full canonicalization is Layer 4. `SUPPORTED_BY` fans a claim out
+to every fragment of the utterance it came from.
+
+### Layer 3 lens items (M4.3)
+
+Every lens item is a dual-labeled node: the generic `:LensItem` label for
+lens-wide queries plus the dynamic label declared in the lens YAML's
+`projects_to` (e.g. `:Decision`, `:ActionItem`). Dynamic labels are validated
+at emit time against the lens spec AND sanitized (`^[A-Z][A-Za-z0-9]*$`) at the
+handler — raw LLM output never reaches Cypher as a label.
+
+```
+(:LensItem:Decision {item_id, lens, lens_version, node_type, confidence,
+                     model, provider, interview_id, <extracted fields>, locked?})
+(:LensItem)-[:SUPPORTED_BY]->(:Sentence)     // fragment grounding
+(:LensItem:Decision)-[:DECIDED_BY]->(:Speaker)   // declarative speaker link
+(:LensItem:ActionItem)-[:OWNED_BY]->(:Speaker)   // relationship name from lens YAML
+```
+
+A `LensApplied` run deletes the interview+lens's prior UNLOCKED items with an
+older `lens_version`; `locked = true` (human override via
+`LensExtractionOverridden`) always survives re-runs.
 
 **Note:** Points from current sentence to *previous* sentence (sentence N follows sentence N-1).
 
@@ -423,3 +446,6 @@ While Neo4j is the read model, EventStoreDB holds the authoritative event stream
 | `EmbeddingGenerated` | `Sentence-{id}` | Fragment embedding (base64 vector, Layer 2) |
 | `ClaimExtracted` | `Interview-{id}` | Utterance-scoped claim (Layer 2) |
 | `UtteranceEmbeddingGenerated` | `Interview-{id}` | Utterance embedding (Layer 2) |
+| `LensApplied` | `Interview-{id}` | Lens run marker; supersedes prior unlocked items (Layer 3) |
+| `LensExtractionGenerated` | `Interview-{id}` | One lens item (dual-label node, Layer 3) |
+| `LensExtractionOverridden` | `Interview-{id}` | Human correction; locks the item (Layer 3) |

@@ -14,10 +14,12 @@ An event-sourced system for processing interview transcripts with AI-powered mul
 4. **Stitches** interrupted utterances via relationship overlay (verbatim text untouched; interruptions become queryable data)
 5. **Enriches** via a registry of focused extractors — one LLM call per dimension (function, structure, purpose, topics, keywords, entities, claims), each schema-enforced with numeric confidence, behind a provider failover chain (Anthropic Haiku → Claude Code → OpenAI)
 6. **Embeds** fragments and utterances into per-model Neo4j vector indexes for semantic search
-7. **Stores** everything as events in EventStoreDB (source of truth); the projection service is Neo4j's sole writer
-8. **Exposes** REST API for querying and user corrections (edits, speakers, stitches)
+7. **Applies lenses** — purpose-built views like meeting minutes (objectives, decisions, action items, follow-ups) extracted by a fully generic engine; adding a lens is one YAML profile + one prompts file, zero code
+8. **Stores** everything as events in EventStoreDB (source of truth); the projection service is Neo4j's sole writer
+9. **Exposes** REST API for querying and user corrections (edits, speakers, stitches, lens items)
 
 **Run it:** `python -m src.ingestion <file> --enrich` (ingest + enrich in one shot), or `make ingest FILE=<path>`.
+Then apply a lens: `python -m src.lens <interview_id> meeting_minutes`.
 
 ## Architecture
 
@@ -124,6 +126,7 @@ tests/               # 691 tests (unit, integration, e2e)
 | `/analysis/` | POST | Trigger background analysis |
 | `/edits/sentences/{id}/{index}/edit` | POST | Edit sentence text |
 | `/edits/sentences/{id}/{index}/analysis/override` | POST | Override AI analysis |
+| `/lenses/{interview_id}/items/{item_id}/override` | POST | Correct a lens item (locks it) |
 
 > Full API documentation at http://localhost:8000/docs
 

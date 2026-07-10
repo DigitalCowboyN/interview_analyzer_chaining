@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-07-06
+**Last Updated:** 2026-07-10
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -23,17 +23,59 @@
 | **M4.1** | ✅ Complete | Layer 1: Ingestion, Map, Speaker Genesis & Stitching |
 | **M4.2** | ✅ Complete | Layer 2: Extractor Registry, Provider Chain, Entities/Claims/Embeddings |
 | **M3.1** | ✅ Complete | Vector Search (delivered as Layer 2 embeddings + per-model indexes) |
-| M4.3 | 📋 Planned | Layer 3: Lens Engine (meeting_minutes first) |
+| **M4.3** | ✅ Complete | Layer 3: Generic Lens Engine (meeting_minutes first) + debt burndown |
 | M4.4 | 📋 Planned | Layer 5: OKF Export + richer queries |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M4.3 Planning (Layer 3 Lens Engine — see docs/superpowers/specs/2026-07-04-mine-layers-design.md)
-**Tests:** 984 unit passing | **Coverage:** 88.8% (unit). ~200 legacy pipeline tests retired in M4.2.
+**Current Phase:** M4.4 Planning (Layer 5 OKF Export — see docs/superpowers/specs/2026-07-04-mine-layers-design.md)
+**Tests:** 959 unit passing | **Coverage:** ~88% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
 ## Milestone Checklist
+
+### M4.3: Layer 3 — Generic Lens Engine + Debt Burndown ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-04-mine-layers-design.md` (Layer 3 + M4.3 design decisions)
+**Plan:** `docs/superpowers/plans/2026-07-09-layer3-lens-engine.md`
+
+Debt burndown (M4.2-exit debt, landed first):
+- [x] Per-model embedding properties (`embedding_<model>`) with per-model vector
+      indexes; embedder dim validation + OpenAI `dimensions` param
+- [x] Resilient failover chain construction (unconstructible providers skipped
+      with a warning; empty chain raises)
+- [x] Span-keyed MENTIONS edges; EntitiesExtracted provider materialized;
+      mixed-provider flag; embed only non-failed fragments; batch CLI per-file
+      isolation; strict-schema test recursion hardened
+- [x] Dead code deleted: `src/io/` + its tests, two long-skipped legacy
+      integration suites, dead `classification` config block
+
+Lens engine (Approach A — fully generic, zero per-lens code):
+- [x] Executor: document scope + public `run_spec_on_text` (SpecOutcome);
+      fragment/utterance paths refactored onto it
+- [x] Lens profile model (`LensSpec`/`load_lens`) — one YAML under `lenses/`
+      fully describes a lens; labels and node_types validated
+- [x] meeting_minutes lens: objectives (document), decisions / action_items /
+      followups (utterance) + prompts; strict-compliant response models
+- [x] Three generic Interview-stream events: `LensApplied` (supersession),
+      `LensExtractionGenerated`, `LensExtractionOverridden` (human lock)
+- [x] Generic projection handlers: dual-label `(:LensItem:<Label>)` nodes
+      (validated + sanitized labels), `SUPPORTED_BY` grounding, declarative
+      speaker links; bootstrap pins 19 → 22; interview allowlist extended
+- [x] LensEngine: owner resolution (SELF / handle / display_name), deterministic
+      uuid5 item ids, idempotent re-runs, locked overrides survive `--force`;
+      `python -m src.lens <interview_id> <lens_name> [--force]`
+- [x] Corrections endpoint: `POST /lenses/{interview_id}/items/{item_id}/override`
+- [x] Layer 3 lens smoke test (end-to-end through real projection)
+
+**Completed:** 2026-07-10
+
+**Deferred:** persona lens (next); lens apply via ingest flag/API; same-version
+`--force` full re-extraction (needs an item-clearing event — CLI documents the
+limitation); OKF export of lens outputs (M4.4).
+
+---
 
 ### M4.2: Layer 2 — Extractor Registry & Core Enrichment ✅ COMPLETE
 
@@ -413,6 +455,9 @@ Neo4j (sole writer, materialized view)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-07-10 | M4.3 (Layer 3) complete: generic lens engine, Approach A | A lens is one YAML + prompts; three generic events + one generic handler set serve every lens — zero per-lens code |
+| 2026-07-10 | M4.2-exit debt burned down before lens work | Per-model embedding isolation, resilient failover construction, dead `src/io` deleted, provenance/edge minors |
+| 2026-07-09 | Dynamic node labels validated at emit AND sanitized at handler | LLM output never reaches Cypher as a label; `projects_to` keys are the only legal labels |
 | 2026-07-06 | M4.2 (Layer 2) complete; legacy pipeline retired | Registry is the sole enrichment path; ~200 legacy tests removed |
 | 2026-07-06 | Generalized provider strategy (interface + config chain) | Anthropic Haiku primary → Claude Code harness → OpenAI; embeddings config-pinned, model-tagged, never silently switched |
 | 2026-07-06 | Embeddings ride as events with inline base64 vectors | Preserves single-writer + replay purity; direct Neo4j writes rejected |
