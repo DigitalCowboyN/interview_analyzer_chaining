@@ -135,6 +135,44 @@ class ClaimExtractedData(BaseModel):
     provider: str = Field(..., description="Provider that served the call")
 
 
+class LensAppliedData(BaseModel):
+    """Data payload for LensApplied event (Layer 3 supersession marker).
+
+    Precedes a lens run's items; its handler deletes the interview+lens's
+    prior UNLOCKED nodes.
+    """
+
+    lens: str = Field(..., description="Lens name (matches lenses/<name>.yaml)")
+    lens_version: int = Field(..., ge=1, description="Version of the lens profile applied")
+
+
+class LensExtractionGeneratedData(BaseModel):
+    """Data payload for LensExtractionGenerated event (one lens item)."""
+
+    lens: str = Field(..., description="Lens name")
+    lens_version: int = Field(..., ge=1, description="Version of the lens profile")
+    node_type: str = Field(..., description="Node label declared in the lens's projects_to")
+    item_id: str = Field(..., description="Deterministic UUID of the item")
+    fields: Dict[str, Any] = Field(..., description="Extracted fields (text, owner, ...)")
+    supporting_fragment_ids: List[str] = Field(
+        default_factory=list, description="Fragments grounding the item"
+    )
+    speaker_links: List[Dict[str, str]] = Field(
+        default_factory=list, description="Each {relationship, speaker_id}"
+    )
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    model: str = Field(..., description="Model that extracted the item")
+    provider: str = Field(..., description="Provider that served the call")
+
+
+class LensExtractionOverriddenData(BaseModel):
+    """Data payload for LensExtractionOverridden event (human correction; locks the item)."""
+
+    item_id: str = Field(..., description="Lens item being corrected")
+    fields_overridden: Dict[str, Any] = Field(..., description="Corrected field values")
+    note: Optional[str] = Field(None, description="Why the correction was made")
+
+
 def create_interview_created_event(
     aggregate_id: str,
     version: int,
@@ -164,7 +202,8 @@ def create_interview_created_event(
         EventEnvelope: Complete event ready for storage
     """
     data = InterviewCreatedData(
-        title=title, source=source, project_id=project_id, language=language, started_at=started_at, metadata=metadata or {}
+        title=title, source=source, project_id=project_id, language=language,
+        started_at=started_at, metadata=metadata or {}
     )
 
     return EventEnvelope(

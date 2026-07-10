@@ -14,6 +14,9 @@ from .interview_events import (
     ClaimExtractedData,
     InterruptionRecordedData,
     InterviewStatus,
+    LensAppliedData,
+    LensExtractionGeneratedData,
+    LensExtractionOverriddenData,
     SpeakerCreatedData,
     SpeakerMergedData,
     SpeakerRenamedData,
@@ -174,6 +177,10 @@ class Interview(AggregateRoot):
         self.claims: Dict[str, Dict[str, Any]] = {}
         self.utterance_embeddings: Dict[str, Dict[str, Any]] = {}
 
+        # Lenses (Layer 3): latest version applied per lens; items keyed by item_id
+        self.lens_runs: Dict[str, int] = {}
+        self.lens_items: Dict[str, Dict[str, Any]] = {}
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the interview's state."""
         if event.event_type == "InterviewCreated":
@@ -202,6 +209,12 @@ class Interview(AggregateRoot):
             self._apply_claim_extracted(event)
         elif event.event_type == "UtteranceEmbeddingGenerated":
             self._apply_utterance_embedding_generated(event)
+        elif event.event_type == "LensApplied":
+            self._apply_lens_applied(event)
+        elif event.event_type == "LensExtractionGenerated":
+            self._apply_lens_extraction_generated(event)
+        elif event.event_type == "LensExtractionOverridden":
+            self._apply_lens_extraction_overridden(event)
         else:
             raise ValueError(f"Unknown event type for Interview: {event.event_type}")
 
@@ -310,6 +323,28 @@ class Interview(AggregateRoot):
             "model": data["model"],
             "dim": data["dim"],
         }
+        self.updated_at = event.occurred_at
+
+    def _apply_lens_applied(self, event: EventEnvelope) -> None:
+        """Apply LensApplied event (Layer 3 supersession marker)."""
+        data = event.data
+        self.lens_runs[data["lens"]] = data["lens_version"]
+        self.updated_at = event.occurred_at
+
+    def _apply_lens_extraction_generated(self, event: EventEnvelope) -> None:
+        """Apply LensExtractionGenerated event (Layer 3 lens item)."""
+        data = event.data
+        self.lens_items[data["item_id"]] = {
+            "lens": data["lens"],
+            "lens_version": data["lens_version"],
+            "node_type": data["node_type"],
+            "locked": False,
+        }
+        self.updated_at = event.occurred_at
+
+    def _apply_lens_extraction_overridden(self, event: EventEnvelope) -> None:
+        """Apply LensExtractionOverridden event (human correction locks the item)."""
+        self.lens_items[event.data["item_id"]]["locked"] = True
         self.updated_at = event.occurred_at
 
     # Command methods (business logic)
@@ -617,6 +652,96 @@ class Interview(AggregateRoot):
 
         return self._add_event(
             event_type="UtteranceEmbeddingGenerated",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def apply_lens(self, lens: str, lens_version: int, **envelope_kwargs) -> EventEnvelope:
+        """Mark a lens run (Layer 3). Supersedes the lens's prior unlocked items."""
+        if self.version < 0:
+            raise ValueError("Interview must be created before applying lenses")
+        previous = self.lens_runs.get(lens)
+        if previous is not None and lens_version < previous:
+            raise ValueError(
+                f"Lens {lens!r} version {lens_version} is older than applied version {previous}"
+            )
+
+        data = LensAppliedData(lens=lens, lens_version=lens_version)
+
+        return self._add_event(
+            event_type="LensApplied",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def record_lens_extraction(
+        self,
+        lens: str,
+        lens_version: int,
+        node_type: str,
+        item_id: str,
+        fields: Dict[str, Any],
+        supporting_fragment_ids: List[str],
+        speaker_links: List[Dict[str, str]],
+        confidence: float,
+        model: str,
+        provider: str,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Record one lens item (Layer 3). A matching LensApplied must precede it.
+
+        Duplicate item_ids raise — the engine does idempotent skipping,
+        mirroring claims. Locked (human-overridden) items raise.
+        """
+        if self.version < 0:
+            raise ValueError("Interview must be created before recording lens extractions")
+        if self.lens_runs.get(lens) != lens_version:
+            raise ValueError(
+                f"No LensApplied for lens {lens!r} version {lens_version} "
+                f"(applied: {self.lens_runs.get(lens)})"
+            )
+        existing = self.lens_items.get(item_id)
+        if existing is not None:
+            if existing["locked"]:
+                raise ValueError(f"Lens item {item_id} is locked by a human override")
+            raise ValueError(f"Lens item {item_id} already recorded")
+
+        data = LensExtractionGeneratedData(
+            lens=lens,
+            lens_version=lens_version,
+            node_type=node_type,
+            item_id=item_id,
+            fields=fields,
+            supporting_fragment_ids=supporting_fragment_ids,
+            speaker_links=speaker_links,
+            confidence=confidence,
+            model=model,
+            provider=provider,
+        )
+
+        return self._add_event(
+            event_type="LensExtractionGenerated",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def override_lens_extraction(
+        self,
+        item_id: str,
+        fields_overridden: Dict[str, Any],
+        note: Optional[str] = None,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Human correction of a lens item. Locks it against future re-runs."""
+        if item_id not in self.lens_items:
+            raise ValueError(f"Unknown lens item: {item_id}")
+
+        data = LensExtractionOverriddenData(
+            item_id=item_id, fields_overridden=fields_overridden, note=note
+        )
+
+        return self._add_event(
+            event_type="LensExtractionOverridden",
             data=data.model_dump(),
             **envelope_kwargs,
         )
