@@ -24,16 +24,65 @@
 | **M4.2** | ✅ Complete | Layer 2: Extractor Registry, Provider Chain, Entities/Claims/Embeddings |
 | **M3.1** | ✅ Complete | Vector Search (delivered as Layer 2 embeddings + per-model indexes) |
 | **M4.3** | ✅ Complete | Layer 3: Generic Lens Engine (meeting_minutes first) + debt burndown |
-| M4.4 | 📋 Planned | Layer 5: OKF Export + richer queries |
+| **M4.4** | ✅ Complete | Layer 5: OKF Export + front-matter capture + richer queries |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M4.4 Planning (Layer 5 OKF Export — see docs/superpowers/specs/2026-07-04-mine-layers-design.md)
-**Tests:** 959 unit passing | **Coverage:** ~88% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Current Phase:** Next milestone planning — Layer 4 entity resolution / GraphRAG (see docs/superpowers/specs/2026-07-04-mine-layers-design.md build order)
+**Tests:** 997 unit passing, 3 skipped | **Coverage:** ~90.8% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
 ## Milestone Checklist
+
+### M4.4: Layer 5 — OKF Export + Front-Matter Capture ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-10-okf-export-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-10-okf-export.md`
+
+Front-matter capture:
+- [x] `parse_front_matter` (tolerant; YAML dates normalized to ISO strings so
+      event payloads stay JSON-serializable); `normalize()` segments the body
+      with offsets kept absolute into the unmodified source
+- [x] Orchestrator stores title/started_at/metadata incl. raw block under
+      `metadata["front_matter"]` via existing `InterviewCreated` (no new
+      event types)
+- [x] Participant speaker seeding: labeled speakers matched by full-name or
+      unique-first-name become confirmed (`display_name = participant`,
+      method `"front_matter"`); unlabeled participants ride into the
+      inference prompt as a hint; ambiguity never seeds
+
+OKF export (Approach: read-side exporter over Neo4j, zero per-lens code):
+- [x] `src/export/reader.py`: single Cypher layer (transcript/speakers/lens
+      items/claims/entities/latest-analysis + worklist + speaker rollup)
+      shared by bundle and API
+- [x] `src/export/renderer.py`: pure OKF v0.1 renderer — dual-audience
+      bundles; frontmatter delimiter-safety (quoted re-dump when values
+      contain `---`); reserved `index.md` (no frontmatter, covers all files)
+      and bundler-owned `log.md` (entries grouped by ISO date, newest
+      first); bundle-absolute links as edges
+      (`DECIDED_BY`/`OWNED_BY`/`MADE_BY` → `/speakers/...`); verbatim
+      blockquote grounding linking `/transcript.md` anchors
+- [x] `src/export/bundler.py` + CLI: `OkfExporter` with projection-lag
+      consistency guard (aggregate expected set = current-version items +
+      locked items of any version vs projected ids); renders fully in
+      memory before writing;
+      `python -m src.export <interview_id> <lens_name> [--out exports] [--zip]`
+- [x] API: `GET /exports/{interview_id}/{lens_name}` (zip download;
+      404/422/409), `GET /interviews/{interview_id}/lenses/{lens}/items`,
+      `GET /review/worklist` (low-confidence + unresolved-reference queue),
+      `GET /speakers/rollup` (by-display-name across interviews — v1
+      limitation, real identity is Layer 4)
+- [x] Layer 5 integration smoke (front matter in → OKF bundle out, real
+      ESDB+Neo4j); `scripts/test-integration.sh` runner
+
+**Completed:** 2026-07-10
+
+**Deferred:** GraphRAG retrieval; corpus-level bundles; incremental/diff
+exports; importing arbitrary OKF bundles; cross-interview speaker identity
+resolution (rollup is display-name match, documented).
+
+---
 
 ### M4.3: Layer 3 — Generic Lens Engine + Debt Burndown ✅ COMPLETE
 
@@ -455,6 +504,8 @@ Neo4j (sole writer, materialized view)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-07-10 | M4.4 (Layer 5) complete: read-side exporter over Neo4j | One reader (`src/export/reader.py`) serves both the OKF bundle and the query endpoints — no second query path to keep in sync |
+| 2026-07-10 | Front matter round-trips through the Interview aggregate, not a new event | Ingest front matter → aggregate metadata (`InterviewCreated.metadata["front_matter"]`) → rendered `interview.md` header; no projection, no new event types |
 | 2026-07-10 | M4.3 (Layer 3) complete: generic lens engine, Approach A | A lens is one YAML + prompts; three generic events + one generic handler set serve every lens — zero per-lens code |
 | 2026-07-10 | M4.2-exit debt burned down before lens work | Per-model embedding isolation, resilient failover construction, dead `src/io` deleted, provenance/edge minors |
 | 2026-07-09 | Dynamic node labels validated at emit AND sanitized at handler | LLM output never reaches Cypher as a label; `projects_to` keys are the only legal labels |

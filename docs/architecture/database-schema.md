@@ -276,6 +276,16 @@ A `LensApplied` run deletes the interview+lens's prior UNLOCKED items with an
 older `lens_version`; `locked = true` (human override via
 `LensExtractionOverridden`) always survives re-runs.
 
+### Layer 5 export (M4.4) — no graph schema changes
+
+M4.4 adds no nodes, edges, or properties. Front matter (title, started_at,
+participants, raw block) lives in the Interview **aggregate's** metadata
+(`InterviewCreated.metadata["front_matter"]`) — it is never projected into
+Neo4j. The OKF exporter (`src/export/bundler.py`) loads the Interview
+aggregate via the repository for the header, and reads the rest of the
+bundle — speakers, lens items, claims, entities, latest analysis — from
+Neo4j (`src/export/reader.py`), the same read model described above.
+
 **Note:** Points from current sentence to *previous* sentence (sentence N follows sentence N-1).
 
 ### `:HAS_FUNCTION_TYPE`
