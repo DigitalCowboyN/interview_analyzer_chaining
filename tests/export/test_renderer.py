@@ -194,3 +194,38 @@ def test_relationship_line_skips_falsy_relationship_or_display():
     content = files["decisions/decision-88888888.md"]
     assert "None:" not in content
     assert "[None]" not in content
+
+
+def test_link_text_escapes_and_collapses():
+    from src.export.renderer import _link_text
+
+    assert _link_text("line one\nline two") == "line one line two"
+    assert _link_text("a [bracketed] thing") == "a \\[bracketed\\] thing"
+    assert len(_link_text("x" * 200)) == 80
+
+
+def test_table_cells_escape_pipes_and_newlines():
+    import copy
+
+    analysis = copy.deepcopy(ANALYSIS)
+    analysis[0]["text"] = "cell | with pipe\nand newline"
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS,
+                               ENTITIES, analysis, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    table_lines = [ln for ln in files["analysis.md"].splitlines() if "cell" in ln]
+    assert table_lines, "analysis row missing"
+    assert "\\|" in table_lines[0] and "\n" not in table_lines[0]
+
+
+def test_index_link_labels_survive_hostile_item_text():
+    import copy
+
+    items = copy.deepcopy(ITEMS)
+    items[0]["props"]["text"] = "Decide [now]\nor never | maybe"
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, items, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    index = files["index.md"]
+    # the link label must not contain raw newlines or unescaped brackets
+    label_line = next(ln for ln in index.splitlines() if "decision-" in ln)
+    assert "\n" not in label_line and "[now]" not in label_line

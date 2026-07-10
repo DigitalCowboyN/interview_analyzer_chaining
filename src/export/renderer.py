@@ -97,6 +97,19 @@ def _speaker_slug(display_name: Optional[str], handle: Optional[str] = None) -> 
     return slugify(display_name or handle or "unknown")
 
 
+def _link_text(value: str, limit: int = 80) -> str:
+    """LLM/graph text used as a markdown link label: one line, brackets escaped."""
+    collapsed = re.sub(r"\s+", " ", str(value)).strip()
+    escaped = collapsed.replace("[", "\\[").replace("]", "\\]")
+    return escaped[:limit]
+
+
+def _cell(value: Any) -> str:
+    """LLM/graph text used as a markdown table cell: one line, pipes escaped."""
+    collapsed = re.sub(r"\s+", " ", str(value)).strip()
+    return collapsed.replace("|", "\\|")
+
+
 def _render_interview(header: Dict[str, Any]) -> Tuple[str, str]:
     fm = {
         "type": "Interview",
@@ -163,11 +176,12 @@ def _render_analysis(analysis: List[Dict[str, Any]]) -> Tuple[str, str]:
     for row in analysis:
         topics = ", ".join(row.get("topics") or [])
         keywords = ", ".join(row.get("keywords") or [])
-        lines.append(
-            f"| {row.get('sequence_order')} | {row.get('speaker')} | {row.get('function')} | "
-            f"{row.get('structure')} | {row.get('purpose')} | {topics} | {keywords} | "
-            f"{row.get('confidence')} | {row.get('text')} |"
-        )
+        cells = [
+            row.get("sequence_order"), row.get("speaker"), row.get("function"),
+            row.get("structure"), row.get("purpose"), topics, keywords,
+            row.get("confidence"), row.get("text"),
+        ]
+        lines.append("| " + " | ".join(_cell(c) for c in cells) + " |")
     return "analysis.md", "\n".join(lines) + "\n"
 
 
@@ -184,7 +198,7 @@ def _render_speaker(
     lines = [_frontmatter(fm), f"# {speaker.get('display_name') or speaker.get('handle')}", ""]
     lines.append("## Referenced By")
     for rel_path, display in references:
-        lines.append(f"- [{display}](/{rel_path})")
+        lines.append(f"- [{_link_text(display)}](/{rel_path})")
     return f"speakers/{slug}.md", "\n".join(lines) + "\n"
 
 
@@ -203,7 +217,10 @@ def _grounding_lines(
         text = sentence_text.get(sid)
         speaker_display = sentence_speaker.get(sid) or fallback_speaker
         speaker_slug = _speaker_slug(speaker_display)
-        link = f"[{speaker_display}](/speakers/{speaker_slug}.md), [{anchor}](/transcript.md#{anchor})"
+        link = (
+            f"[{_link_text(speaker_display)}](/speakers/{speaker_slug}.md), "
+            f"[{anchor}](/transcript.md#{anchor})"
+        )
         if text is not None:
             lines.append(f"> {text}")
             lines.append(f"> — {link}")
@@ -230,7 +247,7 @@ def _render_lens_item(
         if k not in RESERVED_PROPS
     }
     text = props.get("text")
-    title = (text[:80] if text else None) or item_id
+    title = (_link_text(text) if text else None) or item_id
 
     fm = {
         "type": node_type,
@@ -262,7 +279,7 @@ def _render_lens_item(
         if not rel or not display:
             continue
         sp_slug = _speaker_slug(display)
-        lines.append(f"{rel}: [{display}](/speakers/{sp_slug}.md)")
+        lines.append(f"{rel}: [{_link_text(display)}](/speakers/{sp_slug}.md)")
     lines.append("")
 
     speaker_links = item.get("speaker_links") or []
@@ -290,7 +307,7 @@ def _render_claim(
 ) -> Tuple[str, str]:
     claim_id = claim["claim_id"]
     text = claim.get("text")
-    title = (text[:80] if text else None) or claim_id
+    title = (_link_text(text) if text else None) or claim_id
 
     fm = {
         "type": "Claim",
@@ -314,7 +331,7 @@ def _render_claim(
 
     lines.append("## Relationships")
     if claim.get("speaker_id"):
-        lines.append(f"MADE_BY: [{speaker_display}](/speakers/{speaker_slug}.md)")
+        lines.append(f"MADE_BY: [{_link_text(speaker_display)}](/speakers/{speaker_slug}.md)")
     lines.append("")
 
     lines.extend(
@@ -368,7 +385,7 @@ def _render_index(sections: Dict[str, List[Tuple[str, str]]]) -> Tuple[str, str]
             continue
         lines.append(f"## {section.replace('-', ' ').title()}")
         for path, description in entries:
-            lines.append(f"- [{path}]({path}): {description}")
+            lines.append(f"- [{path}]({path}): {_link_text(description)}")
         lines.append("")
     return "index.md", "\n".join(lines) + "\n"
 
@@ -396,11 +413,20 @@ def render_bundle(
     files.append(_render_transcript(transcript, anchors))
     files.append(_render_analysis(analysis))
 
+    # Single derivation of each item's (rel_path, title), reused by the item-file
+    # loop, the index sections, and the speaker back-link references below.
+    item_refs = [
+        (
+            item,
+            f"{item_dir(item['node_type'])}/{item_filename(item['node_type'], item['item_id'])}",
+            (item.get("props") or {}).get("text") or item["item_id"],
+        )
+        for item in items
+    ]
+
     # Which items/claims reference each speaker, for the speaker file's back-links.
     references_by_speaker: Dict[str, List[Tuple[str, str]]] = {sp_id: [] for sp_id in speaker_by_id}
-    for item in items:
-        item_path = f"{item_dir(item['node_type'])}/{item_filename(item['node_type'], item['item_id'])}"
-        title = (item.get("props") or {}).get("text") or item["item_id"]
+    for item, item_path, title in item_refs:
         for link in item.get("speaker_links") or []:
             sp_id = link.get("speaker_id")
             if sp_id in references_by_speaker:
@@ -416,10 +442,9 @@ def render_bundle(
         files.append((path, content))
         index_sections["speakers"].append((path, speaker.get("display_name") or speaker.get("handle")))
 
-    for item in items:
-        path, content = _render_lens_item(item, lens, exported_at, sentence_text, sentence_speaker, anchors)
+    for item, path, title in item_refs:
+        _, content = _render_lens_item(item, lens, exported_at, sentence_text, sentence_speaker, anchors)
         files.append((path, content))
-        title = (item.get("props") or {}).get("text") or item["item_id"]
         index_sections.setdefault(item_dir(item["node_type"]), []).append((path, title))
 
     for claim in claims:
