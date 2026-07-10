@@ -16,8 +16,10 @@ from fastapi import FastAPI
 
 from src.api.routers import analysis as analysis_router
 from src.api.routers import edits as edits_router
+from src.api.routers import exports as exports_router
 from src.api.routers import files as files_router
 from src.api.routers import lenses as lenses_router
+from src.api.routers import queries as queries_router
 from src.api.routers import speakers as speakers_router
 from src.config import config
 from src.utils.logger import get_logger
@@ -36,6 +38,8 @@ app.include_router(analysis_router.router)
 app.include_router(edits_router.router)
 app.include_router(speakers_router.router)
 app.include_router(lenses_router.router)
+app.include_router(exports_router.router)
+app.include_router(queries_router.router)
 
 
 @app.get("/", tags=["Health Check"])

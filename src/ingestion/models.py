@@ -1,7 +1,7 @@
 """Data models for Layer 1 ingestion (format detection and normalization)."""
 
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -39,4 +39,7 @@ class NormalizedTranscript(BaseModel):
     fragments: List[RawFragment]
     speaker_labels: List[str] = Field(
         default_factory=list, description="Distinct parsed labels, in order of first appearance"
+    )
+    front_matter: Optional[Dict[str, Any]] = Field(
+        None, description="Parsed leading YAML block, if the source had one"
     )

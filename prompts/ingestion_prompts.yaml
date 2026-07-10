@@ -7,6 +7,7 @@ speaker_window:
     The fragments below are numbered and appear in as-spoken order. Multiple people
     are talking, sometimes interrupting or talking over one another.
 
+    {participants_hint}
     Assign every fragment a provisional speaker handle (S1, S2, S3, ...). Use cues
     such as: who asks vs answers questions, first-person statements about roles or
     work, greetings and responses, and consistent verbal habits. Use the SAME handle

@@ -2,7 +2,7 @@
 
 An event-sourced system for processing interview transcripts with AI-powered multi-dimensional sentence analysis.
 
-> **Status:** M4.2 Complete (Layer 2: extractor registry, provider chain, entities/claims/embeddings) | **Tests:** 984 passing | **Coverage:** 88.8%
+> **Status:** M4.4 Complete (Layer 5: OKF export, front-matter capture, query endpoints) | **Tests:** 997 passing | **Coverage:** 90.8%
 >
 > See [ROADMAP.md](docs/ROADMAP.md) for milestones and [docs/architecture/](docs/architecture/) for detailed diagrams.
 
@@ -16,10 +16,12 @@ An event-sourced system for processing interview transcripts with AI-powered mul
 6. **Embeds** fragments and utterances into per-model Neo4j vector indexes for semantic search
 7. **Applies lenses** — purpose-built views like meeting minutes (objectives, decisions, action items, follow-ups) extracted by a fully generic engine; adding a lens is one YAML profile + one prompts file, zero code
 8. **Stores** everything as events in EventStoreDB (source of truth); the projection service is Neo4j's sole writer
-9. **Exposes** REST API for querying and user corrections (edits, speakers, stitches, lens items)
+9. **Exports** OKF bundles — markdown files with YAML frontmatter, git-versionable and agent-consumable, grounding every lens item back to the verbatim transcript
+10. **Exposes** REST API for querying and user corrections (edits, speakers, stitches, lens items)
 
 **Run it:** `python -m src.ingestion <file> --enrich` (ingest + enrich in one shot), or `make ingest FILE=<path>`.
 Then apply a lens: `python -m src.lens <interview_id> meeting_minutes`.
+Then export it: `python -m src.export <interview_id> meeting_minutes`.
 
 ## Architecture
 
@@ -127,6 +129,10 @@ tests/               # 691 tests (unit, integration, e2e)
 | `/edits/sentences/{id}/{index}/edit` | POST | Edit sentence text |
 | `/edits/sentences/{id}/{index}/analysis/override` | POST | Override AI analysis |
 | `/lenses/{interview_id}/items/{item_id}/override` | POST | Correct a lens item (locks it) |
+| `/exports/{interview_id}/{lens_name}` | GET | Download an OKF bundle (zip) |
+| `/interviews/{interview_id}/lenses/{lens}/items` | GET | List a lens's items for an interview |
+| `/review/worklist` | GET | Low-confidence + unresolved-reference review queue |
+| `/speakers/rollup` | GET | Speaker rollup by display name, across interviews |
 
 > Full API documentation at http://localhost:8000/docs
 

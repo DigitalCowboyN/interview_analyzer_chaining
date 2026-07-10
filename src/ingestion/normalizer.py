@@ -10,25 +10,41 @@ from typing import List, Optional, Tuple
 from src.utils.text_processing import segment_text_with_offsets
 
 from .format_detector import SPEAKER_LINE_RE, detect_format
+from .front_matter import parse_front_matter
 from .models import NormalizedTranscript, RawFragment, TranscriptFormat
 
 
 def normalize(text: str) -> NormalizedTranscript:
     """Normalize raw transcript text into a NormalizedTranscript."""
     content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    fmt = detect_format(text)
+    front_matter, body_start = parse_front_matter(text)
+    body = text[body_start:]
+    fmt = detect_format(body)
 
     if fmt == TranscriptFormat.LABELED:
-        fragments, labels = _parse_labeled(text)
+        fragments, labels = _parse_labeled(body)
     else:
         fragments = [
             RawFragment(text=t, start_char=s, end_char=e, sequence_order=i)
-            for i, (t, s, e) in enumerate(segment_text_with_offsets(text))
+            for i, (t, s, e) in enumerate(segment_text_with_offsets(body))
         ]
         labels = []
 
+    if body_start:
+        # Offsets must stay absolute into the UNMODIFIED source text.
+        fragments = [
+            f.model_copy(
+                update={
+                    "start_char": f.start_char + body_start,
+                    "end_char": f.end_char + body_start,
+                }
+            )
+            for f in fragments
+        ]
+
     return NormalizedTranscript(
-        content_hash=content_hash, format=fmt, fragments=fragments, speaker_labels=labels
+        content_hash=content_hash, format=fmt, fragments=fragments,
+        speaker_labels=labels, front_matter=front_matter,
     )
 
 
