@@ -158,7 +158,9 @@ async def speaker_rollup_rows(
     name: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    scan_cap: int = 5000,
 ) -> List[Dict[str, Any]]:
+    # bounded scan: grouping/pagination happen in Python; raise scan_cap for very large projects
     items_query = """
     MATCH (n:LensItem)-[r]->(sp:Speaker)
     WHERE sp.merged_into IS NULL AND type(r) <> 'SUPPORTED_BY'
@@ -168,6 +170,7 @@ async def speaker_rollup_rows(
     RETURN sp.display_name AS display_name, n.node_type AS node_type,
            type(r) AS relationship, n.text AS text,
            n.interview_id AS interview_id, n.item_id AS item_id
+    LIMIT $scan_cap
     """
     claims_query = """
     MATCH (c:Claim)-[:MADE_BY]->(sp:Speaker)
@@ -177,16 +180,17 @@ async def speaker_rollup_rows(
               (:Interview {interview_id: c.interview_id}) })
     RETURN sp.display_name AS display_name, c.text AS text, c.kind AS kind,
            c.interview_id AS interview_id, c.claim_id AS claim_id
+    LIMIT $scan_cap
     """
     groups: Dict[str, Dict[str, Any]] = {}
 
-    items_result = await session.run(items_query, project_id=project_id)
+    items_result = await session.run(items_query, project_id=project_id, scan_cap=scan_cap)
     async for r in items_result:
         row = dict(r)
         display_name = row.pop("display_name")
         _group_rollup_row(groups, display_name)["items"].append(row)
 
-    claims_result = await session.run(claims_query, project_id=project_id)
+    claims_result = await session.run(claims_query, project_id=project_id, scan_cap=scan_cap)
     async for r in claims_result:
         row = dict(r)
         display_name = row.pop("display_name")

@@ -6,7 +6,12 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
-from src.export.bundler import InterviewNotFoundError, OkfExporter, ProjectionLagError
+from src.export.bundler import (
+    InterviewNotFoundError,
+    LensNeverAppliedError,
+    OkfExporter,
+    ProjectionLagError,
+)
 from src.utils.logger import get_logger
 
 router = APIRouter(tags=["exports"])
@@ -25,6 +30,8 @@ async def download_bundle(interview_id: str, lens_name: str):
             raise HTTPException(status_code=404, detail=str(e))
         except ProjectionLagError as e:
             raise HTTPException(status_code=409, detail=str(e))
+        except LensNeverAppliedError as e:
+            raise HTTPException(status_code=422, detail=str(e))
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
         payload = Path(result.bundle_path).read_bytes()

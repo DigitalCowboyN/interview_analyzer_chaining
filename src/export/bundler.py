@@ -26,6 +26,10 @@ class InterviewNotFoundError(ValueError):
     """No interview aggregate exists for the given id."""
 
 
+class LensNeverAppliedError(ValueError):
+    """The lens is valid but has never been applied to this interview."""
+
+
 class ExportResult(BaseModel):
     interview_id: str
     lens: str
@@ -95,6 +99,8 @@ class OkfExporter:
     def _guard(self, interview, lens_name: str, projected_rows) -> None:
         """Expected = current-version items + locked items of any version."""
         current = interview.lens_runs.get(lens_name)
+        if current is None:
+            raise LensNeverAppliedError(f"lens {lens_name!r} never applied to this interview")
         expected = {
             iid for iid, v in interview.lens_items.items()
             if v["lens"] == lens_name and (v["lens_version"] == current or v["locked"])

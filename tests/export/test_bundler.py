@@ -96,6 +96,19 @@ async def test_reexport_prepends_log_entry(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_never_applied_lens_raises_422_error(tmp_path):
+    from src.export.bundler import LensNeverAppliedError
+
+    interview = Interview(IID)
+    interview.create(title="t", source="s", metadata={"fragment_count": 1})
+    interview.mark_events_as_committed()
+    patches = patch_world(interview, projected_items=[])
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+        with pytest.raises(LensNeverAppliedError, match="never applied"):
+            await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+
+
+@pytest.mark.asyncio
 async def test_reexport_same_day_groups_under_one_heading(tmp_path):
     patches = patch_world(make_interview(), PROJECTED)
     with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:

@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from src.export.bundler import InterviewNotFoundError, ProjectionLagError
+from src.export.bundler import InterviewNotFoundError, LensNeverAppliedError, ProjectionLagError
 from src.main import app
 
 IID = "22222222-2222-2222-2222-222222222222"
@@ -37,6 +37,7 @@ def test_export_returns_zip(client, tmp_path):
     (InterviewNotFoundError(f"Interview {IID} not found"), 404),
     (ValueError("Unknown lens: nope"), 422),
     (ProjectionLagError("projection lag: retry shortly"), 409),
+    (LensNeverAppliedError("lens 'meeting_minutes' never applied to this interview"), 422),
 ])
 def test_export_error_mapping(client, exc, status):
     with patch("src.api.routers.exports.OkfExporter.export", new=AsyncMock(side_effect=exc)):
