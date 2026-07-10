@@ -6,8 +6,9 @@ repositories; Neo4j is populated by the projection service downstream.
 """
 
 import uuid
+from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -26,6 +27,32 @@ from src.utils.helpers import append_json_line
 from src.utils.logger import get_logger
 
 logger = get_logger()
+
+
+def _match_participant(handle: str, participants: List[str]) -> Optional[str]:
+    """Full-name match, else UNIQUE first-name match; ambiguity never seeds."""
+    needle = handle.strip().lower()
+    full = [p for p in participants if p.strip().lower() == needle]
+    if len(full) == 1:
+        return full[0]
+    first = [p for p in participants if p.split()[0].strip().lower() == needle]
+    if len(first) == 1:
+        return first[0]
+    return None
+
+
+def _parse_fm_date(value: Any) -> Optional[datetime]:
+    """YAML gives date/datetime objects or strings; anything unparseable -> None."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime(value.year, value.month, value.day)
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
 
 
 class IngestionResult(BaseModel):
@@ -65,14 +92,20 @@ class IngestionOrchestrator:
         transcript = normalize(text)
         interview_id = str(uuid.uuid4())
 
+        fm = transcript.front_matter or {}
+        participants = [p for p in fm.get("participants") or [] if isinstance(p, str)]
+        started_at = _parse_fm_date(fm.get("date"))
+
         interview = Interview(interview_id)
         interview.create(
-            title=file_path.name,
+            title=fm.get("title") or file_path.name,
             source=str(file_path),
+            started_at=started_at,
             metadata={
                 "content_hash": transcript.content_hash,
                 "format": transcript.format.value,
                 "fragment_count": len(transcript.fragments),
+                **({"front_matter": fm} if fm else {}),
             },
             actor=actor,
             correlation_id=correlation_id,
@@ -80,7 +113,7 @@ class IngestionOrchestrator:
         )
 
         assignments = await self._resolve_speakers(
-            interview, transcript, actor, correlation_id
+            interview, transcript, actor, correlation_id, participants
         )
         interview_repo = get_interview_repository()
         await interview_repo.save(interview)
@@ -122,8 +155,12 @@ class IngestionOrchestrator:
         transcript: NormalizedTranscript,
         actor: Actor,
         correlation_id: str,
+        participants: Optional[List[str]] = None,
     ) -> List[FragmentSpeaker]:
         """Create speakers (parsed or inferred) and return per-fragment assignments."""
+        participants = participants or []
+        display_names: Dict[str, str] = {}
+        methods: Dict[str, str] = {}
         if transcript.format == TranscriptFormat.LABELED:
             handles = list(transcript.speaker_labels)
             assignments = [
@@ -138,8 +175,14 @@ class IngestionOrchestrator:
                 handles.append("S?")
             provisional, method = False, "parsed"
             confidences = {h: 1.0 for h in handles}
+            for h in handles:
+                matched = _match_participant(h, participants) if participants else None
+                display_names[h] = matched or h
+                methods[h] = "front_matter" if matched else method
         else:
-            result: SpeakerInferenceResult = await self.inference.infer(transcript.fragments)
+            result: SpeakerInferenceResult = await self.inference.infer(
+                transcript.fragments, participants=participants
+            )
             handles = result.handles
             assignments = result.assignments
             confidences = {
@@ -161,10 +204,10 @@ class IngestionOrchestrator:
             interview.add_speaker(
                 speaker_id,
                 handle=handle,
-                display_name=handle,
+                display_name=handle if is_unknown else display_names.get(handle, handle),
                 provisional=True if is_unknown else provisional,
                 confidence=0.0 if is_unknown else round(confidences[handle], 4),
-                method="inference" if is_unknown else method,
+                method="inference" if is_unknown else methods.get(handle, method),
                 actor=actor,
                 correlation_id=correlation_id,
             )

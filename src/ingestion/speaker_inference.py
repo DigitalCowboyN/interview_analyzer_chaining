@@ -4,7 +4,7 @@ Windowed LLM pass proposes handles per fragment; overlapping windows are
 reconciled deterministically by majority vote over the overlap region.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -45,7 +45,9 @@ class SpeakerInferenceService:
         self.overlap = overlap
         self.prompts = load_yaml(PROMPTS_PATH)
 
-    async def infer(self, fragments: List[RawFragment]) -> SpeakerInferenceResult:
+    async def infer(
+        self, fragments: List[RawFragment], participants: Optional[List[str]] = None
+    ) -> SpeakerInferenceResult:
         """Assign a provisional speaker handle to every fragment."""
         global_assignments: Dict[int, FragmentSpeaker] = {}
         handles: List[str] = []
@@ -55,7 +57,7 @@ class SpeakerInferenceService:
             window = fragments[window_start:window_start + self.window_size]
             if not window:
                 break
-            window_result = await self._infer_window(window)
+            window_result = await self._infer_window(window, participants)
 
             mapping = self._reconcile(window, window_result, global_assignments)
 
@@ -89,10 +91,15 @@ class SpeakerInferenceService:
 
         return SpeakerInferenceResult(handles=handles, assignments=assignments)
 
-    async def _infer_window(self, window: List[RawFragment]) -> Dict[int, Tuple[str, float]]:
+    async def _infer_window(
+        self, window: List[RawFragment], participants: Optional[List[str]] = None
+    ) -> Dict[int, Tuple[str, float]]:
         """Run one window through the LLM; returns {local_index: (handle, confidence)}."""
         numbered = "\n".join(f"{i}: {frag.text}" for i, frag in enumerate(window))
-        prompt = self.prompts["speaker_window"]["prompt"].format(fragments=numbered)
+        hint = f"Known participants: {', '.join(participants)}.\n" if participants else ""
+        prompt = self.prompts["speaker_window"]["prompt"].format(
+            fragments=numbered, participants_hint=hint
+        )
         raw = await agent.call_model(prompt)
         try:
             response = SpeakerWindowResponse.model_validate(raw)
