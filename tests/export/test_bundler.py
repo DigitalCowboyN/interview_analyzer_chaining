@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -92,3 +93,21 @@ async def test_reexport_prepends_log_entry(tmp_path):
         await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
     log = (tmp_path / f"{IID}-meeting_minutes" / "log.md").read_text()
     assert log.count("exported") == 2
+
+
+@pytest.mark.asyncio
+async def test_reexport_same_day_groups_under_one_heading(tmp_path):
+    patches = patch_world(make_interview(), PROJECTED)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+        await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+        await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+    log = (tmp_path / f"{IID}-meeting_minutes" / "log.md").read_text()
+    date = datetime.now(timezone.utc).date().isoformat()
+
+    assert log.count(f"## {date}") == 1
+
+    bullets = [line for line in log.splitlines() if line.startswith("- ")]
+    assert len(bullets) == 2
+    first_ts = bullets[0][2:].split(": exported")[0]
+    second_ts = bullets[1][2:].split(": exported")[0]
+    assert first_ts > second_ts

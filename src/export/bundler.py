@@ -124,14 +124,23 @@ class OkfExporter:
         }
 
     def _log_entry(self, bundle_dir: Path, lens, item_count: int, exported_at: str) -> str:
-        """Prepend a new dated entry to the existing log.md, newest-first."""
+        """Add a new dated entry to the existing log.md, newest-first.
+
+        Entries are a flat list grouped by ISO date. If the log already starts
+        with a heading for today's date, the new bullet joins that group
+        (newest bullet first); otherwise a new date block is prepended.
+        """
         log_path = bundle_dir / "log.md"
         existing = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
         date = exported_at.split("T")[0]
-        entry = (
-            f"## {date}\n\n"
-            f"- {exported_at}: exported {item_count} items from {lens.name} v{lens.version}\n"
-        )
+        heading = f"## {date}\n"
+        bullet = f"- {exported_at}: exported {item_count} items from {lens.name} v{lens.version}\n"
+
+        if existing.startswith(heading):
+            rest = existing[len(heading):].lstrip("\n")
+            return f"{heading}\n{bullet}{rest}"
+
+        entry = f"{heading}\n{bullet}"
         if existing:
             return entry + "\n" + existing
         return entry
