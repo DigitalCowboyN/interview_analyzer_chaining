@@ -427,6 +427,43 @@ class TestSentenceHandlers:
         # Verify result was consumed
         mock_result.consume.assert_called_once()
 
+    async def test_sentence_created_sets_fragment_label(self):
+        """Test SentenceCreated handler dual-labels the node with :Fragment."""
+        handler = SentenceCreatedHandler()
+
+        # Mock transaction with proper result consumption
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 5  # Properties updated
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        interview_id = str(uuid.uuid4())
+        sentence_id = str(uuid.uuid4())
+
+        event = EventEnvelope(
+            event_type="SentenceCreated",
+            aggregate_type=AggregateType.SENTENCE,
+            aggregate_id=sentence_id,
+            version=0,
+            data={
+                "interview_id": interview_id,
+                "index": 0,
+                "text": "This is a test sentence.",
+                "speaker": "Speaker A",
+            },
+        )
+
+        await handler.apply(mock_tx, event)
+
+        call_args = mock_tx.run.call_args
+        query = call_args[0][0]
+
+        assert "MERGE (s:Sentence {sentence_id: $sentence_id})" in query  # anchor unchanged
+        assert "s:Fragment" in query  # dual label
+
     async def test_sentence_edited_handler(self):
         """Test SentenceEdited handler updates text and sets edited flag."""
         handler = SentenceEditedHandler()

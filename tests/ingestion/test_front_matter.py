@@ -15,6 +15,14 @@ Alice: We will go with vendor X.
 Bob: Sounds good to me.
 """
 
+FM_FLAT_TEXT = """---
+title: Flat Notes
+participants: [Alice Johnson]
+---
+This is plain prose without speaker labels. It has several sentences.
+Nobody is labeled here at all. The segmenter must still ground offsets.
+"""
+
 
 def test_parse_extracts_mapping_and_body_offset():
     fm, body_start = parse_front_matter(FM_TEXT)
@@ -39,12 +47,13 @@ def test_non_mapping_yaml_degrades():
     assert parse_front_matter(text) == (None, 0)
 
 
-def test_normalize_preserves_offsets_invariant_with_front_matter():
-    transcript = normalize(FM_TEXT)
-    assert transcript.front_matter["project"] == "telemetry"
+@pytest.mark.parametrize("text", [FM_TEXT, FM_FLAT_TEXT], ids=["labeled", "flat"])
+def test_normalize_preserves_offsets_invariant_with_front_matter(text):
+    transcript = normalize(text)
+    assert transcript.front_matter is not None
     assert len(transcript.fragments) >= 2
     for frag in transcript.fragments:
-        assert FM_TEXT[frag.start_char:frag.end_char] == frag.text  # THE invariant
+        assert text[frag.start_char:frag.end_char] == frag.text
 
 
 def test_normalize_without_front_matter_unchanged():

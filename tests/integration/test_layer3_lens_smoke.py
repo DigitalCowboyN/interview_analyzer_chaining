@@ -94,7 +94,7 @@ async def test_lens_projects_dual_label_nodes_with_links_and_grounding(tmp_path,
             """
             MATCH (d:LensItem:Decision {interview_id: $iid})-[:DECIDED_BY]->(dsp:Speaker)
             WITH count(DISTINCT d) AS decisions, collect(DISTINCT dsp.display_name) AS deciders
-            MATCH (a:LensItem:ActionItem {interview_id: $iid})-[:SUPPORTED_BY]->(:Sentence)
+            MATCH (a:LensItem:ActionItem {interview_id: $iid})-[:SUPPORTED_BY]->(:Fragment)
             MATCH (a)-[:OWNED_BY]->(:Speaker)
             WITH decisions, deciders, count(DISTINCT a) AS actions
             MATCH (o:LensItem:Objective {interview_id: $iid})

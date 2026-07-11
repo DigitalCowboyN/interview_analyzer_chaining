@@ -11,7 +11,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Generic, Optional, TypeVar
 
-from .aggregates import AggregateRoot, Interview, Sentence
+from .aggregates import AggregateRoot, Fragment, Interview
 from .store import ConcurrencyError, EventStoreClient, StreamNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -210,15 +210,15 @@ class InterviewRepository(Repository[Interview]):
         return f"Interview-{aggregate_id}"
 
 
-class SentenceRepository(Repository[Sentence]):
-    """Repository for Sentence aggregates."""
+class SentenceRepository(Repository[Fragment]):
+    """Repository for Fragment aggregates."""
 
-    def _create_aggregate(self, aggregate_id: str) -> Sentence:
-        """Create a new Sentence instance."""
-        return Sentence(aggregate_id)
+    def _create_aggregate(self, aggregate_id: str) -> Fragment:
+        """Create a new Fragment instance."""
+        return Fragment(aggregate_id)
 
     def _get_stream_name(self, aggregate_id: str) -> str:
-        """Get the stream name for a Sentence aggregate."""
+        """Get the stream name for a Fragment aggregate (wire format: "Sentence-<id>")."""
         return f"Sentence-{aggregate_id}"
 
 
@@ -248,7 +248,7 @@ class RepositoryFactory:
         """
         return InterviewRepository(self.event_store)
 
-    def create_sentence_repository(self) -> SentenceRepository:
+    def create_fragment_repository(self) -> SentenceRepository:
         """
         Create a SentenceRepository instance.
 
@@ -256,6 +256,13 @@ class RepositoryFactory:
             SentenceRepository: Configured repository instance
         """
         return SentenceRepository(self.event_store)
+
+    # deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop.
+    # Consumer modules (ingestion/lens/enrichment orchestrators, command handlers, speakers
+    # router) intentionally keep calling this old name: ~18 existing tests patch it by
+    # consumer-module dotted path (e.g. patch("src.ingestion.orchestrator.get_sentence_repository")).
+    # Call sites and test patch paths flip to the fragment_ names together, post-M4.5.
+    create_sentence_repository = create_fragment_repository
 
 
 # Global repository factory instance
@@ -296,7 +303,7 @@ def get_interview_repository() -> InterviewRepository:
     return factory.create_interview_repository()
 
 
-def get_sentence_repository() -> SentenceRepository:
+def get_fragment_repository() -> SentenceRepository:
     """
     Get a SentenceRepository instance using the global factory.
 
@@ -304,4 +311,10 @@ def get_sentence_repository() -> SentenceRepository:
         SentenceRepository: Configured repository instance
     """
     factory = get_repository_factory()
-    return factory.create_sentence_repository()
+    return factory.create_fragment_repository()
+
+
+# deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop.
+# See create_sentence_repository above: consumer call sites keep this old name intentionally
+# (test patch paths depend on it), and flip together with the aliases dropping post-M4.5.
+get_sentence_repository = get_fragment_repository

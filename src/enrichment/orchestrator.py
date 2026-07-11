@@ -14,7 +14,7 @@ from src.enrichment.embedder import encode_vector, get_embedder
 from src.enrichment.executor import EnrichmentExecutor
 from src.enrichment.graph_context import FragmentView, GraphContextBuilder
 from src.enrichment.registry import ExtractorRegistry
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Fragment, Interview
 from src.events.envelope import Actor, ActorType, generate_correlation_id
 from src.events.repository import get_interview_repository, get_sentence_repository
 from src.utils.logger import get_logger
@@ -71,8 +71,8 @@ class EnrichmentOrchestrator:
         fragment_count = interview.metadata.get("fragment_count", 0)
 
         # Load all fragments; select which to enrich (resume-awareness).
-        all_sentences: Dict[int, Sentence] = {}
-        to_enrich: List[Sentence] = []
+        all_sentences: Dict[int, Fragment] = {}
+        to_enrich: List[Fragment] = []
         skipped = 0
         for index in range(fragment_count):
             sid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{index}"))
@@ -141,7 +141,7 @@ class EnrichmentOrchestrator:
         )
 
     def _utterance_texts(
-        self, interview: Interview, all_sentences: Dict[int, Sentence]
+        self, interview: Interview, all_sentences: Dict[int, Fragment]
     ) -> Dict[str, str]:
         """Join member-fragment texts (in fragment_ids order) per utterance."""
         by_aggregate = {s.aggregate_id: s for s in all_sentences.values()}

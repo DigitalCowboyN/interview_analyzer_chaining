@@ -173,7 +173,7 @@ class TestProjectionTransactionIntegrity:
                 """
                 MATCH (p:Project {project_id: $project_id})
                 -[:CONTAINS_INTERVIEW]->(i:Interview {interview_id: $interview_id})
-                -[:HAS_SENTENCE]->(s:Sentence {sentence_id: $sentence_id})
+                -[:HAS_SENTENCE]->(s:Fragment {sentence_id: $sentence_id})
                 RETURN p, i, s
                 """,
                 project_id=project_id,
@@ -186,7 +186,7 @@ class TestProjectionTransactionIntegrity:
             # Check Sentence -> Analysis with all relationships
             result = await session.run(
                 """
-                MATCH (s:Sentence {sentence_id: $sentence_id})-[:HAS_ANALYSIS]->(a:Analysis)
+                MATCH (s:Fragment {sentence_id: $sentence_id})-[:HAS_ANALYSIS]->(a:Analysis)
                 OPTIONAL MATCH (a)-[:HAS_FUNCTION]->(ft:FunctionType)
                 OPTIONAL MATCH (a)-[:HAS_STRUCTURE]->(st:StructureType)
                 OPTIONAL MATCH (a)-[:HAS_PURPOSE]->(p:Purpose)
@@ -283,7 +283,7 @@ class TestProjectionRelationshipIntegrity:
             # Check all sentences linked to interview
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
+                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)
                 RETURN count(s) as sentence_count
                 """,
                 interview_id=interview_id,
@@ -294,7 +294,7 @@ class TestProjectionRelationshipIntegrity:
             # Check all sentences have analysis
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
+                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)
                 -[:HAS_ANALYSIS]->(a:Analysis)
                 RETURN count(a) as analysis_count
                 """,
@@ -307,7 +307,7 @@ class TestProjectionRelationshipIntegrity:
             result = await session.run(
                 """
                 MATCH (a:Analysis)
-                WHERE NOT (a)<-[:HAS_ANALYSIS]-(:Sentence)
+                WHERE NOT (a)<-[:HAS_ANALYSIS]-(:Fragment)
                 RETURN count(a) as orphaned_count
                 """
             )
@@ -416,7 +416,7 @@ class TestProjectionDataConsistency:
         async with await Neo4jConnectionManager.get_session() as session:
             result = await session.run(
                 """
-                MATCH (s:Sentence {sentence_id: $sentence_id})-[:HAS_ANALYSIS]->(a:Analysis)
+                MATCH (s:Fragment {sentence_id: $sentence_id})-[:HAS_ANALYSIS]->(a:Analysis)
                 OPTIONAL MATCH (a)-[:HAS_FUNCTION]->(ft:FunctionType)
                 OPTIONAL MATCH (a)-[:HAS_PURPOSE]->(p:Purpose)
                 OPTIONAL MATCH (a)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)
@@ -465,7 +465,7 @@ class TestProjectionDataConsistency:
             result = await session.run(
                 """
                 MATCH (a:Analysis)
-                WHERE NOT (a)<-[:HAS_ANALYSIS]-(:Sentence)
+                WHERE NOT (a)<-[:HAS_ANALYSIS]-(:Fragment)
                 RETURN count(a) as orphaned_analysis
                 """
             )
@@ -475,7 +475,7 @@ class TestProjectionDataConsistency:
             # Sentence nodes should be linked to Interview
             result = await session.run(
                 """
-                MATCH (s:Sentence)
+                MATCH (s:Fragment)
                 WHERE NOT (s)<-[:HAS_SENTENCE]-(:Interview)
                 RETURN count(s) as orphaned_sentences
                 """
@@ -520,7 +520,7 @@ class TestProjectionDataValidation:
         async with await Neo4jConnectionManager.get_session() as session:
             result = await session.run(
                 """
-                MATCH (s:Sentence {sentence_id: $sentence_id})
+                MATCH (s:Fragment {sentence_id: $sentence_id})
                 RETURN
                     s.sequence_order as sequence_order,
                     s.text as text,
@@ -560,7 +560,7 @@ class TestProjectionDataValidation:
         async with await Neo4jConnectionManager.get_session() as session:
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
+                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)
                 RETURN count(DISTINCT s.sentence_id) as unique_count, count(s) as total_count
                 """,
                 interview_id=interview_id,
@@ -572,11 +572,14 @@ class TestProjectionDataValidation:
             # Each sentence should have exactly one analysis
             result = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
+                MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)
                 -[:HAS_ANALYSIS]->(a:Analysis)
                 RETURN s.sentence_id as sentence_id, count(a) as analysis_count
                 """,
                 interview_id=interview_id,
             )
             async for record in result:
-                assert record["analysis_count"] == 1, f"Sentence {record['sentence_id']} has {record['analysis_count']} analyses"
+                assert record["analysis_count"] == 1, (
+                    f"Sentence {record['sentence_id']} has "
+                    f"{record['analysis_count']} analyses"
+                )

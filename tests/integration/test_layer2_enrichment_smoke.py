@@ -92,11 +92,11 @@ async def test_enriched_interview_projects_entity_claim_embedding_subgraph(tmp_p
     async with await Neo4jConnectionManager.get_session() as session:
         res = await session.run(
             """
-            MATCH (s:Sentence {aggregate_id: $f0})-[:MENTIONS]->(e:Entity)
+            MATCH (s:Fragment {aggregate_id: $f0})-[:MENTIONS]->(e:Entity)
             WITH count(e) AS entity_count
             MATCH (c:Claim)-[:MADE_BY]->(:Speaker)
             WITH entity_count, count(DISTINCT c) AS claim_count
-            MATCH (i:Interview {interview_id: $iid})-[:HAS_SENTENCE]->(s2:Sentence)
+            MATCH (i:Interview {interview_id: $iid})-[:HAS_SENTENCE]->(s2:Fragment)
             WHERE s2.embedding IS NOT NULL AND s2.embedding_model = 'smoke-embed'
             RETURN entity_count, claim_count, count(DISTINCT s2) AS embedded
             """,

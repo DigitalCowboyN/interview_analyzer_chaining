@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 async def transcript_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     query = """
-    MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
+    MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)
     OPTIONAL MATCH (s)-[:SPOKEN_BY]->(sp:Speaker)
     OPTIONAL MATCH (s)-[:PART_OF_UTTERANCE]->(u:Utterance)
     RETURN s.sentence_id AS sentence_id, s.sequence_order AS sequence_order,
@@ -47,7 +47,7 @@ async def lens_item_rows(
     WHERE ($node_type IS NULL OR n.node_type = $node_type)
       AND ($min_confidence IS NULL OR n.confidence >= $min_confidence)
     OPTIONAL MATCH (n)-[r]->(sp:Speaker)
-    OPTIONAL MATCH (n)-[:SUPPORTED_BY]->(s:Sentence)
+    OPTIONAL MATCH (n)-[:SUPPORTED_BY]->(s:Fragment)
     WITH n,
          [x IN collect(DISTINCT {relationship: type(r), speaker_id: sp.speaker_id,
                                  display_name: sp.display_name})
@@ -78,7 +78,7 @@ async def claim_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     query = """
     MATCH (c:Claim {interview_id: $interview_id})
     OPTIONAL MATCH (c)-[:MADE_BY]->(sp:Speaker)
-    OPTIONAL MATCH (c)-[:SUPPORTED_BY]->(s:Sentence)
+    OPTIONAL MATCH (c)-[:SUPPORTED_BY]->(s:Fragment)
     WITH c, sp, [x IN collect(DISTINCT s.aggregate_id) WHERE x IS NOT NULL] AS supporting
     RETURN c.claim_id AS claim_id, c.text AS text, c.kind AS kind,
            c.confidence AS confidence, c.model AS model, c.provider AS provider,
@@ -92,7 +92,7 @@ async def claim_rows(session, interview_id: str) -> List[Dict[str, Any]]:
 
 async def entity_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     query = """
-    MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)-[m:MENTIONS]->(e:Entity)
+    MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)-[m:MENTIONS]->(e:Entity)
     WITH e, collect({sentence_id: s.aggregate_id, start: m.start, end: m.end,
                       text: m.text, confidence: m.confidence}) AS mentions
     RETURN e.surface AS surface, e.entity_type AS entity_type, mentions
@@ -158,7 +158,9 @@ async def speaker_rollup_rows(
     name: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    scan_cap: int = 5000,
 ) -> List[Dict[str, Any]]:
+    # bounded scan: grouping/pagination happen in Python; raise scan_cap for very large projects
     items_query = """
     MATCH (n:LensItem)-[r]->(sp:Speaker)
     WHERE sp.merged_into IS NULL AND type(r) <> 'SUPPORTED_BY'
@@ -168,6 +170,7 @@ async def speaker_rollup_rows(
     RETURN sp.display_name AS display_name, n.node_type AS node_type,
            type(r) AS relationship, n.text AS text,
            n.interview_id AS interview_id, n.item_id AS item_id
+    LIMIT $scan_cap
     """
     claims_query = """
     MATCH (c:Claim)-[:MADE_BY]->(sp:Speaker)
@@ -177,16 +180,17 @@ async def speaker_rollup_rows(
               (:Interview {interview_id: c.interview_id}) })
     RETURN sp.display_name AS display_name, c.text AS text, c.kind AS kind,
            c.interview_id AS interview_id, c.claim_id AS claim_id
+    LIMIT $scan_cap
     """
     groups: Dict[str, Dict[str, Any]] = {}
 
-    items_result = await session.run(items_query, project_id=project_id)
+    items_result = await session.run(items_query, project_id=project_id, scan_cap=scan_cap)
     async for r in items_result:
         row = dict(r)
         display_name = row.pop("display_name")
         _group_rollup_row(groups, display_name)["items"].append(row)
 
-    claims_result = await session.run(claims_query, project_id=project_id)
+    claims_result = await session.run(claims_query, project_id=project_id, scan_cap=scan_cap)
     async for r in claims_result:
         row = dict(r)
         display_name = row.pop("display_name")
@@ -202,7 +206,7 @@ async def speaker_rollup_rows(
 
 async def analysis_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     query = """
-    MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)
+    MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)
     OPTIONAL MATCH (s)-[:SPOKEN_BY]->(sp:Speaker)
     OPTIONAL MATCH (s)-[:HAS_ANALYSIS]->(a:Analysis)
     WITH s, sp, a ORDER BY a.created_at DESC

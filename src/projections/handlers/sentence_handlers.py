@@ -41,6 +41,10 @@ class SentenceCreatedHandler(BaseProjectionHandler):
         // This allows both direct writes and projection writes to coexist
         MERGE (s:Sentence {sentence_id: $sentence_id})
 
+        // Dual-label with :Fragment (M4.5 rename). Applied unconditionally, before
+        // the version guard below, so it lands even on replays of older events.
+        SET s:Fragment
+
         // Only update if event version is newer (or not set)
         // This ensures projection service doesn't overwrite newer data
         WITH s, i
@@ -110,7 +114,7 @@ class SentenceEditedHandler(BaseProjectionHandler):
         data = event.data
 
         query = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})
+        MATCH (s:Fragment {aggregate_id: $aggregate_id})
         SET
             s.text = $new_text,
             s.is_edited = true,
@@ -149,7 +153,7 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
 
         # First, check for user-edited relationships before deleting
         query_find_edited = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})-[:HAS_ANALYSIS]->(old_a:Analysis)
+        MATCH (s:Fragment {aggregate_id: $aggregate_id})-[:HAS_ANALYSIS]->(old_a:Analysis)
         OPTIONAL MATCH (old_a)-[r_func:HAS_FUNCTION {is_edited: true}]->(ft:FunctionType)
         OPTIONAL MATCH (old_a)-[r_struct:HAS_STRUCTURE {is_edited: true}]->(st:StructureType)
         OPTIONAL MATCH (old_a)-[r_purp:HAS_PURPOSE {is_edited: true}]->(p:Purpose)
@@ -173,7 +177,7 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
 
         # Now delete any existing Analysis nodes
         query_delete_old = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})-[:HAS_ANALYSIS]->(old_a:Analysis)
+        MATCH (s:Fragment {aggregate_id: $aggregate_id})-[:HAS_ANALYSIS]->(old_a:Analysis)
         DETACH DELETE old_a
         """
         result = await tx.run(query_delete_old, aggregate_id=event.aggregate_id)
@@ -188,7 +192,7 @@ class AnalysisGeneratedHandler(BaseProjectionHandler):
         # handler already maintains. (The plan's text said "Sentence node"; this
         # is a deliberate deviation — graph consumers read them off :Analysis.)
         query_analysis = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})
+        MATCH (s:Fragment {aggregate_id: $aggregate_id})
         CREATE (a:Analysis {
             analysis_id: $analysis_id,
             model: $model,
@@ -329,7 +333,7 @@ class AnalysisOverriddenHandler(BaseProjectionHandler):
 
         # Mark analysis as overridden
         query_analysis = """
-        MATCH (s:Sentence {aggregate_id: $aggregate_id})-[:HAS_ANALYSIS]->(a:Analysis)
+        MATCH (s:Fragment {aggregate_id: $aggregate_id})-[:HAS_ANALYSIS]->(a:Analysis)
         SET
             a.is_overridden = true,
             a.override_note = $note,

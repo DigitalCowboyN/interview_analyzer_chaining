@@ -109,7 +109,7 @@ class LensExtractionGeneratedHandler(BaseProjectionHandler):
             "    n.model = $model, n.provider = $provider,",
             "    n.interview_id = $interview_id, n += $props",
             "WITH n",
-            "OPTIONAL MATCH (s:Sentence) WHERE s.aggregate_id IN $supporting_ids",
+            "OPTIONAL MATCH (s:Fragment) WHERE s.aggregate_id IN $supporting_ids",
             "FOREACH (f IN CASE WHEN s IS NULL THEN [] ELSE [s] END |",
             "    MERGE (n)-[:SUPPORTED_BY]->(f))",
             "WITH n, count(DISTINCT s) AS supported",

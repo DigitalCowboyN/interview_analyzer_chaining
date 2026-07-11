@@ -4,6 +4,7 @@ No I/O, no Neo4j. Lens items render generically from node_type + properties +
 the lens YAML's projects_to — zero per-lens code.
 """
 
+import hashlib
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -28,6 +29,24 @@ _OKF_FRONTMATTER_KEYS = {
 
 def slugify(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+class _SlugRegistry:
+    """Bundle-wide unique slugs: collisions suffixed, empty slugs hashed."""
+
+    def __init__(self) -> None:
+        self._taken: set = set()
+
+    def slug_for(self, value: str) -> str:
+        base = slugify(value)
+        if not base:
+            base = "x-" + hashlib.sha1(value.encode("utf-8")).hexdigest()[:8]
+        candidate, n = base, 1
+        while candidate in self._taken:
+            n += 1
+            candidate = f"{base}-{n}"
+        self._taken.add(candidate)
+        return candidate
 
 
 def _kebab(node_type: str) -> str:
@@ -93,11 +112,56 @@ def _anchors(transcript: List[Dict[str, Any]]) -> Dict[str, str]:
     return anchors
 
 
-def _speaker_slug(display_name: Optional[str], handle: Optional[str] = None) -> str:
-    return slugify(display_name or handle or "unknown")
+def _speaker_slug(
+    display_name: Optional[str],
+    handle: Optional[str] = None,
+    *,
+    registry: "_SlugRegistry",
+    speaker_slugs: Dict[str, str],
+    speaker_id: Optional[str] = None,
+) -> str:
+    """Slug for a speaker identity, resolved through the bundle-wide registry.
+
+    Cached by speaker_id when the caller has one -- that's the only thing
+    that reliably distinguishes two speakers, since their display_name/handle
+    may be identical or both absent (e.g. two anonymous speakers both reduce
+    to "unknown"). Falling back to the identity string only applies when no
+    speaker_id is available at all. Every call site that resolves a speaker
+    link (transcript participants, lens items, claims, grounding
+    attributions, the speaker file itself) passes the speaker_id it knows so
+    they all agree on the one slug that speaker's file actually got.
+    """
+    identity = display_name or handle or "unknown"
+    cache_key = speaker_id if speaker_id is not None else identity
+    slug = speaker_slugs.get(cache_key)
+    if slug is None:
+        slug = registry.slug_for(identity)
+        speaker_slugs[cache_key] = slug
+    return slug
 
 
-def _render_interview(header: Dict[str, Any]) -> Tuple[str, str]:
+def _link_text(value: str, limit: int = 80) -> str:
+    """LLM/graph text used as a markdown link label: one line, brackets escaped.
+
+    Truncates the raw text first, then escapes -- escaping first and
+    truncating second can sever a `\\[`/`\\]` pair at the boundary, leaving a
+    lone trailing backslash that escapes the link's closing `]` and breaks
+    the markdown link. The escaped result may run slightly past `limit`;
+    well-formedness beats exact length.
+    """
+    collapsed = re.sub(r"\s+", " ", str(value)).strip()
+    return collapsed[:limit].replace("[", "\\[").replace("]", "\\]")
+
+
+def _cell(value: Any) -> str:
+    """LLM/graph text used as a markdown table cell: one line, pipes escaped."""
+    collapsed = re.sub(r"\s+", " ", str(value)).strip()
+    return collapsed.replace("|", "\\|")
+
+
+def _render_interview(
+    header: Dict[str, Any], registry: "_SlugRegistry", speaker_slugs: Dict[str, str]
+) -> Tuple[str, str]:
     fm = {
         "type": "Interview",
         "title": header.get("title"),
@@ -116,8 +180,11 @@ def _render_interview(header: Dict[str, Any]) -> Tuple[str, str]:
     lines.append("## Participants")
     for p in header.get("participants") or []:
         marker = " (provisional)" if p.get("provisional") else ""
-        slug = _speaker_slug(p.get("display_name"), p.get("handle"))
-        lines.append(f"- [{p.get('display_name')}](/speakers/{slug}.md){marker}")
+        slug = _speaker_slug(
+            p.get("display_name"), p.get("handle"),
+            registry=registry, speaker_slugs=speaker_slugs, speaker_id=p.get("speaker_id"),
+        )
+        lines.append(f"- [{_link_text(p.get('display_name'))}](/speakers/{slug}.md){marker}")
     return "interview.md", "\n".join(lines) + "\n"
 
 
@@ -163,18 +230,25 @@ def _render_analysis(analysis: List[Dict[str, Any]]) -> Tuple[str, str]:
     for row in analysis:
         topics = ", ".join(row.get("topics") or [])
         keywords = ", ".join(row.get("keywords") or [])
-        lines.append(
-            f"| {row.get('sequence_order')} | {row.get('speaker')} | {row.get('function')} | "
-            f"{row.get('structure')} | {row.get('purpose')} | {topics} | {keywords} | "
-            f"{row.get('confidence')} | {row.get('text')} |"
-        )
+        cells = [
+            row.get("sequence_order"), row.get("speaker"), row.get("function"),
+            row.get("structure"), row.get("purpose"), topics, keywords,
+            row.get("confidence"), row.get("text"),
+        ]
+        lines.append("| " + " | ".join(_cell(c) for c in cells) + " |")
     return "analysis.md", "\n".join(lines) + "\n"
 
 
 def _render_speaker(
-    speaker: Dict[str, Any], references: List[Tuple[str, str]]
+    speaker: Dict[str, Any],
+    references: List[Tuple[str, str]],
+    registry: "_SlugRegistry",
+    speaker_slugs: Dict[str, str],
 ) -> Tuple[str, str]:
-    slug = _speaker_slug(speaker.get("display_name"), speaker.get("handle"))
+    slug = _speaker_slug(
+        speaker.get("display_name"), speaker.get("handle"),
+        registry=registry, speaker_slugs=speaker_slugs, speaker_id=speaker.get("speaker_id"),
+    )
     fm = {
         "type": "Speaker",
         "title": speaker.get("display_name") or speaker.get("handle"),
@@ -184,7 +258,7 @@ def _render_speaker(
     lines = [_frontmatter(fm), f"# {speaker.get('display_name') or speaker.get('handle')}", ""]
     lines.append("## Referenced By")
     for rel_path, display in references:
-        lines.append(f"- [{display}](/{rel_path})")
+        lines.append(f"- [{_link_text(display)}](/{rel_path})")
     return f"speakers/{slug}.md", "\n".join(lines) + "\n"
 
 
@@ -194,6 +268,10 @@ def _grounding_lines(
     sentence_speaker: Dict[str, str],
     anchors: Dict[str, str],
     fallback_speaker: str,
+    registry: "_SlugRegistry",
+    speaker_slugs: Dict[str, str],
+    sentence_speaker_id: Optional[Dict[str, str]] = None,
+    fallback_speaker_id: Optional[str] = None,
 ) -> List[str]:
     lines = ["## Grounding"]
     for sid in supporting_fragment_ids or []:
@@ -202,8 +280,12 @@ def _grounding_lines(
             continue
         text = sentence_text.get(sid)
         speaker_display = sentence_speaker.get(sid) or fallback_speaker
-        speaker_slug = _speaker_slug(speaker_display)
-        link = f"[{speaker_display}](/speakers/{speaker_slug}.md), [{anchor}](/transcript.md#{anchor})"
+        sp_id = (sentence_speaker_id or {}).get(sid) or fallback_speaker_id
+        speaker_slug = _speaker_slug(speaker_display, registry=registry, speaker_slugs=speaker_slugs, speaker_id=sp_id)
+        link = (
+            f"[{_link_text(speaker_display)}](/speakers/{speaker_slug}.md), "
+            f"[{anchor}](/transcript.md#{anchor})"
+        )
         if text is not None:
             lines.append(f"> {text}")
             lines.append(f"> — {link}")
@@ -220,6 +302,9 @@ def _render_lens_item(
     sentence_text: Dict[str, str],
     sentence_speaker: Dict[str, str],
     anchors: Dict[str, str],
+    registry: "_SlugRegistry",
+    speaker_slugs: Dict[str, str],
+    sentence_speaker_id: Optional[Dict[str, str]] = None,
 ) -> Tuple[str, str]:
     node_type = item["node_type"]
     item_id = item["item_id"]
@@ -230,7 +315,7 @@ def _render_lens_item(
         if k not in RESERVED_PROPS
     }
     text = props.get("text")
-    title = (text[:80] if text else None) or item_id
+    title = (_link_text(text) if text else None) or item_id
 
     fm = {
         "type": node_type,
@@ -261,12 +346,15 @@ def _render_lens_item(
         display = link.get("display_name")
         if not rel or not display:
             continue
-        sp_slug = _speaker_slug(display)
-        lines.append(f"{rel}: [{display}](/speakers/{sp_slug}.md)")
+        sp_slug = _speaker_slug(
+            display, registry=registry, speaker_slugs=speaker_slugs, speaker_id=link.get("speaker_id")
+        )
+        lines.append(f"{rel}: [{_link_text(display)}](/speakers/{sp_slug}.md)")
     lines.append("")
 
     speaker_links = item.get("speaker_links") or []
     fallback_speaker = speaker_links[0].get("display_name") if speaker_links else "Unknown"
+    fallback_speaker_id = speaker_links[0].get("speaker_id") if speaker_links else None
 
     lines.extend(
         _grounding_lines(
@@ -275,6 +363,10 @@ def _render_lens_item(
             sentence_speaker,
             anchors,
             fallback_speaker,
+            registry,
+            speaker_slugs,
+            sentence_speaker_id,
+            fallback_speaker_id,
         )
     )
 
@@ -287,10 +379,13 @@ def _render_claim(
     sentence_text: Dict[str, str],
     sentence_speaker: Dict[str, str],
     anchors: Dict[str, str],
+    registry: "_SlugRegistry",
+    speaker_slugs: Dict[str, str],
+    sentence_speaker_id: Optional[Dict[str, str]] = None,
 ) -> Tuple[str, str]:
     claim_id = claim["claim_id"]
     text = claim.get("text")
-    title = (text[:80] if text else None) or claim_id
+    title = (_link_text(text) if text else None) or claim_id
 
     fm = {
         "type": "Claim",
@@ -310,11 +405,14 @@ def _render_claim(
         lines.append("")
 
     speaker_display = claim.get("speaker") or "Unknown"
-    speaker_slug = _speaker_slug(speaker_display)
+    claim_speaker_id = claim.get("speaker_id")
+    speaker_slug = _speaker_slug(
+        speaker_display, registry=registry, speaker_slugs=speaker_slugs, speaker_id=claim_speaker_id
+    )
 
     lines.append("## Relationships")
-    if claim.get("speaker_id"):
-        lines.append(f"MADE_BY: [{speaker_display}](/speakers/{speaker_slug}.md)")
+    if claim_speaker_id:
+        lines.append(f"MADE_BY: [{_link_text(speaker_display)}](/speakers/{speaker_slug}.md)")
     lines.append("")
 
     lines.extend(
@@ -324,6 +422,10 @@ def _render_claim(
             sentence_speaker,
             anchors,
             speaker_display,
+            registry,
+            speaker_slugs,
+            sentence_speaker_id,
+            claim_speaker_id,
         )
     )
 
@@ -331,9 +433,9 @@ def _render_claim(
     return path, "\n".join(lines) + "\n"
 
 
-def _render_entity(entity: Dict[str, Any], anchors: Dict[str, str]) -> Tuple[str, str]:
+def _render_entity(entity: Dict[str, Any], anchors: Dict[str, str], registry: "_SlugRegistry") -> Tuple[str, str]:
     surface = entity["surface"]
-    slug = slugify(surface)
+    slug = registry.slug_for(surface)
     fm = {
         "type": "Entity",
         "title": surface,
@@ -347,7 +449,7 @@ def _render_entity(entity: Dict[str, Any], anchors: Dict[str, str]) -> Tuple[str
     for mention in entity.get("mentions") or []:
         anchor = anchors.get(mention.get("sentence_id"))
         location = f"[{anchor}](/transcript.md#{anchor})" if anchor else ""
-        lines.append(f"| {mention.get('text')} | {mention.get('confidence')} | {location} |")
+        lines.append(f"| {_cell(mention.get('text'))} | {mention.get('confidence')} | {location} |")
     return f"entities/{slug}.md", "\n".join(lines) + "\n"
 
 
@@ -368,7 +470,7 @@ def _render_index(sections: Dict[str, List[Tuple[str, str]]]) -> Tuple[str, str]
             continue
         lines.append(f"## {section.replace('-', ' ').title()}")
         for path, description in entries:
-            lines.append(f"- [{path}]({path}): {description}")
+            lines.append(f"- [{path}]({path}): {_link_text(description)}")
         lines.append("")
     return "index.md", "\n".join(lines) + "\n"
 
@@ -387,20 +489,38 @@ def render_bundle(
     anchors = _anchors(transcript)
     sentence_text = {row["sentence_id"]: row.get("text", "") for row in transcript}
     sentence_speaker = {row["sentence_id"]: row.get("speaker") for row in transcript}
+    sentence_speaker_id = {row["sentence_id"]: row.get("speaker_id") for row in transcript}
     speaker_by_id = {sp["speaker_id"]: sp for sp in speakers}
+
+    # One registry for the whole bundle: speakers and entities share a slug
+    # namespace, so e.g. speaker "ECU" and entity "ecu" cannot collide. The
+    # speaker_slugs cache resolves every /speakers/<slug>.md link (interview
+    # participants, lens items, claims, grounding attributions, transcript-
+    # adjacent references) to the same slug the speaker file itself gets.
+    registry = _SlugRegistry()
+    speaker_slugs: Dict[str, str] = {}
 
     files: List[Tuple[str, str]] = []
     index_sections: Dict[str, List[Tuple[str, str]]] = {"speakers": []}
 
-    files.append(_render_interview(header))
+    files.append(_render_interview(header, registry, speaker_slugs))
     files.append(_render_transcript(transcript, anchors))
     files.append(_render_analysis(analysis))
 
+    # Single derivation of each item's (rel_path, title), reused by the item-file
+    # loop, the index sections, and the speaker back-link references below.
+    item_refs = [
+        (
+            item,
+            f"{item_dir(item['node_type'])}/{item_filename(item['node_type'], item['item_id'])}",
+            (item.get("props") or {}).get("text") or item["item_id"],
+        )
+        for item in items
+    ]
+
     # Which items/claims reference each speaker, for the speaker file's back-links.
     references_by_speaker: Dict[str, List[Tuple[str, str]]] = {sp_id: [] for sp_id in speaker_by_id}
-    for item in items:
-        item_path = f"{item_dir(item['node_type'])}/{item_filename(item['node_type'], item['item_id'])}"
-        title = (item.get("props") or {}).get("text") or item["item_id"]
+    for item, item_path, title in item_refs:
         for link in item.get("speaker_links") or []:
             sp_id = link.get("speaker_id")
             if sp_id in references_by_speaker:
@@ -412,23 +532,29 @@ def render_bundle(
             references_by_speaker[sp_id].append((claim_path, claim.get("text") or claim["claim_id"]))
 
     for speaker in speakers:
-        path, content = _render_speaker(speaker, references_by_speaker.get(speaker["speaker_id"], []))
+        path, content = _render_speaker(
+            speaker, references_by_speaker.get(speaker["speaker_id"], []), registry, speaker_slugs
+        )
         files.append((path, content))
         index_sections["speakers"].append((path, speaker.get("display_name") or speaker.get("handle")))
 
-    for item in items:
-        path, content = _render_lens_item(item, lens, exported_at, sentence_text, sentence_speaker, anchors)
+    for item, path, title in item_refs:
+        _, content = _render_lens_item(
+            item, lens, exported_at, sentence_text, sentence_speaker, anchors, registry, speaker_slugs,
+            sentence_speaker_id,
+        )
         files.append((path, content))
-        title = (item.get("props") or {}).get("text") or item["item_id"]
         index_sections.setdefault(item_dir(item["node_type"]), []).append((path, title))
 
     for claim in claims:
-        path, content = _render_claim(claim, sentence_text, sentence_speaker, anchors)
+        path, content = _render_claim(
+            claim, sentence_text, sentence_speaker, anchors, registry, speaker_slugs, sentence_speaker_id
+        )
         files.append((path, content))
         index_sections.setdefault("claims", []).append((path, claim.get("text") or claim["claim_id"]))
 
     for entity in entities:
-        path, content = _render_entity(entity, anchors)
+        path, content = _render_entity(entity, anchors, registry)
         files.append((path, content))
         index_sections.setdefault("entities", []).append((path, entity.get("entity_type") or entity["surface"]))
 
