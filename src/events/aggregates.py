@@ -24,6 +24,15 @@ from .interview_events import (
     UtteranceEmbeddingGeneratedData,
     UtteranceIdentifiedData,
 )
+from .project_events import (
+    EntityAliasAddedData,
+    EntityCanonicalizedData,
+    EntityMergeConfirmedData,
+    EntitySplitData,
+    PersonIdentifiedData,
+    PersonLinkRemovedData,
+    SpeakerLinkedToPersonData,
+)
 from .sentence_events import (
     EditorType,
     EmbeddingGeneratedData,
@@ -121,6 +130,8 @@ class AggregateRoot(ABC):
             aggregate_type = AggregateType.INTERVIEW
         elif isinstance(self, Fragment):
             aggregate_type = AggregateType.SENTENCE
+        elif isinstance(self, Project):
+            aggregate_type = AggregateType.PROJECT
         else:
             raise ValueError(f"Unknown aggregate type: {type(self)}")
 
@@ -1173,6 +1184,268 @@ class Fragment(AggregateRoot):
             },
             **envelope_kwargs,
         )
+
+
+class Project(AggregateRoot):
+    """Cross-interview resolution home (M4.5b).
+
+    Holds canonical entities (with alias surfaces) and Person identities.
+    aggregate_id is uuid5 of the human project_id (see
+    project_events.project_aggregate_id); event payloads carry the human
+    project_id for the graph handlers. Streams are Project-{aggregate_id}
+    (wire format, frozen).
+    """
+
+    def __init__(self, aggregate_id: str):
+        super().__init__(aggregate_id)
+        self.project_id: Optional[str] = None
+        # canonical_id -> {name, entity_type, surfaces: [str], locked: bool, merged_into: Optional[str]}
+        self.canonical_entities: Dict[str, Dict[str, Any]] = {}
+        # person_id -> {display_name, links: [[interview_id, speaker_id], ...]}
+        self.persons: Dict[str, Dict[str, Any]] = {}
+        # (interview_id, speaker_id) pairs a human unlinked: never auto re-linked
+        self.blocked_links: set = set()
+        self.updated_at: Optional[datetime] = None
+
+    def apply_event(self, event: EventEnvelope) -> None:
+        """Apply an event to update the project's state."""
+        handlers = {
+            "EntityCanonicalized": self._apply_entity_canonicalized,
+            "EntityAliasAdded": self._apply_entity_alias_added,
+            "EntityMergeConfirmed": self._apply_entity_merge_confirmed,
+            "EntitySplit": self._apply_entity_split,
+            "PersonIdentified": self._apply_person_identified,
+            "SpeakerLinkedToPerson": self._apply_speaker_linked_to_person,
+            "PersonLinkRemoved": self._apply_person_link_removed,
+        }
+        handler = handlers.get(event.event_type)
+        if handler is None:
+            raise ValueError(f"Unknown event type for Project: {event.event_type}")
+        handler(event)
+
+    # --- queries -----------------------------------------------------------
+
+    def canonical_for_surface(self, surface: str, entity_type: str) -> Optional[str]:
+        """The live (non-merged) canonical owning a surface, if any."""
+        for cid, entry in self.canonical_entities.items():
+            if entry["merged_into"] is not None:
+                continue
+            if entry["entity_type"] == entity_type and surface in entry["surfaces"]:
+                return cid
+        return None
+
+    def link_for_speaker(self, interview_id: str, speaker_id: str) -> Optional[str]:
+        """The person a speaker is linked to, if any."""
+        for pid, person in self.persons.items():
+            if [interview_id, speaker_id] in person["links"]:
+                return pid
+        return None
+
+    # --- entity domain methods ---------------------------------------------
+
+    def canonicalize_entity(
+        self,
+        project_id: str,
+        canonical_id: str,
+        name: str,
+        entity_type: str,
+        surfaces: List[str],
+        method: str,
+        confidence: float,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        if canonical_id in self.canonical_entities:
+            raise ValueError(f"Canonical entity {canonical_id} already exists")
+        for surface in surfaces:
+            owner = self.canonical_for_surface(surface, entity_type)
+            if owner is not None:
+                raise ValueError(f"Surface {surface!r} already belongs to {owner}")
+        data = EntityCanonicalizedData(
+            project_id=project_id, canonical_id=canonical_id, name=name,
+            entity_type=entity_type, surfaces=surfaces, method=method,
+            confidence=confidence,
+        ).model_dump()
+        return self._add_event("EntityCanonicalized", data, project_id=project_id, **envelope_kwargs)
+
+    def add_entity_alias(
+        self, project_id: str, canonical_id: str, surface: str,
+        method: str, confidence: float, **envelope_kwargs,
+    ) -> EventEnvelope:
+        entry = self.canonical_entities.get(canonical_id)
+        if entry is None or entry["merged_into"] is not None:
+            raise ValueError(f"Canonical entity {canonical_id} not found")
+        if entry["locked"] and method != "human":
+            raise ValueError(f"Canonical entity {canonical_id} is locked")
+        owner = self.canonical_for_surface(surface, entry["entity_type"])
+        if owner is not None:
+            raise ValueError(f"Surface {surface!r} already belongs to {owner}")
+        data = EntityAliasAddedData(
+            project_id=project_id, canonical_id=canonical_id, surface=surface,
+            method=method, confidence=confidence,
+        ).model_dump()
+        return self._add_event("EntityAliasAdded", data, project_id=project_id, **envelope_kwargs)
+
+    def confirm_entity_merge(
+        self, project_id: str, canonical_id: str, merged_canonical_id: str, **envelope_kwargs,
+    ) -> EventEnvelope:
+        if canonical_id == merged_canonical_id:
+            raise ValueError("Cannot merge a canonical entity into itself")
+        for cid in (canonical_id, merged_canonical_id):
+            entry = self.canonical_entities.get(cid)
+            if entry is None:
+                raise ValueError(f"Canonical entity {cid} not found")
+            if entry["merged_into"] is not None:
+                raise ValueError(f"Canonical entity {cid} was already merged away")
+        data = EntityMergeConfirmedData(
+            project_id=project_id, canonical_id=canonical_id,
+            merged_canonical_id=merged_canonical_id,
+        ).model_dump()
+        return self._add_event("EntityMergeConfirmed", data, project_id=project_id, **envelope_kwargs)
+
+    def split_entity(
+        self, project_id: str, canonical_id: str, surfaces_removed: List[str],
+        new_canonical_id: str, new_name: str, **envelope_kwargs,
+    ) -> EventEnvelope:
+        entry = self.canonical_entities.get(canonical_id)
+        if entry is None or entry["merged_into"] is not None:
+            raise ValueError(f"Canonical entity {canonical_id} not found")
+        if new_canonical_id in self.canonical_entities:
+            raise ValueError(f"Canonical entity {new_canonical_id} already exists")
+        missing = [s for s in surfaces_removed if s not in entry["surfaces"]]
+        if missing:
+            raise ValueError(f"Surfaces not owned by {canonical_id}: {missing}")
+        if len(surfaces_removed) >= len(entry["surfaces"]):
+            raise ValueError("Split must leave at least one surface behind")
+        data = EntitySplitData(
+            project_id=project_id, canonical_id=canonical_id,
+            surfaces_removed=surfaces_removed, new_canonical_id=new_canonical_id,
+            new_name=new_name,
+        ).model_dump()
+        return self._add_event("EntitySplit", data, project_id=project_id, **envelope_kwargs)
+
+    # --- person domain methods ----------------------------------------------
+
+    def identify_person(
+        self, project_id: str, person_id: str, display_name: str, **envelope_kwargs,
+    ) -> EventEnvelope:
+        if person_id in self.persons:
+            raise ValueError(f"Person {person_id} already exists")
+        data = PersonIdentifiedData(
+            project_id=project_id, person_id=person_id, display_name=display_name,
+        ).model_dump()
+        return self._add_event("PersonIdentified", data, project_id=project_id, **envelope_kwargs)
+
+    def link_speaker_to_person(
+        self, project_id: str, interview_id: str, speaker_id: str, person_id: str,
+        method: str, confidence: float, **envelope_kwargs,
+    ) -> EventEnvelope:
+        if person_id not in self.persons:
+            raise ValueError(f"Person {person_id} not found")
+        linked_to = self.link_for_speaker(interview_id, speaker_id)
+        if linked_to is not None:
+            raise ValueError(
+                f"Speaker ({interview_id}, {speaker_id}) already linked to {linked_to}"
+            )
+        if (interview_id, speaker_id) in self.blocked_links and method != "human":
+            raise ValueError(
+                f"Speaker ({interview_id}, {speaker_id}) is blocked from auto-linking"
+            )
+        data = SpeakerLinkedToPersonData(
+            project_id=project_id, interview_id=interview_id, speaker_id=speaker_id,
+            person_id=person_id, method=method, confidence=confidence,
+        ).model_dump()
+        return self._add_event("SpeakerLinkedToPerson", data, project_id=project_id, **envelope_kwargs)
+
+    def remove_person_link(
+        self, project_id: str, interview_id: str, speaker_id: str, person_id: str,
+        note: Optional[str] = None, **envelope_kwargs,
+    ) -> EventEnvelope:
+        person = self.persons.get(person_id)
+        if person is None or [interview_id, speaker_id] not in person["links"]:
+            raise ValueError(
+                f"Speaker ({interview_id}, {speaker_id}) is not linked to {person_id}"
+            )
+        data = PersonLinkRemovedData(
+            project_id=project_id, interview_id=interview_id, speaker_id=speaker_id,
+            person_id=person_id, note=note,
+        ).model_dump()
+        return self._add_event("PersonLinkRemoved", data, project_id=project_id, **envelope_kwargs)
+
+    # --- apply methods -------------------------------------------------------
+
+    def _apply_entity_canonicalized(self, event: EventEnvelope) -> None:
+        d = event.data
+        self.project_id = d["project_id"]
+        self.canonical_entities[d["canonical_id"]] = {
+            "name": d["name"],
+            "entity_type": d["entity_type"],
+            "surfaces": list(d["surfaces"]),
+            "locked": d["method"] == "human",
+            "merged_into": None,
+        }
+        self.updated_at = event.occurred_at
+
+    def _apply_entity_alias_added(self, event: EventEnvelope) -> None:
+        d = event.data
+        self.project_id = d["project_id"]
+        entry = self.canonical_entities[d["canonical_id"]]
+        entry["surfaces"].append(d["surface"])
+        if d["method"] == "human":
+            entry["locked"] = True
+        self.updated_at = event.occurred_at
+
+    def _apply_entity_merge_confirmed(self, event: EventEnvelope) -> None:
+        d = event.data
+        self.project_id = d["project_id"]
+        survivor = self.canonical_entities[d["canonical_id"]]
+        merged = self.canonical_entities[d["merged_canonical_id"]]
+        for surface in merged["surfaces"]:
+            if surface not in survivor["surfaces"]:
+                survivor["surfaces"].append(surface)
+        survivor["locked"] = True
+        merged["locked"] = True
+        merged["merged_into"] = d["canonical_id"]
+        self.updated_at = event.occurred_at
+
+    def _apply_entity_split(self, event: EventEnvelope) -> None:
+        d = event.data
+        self.project_id = d["project_id"]
+        old = self.canonical_entities[d["canonical_id"]]
+        old["surfaces"] = [s for s in old["surfaces"] if s not in d["surfaces_removed"]]
+        old["locked"] = True
+        self.canonical_entities[d["new_canonical_id"]] = {
+            "name": d["new_name"],
+            "entity_type": old["entity_type"],
+            "surfaces": list(d["surfaces_removed"]),
+            "locked": True,
+            "merged_into": None,
+        }
+        self.updated_at = event.occurred_at
+
+    def _apply_person_identified(self, event: EventEnvelope) -> None:
+        d = event.data
+        self.project_id = d["project_id"]
+        self.persons[d["person_id"]] = {"display_name": d["display_name"], "links": []}
+        self.updated_at = event.occurred_at
+
+    def _apply_speaker_linked_to_person(self, event: EventEnvelope) -> None:
+        d = event.data
+        self.project_id = d["project_id"]
+        self.persons[d["person_id"]]["links"].append([d["interview_id"], d["speaker_id"]])
+        if d["method"] == "human":
+            self.blocked_links.discard((d["interview_id"], d["speaker_id"]))
+        self.updated_at = event.occurred_at
+
+    def _apply_person_link_removed(self, event: EventEnvelope) -> None:
+        d = event.data
+        self.project_id = d["project_id"]
+        person = self.persons[d["person_id"]]
+        person["links"] = [
+            link for link in person["links"]
+            if link != [d["interview_id"], d["speaker_id"]]
+        ]
+        self.blocked_links.add((d["interview_id"], d["speaker_id"]))
+        self.updated_at = event.occurred_at
 
 
 # deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop
