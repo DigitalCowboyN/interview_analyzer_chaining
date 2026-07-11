@@ -106,9 +106,14 @@ CREATE CONSTRAINT source_file_filename IF NOT EXISTS
 FOR (sf:SourceFile) REQUIRE sf.filename IS UNIQUE
 ```
 
-### `:Sentence`
+### `:Fragment`
 
-Represents an individual sentence from a transcript.
+Represents an individual sentence-level fragment from a transcript. Carries
+the deprecated `:Sentence` shim label through M4.5 (dual-labeled on write,
+`:Fragment` is the primary name for reads); the shim is dropped in a later
+backlog item. Event types (`SentenceCreated`, `SentenceEdited`, …) and the
+`Sentence-{id}` EventStoreDB stream pattern are frozen wire format and are
+unaffected by this rename.
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -120,7 +125,7 @@ Represents an individual sentence from a transcript.
 
 ```cypher
 CREATE INDEX sentence_id_idx IF NOT EXISTS
-FOR (s:Sentence) ON (s.sentence_id, s.filename)
+FOR (s:Fragment) ON (s.sentence_id, s.filename)
 ```
 
 ### `:FunctionType`
@@ -196,7 +201,7 @@ A speaker's continuous thought, possibly spanning non-adjacent fragments
 | `interview_id` | string | Owning interview |
 | `confidence` | float | Stitching confidence (0–1) |
 
-**New `:Sentence` properties (Layer 1):** `start_char` / `end_char` — offsets
+**New `:Fragment` properties (Layer 1):** `start_char` / `end_char` — offsets
 into the immutable source text such that `source[start_char:end_char] == text`.
 
 ## Relationship Types
@@ -206,7 +211,7 @@ into the immutable source text such that `source[start_char:end_char] == text`.
 Links sentences to their source file.
 
 ```
-(:Sentence)-[:PART_OF_FILE]->(:SourceFile)
+(:Fragment)-[:PART_OF_FILE]->(:SourceFile)
 ```
 
 ### `:FOLLOWS`
@@ -214,16 +219,16 @@ Links sentences to their source file.
 Links sentences in sequence order.
 
 ```
-(:Sentence)-[:FOLLOWS]->(:Sentence)
+(:Fragment)-[:FOLLOWS]->(:Fragment)
 ```
 
 ### Layer 1 relationships (M4.1)
 
 ```
 (:Interview)-[:HAS_PARTICIPANT]->(:Speaker)
-(:Sentence)-[:SPOKEN_BY {confidence, method, locked}]->(:Speaker)
+(:Fragment)-[:SPOKEN_BY {confidence, method, locked}]->(:Speaker)
 (:Speaker)-[:SPOKE]->(:Utterance)
-(:Sentence)-[:PART_OF_UTTERANCE {position}]->(:Utterance)
+(:Fragment)-[:PART_OF_UTTERANCE {position}]->(:Utterance)
 (:Utterance)-[:INTERRUPTS {at_fragment_id}]->(:Utterance)
 ```
 
@@ -245,9 +250,9 @@ Per-analysis metadata (provider, dimension_confidences, flags) lives on the
 `:Analysis` node.
 
 ```
-(:Sentence)-[:MENTIONS {start, end, text, confidence}]->(:Entity)
+(:Fragment)-[:MENTIONS {start, end, text, confidence}]->(:Entity)
 (:Claim)-[:MADE_BY]->(:Speaker)
-(:Claim)-[:SUPPORTED_BY]->(:Sentence)
+(:Claim)-[:SUPPORTED_BY]->(:Fragment)
 ```
 
 `MENTIONS` edges are keyed by their `{start, end}` span (character offsets
@@ -267,7 +272,7 @@ handler — raw LLM output never reaches Cypher as a label.
 ```
 (:LensItem:Decision {item_id, lens, lens_version, node_type, confidence,
                      model, provider, interview_id, <extracted fields>, locked?})
-(:LensItem)-[:SUPPORTED_BY]->(:Sentence)     // fragment grounding
+(:LensItem)-[:SUPPORTED_BY]->(:Fragment)     // fragment grounding
 (:LensItem:Decision)-[:DECIDED_BY]->(:Speaker)   // declarative speaker link
 (:LensItem:ActionItem)-[:OWNED_BY]->(:Speaker)   // relationship name from lens YAML
 ```
@@ -293,7 +298,7 @@ Neo4j (`src/export/reader.py`), the same read model described above.
 Links sentence to its function classification.
 
 ```
-(:Sentence)-[:HAS_FUNCTION_TYPE]->(:FunctionType)
+(:Fragment)-[:HAS_FUNCTION_TYPE]->(:FunctionType)
 ```
 
 ### `:HAS_STRUCTURE_TYPE`
@@ -301,7 +306,7 @@ Links sentence to its function classification.
 Links sentence to its structure classification.
 
 ```
-(:Sentence)-[:HAS_STRUCTURE_TYPE]->(:StructureType)
+(:Fragment)-[:HAS_STRUCTURE_TYPE]->(:StructureType)
 ```
 
 ### `:HAS_PURPOSE`
@@ -309,7 +314,7 @@ Links sentence to its structure classification.
 Links sentence to its purpose classification.
 
 ```
-(:Sentence)-[:HAS_PURPOSE]->(:Purpose)
+(:Fragment)-[:HAS_PURPOSE]->(:Purpose)
 ```
 
 ### `:HAS_TOPIC`
@@ -317,7 +322,7 @@ Links sentence to its purpose classification.
 Links sentence to topics (both Level 1 and Level 3).
 
 ```
-(:Sentence)-[:HAS_TOPIC]->(:Topic)
+(:Fragment)-[:HAS_TOPIC]->(:Topic)
 ```
 
 ### `:MENTIONS_OVERALL_KEYWORD`
@@ -325,7 +330,7 @@ Links sentence to topics (both Level 1 and Level 3).
 Links sentence to general keywords.
 
 ```
-(:Sentence)-[:MENTIONS_OVERALL_KEYWORD]->(:Keyword)
+(:Fragment)-[:MENTIONS_OVERALL_KEYWORD]->(:Keyword)
 ```
 
 ### `:MENTIONS_DOMAIN_KEYWORD`
@@ -333,7 +338,7 @@ Links sentence to general keywords.
 Links sentence to domain-specific keywords.
 
 ```
-(:Sentence)-[:MENTIONS_DOMAIN_KEYWORD]->(:Keyword)
+(:Fragment)-[:MENTIONS_DOMAIN_KEYWORD]->(:Keyword)
 ```
 
 ## Example Queries
@@ -341,7 +346,7 @@ Links sentence to domain-specific keywords.
 ### Find all questions about a topic
 
 ```cypher
-MATCH (s:Sentence)-[:HAS_FUNCTION_TYPE]->(f:FunctionType {name: "interrogative"})
+MATCH (s:Fragment)-[:HAS_FUNCTION_TYPE]->(f:FunctionType {name: "interrogative"})
 MATCH (s)-[:HAS_TOPIC]->(t:Topic {name: "product development"})
 RETURN s.text, s.sequence_order
 ORDER BY s.sequence_order
@@ -350,7 +355,7 @@ ORDER BY s.sequence_order
 ### Get sentence with full analysis
 
 ```cypher
-MATCH (s:Sentence {sentence_id: 1, filename: "interview_001.txt"})
+MATCH (s:Fragment {sentence_id: 1, filename: "interview_001.txt"})
 OPTIONAL MATCH (s)-[:HAS_FUNCTION_TYPE]->(ft:FunctionType)
 OPTIONAL MATCH (s)-[:HAS_STRUCTURE_TYPE]->(st:StructureType)
 OPTIONAL MATCH (s)-[:HAS_PURPOSE]->(p:Purpose)
@@ -369,7 +374,7 @@ RETURN s.text,
 ### Find related sentences by keyword
 
 ```cypher
-MATCH (s1:Sentence)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)<-[:MENTIONS_OVERALL_KEYWORD]-(s2:Sentence)
+MATCH (s1:Fragment)-[:MENTIONS_OVERALL_KEYWORD]->(k:Keyword)<-[:MENTIONS_OVERALL_KEYWORD]-(s2:Fragment)
 WHERE s1.sentence_id <> s2.sentence_id
 RETURN s1.text, s2.text, k.text AS shared_keyword
 LIMIT 20
@@ -378,7 +383,7 @@ LIMIT 20
 ### Get conversation flow
 
 ```cypher
-MATCH path = (first:Sentence)-[:FOLLOWS*]->(last:Sentence)
+MATCH path = (first:Fragment)-[:FOLLOWS*]->(last:Fragment)
 WHERE first.filename = "interview_001.txt"
   AND NOT ()-[:FOLLOWS]->(first)
 RETURN [node IN nodes(path) | node.text] AS conversation
@@ -387,7 +392,7 @@ RETURN [node IN nodes(path) | node.text] AS conversation
 ### Count sentences by topic
 
 ```cypher
-MATCH (s:Sentence)-[:HAS_TOPIC]->(t:Topic)
+MATCH (s:Fragment)-[:HAS_TOPIC]->(t:Topic)
 RETURN t.name AS topic, COUNT(s) AS sentence_count
 ORDER BY sentence_count DESC
 LIMIT 10
@@ -402,10 +407,10 @@ FOR (sf:SourceFile) REQUIRE sf.filename IS UNIQUE;
 
 // Indexes for performance
 CREATE INDEX sentence_lookup IF NOT EXISTS
-FOR (s:Sentence) ON (s.sentence_id, s.filename);
+FOR (s:Fragment) ON (s.sentence_id, s.filename);
 
 CREATE INDEX sentence_sequence IF NOT EXISTS
-FOR (s:Sentence) ON (s.filename, s.sequence_order);
+FOR (s:Fragment) ON (s.filename, s.sequence_order);
 
 CREATE INDEX topic_name IF NOT EXISTS
 FOR (t:Topic) ON (t.name);

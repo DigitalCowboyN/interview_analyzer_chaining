@@ -143,7 +143,7 @@ class TestProjectionReplay:
 
             # Check Sentence nodes
             result = await session.run(
-                "MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence) "
+                "MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment) "
                 "RETURN count(s) as count",
                 interview_id=interview_id,
             )
@@ -152,7 +152,7 @@ class TestProjectionReplay:
 
             # Check Analysis nodes
             result = await session.run(
-                "MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Sentence)"
+                "MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)"
                 "-[:HAS_ANALYSIS]->(a:Analysis) "
                 "RETURN count(a) as count",
                 interview_id=interview_id,
@@ -260,7 +260,7 @@ class TestProjectionReplay:
             original_title = (await result.single())["title"]
 
             result = await session.run(
-                "MATCH (s:Sentence)-[:PART_OF_INTERVIEW]->(:Interview {interview_id: $interview_id}) "
+                "MATCH (s:Fragment)-[:PART_OF_INTERVIEW]->(:Interview {interview_id: $interview_id}) "
                 "RETURN count(s) as count",
                 interview_id=interview_id,
             )
@@ -289,7 +289,7 @@ class TestProjectionReplay:
             assert replayed_title == original_title, "Title mismatch after replay"
 
             result = await session.run(
-                "MATCH (s:Sentence)-[:PART_OF_INTERVIEW]->(:Interview {interview_id: $interview_id}) "
+                "MATCH (s:Fragment)-[:PART_OF_INTERVIEW]->(:Interview {interview_id: $interview_id}) "
                 "RETURN count(s) as count",
                 interview_id=interview_id,
             )

@@ -176,7 +176,7 @@ class TestIdempotency:
         # Verify text is "Edited text"
         async with await Neo4jConnectionManager.get_session(database="neo4j") as session:
             result = await session.run(
-                "MATCH (s:Sentence {sentence_id: $sentence_id}) RETURN s.text as text, s.event_version as version",
+                "MATCH (s:Fragment {sentence_id: $sentence_id}) RETURN s.text as text, s.event_version as version",
                 sentence_id=sentence_id,
             )
             record = await result.single()
@@ -189,7 +189,7 @@ class TestIdempotency:
         # === Verify state unchanged (version guard worked) ===
         async with await Neo4jConnectionManager.get_session(database="neo4j") as session:
             result = await session.run(
-                "MATCH (s:Sentence {sentence_id: $sentence_id}) RETURN s.text as text, s.event_version as version",
+                "MATCH (s:Fragment {sentence_id: $sentence_id}) RETURN s.text as text, s.event_version as version",
                 sentence_id=sentence_id,
             )
             record = await result.single()
@@ -278,7 +278,7 @@ class TestIdempotency:
         # Capture final state
         async with await Neo4jConnectionManager.get_session(database="neo4j") as session:
             result = await session.run(
-                "MATCH (s:Sentence {sentence_id: $sentence_id}) "
+                "MATCH (s:Fragment {sentence_id: $sentence_id}) "
                 "RETURN s.text as text, s.event_version as version, s.is_edited as is_edited",
                 sentence_id=sentence_id,
             )
@@ -295,7 +295,7 @@ class TestIdempotency:
         # === Verify state unchanged ===
         async with await Neo4jConnectionManager.get_session(database="neo4j") as session:
             result = await session.run(
-                "MATCH (s:Sentence {sentence_id: $sentence_id}) "
+                "MATCH (s:Fragment {sentence_id: $sentence_id}) "
                 "RETURN s.text as text, s.event_version as version, s.is_edited as is_edited",
                 sentence_id=sentence_id,
             )

@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-07-10
+**Last Updated:** 2026-07-11
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -25,15 +25,63 @@
 | **M3.1** | ✅ Complete | Vector Search (delivered as Layer 2 embeddings + per-model indexes) |
 | **M4.3** | ✅ Complete | Layer 3: Generic Lens Engine (meeting_minutes first) + debt burndown |
 | **M4.4** | ✅ Complete | Layer 5: OKF Export + front-matter capture + richer queries |
+| **M4.5** | ⏳ In Progress | Layer 4: schema v2 (a: debt+rename ✅, b: resolution, c: segments) |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** Next milestone planning — Layer 4 entity resolution / GraphRAG (see docs/superpowers/specs/2026-07-04-mine-layers-design.md build order)
-**Tests:** 997 unit passing, 3 skipped | **Coverage:** ~90.8% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Current Phase:** M4.5b (resolution core)
+**Tests:** 1018 unit passing, 3 skipped | **Coverage:** ~90.8% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
 ## Milestone Checklist
+
+### M4.5a: Debt Burndown + Fragment Rename ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-10-layer4-schema-v2-design.md` (M4.5a section)
+**Plan:** `docs/superpowers/plans/2026-07-10-m45a-debt-fragment-rename.md`
+
+Debt burndown (M4.4-exit debt, landed first, per the M4.3 pattern):
+- [x] Renderer text safety: `_link_text` / `_cell` escape LLM/graph text in
+      markdown link labels and table cells; single-pass `(path, title)`
+      derivation shared across item files, index sections, speaker back-links
+- [x] `_SlugRegistry`: bundle-wide unique speaker/entity slugs (`-2`, `-3`, …
+      suffixes; hash fallback for punctuation-only surfaces)
+- [x] `LensNeverAppliedError` → 422 (never-applied lens no longer produces a
+      near-empty bundle); `speaker_rollup_rows` scan-capped (`LIMIT $scan_cap`,
+      default 5000)
+- [x] Staged atomic bundle writes off the event loop (`_write_bundle` via
+      `asyncio.to_thread`; write to a sibling staging dir, then swap — a
+      failure mid-write leaves the old bundle intact)
+- [x] Offsets-invariant-with-front-matter test parametrized for the FLAT
+      (unlabeled) path alongside LABELED
+
+Sentence → Fragment rename (dual-label overlay + migration CLI; wire format frozen):
+- [x] Dual-label writer: `SentenceCreatedHandler`'s create query keeps
+      `MERGE (s:Sentence {sentence_id: $sentence_id})` as anchor and adds
+      `SET s:Fragment`; `python -m src.projections.migrate_fragment_label`
+      one-shot idempotent migration (`{"relabeled": <n>}`)
+- [x] All owned reads flip `MATCH (s:Sentence ...)` → `MATCH (s:Fragment ...)`
+      across `src/export/reader.py` and every projection handler; vector-index
+      DDL stays on `:Sentence` (shim keeps it serving) until the shim drops
+- [x] Code-surface rename: `Fragment` aggregate class (was `Sentence`),
+      `get_fragment_repository()` (was `get_sentence_repository`) — both with
+      deprecated aliases (`Sentence = Fragment`, `get_sentence_repository =
+      get_fragment_repository`); event types, `aggregate_type` value
+      (`"Sentence"`), and `Sentence-{id}` stream names are frozen wire format
+      and unchanged
+- [x] Integration smokes (Layers 1/2/3/5) and data-integrity/idempotency/replay
+      tests flipped to `:Fragment`; migration idempotence proven live against
+      the test DB (second run relabels 0); `docs/architecture/database-schema.md`
+      updated (`:Fragment` primary, `:Sentence` shim + frozen-wire-format note)
+
+**Completed:** 2026-07-11
+
+**Deferred:** M4.5b (Project aggregate, resolution engine, corrections) and
+M4.5c (segments); dropping the `:Sentence` shim label and deprecated code
+aliases; re-targeting vector index DDL to `:Fragment` (rides the shim drop).
+
+---
 
 ### M4.4: Layer 5 — OKF Export + Front-Matter Capture ✅ COMPLETE
 

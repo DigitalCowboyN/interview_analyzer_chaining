@@ -64,7 +64,7 @@ async def test_ingested_interview_projects_speaker_utterance_subgraph(tmp_path):
         res = await session.run(
             """
             MATCH (i:Interview {interview_id: $iid})-[:HAS_PARTICIPANT]->(sp:Speaker)
-            OPTIONAL MATCH (sp)-[:SPOKE]->(u:Utterance)<-[:PART_OF_UTTERANCE]-(s:Sentence)
+            OPTIONAL MATCH (sp)-[:SPOKE]->(u:Utterance)<-[:PART_OF_UTTERANCE]-(s:Fragment)
             RETURN count(DISTINCT sp) AS speakers,
                    count(DISTINCT u) AS utterances,
                    count(DISTINCT s) AS fragments
