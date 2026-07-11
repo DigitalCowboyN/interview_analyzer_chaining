@@ -257,7 +257,11 @@ class RepositoryFactory:
         """
         return SentenceRepository(self.event_store)
 
-    # deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop
+    # deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop.
+    # Consumer modules (ingestion/lens/enrichment orchestrators, command handlers, speakers
+    # router) intentionally keep calling this old name: ~18 existing tests patch it by
+    # consumer-module dotted path (e.g. patch("src.ingestion.orchestrator.get_sentence_repository")).
+    # Call sites and test patch paths flip to the fragment_ names together, post-M4.5.
     create_sentence_repository = create_fragment_repository
 
 
@@ -310,5 +314,7 @@ def get_fragment_repository() -> SentenceRepository:
     return factory.create_fragment_repository()
 
 
-# deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop
+# deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop.
+# See create_sentence_repository above: consumer call sites keep this old name intentionally
+# (test patch paths depend on it), and flip together with the aliases dropping post-M4.5.
 get_sentence_repository = get_fragment_repository

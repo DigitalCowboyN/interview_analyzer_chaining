@@ -30,7 +30,7 @@
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** M4.5b (resolution core)
-**Tests:** 1018 unit passing, 3 skipped | **Coverage:** ~90.8% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Tests:** 1018 unit passing, 3 skipped | **Coverage:** 90.97% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
@@ -76,6 +76,10 @@ Sentence → Fragment rename (dual-label overlay + migration CLI; wire format fr
       updated (`:Fragment` primary, `:Sentence` shim + frozen-wire-format note)
 
 **Completed:** 2026-07-11
+
+**Deploy prerequisite:** any environment with pre-existing graph data MUST run
+`python -m src.projections.migrate_fragment_label` when deploying this branch
+(reads already query `:Fragment`); verified idempotent live.
 
 **Deferred:** M4.5b (Project aggregate, resolution engine, corrections) and
 M4.5c (segments); dropping the `:Sentence` shim label and deprecated code
@@ -505,6 +509,28 @@ limitation); OKF export of lens outputs (M4.4).
 - [ ] Rollup substring name-filter behavioral test with non-empty data;
       renderer item_path/title derivation DRY-up; bundler rmtree→write window
       not atomic on OS/IO failure (consider temp-dir + rename staging)
+
+**From M4.5a final review (2026-07-11):**
+- [ ] Flip repository getter/factory call sites + test patch paths to
+      `get_fragment_repository`/`create_fragment_repository` together when the
+      deprecated aliases drop (post-M4.5)
+- [ ] Dual-label invariant assertion (every `:Sentence` is `:Fragment` and vice
+      versa) → land in the M4.5b Layer-4 integration smoke
+- [ ] `_link_text` backslash hardening in `src/export/renderer.py` (raw
+      trailing `\` can still escape a link's closing bracket; escape
+      backslashes first or rstrip after truncation)
+- [ ] `FragmentRepository = SentenceRepository` class alias (+ edits.py local
+      dependency naming) so M4.5b code doesn't annotate against the old class
+      name
+- [ ] Concurrent exports of same interview+lens share one fixed `.staging`
+      path (`bundler.py`) — pre-existing race, not a regression
+- [ ] Unit-test gap: projection-handler read-MATCH label shapes covered only
+      by integration smokes
+- [ ] Migration CLI uses deprecated `CALL {} IN TRANSACTIONS` syntax
+      (non-fatal notice; CLI deleted at shim drop — fix only if it outlives
+      that)
+- [ ] Claim `(path, title)` derivation duplicated between render_bundle
+      back-links and `_render_claim` (DRY)
 
 **Feature deferrals (each waits for a real need or its milestone):**
 - [ ] Persona lens — second lens, proves zero-per-lens-code for real (YAML + prompts)

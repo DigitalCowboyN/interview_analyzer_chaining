@@ -123,8 +123,16 @@ unaffected by this rename.
 | `sequence_order` | integer | Order in document |
 | `event_version` | integer | Latest event version (for idempotency) |
 
+During the shim window both labels need their own index — the write path
+still `MERGE`s on `:Sentence {sentence_id}` while reads query `:Fragment`.
+The `:Sentence`-label index is dropped together with the shim label
+after M4.5.
+
 ```cypher
 CREATE INDEX sentence_id_idx IF NOT EXISTS
+FOR (s:Sentence) ON (s.sentence_id, s.filename)
+
+CREATE INDEX fragment_id_idx IF NOT EXISTS
 FOR (s:Fragment) ON (s.sentence_id, s.filename)
 ```
 
@@ -406,10 +414,20 @@ CREATE CONSTRAINT source_file_filename IF NOT EXISTS
 FOR (sf:SourceFile) REQUIRE sf.filename IS UNIQUE;
 
 // Indexes for performance
+// Shim window: `:Sentence` is the write-path MERGE anchor, `:Fragment` is the
+// read-path label — both need indexes until the `:Sentence` shim label drops
+// after M4.5, at which point the `sentence_lookup` / `sentence_sequence`
+// indexes below are removed.
 CREATE INDEX sentence_lookup IF NOT EXISTS
-FOR (s:Fragment) ON (s.sentence_id, s.filename);
+FOR (s:Sentence) ON (s.sentence_id, s.filename);
 
 CREATE INDEX sentence_sequence IF NOT EXISTS
+FOR (s:Sentence) ON (s.filename, s.sequence_order);
+
+CREATE INDEX fragment_lookup IF NOT EXISTS
+FOR (s:Fragment) ON (s.sentence_id, s.filename);
+
+CREATE INDEX fragment_sequence IF NOT EXISTS
 FOR (s:Fragment) ON (s.filename, s.sequence_order);
 
 CREATE INDEX topic_name IF NOT EXISTS
