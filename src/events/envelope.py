@@ -26,6 +26,7 @@ class AggregateType(str, Enum):
 
     INTERVIEW = "Interview"
     SENTENCE = "Sentence"
+    PROJECT = "Project"
 
 
 class Actor(BaseModel):
