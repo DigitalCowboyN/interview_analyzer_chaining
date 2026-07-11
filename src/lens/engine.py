@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel
 
 from src.enrichment.executor import EnrichmentExecutor
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Fragment, Interview
 from src.events.envelope import Actor, ActorType, generate_correlation_id
 from src.events.repository import get_interview_repository, get_sentence_repository
 from src.lens.models import LensExtractorDecl, LensSpec, load_lens
@@ -144,11 +144,11 @@ class LensEngine:
             units_processed=units,
         )
 
-    async def _load_fragments(self, interview: Interview) -> List[Sentence]:
+    async def _load_fragments(self, interview: Interview) -> List[Fragment]:
         """Load fragments by deterministic uuid5 id, in index order."""
         sentence_repo = get_sentence_repository()
         fragment_count = interview.metadata.get("fragment_count", 0)
-        ordered: List[Sentence] = []
+        ordered: List[Fragment] = []
         for index in range(fragment_count):
             sid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview.aggregate_id}:{index}"))
             sentence = await sentence_repo.load(sid)
@@ -158,7 +158,7 @@ class LensEngine:
         return ordered
 
     def _utterance_texts(
-        self, interview: Interview, ordered: List[Sentence]
+        self, interview: Interview, ordered: List[Fragment]
     ) -> Dict[str, str]:
         """Join member-fragment texts (in fragment_ids order) per utterance."""
         by_aggregate = {s.aggregate_id: s for s in ordered}
@@ -170,7 +170,7 @@ class LensEngine:
             texts[uid] = " ".join(parts)
         return texts
 
-    def _document_text(self, interview: Interview, ordered: List[Sentence]) -> str:
+    def _document_text(self, interview: Interview, ordered: List[Fragment]) -> str:
         """Full transcript, speaker-labeled '[S1]: text' lines in index order."""
         lines = []
         for s in ordered:
@@ -182,7 +182,7 @@ class LensEngine:
         self,
         decl: LensExtractorDecl,
         interview: Interview,
-        ordered: List[Sentence],
+        ordered: List[Fragment],
         utterance_texts: Dict[str, str],
         document_text: str,
     ) -> List[Tuple[str, str, Optional[str], List[str]]]:

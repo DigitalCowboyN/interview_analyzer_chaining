@@ -119,7 +119,7 @@ class AggregateRoot(ABC):
         # Determine aggregate type based on class
         if isinstance(self, Interview):
             aggregate_type = AggregateType.INTERVIEW
-        elif isinstance(self, Sentence):
+        elif isinstance(self, Fragment):
             aggregate_type = AggregateType.SENTENCE
         else:
             raise ValueError(f"Unknown aggregate type: {type(self)}")
@@ -747,16 +747,20 @@ class Interview(AggregateRoot):
         )
 
 
-class Sentence(AggregateRoot):
+class Fragment(AggregateRoot):
     """
-    Sentence aggregate representing a single sentence within an interview.
+    Fragment aggregate representing a single sentence within an interview.
 
     Manages sentence content, editing, analysis results, and manual overrides.
     Tracks the relationship to its parent interview and maintains sequence order.
+
+    Formerly named ``Sentence``; the wire format (AggregateType.SENTENCE,
+    the "Sentence" stream/type value, and all SentenceCreated-style event
+    type strings) is unchanged by this rename.
     """
 
     def __init__(self, aggregate_id: str):
-        """Initialize a new Sentence aggregate."""
+        """Initialize a new Fragment aggregate."""
         super().__init__(aggregate_id)
         self.interview_id: Optional[str] = None
         self.index: Optional[int] = None
@@ -1169,3 +1173,7 @@ class Sentence(AggregateRoot):
             },
             **envelope_kwargs,
         )
+
+
+# deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop
+Sentence = Fragment

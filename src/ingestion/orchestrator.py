@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Fragment, Interview
 from src.events.envelope import Actor, ActorType, generate_correlation_id
 from src.events.repository import get_interview_repository, get_sentence_repository
 from src.ingestion.models import NormalizedTranscript, TranscriptFormat
@@ -227,7 +227,7 @@ class IngestionOrchestrator:
         actor: Actor,
         correlation_id: str,
     ) -> Dict[int, str]:
-        """Create Sentence aggregates with offsets and speaker attribution."""
+        """Create Fragment aggregates with offsets and speaker attribution."""
         sentence_repo = get_sentence_repository()
         assignment_by_seq = {a.sequence_order: a for a in assignments}
         fragment_uuids: Dict[int, str] = {}
@@ -236,7 +236,7 @@ class IngestionOrchestrator:
                 uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{frag.sequence_order}")
             )
             fragment_uuids[frag.sequence_order] = sentence_id
-            sentence = Sentence(sentence_id)
+            sentence = Fragment(sentence_id)
             sentence.create(
                 interview_id=interview_id,
                 index=frag.sequence_order,

@@ -8,7 +8,7 @@ and persist events to the event store.
 import logging
 from typing import Optional
 
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Fragment, Interview
 from src.events.envelope import Actor, generate_correlation_id
 from src.events.interview_events import InterviewStatus
 from src.events.repository import RepositoryFactory
@@ -238,7 +238,7 @@ class SentenceCommandHandler(CommandHandler):
                 raise CommandValidationError(f"Sentence {command.sentence_id} already exists", field="sentence_id")
 
             # Create new sentence aggregate
-            sentence = Sentence(command.sentence_id)
+            sentence = Fragment(command.sentence_id)
 
             # Execute command
             sentence.create(
