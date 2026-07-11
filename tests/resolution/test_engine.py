@@ -106,7 +106,11 @@ async def test_first_run_two_interviews_canonicalizes_entities_and_links_persons
     interviews = {I1: make_interview(I1), I2: make_interview(I2)}
     project = Project(project_aggregate_id(PID))
 
+    events = []
     patches, project_repo, _ = patch_engine(project, rows, speakers, interviews)
+    project_repo.save = AsyncMock(
+        side_effect=lambda a, **k: (events.extend(a.get_uncommitted_events()), a.mark_events_as_committed())
+    )
     with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
         result = await ResolutionEngine(config_dict={"resolution": {}}).apply(PID)
 
@@ -141,6 +145,12 @@ async def test_first_run_two_interviews_canonicalizes_entities_and_links_persons
     for pid, sid in [(I1, "s1"), (I2, "s2")]:
         link_pid = project.link_for_speaker(pid, sid)
         assert link_pid == jane_id
+
+    # Verify that both SpeakerLinkedToPerson events used exact_name method.
+    speaker_link_events = [e for e in events if e.event_type == "SpeakerLinkedToPerson"]
+    assert len(speaker_link_events) == 2
+    for event in speaker_link_events:
+        assert event.data["method"] == "exact_name"
 
     project_repo.save.assert_awaited_once()
 
@@ -278,7 +288,11 @@ async def test_front_matter_participant_single_speaker_uses_front_matter_method(
     interviews = {I1: make_interview(I1, participants=["Jane Doe"])}
     project = Project(project_aggregate_id(PID))
 
+    events = []
     patches, project_repo, _ = patch_engine(project, rows, speakers, interviews)
+    project_repo.save = AsyncMock(
+        side_effect=lambda a, **k: (events.extend(a.get_uncommitted_events()), a.mark_events_as_committed())
+    )
     with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
         result = await ResolutionEngine(config_dict={"resolution": {}}).apply(PID)
 
@@ -287,6 +301,12 @@ async def test_front_matter_participant_single_speaker_uses_front_matter_method(
     jane_id = person_id_for(PID, "jane doe")
     person = project.persons[jane_id]
     assert person["links"] == [[I1, "s1"]]
+
+    # Verify that SpeakerLinkedToPerson event used front_matter method.
+    speaker_link_events = [e for e in events if e.event_type == "SpeakerLinkedToPerson"]
+    assert len(speaker_link_events) == 1
+    assert speaker_link_events[0].data["method"] == "front_matter"
+
     project_repo.save.assert_awaited_once()
 
 
