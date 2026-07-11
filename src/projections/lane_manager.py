@@ -251,6 +251,10 @@ class LaneManager:
         if event.aggregate_type == "Sentence":
             return event.data.get("interview_id")
 
+        if event.aggregate_type == "Project":
+            # Project events serialize per project; lane key is the aggregate id.
+            return event.aggregate_id
+
         logger.warning(f"Unknown aggregate type {event.aggregate_type} for event {event.event_id}")
         return None
 
