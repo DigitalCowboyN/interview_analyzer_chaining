@@ -16,3 +16,11 @@ def test_project_subscription_allowlist():
         "PersonLinkRemoved",
     ):
         assert is_event_allowed("project", event_type)
+
+
+def test_interview_subscription_allowlist_includes_segment_events():
+    """The $ce-Interview subscription must allow the M4.5c segment event types."""
+    from src.projections.config import is_event_allowed
+
+    assert is_event_allowed("interview", "SegmentIdentified")
+    assert is_event_allowed("interview", "SegmentRemoved")

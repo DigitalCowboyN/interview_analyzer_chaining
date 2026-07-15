@@ -63,6 +63,9 @@ SUBSCRIPTION_CONFIG: Dict[str, Dict] = {
             "LensApplied",
             "LensExtractionGenerated",
             "LensExtractionOverridden",
+            # Layer 4 (M4.5c): topic segments
+            "SegmentIdentified",
+            "SegmentRemoved",
         ],
     },
     "sentence": {

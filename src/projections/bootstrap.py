@@ -42,6 +42,10 @@ from src.projections.handlers.resolution_handlers import (
     PersonLinkRemovedHandler,
     SpeakerLinkedToPersonHandler,
 )
+from src.projections.handlers.segment_handlers import (
+    SegmentIdentifiedHandler,
+    SegmentRemovedHandler,
+)
 from src.projections.handlers.utterance_handlers import (
     InterruptionRecordedHandler,
     StitchRemovedHandler,
@@ -107,6 +111,10 @@ def create_handler_registry(
     registry.register(
         "LensExtractionOverridden", LensExtractionOverriddenHandler(parked_events_manager)
     )
+
+    # Register segment handlers (Layer 4, M4.5c) — Interview stream
+    registry.register("SegmentIdentified", SegmentIdentifiedHandler(parked_events_manager))
+    registry.register("SegmentRemoved", SegmentRemovedHandler(parked_events_manager))
 
     # Register resolution handlers (Layer 4, M4.5b) — Project stream
     registry.register("EntityCanonicalized", EntityCanonicalizedHandler(parked_events_manager))
