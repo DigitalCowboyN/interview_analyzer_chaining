@@ -227,4 +227,4 @@ def test_document_scope_specs_split():
     executor = EnrichmentExecutor(
         MagicMock(), specs, load_yaml("prompts/core_extractors.yaml"), domain_keywords=[], concurrency=2
     )
-    assert [s.name for s in executor.document_specs] == ["objectives"]
+    assert [s.name for s in executor.document_specs] == ["topic_segments", "objectives"]

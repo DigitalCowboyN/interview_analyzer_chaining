@@ -75,3 +75,14 @@ class ClaimItem(StrictResult):
 
 class ClaimsResult(StrictResult):
     claims: List[ClaimItem]
+
+
+class SegmentItem(StrictResult):
+    topic: str
+    start_index: int = Field(..., ge=0)
+    end_index: int = Field(..., ge=0)
+    confidence: float = Field(..., ge=0.0, le=1.0)
+
+
+class SegmentsResult(StrictResult):
+    segments: List[SegmentItem]

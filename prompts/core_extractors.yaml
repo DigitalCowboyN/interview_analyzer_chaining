@@ -213,3 +213,23 @@ claims:
     """
 
     Provide your response explicitly formatted as JSON.
+
+topic_segments:
+  prompt: |
+    Segment the transcript below into topic episodes. Each transcript line is
+    one fragment, prefixed with its fragment index in square brackets, then
+    the speaker. A topic episode is a contiguous run of fragments about one
+    topic. For each episode report a short noun-phrase topic, the index of
+    its first fragment (start_index) and of its last fragment (end_index,
+    inclusive). Episodes must be in transcript order, must not overlap, and
+    every index must be one of the bracketed indices shown. Not every
+    fragment needs an episode; skip greetings and small talk.
+
+    Format: {{"segments": [{{"topic": "<short noun phrase>", "start_index": <int>, "end_index": <int>, "confidence": <number between 0 and 1>}}]}}
+
+    If there are no clear topic episodes, return {{"segments": []}}.
+
+    Transcript:
+    {sentence}
+
+    Provide your response explicitly formatted as JSON.
