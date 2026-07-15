@@ -188,11 +188,24 @@ def _render_interview(
     return "interview.md", "\n".join(lines) + "\n"
 
 
-def _render_transcript(transcript: List[Dict[str, Any]], anchors: Dict[str, str]) -> Tuple[str, str]:
+def _render_transcript(
+    transcript: List[Dict[str, Any]],
+    anchors: Dict[str, str],
+    segments: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[str, str]:
     fm = {"type": "Transcript"}
     lines = [_frontmatter(fm), "# Transcript", ""]
+    headings = {s["start_index"]: s["topic"] for s in (segments or [])}
     last_anchor = None
     for row in transcript:
+        topic = headings.get(row.get("sequence_order"))
+        if topic is not None:
+            if last_anchor is not None:
+                lines.append("")
+            lines.append(f"## {topic}")
+            lines.append("")
+            # Force a fresh speaker header under the new section.
+            last_anchor = None
         anchor = anchors[row["sentence_id"]]
         if anchor != last_anchor:
             if last_anchor is not None:
@@ -538,6 +551,7 @@ def render_bundle(
     lens: LensSpec,
     exported_at: str,
     persons: Optional[List[Dict[str, Any]]] = None,
+    segments: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Tuple[str, str]]:
     anchors = _anchors(transcript)
     sentence_text = {row["sentence_id"]: row.get("text", "") for row in transcript}
@@ -557,7 +571,7 @@ def render_bundle(
     index_sections: Dict[str, List[Tuple[str, str]]] = {"speakers": []}
 
     files.append(_render_interview(header, registry, speaker_slugs))
-    files.append(_render_transcript(transcript, anchors))
+    files.append(_render_transcript(transcript, anchors, segments=segments))
     files.append(_render_analysis(analysis))
 
     # Single derivation of each item's (rel_path, title), reused by the item-file

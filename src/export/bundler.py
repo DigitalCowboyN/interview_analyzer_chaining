@@ -66,12 +66,13 @@ class OkfExporter:
             entities = await reader.entity_rows(session, interview_id)
             analysis = await reader.analysis_rows(session, interview_id)
             persons = await reader.person_rows(session, interview_id)
+            segments = await reader.segment_rows(session, interview_id)
 
         header = self._header(interview, lens)
         exported_at = datetime.now(timezone.utc).isoformat()
         files = render_bundle(
             header, transcript, speakers, items, claims, entities, analysis, lens, exported_at,
-            persons=persons,
+            persons=persons, segments=segments,
         )
 
         bundle_dir = Path(out_dir) / f"{interview_id}-{lens.name}"
