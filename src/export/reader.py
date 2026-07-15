@@ -95,11 +95,27 @@ async def entity_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)-[m:MENTIONS]->(e:Entity)
     WITH e, collect({sentence_id: s.aggregate_id, start: m.start, end: m.end,
                       text: m.text, confidence: m.confidence}) AS mentions
-    RETURN e.surface AS surface, e.entity_type AS entity_type, mentions
+    OPTIONAL MATCH (e)-[:ALIAS_OF]->(c:CanonicalEntity)
+    WHERE c.merged_into IS NULL
+    RETURN e.surface AS surface, e.entity_type AS entity_type, mentions,
+           c.canonical_id AS canonical_id, c.name AS canonical_name
     ORDER BY e.surface
     """
     result = await session.run(query, interview_id=interview_id)
     return [dict(r) async for r in result]
+
+
+async def person_rows(session, interview_id: str) -> List[Dict[str, Any]]:
+    """Persons identified for this interview's speakers."""
+    query = """
+    MATCH (:Interview {interview_id: $interview_id})-[:HAS_PARTICIPANT]->
+          (sp:Speaker)-[:IDENTIFIED_AS]->(p:Person)
+    RETURN sp.speaker_id AS speaker_id, p.person_id AS person_id,
+           p.display_name AS display_name
+    ORDER BY speaker_id
+    """
+    result = await session.run(query, interview_id=interview_id)
+    return [dict(record) async for record in result]
 
 
 async def worklist_rows(

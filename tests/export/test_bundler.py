@@ -34,7 +34,7 @@ def patch_world(interview, projected_items):
     session.__aexit__ = AsyncMock(return_value=False)
     reader_rows = {
         "transcript_rows": [], "speaker_rows": [], "claim_rows": [],
-        "entity_rows": [], "analysis_rows": [],
+        "entity_rows": [], "analysis_rows": [], "person_rows": [],
     }
     patches = [
         patch("src.export.bundler.get_interview_repository", return_value=repo),
@@ -60,7 +60,7 @@ PROJECTED = [{
 async def test_export_writes_conformant_bundle(tmp_path):
     import yaml
     patches = patch_world(make_interview(), PROJECTED)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8]:
         result = await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
     bundle = tmp_path / f"{IID}-meeting_minutes"
     assert (bundle / "index.md").exists() and (bundle / "interview.md").exists()
@@ -73,7 +73,7 @@ async def test_export_writes_conformant_bundle(tmp_path):
 @pytest.mark.asyncio
 async def test_projection_lag_raises(tmp_path):
     patches = patch_world(make_interview(with_item=True), projected_items=[])  # graph empty
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8]:
         with pytest.raises(RuntimeError, match="projection lag"):
             await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
 
@@ -89,7 +89,7 @@ async def test_unknown_interview_raises(tmp_path):
 @pytest.mark.asyncio
 async def test_reexport_prepends_log_entry(tmp_path):
     patches = patch_world(make_interview(), PROJECTED)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8]:
         await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
         await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
     log = (tmp_path / f"{IID}-meeting_minutes" / "log.md").read_text()
@@ -104,7 +104,7 @@ async def test_never_applied_lens_raises_422_error(tmp_path):
     interview.create(title="t", source="s", metadata={"fragment_count": 1})
     interview.mark_events_as_committed()
     patches = patch_world(interview, projected_items=[])
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8]:
         with pytest.raises(LensNeverAppliedError, match="never applied"):
             await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
 
@@ -112,7 +112,7 @@ async def test_never_applied_lens_raises_422_error(tmp_path):
 @pytest.mark.asyncio
 async def test_reexport_same_day_groups_under_one_heading(tmp_path):
     patches = patch_world(make_interview(), PROJECTED)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8]:
         await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
         await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
     log = (tmp_path / f"{IID}-meeting_minutes" / "log.md").read_text()
@@ -130,7 +130,7 @@ async def test_reexport_same_day_groups_under_one_heading(tmp_path):
 @pytest.mark.asyncio
 async def test_failed_write_preserves_previous_bundle(tmp_path, monkeypatch):
     patches = patch_world(make_interview(), PROJECTED)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8]:
         await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
         bundle = tmp_path / f"{IID}-meeting_minutes"
         original_index = (bundle / "index.md").read_text()

@@ -113,6 +113,42 @@ async def test_rollup_substring_filter_on_grouped_data():
 
 
 @pytest.mark.asyncio
+async def test_entity_rows_returns_canonical_fields():
+    session = make_session([
+        {"surface": "ecu", "entity_type": "product", "mentions": [],
+         "canonical_id": "canon-1", "canonical_name": "ECU"},
+    ])
+    rows = await reader.entity_rows(session, IID)
+    assert rows[0]["canonical_id"] == "canon-1"
+    assert rows[0]["canonical_name"] == "ECU"
+    query = session.run.call_args[0][0]
+    assert "OPTIONAL MATCH" in query and "ALIAS_OF" in query
+
+
+@pytest.mark.asyncio
+async def test_entity_rows_canonical_none_when_no_alias():
+    session = make_session([
+        {"surface": "ecu", "entity_type": "product", "mentions": [],
+         "canonical_id": None, "canonical_name": None},
+    ])
+    rows = await reader.entity_rows(session, IID)
+    assert rows[0]["canonical_id"] is None
+    assert rows[0]["canonical_name"] is None
+
+
+@pytest.mark.asyncio
+async def test_person_rows_shape_and_query():
+    session = make_session([
+        {"speaker_id": "sp1", "person_id": "person-1", "display_name": "Jane Doe"},
+    ])
+    rows = await reader.person_rows(session, IID)
+    assert rows == [{"speaker_id": "sp1", "person_id": "person-1", "display_name": "Jane Doe"}]
+    query = session.run.call_args[0][0]
+    assert "HAS_PARTICIPANT" in query and "IDENTIFIED_AS" in query
+    assert session.run.call_args.kwargs["interview_id"] == IID
+
+
+@pytest.mark.asyncio
 async def test_rollup_groups_linked_speakers_by_person():
     rows = [
         {"display_name": "Jane D.", "node_type": "ActionItem", "relationship": "OWNED_BY",
