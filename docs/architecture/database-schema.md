@@ -1,6 +1,6 @@
 # Database Schema
 
-> **Last Updated:** 2026-01-18
+> **Last Updated:** 2026-07-15
 
 ## Neo4j Graph Schema
 
@@ -289,6 +289,51 @@ A `LensApplied` run deletes the interview+lens's prior UNLOCKED items with an
 older `lens_version`; `locked = true` (human override via
 `LensExtractionOverridden`) always survives re-runs.
 
+### `:CanonicalEntity` (Layer 4 / M4.5b)
+
+The resolved identity behind one or more `:Entity` surfaces within a project.
+Never rewrites the Layer 2 `:Entity` node it aliases — resolution is a pure
+overlay.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `canonical_id` | string | Deterministic UUID (uuid5 of `{project_id}:entity:{normalized_name}:{entity_type}`) |
+| `name` | string | Representative display name (most-mentioned surface) |
+| `entity_type` | string | Entity type shared by every aliased surface |
+| `project_id` | string | Owning project (human id, not the aggregate UUID) |
+| `method` | string | `deterministic` \| `human` |
+| `confidence` | float | Resolution confidence (0–1) |
+| `locked` | boolean | True once a human merges/splits/canonicalizes — survives re-runs |
+| `merged_into` | string? | Surviving canonical id when this one lost a merge |
+
+### `:Person` (Layer 4 / M4.5b)
+
+A cross-interview identity behind one or more Layer 1 `:Speaker` nodes within
+a project. Never rewrites the `:Speaker` node it identifies.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `person_id` | string | Deterministic UUID (uuid5 of `{project_id}:person:{normalized_display_name}`) |
+| `display_name` | string | Front-matter spelling if matched, else most common raw speaker name |
+| `project_id` | string | Owning project |
+
+### Layer 4 resolution overlay (M4.5b)
+
+Canonical/person nodes and their edges are an overlay: they never rewrite
+Layer 1 `:Speaker` / Layer 2 `:Entity` nodes, only link to them. `Project-{id}`
+streams and the seven event names below are wire format (frozen).
+
+```
+(:Entity)-[:ALIAS_OF {project_id, method, confidence}]->(:CanonicalEntity)
+(:Speaker)-[:IDENTIFIED_AS {method, confidence}]->(:Person)
+```
+
+`ALIAS_OF` is keyed by `project_id` so the same `:Entity` surface can alias
+different canonicals in different projects. A merge (`EntityMergeConfirmed`)
+locks both canonicals and moves the losing one's `ALIAS_OF` edges to the
+survivor; a split (`EntitySplit`) creates a new canonical and moves the
+removed surfaces' edges to it.
+
 ### Layer 5 export (M4.4) — no graph schema changes
 
 M4.4 adds no nodes, edges, or properties. Front matter (title, started_at,
@@ -454,6 +499,7 @@ While Neo4j is the read model, EventStoreDB holds the authoritative event stream
 |----------------|---------|
 | `Interview-{uuid}` | Interview lifecycle events |
 | `Sentence-{uuid}` | Sentence lifecycle and analysis events |
+| `Project-{uuid}` | Project-scoped resolution events (Layer 4, M4.5b); `{uuid}` is `project_aggregate_id(project_id)` — a uuid5 of the human project id |
 | `$all` | System stream (all events) |
 
 ### Event Types Stored
@@ -482,3 +528,10 @@ While Neo4j is the read model, EventStoreDB holds the authoritative event stream
 | `LensApplied` | `Interview-{id}` | Lens run marker; supersedes prior unlocked items (Layer 3) |
 | `LensExtractionGenerated` | `Interview-{id}` | One lens item (dual-label node, Layer 3) |
 | `LensExtractionOverridden` | `Interview-{id}` | Human correction; locks the item (Layer 3) |
+| `EntityCanonicalized` | `Project-{id}` | New canonical entity created from a surface cluster (Layer 4) |
+| `EntityAliasAdded` | `Project-{id}` | One more surface aliased to an existing canonical (Layer 4) |
+| `EntityMergeConfirmed` | `Project-{id}` | Human merge of two canonicals (Layer 4) |
+| `EntitySplit` | `Project-{id}` | Human split-off of surfaces into a new canonical (Layer 4) |
+| `PersonIdentified` | `Project-{id}` | New cross-interview person identity (Layer 4) |
+| `SpeakerLinkedToPerson` | `Project-{id}` | Speaker linked to a person (`exact_name`/`front_matter`/`human`, Layer 4) |
+| `PersonLinkRemoved` | `Project-{id}` | Human unlinked a speaker from a person (Layer 4) |

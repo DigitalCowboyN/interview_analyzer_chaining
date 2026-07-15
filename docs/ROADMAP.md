@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-07-11
+**Last Updated:** 2026-07-15
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -25,16 +25,64 @@
 | **M3.1** | ✅ Complete | Vector Search (delivered as Layer 2 embeddings + per-model indexes) |
 | **M4.3** | ✅ Complete | Layer 3: Generic Lens Engine (meeting_minutes first) + debt burndown |
 | **M4.4** | ✅ Complete | Layer 5: OKF Export + front-matter capture + richer queries |
-| **M4.5** | ⏳ In Progress | Layer 4: schema v2 (a: debt+rename ✅, b: resolution, c: segments) |
+| **M4.5** | ⏳ In Progress | Layer 4: schema v2 (a ✅, b ✅, c: segments) |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M4.5b (resolution core)
-**Tests:** 1018 unit passing, 3 skipped | **Coverage:** 90.97% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Current Phase:** M4.5c (segments)
+**Tests:** 1123 unit passing, 3 skipped | **Coverage:** 91.63% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
 ## Milestone Checklist
+
+### M4.5b: Resolution Core ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-10-layer4-schema-v2-design.md` (M4.5b section)
+**Plan:** `docs/superpowers/plans/2026-07-11-m45b-resolution-core.md`
+
+Cross-interview resolution: canonical entities with aliases and real Person
+identities, driven by a new event-sourced `Project` aggregate, a
+deterministic+embedding `ResolutionEngine`, human corrections API, and
+consumer upgrades (worklist suggestions, Person-grouped rollup,
+canonical-keyed OKF bundles).
+
+- [x] Task 1: `src/events/project_events.py` — 7 event payload models +
+      `project_aggregate_id`/`canonical_entity_id`/`person_id_for` uuid5
+      helpers; `AggregateType.PROJECT`
+- [x] Task 2: `Project` aggregate (`src/events/aggregates.py`) — canonical
+      entities, persons, blocked links, locking discipline
+- [x] Task 3: `ProjectRepository` + factory/getter (`Project-{id}` stream)
+- [x] Task 4: Projection handlers for the 7 Project events
+      (`src/projections/handlers/resolution_handlers.py`) —
+      `(:CanonicalEntity)`/`(:Person)` overlay, `ALIAS_OF`/`IDENTIFIED_AS`
+- [x] Task 5: Delivery wiring — bootstrap registration, subscription
+      allowlist, lane routing, pin tests (bootstrap pin count → 29)
+- [x] Task 6: Resolution reader — the engine's own Neo4j input reads
+      (`src/resolution/reader.py`)
+- [x] Task 7: Candidate logic — pure functions for exact/embedding grouping
+      and person linking (`src/resolution/candidates.py`)
+- [x] Task 8: `ResolutionEngine` + CLI (`src/resolution/engine.py`,
+      `python -m src.resolution`) — idempotent re-runs, locked/blocked skips
+- [x] Task 9: Corrections API (`src/api/routers/resolution.py`) — merge,
+      split, link, unlink; 409s from domain `ValueError`
+- [x] Task 10: Worklist suggestions + Person-grouped speaker rollup
+- [x] Task 11: OKF bundle — canonical entities + Person concept files
+- [x] Task 12: Layer 4 integration smoke (`test_layer4_resolution_smoke.py`,
+      two interviews, overlapping surfaces, fake embedder, idempotence,
+      dual-label invariant) + schema v2 docs
+
+**Completed:** 2026-07-15
+
+**Deferred:** M4.5c (topic segments); LLM adjudication of borderline entity
+pairs (deterministic + review only, spec non-goal); cross-project person
+linking (human-only, future); embedding cache beyond a single run;
+suggestion pagination on the worklist; front-matter participant matching
+inside on-demand suggestions (engine-only); `FragmentRepository =
+SentenceRepository` class alias + call-site/patch-path flips (existing
+backlog, rides the alias drop).
+
+---
 
 ### M4.5a: Debt Burndown + Fragment Rename ✅ COMPLETE
 
@@ -514,8 +562,9 @@ limitation); OKF export of lens outputs (M4.4).
 - [ ] Flip repository getter/factory call sites + test patch paths to
       `get_fragment_repository`/`create_fragment_repository` together when the
       deprecated aliases drop (post-M4.5)
-- [ ] Dual-label invariant assertion (every `:Sentence` is `:Fragment` and vice
-      versa) → land in the M4.5b Layer-4 integration smoke
+- [x] Dual-label invariant assertion (every `:Sentence` is `:Fragment` and vice
+      versa) → closed by `tests/integration/test_layer4_resolution_smoke.py`
+      (M4.5b Task 12)
 - [ ] `_link_text` backslash hardening in `src/export/renderer.py` (raw
       trailing `\` can still escape a link's closing bracket; escape
       backslashes first or rstrip after truncation)
@@ -531,6 +580,14 @@ limitation); OKF export of lens outputs (M4.4).
       that)
 - [ ] Claim `(path, title)` derivation duplicated between render_bundle
       back-links and `_render_claim` (DRY)
+
+**From M4.5b (2026-07-15):**
+- [ ] Dockerized projection-service has never worked in this environment: its
+      Neo4j target (dev `neo4j` compose service) has been stopped for months
+      and until 278902f subscription groups were created without
+      resolve_links (all $ce- events parked). resolve_links is fixed; still
+      needed: point the service at a live Neo4j (or drop it from the default
+      stack) and add a deployed-path smoke.
 
 **Feature deferrals (each waits for a real need or its milestone):**
 - [ ] Persona lens — second lens, proves zero-per-lens-code for real (YAML + prompts)
