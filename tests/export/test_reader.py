@@ -82,9 +82,11 @@ async def test_rollup_queries_carry_scan_cap():
 async def test_rollup_substring_filter_on_grouped_data():
     rows = [
         {"display_name": "Alice Johnson", "node_type": "ActionItem", "relationship": "OWNED_BY",
-         "text": "t", "interview_id": "i1", "item_id": "x1"},
+         "text": "t", "interview_id": "i1", "item_id": "x1",
+         "person_id": None, "person_name": None},
         {"display_name": "Bob Reyes", "node_type": "Decision", "relationship": "DECIDED_BY",
-         "text": "t", "interview_id": "i1", "item_id": "x2"},
+         "text": "t", "interview_id": "i1", "item_id": "x2",
+         "person_id": None, "person_name": None},
     ]
     # first session.run call (items query) returns rows; second (claims) returns empty
     results = [rows, []]
@@ -106,3 +108,50 @@ async def test_rollup_substring_filter_on_grouped_data():
     session.run = AsyncMock(side_effect=run_side_effect)
     grouped = await reader.speaker_rollup_rows(session, name="ali")
     assert [g["display_name"] for g in grouped] == ["Alice Johnson"]
+    assert grouped[0]["linked"] is False
+    assert grouped[0]["person_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_rollup_groups_linked_speakers_by_person():
+    rows = [
+        {"display_name": "Jane D.", "node_type": "ActionItem", "relationship": "OWNED_BY",
+         "text": "t1", "interview_id": "i1", "item_id": "x1",
+         "person_id": "person-1", "person_name": "Jane Doe"},
+        {"display_name": "J. Doe", "node_type": "Decision", "relationship": "DECIDED_BY",
+         "text": "t2", "interview_id": "i2", "item_id": "x2",
+         "person_id": "person-1", "person_name": "Jane Doe"},
+        {"display_name": "Bob Reyes", "node_type": "Decision", "relationship": "DECIDED_BY",
+         "text": "t3", "interview_id": "i1", "item_id": "x3",
+         "person_id": None, "person_name": None},
+    ]
+    results = [rows, []]
+    call_count = {"n": 0}
+
+    def run_side_effect(query, **kw):
+        res = MagicMock()
+        data = results[min(call_count["n"], 1)]
+        call_count["n"] += 1
+
+        async def aiter(self):
+            for r in data:
+                yield r
+        res.__aiter__ = aiter
+        return res
+
+    session = MagicMock()
+    session.run = AsyncMock(side_effect=run_side_effect)
+    grouped = await reader.speaker_rollup_rows(session)
+
+    by_name = {g["display_name"]: g for g in grouped}
+    assert set(by_name) == {"Jane Doe", "Bob Reyes"}
+
+    jane = by_name["Jane Doe"]
+    assert jane["linked"] is True
+    assert jane["person_id"] == "person-1"
+    assert len(jane["items"]) == 2  # both raw speaker display_names merged under Person
+
+    bob = by_name["Bob Reyes"]
+    assert bob["linked"] is False
+    assert bob["person_id"] is None
+    assert len(bob["items"]) == 1

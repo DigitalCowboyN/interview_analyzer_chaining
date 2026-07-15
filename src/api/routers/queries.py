@@ -4,8 +4,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Query
 
+from src.config import config
+from src.enrichment.embedder import get_embedder
+from src.events.project_events import project_aggregate_id
+from src.events.repository import get_project_repository
 from src.export import reader
 from src.export.renderer import RESERVED_PROPS
+from src.resolution.suggestions import compute_suggestions
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
 router = APIRouter(tags=["queries"])
@@ -41,10 +46,23 @@ async def review_worklist(
     offset: int = Query(0, ge=0),
 ):
     async with await Neo4jConnectionManager.get_session() as session:
-        return await reader.worklist_rows(
+        payload = await reader.worklist_rows(
             session, project_id=project_id, threshold=threshold,
             limit=limit, offset=offset,
         )
+
+        if project_id is not None:
+            project = await get_project_repository().load(project_aggregate_id(project_id))
+            resolution_cfg = config.get("resolution", {})
+            suggestions = await compute_suggestions(
+                session, project, project_id, get_embedder(config),
+                auto_thr=resolution_cfg.get("auto_merge_threshold", 0.92),
+                suggest_thr=resolution_cfg.get("suggest_threshold", 0.80),
+            )
+        else:
+            suggestions = {"entity_merge_suggestions": [], "person_link_suggestions": []}
+        payload.update(suggestions)
+    return payload
 
 
 @router.get("/speakers/rollup")

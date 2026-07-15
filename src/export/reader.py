@@ -146,10 +146,20 @@ async def worklist_rows(
     return {"lens_items": lens_items, "claims": claims}
 
 
-def _group_rollup_row(groups: Dict[str, Dict[str, Any]], display_name: str) -> Dict[str, Any]:
-    return groups.setdefault(
-        display_name, {"display_name": display_name, "items": [], "claims": []}
-    )
+def _group_rollup_row(
+    groups: Dict[str, Dict[str, Any]],
+    display_name: str,
+    person_id: Optional[str],
+    person_name: Optional[str],
+) -> Dict[str, Any]:
+    key = person_id or f"name:{display_name.lower()}"
+    return groups.setdefault(key, {
+        "display_name": person_name or display_name,
+        "linked": person_id is not None,
+        "person_id": person_id,
+        "items": [],
+        "claims": [],
+    })
 
 
 async def speaker_rollup_rows(
@@ -167,9 +177,11 @@ async def speaker_rollup_rows(
       AND ($project_id IS NULL OR EXISTS {
         MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
               (:Interview {interview_id: n.interview_id}) })
+    OPTIONAL MATCH (sp)-[:IDENTIFIED_AS]->(person:Person)
     RETURN sp.display_name AS display_name, n.node_type AS node_type,
            type(r) AS relationship, n.text AS text,
-           n.interview_id AS interview_id, n.item_id AS item_id
+           n.interview_id AS interview_id, n.item_id AS item_id,
+           person.person_id AS person_id, person.display_name AS person_name
     LIMIT $scan_cap
     """
     claims_query = """
@@ -178,8 +190,10 @@ async def speaker_rollup_rows(
       AND ($project_id IS NULL OR EXISTS {
         MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
               (:Interview {interview_id: c.interview_id}) })
+    OPTIONAL MATCH (sp)-[:IDENTIFIED_AS]->(person:Person)
     RETURN sp.display_name AS display_name, c.text AS text, c.kind AS kind,
-           c.interview_id AS interview_id, c.claim_id AS claim_id
+           c.interview_id AS interview_id, c.claim_id AS claim_id,
+           person.person_id AS person_id, person.display_name AS person_name
     LIMIT $scan_cap
     """
     groups: Dict[str, Dict[str, Any]] = {}
@@ -188,20 +202,23 @@ async def speaker_rollup_rows(
     async for r in items_result:
         row = dict(r)
         display_name = row.pop("display_name")
-        _group_rollup_row(groups, display_name)["items"].append(row)
+        person_id = row.pop("person_id")
+        person_name = row.pop("person_name")
+        _group_rollup_row(groups, display_name, person_id, person_name)["items"].append(row)
 
     claims_result = await session.run(claims_query, project_id=project_id, scan_cap=scan_cap)
     async for r in claims_result:
         row = dict(r)
         display_name = row.pop("display_name")
-        _group_rollup_row(groups, display_name)["claims"].append(row)
+        person_id = row.pop("person_id")
+        person_name = row.pop("person_name")
+        _group_rollup_row(groups, display_name, person_id, person_name)["claims"].append(row)
 
-    display_names = sorted(groups)
+    ordered = sorted(groups.values(), key=lambda g: g["display_name"])
     if name is not None:
         needle = name.lower()
-        display_names = [dn for dn in display_names if needle in dn.lower()]
-    paginated = display_names[offset:offset + limit]
-    return [groups[dn] for dn in paginated]
+        ordered = [g for g in ordered if needle in g["display_name"].lower()]
+    return ordered[offset:offset + limit]
 
 
 async def analysis_rows(session, interview_id: str) -> List[Dict[str, Any]]:
