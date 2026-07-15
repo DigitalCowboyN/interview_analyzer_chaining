@@ -21,6 +21,7 @@ from src.api.routers import files as files_router
 from src.api.routers import lenses as lenses_router
 from src.api.routers import queries as queries_router
 from src.api.routers import resolution as resolution_router
+from src.api.routers import segments as segments_router
 from src.api.routers import speakers as speakers_router
 from src.config import config
 from src.utils.logger import get_logger
@@ -38,6 +39,7 @@ app.include_router(files_router.router)
 app.include_router(analysis_router.router)
 app.include_router(edits_router.router)
 app.include_router(speakers_router.router)
+app.include_router(segments_router.router)
 app.include_router(resolution_router.router)
 app.include_router(lenses_router.router)
 app.include_router(exports_router.router)
