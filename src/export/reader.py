@@ -92,11 +92,12 @@ async def claim_rows(session, interview_id: str) -> List[Dict[str, Any]]:
 
 async def entity_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     query = """
-    MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)-[m:MENTIONS]->(e:Entity)
-    WITH e, collect({sentence_id: s.aggregate_id, start: m.start, end: m.end,
+    MATCH (proj:Project)-[:CONTAINS_INTERVIEW]->
+          (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)-[m:MENTIONS]->(e:Entity)
+    WITH proj, e, collect({sentence_id: s.aggregate_id, start: m.start, end: m.end,
                       text: m.text, confidence: m.confidence}) AS mentions
-    OPTIONAL MATCH (e)-[:ALIAS_OF]->(c:CanonicalEntity)
-    WHERE c.merged_into IS NULL
+    OPTIONAL MATCH (e)-[a:ALIAS_OF]->(c:CanonicalEntity)
+    WHERE a.project_id = proj.project_id AND c.merged_into IS NULL
     RETURN e.surface AS surface, e.entity_type AS entity_type, mentions,
            c.canonical_id AS canonical_id, c.name AS canonical_name
     ORDER BY e.surface

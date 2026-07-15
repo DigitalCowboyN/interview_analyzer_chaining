@@ -123,6 +123,8 @@ async def test_entity_rows_returns_canonical_fields():
     assert rows[0]["canonical_name"] == "ECU"
     query = session.run.call_args[0][0]
     assert "OPTIONAL MATCH" in query and "ALIAS_OF" in query
+    assert "merged_into IS NULL" in query
+    assert "CONTAINS_INTERVIEW" in query and "a.project_id = proj.project_id" in query
 
 
 @pytest.mark.asyncio

@@ -129,9 +129,10 @@ Sentence → Fragment rename (dual-label overlay + migration CLI; wire format fr
 `python -m src.projections.migrate_fragment_label` when deploying this branch
 (reads already query `:Fragment`); verified idempotent live.
 
-**Deferred:** M4.5b (Project aggregate, resolution engine, corrections) and
-M4.5c (segments); dropping the `:Sentence` shim label and deprecated code
-aliases; re-targeting vector index DDL to `:Fragment` (rides the shim drop).
+**Deferred to M4.5b (since completed — see M4.5b section above):** Project
+aggregate, resolution engine, corrections. Still outstanding: M4.5c (segments);
+dropping the `:Sentence` shim label and deprecated code aliases; re-targeting
+vector index DDL to `:Fragment` (rides the shim drop).
 
 ---
 
@@ -588,6 +589,34 @@ limitation); OKF export of lens outputs (M4.4).
       resolve_links (all $ce- events parked). resolve_links is fixed; still
       needed: point the service at a live Neo4j (or drop it from the default
       stack) and add a deployed-path smoke.
+
+**From M4.5b final review (2026-07-15):**
+- [ ] Engine-deferred merge pairs (auto-band, two existing canonicals) never
+      appear on the worklist — surface them in compute_suggestions
+      (`src/resolution/suggestions.py` discards the auto band)
+- [ ] No human path to add an alias to a locked canonical: corrections API
+      lacks add-alias, and skipped_locked surfaces are invisible on the
+      worklist (engine counter only)
+- [ ] `PersonLinkRemovedHandler` parks on duplicate delivery (removed==0
+      guard) — NOTE: the guard is load-bearing for parked-event ordering
+      (prevents a replayed parked link from resurrecting a removed edge);
+      any fix must keep that property
+- [ ] `suggestions.py` docstring overclaims: entity-merge rows are NOT
+      actionable before the first engine run (confirm_entity_merge 404/409s
+      until canonicals exist in the aggregate)
+- [ ] Worklist GET degrades hard when the embedder is unavailable (quota) —
+      500s the whole worklist; add graceful degradation (companion to the
+      deferred embedding cache)
+- [ ] `person_rows` lacks a `sp.merged_into IS NULL` filter; broader:
+      SpeakerMerged x IDENTIFIED_AS/person-link interaction is unhandled
+      (stale links after Layer-1 merges)
+- [ ] Consider exempting PERSON-type surfaces from the plural fold in
+      normalize_surface ("Jenkins"→"jenkin") — derivation is wire-adjacent
+      once minted
+- [ ] Carried task-review minors: `_cid_for_key` checks only the first
+      surface of a group; no two-speakers-one-person render test; aliases
+      frontmatter order asserted as set not list; T9 error-detail/tuple
+      conventions
 
 **Feature deferrals (each waits for a real need or its milestone):**
 - [ ] Persona lens — second lens, proves zero-per-lens-code for real (YAML + prompts)
