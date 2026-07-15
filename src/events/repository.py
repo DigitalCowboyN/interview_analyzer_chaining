@@ -11,7 +11,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Generic, Optional, TypeVar
 
-from .aggregates import AggregateRoot, Fragment, Interview
+from .aggregates import AggregateRoot, Fragment, Interview, Project
 from .store import ConcurrencyError, EventStoreClient, StreamNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -222,6 +222,18 @@ class SentenceRepository(Repository[Fragment]):
         return f"Sentence-{aggregate_id}"
 
 
+class ProjectRepository(Repository[Project]):
+    """Repository for Project aggregates (M4.5b resolution core)."""
+
+    def _create_aggregate(self, aggregate_id: str) -> Project:
+        """Create a new Project instance."""
+        return Project(aggregate_id)
+
+    def _get_stream_name(self, aggregate_id: str) -> str:
+        """Get the stream name for a Project aggregate (wire format: "Project-<id>")."""
+        return f"Project-{aggregate_id}"
+
+
 class RepositoryFactory:
     """
     Factory for creating repository instances.
@@ -247,6 +259,15 @@ class RepositoryFactory:
             InterviewRepository: Configured repository instance
         """
         return InterviewRepository(self.event_store)
+
+    def create_project_repository(self) -> ProjectRepository:
+        """
+        Create a ProjectRepository instance.
+
+        Returns:
+            ProjectRepository: Configured repository instance
+        """
+        return ProjectRepository(self.event_store)
 
     def create_fragment_repository(self) -> SentenceRepository:
         """
@@ -301,6 +322,17 @@ def get_interview_repository() -> InterviewRepository:
     """
     factory = get_repository_factory()
     return factory.create_interview_repository()
+
+
+def get_project_repository() -> ProjectRepository:
+    """
+    Get a ProjectRepository instance using the global factory.
+
+    Returns:
+        ProjectRepository: Configured repository instance
+    """
+    factory = get_repository_factory()
+    return factory.create_project_repository()
 
 
 def get_fragment_repository() -> SentenceRepository:

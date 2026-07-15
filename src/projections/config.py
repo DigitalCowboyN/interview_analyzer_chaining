@@ -88,6 +88,19 @@ SUBSCRIPTION_CONFIG: Dict[str, Dict] = {
             "EmbeddingGenerated",
         ],
     },
+    "project": {
+        "stream": "$ce-Project",  # Category stream for Project aggregate (M4.5b)
+        "group": "neo4j-projection-project-v1",
+        "allowlist": [
+            "EntityCanonicalized",
+            "EntityAliasAdded",
+            "EntityMergeConfirmed",
+            "EntitySplit",
+            "PersonIdentified",
+            "SpeakerLinkedToPerson",
+            "PersonLinkRemoved",
+        ],
+    },
 }
 
 # Parked events configuration

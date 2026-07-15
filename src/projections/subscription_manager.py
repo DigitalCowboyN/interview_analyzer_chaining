@@ -167,6 +167,7 @@ class SubscriptionManager:
                         group_name=group_name,
                         stream_name=stream_name,
                         from_end=False,  # Start from beginning
+                        resolve_links=True,  # $ce- streams deliver $> links; resolve to real events
                     )
                     logger.info(f"Created subscription '{group_name}' to '{stream_name}'")
         except Exception as e:

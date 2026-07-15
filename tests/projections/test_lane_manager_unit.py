@@ -195,6 +195,15 @@ class TestLaneManager:
         extracted_id = manager._extract_interview_id(event)
         assert extracted_id == interview_id
 
+    async def test_project_events_lane_key_is_aggregate_id(self):
+        """Project events route by aggregate_id — one lane per project, never dropped."""
+        handler_registry = MagicMock()
+        manager = LaneManager(handler_registry, lane_count=4)
+        event = MagicMock()
+        event.aggregate_type = "Project"
+        event.aggregate_id = "abc-123"
+        assert manager._extract_interview_id(event) == "abc-123"
+
     async def test_get_status(self):
         """Test getting status of all lanes."""
         handler_registry = MagicMock()

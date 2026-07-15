@@ -400,6 +400,7 @@ class TestEnsureSubscriptionExists:
             group_name="test-group",
             stream_name="$ce-Test",
             from_end=False,
+            resolve_links=True,
         )
 
     @pytest.mark.asyncio

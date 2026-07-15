@@ -37,6 +37,7 @@ ENTITIES = [{"surface": "ecu", "entity_type": "product",
 ANALYSIS = [{"sequence_order": 0, "text": "Let's go with X.", "speaker": "Alice Johnson",
              "function": "declarative", "structure": "simple", "purpose": "Statement",
              "topics": ["vendors"], "keywords": ["telemetry"], "confidence": 0.9, "flags": None}]
+PERSONS = [{"speaker_id": "sp1", "person_id": "person-1", "display_name": "Jane Doe"}]
 
 
 def render():
@@ -363,3 +364,77 @@ def test_speaker_slug_keyed_by_id_not_identity_string():
     claim_content = files["claims/claim-cB.md"]
     slug_for_b = "unknown" if fm_a["id"] == "spB" else "unknown-2"
     assert f"MADE_BY: [Unknown](/speakers/{slug_for_b}.md)" in claim_content
+
+
+def test_two_surfaces_sharing_canonical_render_one_entity_file():
+    entities = [
+        {"surface": "ecu", "entity_type": "product", "canonical_id": "canon-1", "canonical_name": "ECU",
+         "mentions": [{"sentence_id": "f1", "start": 0, "end": 3, "text": "ECU", "confidence": 0.9}]},
+        {"surface": "Engine Control Unit", "entity_type": "product", "canonical_id": "canon-1",
+         "canonical_name": "ECU",
+         "mentions": [{"sentence_id": "f2", "start": 0, "end": 19, "text": "Engine Control Unit",
+                       "confidence": 0.8}]},
+    ]
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS,
+                               entities, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00"))
+    entity_files = [p for p in files if p.startswith("entities/")]
+    assert len(entity_files) == 1
+    path = entity_files[0]
+    content = files[path]
+    fm = yaml.safe_load(content.split("---\n")[1])
+    assert fm["id"] == "canon-1"
+    assert fm["title"] == "ECU"
+    assert set(fm["aliases"]) == {"ecu", "Engine Control Unit"}
+    assert "ECU" in content and "Engine Control Unit" in content
+
+
+def test_surface_without_canonical_renders_per_surface_regression():
+    files = render()
+    content = files["entities/ecu.md"]
+    fm = yaml.safe_load(content.split("---\n")[1])
+    assert fm["type"] == "Entity"
+    assert fm["title"] == "ecu"
+    assert "aliases" not in fm
+
+
+def test_render_person_produces_persons_file():
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00",
+                               persons=PERSONS))
+    person_files = [p for p in files if p.startswith("persons/")]
+    assert len(person_files) == 1
+    path = person_files[0]
+    content = files[path]
+    fm = yaml.safe_load(content.split("---\n")[1])
+    assert fm["type"] == "Person"
+    assert fm["id"] == "person-1"
+    assert fm["title"] == "Jane Doe"
+
+
+def test_speaker_file_links_to_identified_person():
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00",
+                               persons=PERSONS))
+    speaker_content = files["speakers/alice-johnson.md"]
+    person_path = next(p for p in files if p.startswith("persons/"))
+    person_slug = person_path.split("/", 1)[1].removesuffix(".md")
+    assert f"Identified as [Jane Doe](/persons/{person_slug}.md)" in speaker_content
+
+
+def test_index_lists_persons_section_when_persons_exist():
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(HEADER, TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS,
+                               ENTITIES, ANALYSIS, lens, exported_at="2026-07-10T12:00:00+00:00",
+                               persons=PERSONS))
+    index = files["index.md"]
+    assert "## Persons" in index
+    person_path = next(p for p in files if p.startswith("persons/"))
+    assert f"]({person_path})" in index
+
+
+def test_index_omits_persons_section_when_no_persons():
+    files = render()
+    assert "## Persons" not in files["index.md"]

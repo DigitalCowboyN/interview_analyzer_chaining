@@ -33,6 +33,15 @@ from src.projections.handlers.lens_handlers import (
     LensExtractionGeneratedHandler,
     LensExtractionOverriddenHandler,
 )
+from src.projections.handlers.resolution_handlers import (
+    EntityAliasAddedHandler,
+    EntityCanonicalizedHandler,
+    EntityMergeConfirmedHandler,
+    EntitySplitHandler,
+    PersonIdentifiedHandler,
+    PersonLinkRemovedHandler,
+    SpeakerLinkedToPersonHandler,
+)
 from src.projections.handlers.utterance_handlers import (
     InterruptionRecordedHandler,
     StitchRemovedHandler,
@@ -98,6 +107,15 @@ def create_handler_registry(
     registry.register(
         "LensExtractionOverridden", LensExtractionOverriddenHandler(parked_events_manager)
     )
+
+    # Register resolution handlers (Layer 4, M4.5b) — Project stream
+    registry.register("EntityCanonicalized", EntityCanonicalizedHandler(parked_events_manager))
+    registry.register("EntityAliasAdded", EntityAliasAddedHandler(parked_events_manager))
+    registry.register("EntityMergeConfirmed", EntityMergeConfirmedHandler(parked_events_manager))
+    registry.register("EntitySplit", EntitySplitHandler(parked_events_manager))
+    registry.register("PersonIdentified", PersonIdentifiedHandler(parked_events_manager))
+    registry.register("SpeakerLinkedToPerson", SpeakerLinkedToPersonHandler(parked_events_manager))
+    registry.register("PersonLinkRemoved", PersonLinkRemovedHandler(parked_events_manager))
 
     registered_types = registry.get_registered_types()
     logger.info(f"Handler registry initialized with {len(registered_types)} handlers: {registered_types}")

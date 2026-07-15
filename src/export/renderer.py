@@ -244,6 +244,8 @@ def _render_speaker(
     references: List[Tuple[str, str]],
     registry: "_SlugRegistry",
     speaker_slugs: Dict[str, str],
+    person: Optional[Dict[str, Any]] = None,
+    person_slug: Optional[str] = None,
 ) -> Tuple[str, str]:
     slug = _speaker_slug(
         speaker.get("display_name"), speaker.get("handle"),
@@ -256,6 +258,9 @@ def _render_speaker(
         "provisional": speaker.get("provisional"),
     }
     lines = [_frontmatter(fm), f"# {speaker.get('display_name') or speaker.get('handle')}", ""]
+    if person is not None:
+        lines.append(f"Identified as [{_link_text(person.get('display_name'))}](/persons/{person_slug}.md)")
+        lines.append("")
     lines.append("## Referenced By")
     for rel_path, display in references:
         lines.append(f"- [{_link_text(display)}](/{rel_path})")
@@ -433,7 +438,17 @@ def _render_claim(
     return path, "\n".join(lines) + "\n"
 
 
+def _mentions_table(mentions: List[Dict[str, Any]], anchors: Dict[str, str]) -> List[str]:
+    lines = ["## Mentions", "| Text | Confidence | Location |", "|---|---|---|"]
+    for mention in mentions or []:
+        anchor = anchors.get(mention.get("sentence_id"))
+        location = f"[{anchor}](/transcript.md#{anchor})" if anchor else ""
+        lines.append(f"| {_cell(mention.get('text'))} | {mention.get('confidence')} | {location} |")
+    return lines
+
+
 def _render_entity(entity: Dict[str, Any], anchors: Dict[str, str], registry: "_SlugRegistry") -> Tuple[str, str]:
+    """Per-surface entity page: no canonical exists for this surface (regression path)."""
     surface = entity["surface"]
     slug = registry.slug_for(surface)
     fm = {
@@ -443,14 +458,51 @@ def _render_entity(entity: Dict[str, Any], anchors: Dict[str, str], registry: "_
         "entity_type": entity.get("entity_type"),
     }
     lines = [_frontmatter(fm), f"# {surface}", ""]
-    lines.append("## Mentions")
-    lines.append("| Text | Confidence | Location |")
-    lines.append("|---|---|---|")
-    for mention in entity.get("mentions") or []:
-        anchor = anchors.get(mention.get("sentence_id"))
-        location = f"[{anchor}](/transcript.md#{anchor})" if anchor else ""
-        lines.append(f"| {_cell(mention.get('text'))} | {mention.get('confidence')} | {location} |")
+    lines.extend(_mentions_table(entity.get("mentions"), anchors))
     return f"entities/{slug}.md", "\n".join(lines) + "\n"
+
+
+def _render_canonical_entity(
+    canonical_id: str,
+    canonical_name: str,
+    surfaces: List[Dict[str, Any]],
+    anchors: Dict[str, str],
+    registry: "_SlugRegistry",
+) -> Tuple[str, str]:
+    """One page for a canonical entity: aliases listed, mentions aggregated across surfaces."""
+    slug = registry.slug_for(canonical_name)
+    entity_type = surfaces[0].get("entity_type")
+    fm = {
+        "type": "Entity",
+        "title": canonical_name,
+        "description": entity_type,
+        "entity_type": entity_type,
+        "id": canonical_id,
+        "aliases": [s["surface"] for s in surfaces],
+    }
+    lines = [_frontmatter(fm), f"# {canonical_name}", ""]
+    all_mentions = [m for s in surfaces for m in (s.get("mentions") or [])]
+    lines.extend(_mentions_table(all_mentions, anchors))
+    return f"entities/{slug}.md", "\n".join(lines) + "\n"
+
+
+def _render_person(
+    person: Dict[str, Any],
+    references: List[Tuple[str, str]],
+    registry: "_SlugRegistry",
+) -> Tuple[str, str]:
+    display_name = person.get("display_name")
+    slug = registry.slug_for(display_name)
+    fm = {
+        "type": "Person",
+        "title": display_name,
+        "id": person.get("person_id"),
+    }
+    lines = [_frontmatter(fm), f"# {display_name}", ""]
+    lines.append("## Speakers")
+    for rel_path, display in references:
+        lines.append(f"- [{_link_text(display)}](/{rel_path})")
+    return f"persons/{slug}.md", "\n".join(lines) + "\n"
 
 
 _OVERVIEW_ENTRIES = [
@@ -485,6 +537,7 @@ def render_bundle(
     analysis: List[Dict[str, Any]],
     lens: LensSpec,
     exported_at: str,
+    persons: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Tuple[str, str]]:
     anchors = _anchors(transcript)
     sentence_text = {row["sentence_id"]: row.get("text", "") for row in transcript}
@@ -531,9 +584,39 @@ def render_bundle(
             claim_path = f"claims/claim-{claim['claim_id'][:8]}.md"
             references_by_speaker[sp_id].append((claim_path, claim.get("text") or claim["claim_id"]))
 
+    persons = persons or []
+
+    # Speaker slugs are resolved (not yet rendered) before persons render, so
+    # each person's "## Speakers" back-link can point at the speaker file's
+    # real slug; the speaker files render afterward, reusing the same cache,
+    # so their own "Identified as" link agrees with the person file's slug.
+    person_by_speaker_id = {p["speaker_id"]: p for p in persons}
+    speaker_refs_by_person: Dict[str, List[Tuple[str, str]]] = {p["person_id"]: [] for p in persons}
     for speaker in speakers:
+        slug = _speaker_slug(
+            speaker.get("display_name"), speaker.get("handle"),
+            registry=registry, speaker_slugs=speaker_slugs, speaker_id=speaker.get("speaker_id"),
+        )
+        person = person_by_speaker_id.get(speaker["speaker_id"])
+        if person is not None:
+            display = speaker.get("display_name") or speaker.get("handle")
+            speaker_refs_by_person[person["person_id"]].append((f"speakers/{slug}.md", display))
+
+    person_slugs: Dict[str, str] = {}
+    for person in persons:
+        if person["person_id"] in person_slugs:
+            continue
+        path, content = _render_person(person, speaker_refs_by_person.get(person["person_id"], []), registry)
+        person_slugs[person["person_id"]] = path[len("persons/"):-len(".md")]
+        files.append((path, content))
+        index_sections.setdefault("persons", []).append((path, person.get("display_name")))
+
+    for speaker in speakers:
+        person = person_by_speaker_id.get(speaker["speaker_id"])
+        person_slug = person_slugs.get(person["person_id"]) if person else None
         path, content = _render_speaker(
-            speaker, references_by_speaker.get(speaker["speaker_id"], []), registry, speaker_slugs
+            speaker, references_by_speaker.get(speaker["speaker_id"], []), registry, speaker_slugs,
+            person=person, person_slug=person_slug,
         )
         files.append((path, content))
         index_sections["speakers"].append((path, speaker.get("display_name") or speaker.get("handle")))
@@ -553,10 +636,29 @@ def render_bundle(
         files.append((path, content))
         index_sections.setdefault("claims", []).append((path, claim.get("text") or claim["claim_id"]))
 
+    # Surfaces sharing a non-null canonical_id render as one canonical page;
+    # surfaces with no canonical (canonical_id is None) keep the existing
+    # per-surface path unchanged (regression guard).
+    canonical_groups: Dict[str, List[Dict[str, Any]]] = {}
+    canonical_names: Dict[str, str] = {}
     for entity in entities:
-        path, content = _render_entity(entity, anchors, registry)
+        canonical_id = entity.get("canonical_id")
+        if canonical_id is None:
+            path, content = _render_entity(entity, anchors, registry)
+            files.append((path, content))
+            index_sections.setdefault("entities", []).append(
+                (path, entity.get("entity_type") or entity["surface"])
+            )
+        else:
+            canonical_groups.setdefault(canonical_id, []).append(entity)
+            canonical_names.setdefault(canonical_id, entity.get("canonical_name"))
+
+    for canonical_id, surfaces in canonical_groups.items():
+        path, content = _render_canonical_entity(
+            canonical_id, canonical_names[canonical_id], surfaces, anchors, registry
+        )
         files.append((path, content))
-        index_sections.setdefault("entities", []).append((path, entity.get("entity_type") or entity["surface"]))
+        index_sections.setdefault("entities", []).append((path, canonical_names[canonical_id]))
 
     files.append(_render_index(index_sections))
     return files

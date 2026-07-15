@@ -40,9 +40,35 @@ def test_lens_items_endpoint_splits_fields(client):
 def test_worklist_endpoint(client):
     result = {"lens_items": [], "claims": []}
     with patch_session(), \
-         patch("src.api.routers.queries.reader.worklist_rows", new=AsyncMock(return_value=result)):
+         patch("src.api.routers.queries.reader.worklist_rows", new=AsyncMock(return_value=result)), \
+         patch("src.api.routers.queries.compute_suggestions", new=AsyncMock()) as suggestions_mock:
         resp = client.get("/review/worklist?threshold=0.5")
-    assert resp.status_code == 200 and resp.json() == result
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["lens_items"] == [] and body["claims"] == []
+    assert body["entity_merge_suggestions"] == []
+    assert body["person_link_suggestions"] == []
+    suggestions_mock.assert_not_awaited()
+
+
+def test_worklist_endpoint_with_project_id_includes_suggestions(client):
+    result = {"lens_items": [], "claims": []}
+    suggestions = {
+        "entity_merge_suggestions": [{"surviving_canonical_id": "a"}],
+        "person_link_suggestions": [{"person_id": "b"}],
+    }
+    with patch_session(), \
+         patch("src.api.routers.queries.reader.worklist_rows", new=AsyncMock(return_value=result)), \
+         patch("src.api.routers.queries.get_project_repository") as get_repo_mock, \
+         patch("src.api.routers.queries.compute_suggestions",
+               new=AsyncMock(return_value=suggestions)) as suggestions_mock:
+        get_repo_mock.return_value.load = AsyncMock(return_value=None)
+        resp = client.get("/review/worklist?project_id=proj-1&threshold=0.5")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["entity_merge_suggestions"] == suggestions["entity_merge_suggestions"]
+    assert body["person_link_suggestions"] == suggestions["person_link_suggestions"]
+    suggestions_mock.assert_awaited_once()
 
 
 def test_rollup_endpoint(client):

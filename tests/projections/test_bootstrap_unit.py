@@ -104,13 +104,13 @@ class TestCreateHandlerRegistry:
     def test_create_handler_registry_registers_all_handlers(
         self, mock_get_client
     ):
-        """Registry should have exactly 22 handlers (7 core + 5 speaker + 3 utterance + 4 enrichment + 3 lens)."""
+        """Registry has 29 handlers (7 core + 5 speaker + 3 utterance + 4 enrichment + 3 lens + 7 resolution)."""
         mock_get_client.return_value = MagicMock()
 
         registry = create_handler_registry()
 
         registered_types = registry.get_registered_types()
-        assert len(registered_types) == 22
+        assert len(registered_types) == 29
 
     @patch("src.projections.bootstrap.get_event_store_client")
     def test_create_handler_registry_uses_provided_parked_events_manager(
@@ -173,7 +173,7 @@ class TestCreateHandlerRegistry:
             create_handler_registry()
 
         assert "Handler registry initialized" in caplog.text
-        assert "22 handlers" in caplog.text
+        assert "29 handlers" in caplog.text
 
     @patch("src.projections.bootstrap.get_event_store_client")
     def test_create_handler_registry_returns_new_instance_each_call(
@@ -219,7 +219,26 @@ class TestCreateHandlerRegistry:
             "LensApplied",
             "LensExtractionGenerated",
             "LensExtractionOverridden",
+            "EntityCanonicalized",
+            "EntityAliasAdded",
+            "EntityMergeConfirmed",
+            "EntitySplit",
+            "PersonIdentified",
+            "SpeakerLinkedToPerson",
+            "PersonLinkRemoved",
         }
         registered_types = set(registry.get_registered_types())
 
         assert registered_types == expected_types
+
+    @patch("src.projections.bootstrap.get_event_store_client")
+    def test_resolution_handlers_registered(self, mock_get_client):
+        """All 7 Project-stream events map to resolution handlers."""
+        mock_get_client.return_value = MagicMock()
+        registry = create_handler_registry()
+        from src.projections.handlers.resolution_handlers import (
+            EntityCanonicalizedHandler,
+            PersonLinkRemovedHandler,
+        )
+        assert isinstance(registry.get_handler("EntityCanonicalized"), EntityCanonicalizedHandler)
+        assert isinstance(registry.get_handler("PersonLinkRemoved"), PersonLinkRemovedHandler)
