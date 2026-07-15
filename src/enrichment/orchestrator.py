@@ -6,16 +6,18 @@ repositories. Resume-aware: skips fragments already analyzed unless forced.
 """
 
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.enrichment.embedder import encode_vector, get_embedder
 from src.enrichment.executor import EnrichmentExecutor
 from src.enrichment.graph_context import FragmentView, GraphContextBuilder
 from src.enrichment.registry import ExtractorRegistry
+from src.enrichment.segments import validate_segments
 from src.events.aggregates import Fragment, Interview
 from src.events.envelope import Actor, ActorType, generate_correlation_id
+from src.events.interview_events import segment_id_for
 from src.events.repository import get_interview_repository, get_sentence_repository
 from src.utils.logger import get_logger
 
@@ -33,6 +35,8 @@ class EnrichmentResult(BaseModel):
     entities_extracted: int
     claims_extracted: int
     embeddings_generated: int
+    segments_extracted: int = 0
+    flags: Dict[str, str] = Field(default_factory=dict)
 
 
 class EnrichmentOrchestrator:
@@ -124,6 +128,9 @@ class EnrichmentOrchestrator:
         claims_count, utt_embeddings = await self._emit_utterance_results(
             executor, embedder, interview, utterance_texts, actor, correlation_id, force,
         )
+        segments_count, segment_flags = await self._emit_segment_results(
+            executor, interview, all_sentences, speaker_handle, actor, correlation_id, force,
+        )
         await interview_repo.save(interview)
 
         logger.info(
@@ -138,6 +145,8 @@ class EnrichmentOrchestrator:
             entities_extracted=entities_count,
             claims_extracted=claims_count,
             embeddings_generated=embeddings_count + utt_embeddings,
+            segments_extracted=segments_count,
+            flags=segment_flags,
         )
 
     def _utterance_texts(
@@ -274,3 +283,79 @@ class EnrichmentOrchestrator:
                 )
                 utt_embeddings += 1
         return claims_count, utt_embeddings
+
+    def _document_text(
+        self, all_sentences: Dict[int, Fragment], speaker_handle: Dict[str, str]
+    ) -> str:
+        """Index-prefixed, speaker-labeled transcript for document-scope prompts.
+
+        The index prefix is the extractor contract: segment proposals
+        reference these fragment sequence numbers.
+        """
+        lines = []
+        for s in sorted(all_sentences.values(), key=lambda s: s.index):
+            handle = speaker_handle.get(s.speaker_id, "S?")
+            lines.append(f"[{s.index}] [{handle}]: {s.text}")
+        return "\n".join(lines)
+
+    async def _emit_segment_results(
+        self,
+        executor,
+        interview: Interview,
+        all_sentences: Dict[int, Fragment],
+        speaker_handle: Dict[str, str],
+        actor,
+        correlation_id,
+        force: bool = False,
+    ) -> Tuple[int, Dict[str, str]]:
+        """Run the document-scope topic_segments extractor and record segments.
+
+        Resume-aware: an interview with live segments skips unless forced.
+        An invalid proposal drops ALL segments and flags
+        `topic_segments_invalid` — never a failed enrichment.
+        """
+        flags: Dict[str, str] = {}
+        spec = next(
+            (s for s in executor.document_specs if s.name == "topic_segments" and s.enabled),
+            None,
+        )
+        if spec is None or not all_sentences:
+            return 0, flags
+        has_live_segments = any(not s["removed"] for s in interview.segments.values())
+        if has_live_segments and not force:
+            return 0, flags
+
+        outcome = await executor.run_spec_on_text(
+            spec, self._document_text(all_sentences, speaker_handle)
+        )
+        if outcome.data is None:
+            flags.update(outcome.flags)
+            return 0, flags
+
+        ordered = validate_segments(outcome.data["segments"], set(all_sentences.keys()))
+        if ordered is None:
+            logger.warning(
+                f"topic_segments: invalid proposal for {interview.aggregate_id}; "
+                f"dropping all segments"
+            )
+            flags["topic_segments_invalid"] = "bad indices or overlapping ranges"
+            return 0, flags
+
+        count = 0
+        for ordinal, seg in enumerate(ordered):
+            segment_id = segment_id_for(interview.aggregate_id, ordinal)
+            existing = interview.segments.get(segment_id)
+            if existing is not None and not existing["removed"]:
+                logger.info(f"Segment {segment_id} already recorded; skipping")
+                continue
+            interview.record_segment(
+                segment_id,
+                seg["topic"],
+                seg["start_index"],
+                seg["end_index"],
+                seg["confidence"],
+                actor=actor,
+                correlation_id=correlation_id,
+            )
+            count += 1
+        return count, flags
