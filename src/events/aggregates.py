@@ -17,6 +17,8 @@ from .interview_events import (
     LensAppliedData,
     LensExtractionGeneratedData,
     LensExtractionOverriddenData,
+    SegmentIdentifiedData,
+    SegmentRemovedData,
     SpeakerCreatedData,
     SpeakerMergedData,
     SpeakerRenamedData,
@@ -192,6 +194,9 @@ class Interview(AggregateRoot):
         self.lens_runs: Dict[str, int] = {}
         self.lens_items: Dict[str, Dict[str, Any]] = {}
 
+        # Segments (Layer 4): topic episodes keyed by segment_id
+        self.segments: Dict[str, Dict[str, Any]] = {}
+
     def apply_event(self, event: EventEnvelope) -> None:
         """Apply an event to update the interview's state."""
         if event.event_type == "InterviewCreated":
@@ -226,6 +231,10 @@ class Interview(AggregateRoot):
             self._apply_lens_extraction_generated(event)
         elif event.event_type == "LensExtractionOverridden":
             self._apply_lens_extraction_overridden(event)
+        elif event.event_type == "SegmentIdentified":
+            self._apply_segment_identified(event)
+        elif event.event_type == "SegmentRemoved":
+            self._apply_segment_removed(event)
         else:
             raise ValueError(f"Unknown event type for Interview: {event.event_type}")
 
@@ -356,6 +365,22 @@ class Interview(AggregateRoot):
     def _apply_lens_extraction_overridden(self, event: EventEnvelope) -> None:
         """Apply LensExtractionOverridden event (human correction locks the item)."""
         self.lens_items[event.data["item_id"]]["locked"] = True
+        self.updated_at = event.occurred_at
+
+    def _apply_segment_identified(self, event: EventEnvelope) -> None:
+        """Apply SegmentIdentified event (Layer 4 topic episode)."""
+        data = event.data
+        self.segments[data["segment_id"]] = {
+            "topic": data["topic"],
+            "start_index": data["start_index"],
+            "end_index": data["end_index"],
+            "removed": False,
+        }
+        self.updated_at = event.occurred_at
+
+    def _apply_segment_removed(self, event: EventEnvelope) -> None:
+        """Apply SegmentRemoved event (human correction)."""
+        self.segments[event.data["segment_id"]]["removed"] = True
         self.updated_at = event.occurred_at
 
     # Command methods (business logic)
@@ -753,6 +778,60 @@ class Interview(AggregateRoot):
 
         return self._add_event(
             event_type="LensExtractionOverridden",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def record_segment(
+        self,
+        segment_id: str,
+        topic: str,
+        start_index: int,
+        end_index: int,
+        confidence: float,
+        **envelope_kwargs,
+    ) -> EventEnvelope:
+        """Record a topic segment (Layer 4).
+
+        Re-identifying a REMOVED segment is allowed (redraw = remove +
+        re-run); a live duplicate raises — the orchestrator does idempotent
+        skipping, mirroring claims.
+        """
+        if self.version < 0:
+            raise ValueError("Interview must be created before recording segments")
+        if start_index > end_index:
+            raise ValueError(f"Segment range inverted: {start_index} > {end_index}")
+        existing = self.segments.get(segment_id)
+        if existing is not None and not existing["removed"]:
+            raise ValueError(f"Segment {segment_id} already recorded")
+
+        data = SegmentIdentifiedData(
+            segment_id=segment_id,
+            topic=topic,
+            start_index=start_index,
+            end_index=end_index,
+            confidence=confidence,
+        )
+
+        return self._add_event(
+            event_type="SegmentIdentified",
+            data=data.model_dump(),
+            **envelope_kwargs,
+        )
+
+    def remove_segment(
+        self, segment_id: str, reason: Optional[str] = None, **envelope_kwargs
+    ) -> EventEnvelope:
+        """Human correction: a segment was wrong; remove it (redraw = remove + re-run)."""
+        if segment_id not in self.segments:
+            raise ValueError(f"Unknown segment: {segment_id}")
+        if self.segments[segment_id]["removed"]:
+            raise ValueError(f"Segment {segment_id} already removed")
+
+        data = SegmentRemovedData(segment_id=segment_id, reason=reason)
+
+        return self._add_event(
+            event_type="SegmentRemoved",
             data=data.model_dump(),
             **envelope_kwargs,
         )

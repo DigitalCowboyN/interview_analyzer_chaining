@@ -5,6 +5,7 @@ Defines all events that can occur within the Interview aggregate lifecycle,
 including creation, updates, status changes, and archival.
 """
 
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -171,6 +172,28 @@ class LensExtractionOverriddenData(BaseModel):
     item_id: str = Field(..., description="Lens item being corrected")
     fields_overridden: Dict[str, Any] = Field(..., description="Corrected field values")
     note: Optional[str] = Field(None, description="Why the correction was made")
+
+
+class SegmentIdentifiedData(BaseModel):
+    """Data payload for SegmentIdentified event (Layer 4 topic episode)."""
+
+    segment_id: str = Field(..., description="Deterministic UUID of the segment")
+    topic: str = Field(..., description="Short topic label for the episode")
+    start_index: int = Field(..., ge=0, description="First fragment sequence number (inclusive)")
+    end_index: int = Field(..., ge=0, description="Last fragment sequence number (inclusive)")
+    confidence: float = Field(..., ge=0.0, le=1.0)
+
+
+class SegmentRemovedData(BaseModel):
+    """Data payload for SegmentRemoved event (human correction; redraw = remove + re-run)."""
+
+    segment_id: str = Field(..., description="Segment being removed")
+    reason: Optional[str] = Field(None, description="Why the segment was wrong")
+
+
+def segment_id_for(interview_id: str, ordinal: int) -> str:
+    """Deterministic segment id: uuid5 of '{interview_id}:segment:{ordinal}' (wire format)."""
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:segment:{ordinal}"))
 
 
 def create_interview_created_event(
