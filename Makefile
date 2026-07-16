@@ -266,13 +266,19 @@ projection-status:
 # scripts/test-integration.sh: that script overrides NEO4J_URI to the test
 # instance, but this test constructs its own dev-Neo4j driver regardless — the
 # direct invocation just keeps the intent (dev stack, not test stack) obvious.
+# NOTE: deliberately NOT using $(PYTHON) here. $(PYTHON) resolves via
+# `command -v python` in the invoking shell, which on this machine (and in
+# non-interactive Bash generally) can resolve to a Homebrew python without
+# pytest installed. scripts/test.sh and scripts/test-integration.sh pin
+# $$HOME/.pyenv/versions/3.10.7/bin/python directly for the same reason —
+# mirror that convention here so `make deployed-smoke` works standalone.
 .PHONY: deployed-smoke
 deployed-smoke:
 	@echo "Building + starting neo4j, eventstore, projection-service (dev stack)..."
 	docker compose up -d --build neo4j eventstore projection-service
 	@echo "Waiting for services..."
 	docker compose ps
-	DEPLOYED_SMOKE=1 $(PYTHON) -m pytest tests/integration/test_deployed_projection_smoke.py -q --no-cov
+	DEPLOYED_SMOKE=1 $$HOME/.pyenv/versions/3.10.7/bin/python -m pytest tests/integration/test_deployed_projection_smoke.py -q --no-cov
 
 # --- End Deployed-Path Smoke --- #
 

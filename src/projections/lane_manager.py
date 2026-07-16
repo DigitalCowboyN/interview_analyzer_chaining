@@ -7,6 +7,7 @@ processing within each lane while allowing parallel processing across lanes.
 
 import asyncio
 import hashlib
+import inspect
 import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -16,6 +17,21 @@ from src.events.envelope import EventEnvelope
 from .config import LANE_COUNT, QUEUE_DEPTH_ALERT_THRESHOLD
 
 logger = logging.getLogger(__name__)
+
+
+async def _invoke_checkpoint_callback(checkpoint_callback) -> None:
+    """
+    Invoke a checkpoint callback, supporting both sync and async callables.
+
+    SubscriptionManager passes a synchronous lambda (e.g. `subscription.ack`
+    wrapped as `lambda event_id=...: subscription.ack(event_id)`), which
+    returns None and is not awaitable. Tests and other callers may still pass
+    an async callback. Only await the result if it is actually awaitable, so
+    both contracts are honored.
+    """
+    result = checkpoint_callback()
+    if inspect.isawaitable(result):
+        await result
 
 
 class Lane:
@@ -121,7 +137,7 @@ class Lane:
             handler = self.handler_registry.get_handler(event.event_type)
             if handler is None:
                 logger.warning(f"No handler found for event type {event.event_type}, skipping")
-                await checkpoint_callback()
+                await _invoke_checkpoint_callback(checkpoint_callback)
                 return
 
             # Process event with retry logic (handler includes retry-to-park)
@@ -132,7 +148,7 @@ class Lane:
             self.last_processed_at = datetime.now(timezone.utc)
 
             # Checkpoint after successful processing
-            await checkpoint_callback()
+            await _invoke_checkpoint_callback(checkpoint_callback)
 
             logger.debug(
                 f"Lane {self.lane_id} processed event {event.event_id} "
@@ -144,7 +160,7 @@ class Lane:
             self.events_failed += 1
             logger.error(f"Lane {self.lane_id} failed to process event {event.event_id}: {e}", exc_info=True)
             # Still checkpoint to move past this event
-            await checkpoint_callback()
+            await _invoke_checkpoint_callback(checkpoint_callback)
 
     def get_status(self) -> Dict:
         """Get current status of this lane."""
@@ -224,7 +240,7 @@ class LaneManager:
         if not interview_id:
             logger.error(f"Could not extract interview_id from event {event.event_id}, " f"type: {event.event_type}")
             # Checkpoint anyway to avoid blocking
-            await checkpoint_callback()
+            await _invoke_checkpoint_callback(checkpoint_callback)
             return
 
         # Get the lane for this interview
