@@ -7,6 +7,8 @@ to EventStoreDB category streams.
 
 import asyncio
 import logging
+import queue
+import threading
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 import pytest
@@ -540,3 +542,223 @@ class TestRunSubscription:
 
         # Should not have tried to ensure subscription exists
         manager._ensure_subscription_exists.assert_not_called()
+
+
+class _BlockingQueueSubscription:
+    """
+    Fake persistent subscription backed by a blocking `queue.Queue`.
+
+    Mimics the real esdbclient subscription object: iterating it calls the
+    *synchronous, blocking* `queue.Queue.get()`, exactly like the real
+    subscription's `__next__` blocks on network I/O. This is the shape that
+    starves the event loop if it isn't offloaded to a thread.
+    """
+
+    def __init__(self):
+        self._queue: "queue.Queue" = queue.Queue()
+        self.acked_ids = []
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self._queue.get()  # blocks the calling thread
+
+    def put(self, event):
+        self._queue.put(event)
+
+    def ack(self, event_id):
+        self.acked_ids.append(event_id)
+
+
+class _FakeEvent:
+    """Minimal stand-in for esdbclient's RecordedEvent."""
+
+    def __init__(self, event_id):
+        self.id = event_id
+
+
+class _RecordingLaneManager:
+    """Fake lane manager that immediately invokes checkpoint_callback."""
+
+    def __init__(self):
+        self.routed = []
+
+    async def route_event(self, envelope, checkpoint_callback):
+        self.routed.append(envelope)
+        await checkpoint_callback()
+
+
+class TestRunSubscriptionConcurrency:
+    """
+    Regression test for the blocking-generator starvation defect.
+
+    Before the fix, `for event in subscription:` iterated the blocking
+    subscription synchronously inside the coroutine with no thread offload,
+    so a single subscription task that received events would starve the
+    event loop and every other subscription task would never run. This test
+    runs two `_run_subscription` tasks concurrently against blocking
+    queue-backed fake subscriptions and asserts both deliver their events
+    within a timeout -- it fails (times out) on the old for-loop
+    implementation and passes with the asyncio.to_thread offload.
+    """
+
+    @pytest.mark.asyncio
+    @patch("src.projections.subscription_manager.is_event_allowed", return_value=True)
+    async def test_two_subscriptions_deliver_concurrently(self, mock_is_allowed):
+        mock_event_store = MagicMock()
+        mock_event_store._recorded_event_to_envelope.side_effect = lambda event: MagicMock(
+            event_id=event.id, event_type="TestEvent"
+        )
+
+        subscriptions = {
+            "sub_a": _BlockingQueueSubscription(),
+            "sub_b": _BlockingQueueSubscription(),
+        }
+
+        def get_client_for(sub_name):
+            client = MagicMock()
+            client.read_subscription_to_stream.return_value = subscriptions[sub_name]
+            async_cm = MagicMock()
+            async_cm.__aenter__ = AsyncMock(return_value=client)
+            async_cm.__aexit__ = AsyncMock(return_value=False)
+            return async_cm
+
+        # get_client() is called once per subscription task; hand back a
+        # context manager bound to that subscription's fake queue.
+        call_order = []
+
+        def get_client_side_effect():
+            # Determine which subscription is asking based on call order:
+            # each task calls get_client() once before entering the loop.
+            call_order.append(1)
+            name = "sub_a" if len(call_order) == 1 else "sub_b"
+            return get_client_for(name)
+
+        mock_event_store.get_client.side_effect = get_client_side_effect
+
+        lane_manager = _RecordingLaneManager()
+        manager = SubscriptionManager(event_store=mock_event_store, lane_manager=lane_manager)
+        manager._ensure_subscription_exists = AsyncMock()
+        manager.is_running = True
+
+        config_a = {"stream": "$ce-A", "group": "group-a"}
+        config_b = {"stream": "$ce-B", "group": "group-b"}
+
+        task_a = asyncio.create_task(manager._run_subscription("sub_a", config_a))
+        task_b = asyncio.create_task(manager._run_subscription("sub_b", config_b))
+
+        # Give both tasks a chance to reach their blocking `next()` call.
+        await asyncio.sleep(0.1)
+
+        subscriptions["sub_a"].put(_FakeEvent("event-a-1"))
+        subscriptions["sub_b"].put(_FakeEvent("event-b-1"))
+
+        async def wait_for_both_routed():
+            while len(lane_manager.routed) < 2:
+                await asyncio.sleep(0.05)
+
+        try:
+            await asyncio.wait_for(wait_for_both_routed(), timeout=5.0)
+        except asyncio.TimeoutError:
+            pytest.fail(
+                "Both subscriptions did not deliver within timeout -- "
+                f"routed so far: {[e.event_id for e in lane_manager.routed]}. "
+                "This indicates the event loop is starved by a blocking "
+                "synchronous iterator (the pre-fix defect)."
+            )
+        finally:
+            manager.is_running = False
+            subscriptions["sub_a"].put(threading.Event())  # unblock next() with a throwaway value
+            subscriptions["sub_b"].put(threading.Event())
+            task_a.cancel()
+            task_b.cancel()
+            for t in (task_a, task_b):
+                try:
+                    await t
+                except asyncio.CancelledError:
+                    pass
+
+        delivered_ids = {e.event_id for e in lane_manager.routed}
+        assert delivered_ids == {"event-a-1", "event-b-1"}
+
+
+class TestRunSubscriptionAckBinding:
+    """
+    Regression test for the late-binding checkpoint_callback defect.
+
+    The original code used `checkpoint_callback=lambda: subscription.ack(event.id)`,
+    which closes over the loop variable `event` by reference. LaneManager
+    defers invoking checkpoint_callback until its own processing loop picks
+    the event off its queue, by which point `event` may have been rebound to
+    a later iteration -- acking the wrong id. This test uses a fake lane
+    manager that stores (but does not call) checkpoint callbacks, feeds two
+    events through _run_subscription, then invokes the FIRST stored callback
+    and asserts the FIRST event's id was acked.
+    """
+
+    @pytest.mark.asyncio
+    @patch("src.projections.subscription_manager.is_event_allowed", return_value=True)
+    async def test_first_callback_acks_first_event_id(self, mock_is_allowed):
+        mock_event_store = MagicMock()
+        mock_event_store._recorded_event_to_envelope.side_effect = lambda event: MagicMock(
+            event_id=event.id, event_type="TestEvent"
+        )
+
+        subscription = _BlockingQueueSubscription()
+        client = MagicMock()
+        client.read_subscription_to_stream.return_value = subscription
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=client)
+        async_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_event_store.get_client.return_value = async_cm
+
+        class _DeferringLaneManager:
+            """Stores checkpoint callbacks without invoking them, like the
+            real LaneManager does while an event sits in a lane's queue."""
+
+            def __init__(self):
+                self.stored_callbacks = []
+
+            async def route_event(self, envelope, checkpoint_callback):
+                self.stored_callbacks.append(checkpoint_callback)
+
+        lane_manager = _DeferringLaneManager()
+        manager = SubscriptionManager(event_store=mock_event_store, lane_manager=lane_manager)
+        manager._ensure_subscription_exists = AsyncMock()
+        manager.is_running = True
+
+        config = {"stream": "$ce-Test", "group": "test-group"}
+        task = asyncio.create_task(manager._run_subscription("test_sub", config))
+
+        await asyncio.sleep(0.05)
+        subscription.put(_FakeEvent("first-event-id"))
+        await asyncio.sleep(0.05)
+        subscription.put(_FakeEvent("second-event-id"))
+
+        async def wait_for_two_callbacks():
+            while len(lane_manager.stored_callbacks) < 2:
+                await asyncio.sleep(0.05)
+
+        try:
+            await asyncio.wait_for(wait_for_two_callbacks(), timeout=5.0)
+
+            # Invoke only the FIRST stored callback, after the loop has
+            # already advanced to (and stored a callback for) the second
+            # event -- this is exactly the scenario where late binding
+            # would ack the wrong (second) event's id. checkpoint_callback
+            # is `lambda event_id=event.id: subscription.ack(event_id)`, a
+            # plain sync callable (matching how SubscriptionManager builds
+            # it), so invoke it directly rather than awaiting it.
+            first_callback = lane_manager.stored_callbacks[0]
+            first_callback()
+        finally:
+            manager.is_running = False
+            subscription.put(threading.Event())
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        assert subscription.acked_ids == ["first-event-id"]

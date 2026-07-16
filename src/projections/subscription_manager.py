@@ -19,6 +19,11 @@ from .config import SUBSCRIPTION_CONFIG, is_event_allowed
 
 logger = logging.getLogger(__name__)
 
+# Sentinel returned by asyncio.to_thread(next, iterator, _SUBSCRIPTION_ENDED)
+# when the underlying (blocking) subscription iterator is exhausted, so we
+# can distinguish "no more events" from a real event without next() raising.
+_SUBSCRIPTION_ENDED = object()
+
 
 class SubscriptionManager:
     """
@@ -72,6 +77,12 @@ class SubscriptionManager:
         logger.info("Stopping subscriptions...")
 
         for sub_name, task in self.subscriptions.items():
+            # If a to_thread(next, ...) call is in flight when we cancel,
+            # the worker thread stays blocked inside the sync client's
+            # next() until the `async with` block's client close unblocks
+            # it (or the network call itself returns); the awaiting task
+            # only actually finishes at that point. Acceptable latency for
+            # service shutdown.
             task.cancel()
             try:
                 await task
@@ -107,8 +118,23 @@ class SubscriptionManager:
                         stream_name=stream_name,
                     )
 
-                    for event in subscription:
-                        if not self.is_running:
+                    # `subscription` is a synchronous (blocking) esdbclient
+                    # generator. Iterating it directly with `for event in
+                    # subscription:` inside this coroutine would block the
+                    # event loop indefinitely on network I/O, starving the
+                    # other subscription tasks (they'd never get a turn to
+                    # run) -- this was the defect that kept the deployed
+                    # service from ever creating the 'sentence'/'project'
+                    # persistent subscriptions. Offload each blocking next()
+                    # call to a worker thread via asyncio.to_thread so the
+                    # loop stays free; one worker thread is held per
+                    # subscription for as long as it's waiting on the next
+                    # event, which is fine for our fixed, small subscription
+                    # count.
+                    iterator = iter(subscription)
+                    while self.is_running:
+                        event = await asyncio.to_thread(next, iterator, _SUBSCRIPTION_ENDED)
+                        if event is _SUBSCRIPTION_ENDED:
                             break
 
                         # Convert to EventEnvelope
@@ -125,8 +151,19 @@ class SubscriptionManager:
 
                         # Route to lane manager
                         if self.lane_manager:
+                            # Bind event.id as a default arg so the callback
+                            # captures *this* event's id at creation time.
+                            # LaneManager.route_event enqueues (event,
+                            # checkpoint_callback) and invokes the callback
+                            # later, from the lane's processing loop -- a
+                            # plain `lambda: subscription.ack(event.id)`
+                            # would close over the loop variable `event` by
+                            # reference, so by the time the callback ran it
+                            # could have already been rebound to a later
+                            # iteration's event, acking the wrong id.
                             await self.lane_manager.route_event(
-                                envelope, checkpoint_callback=lambda: subscription.ack(event.id)
+                                envelope,
+                                checkpoint_callback=lambda event_id=event.id: subscription.ack(event_id),
                             )
                         else:
                             # No lane manager, just ack
