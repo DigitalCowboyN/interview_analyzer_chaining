@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.ask.engine import AskEngine
-from src.enrichment.executor import FragmentEnrichment, SpecOutcome
+from src.enrichment.executor import FragmentEnrichment
 from src.enrichment.orchestrator import EnrichmentOrchestrator
 from src.events.project_events import project_aggregate_id
 from src.events.repository import get_repository_factory

@@ -31,7 +31,7 @@
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** M4.7 (TBD — pick from Deferred Backlog)
-**Tests:** 1163 unit passing, 3 skipped | **Coverage:** 91.86% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Tests:** 1198 unit passing, 3 skipped | **Coverage:** 91.82% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
@@ -730,6 +730,29 @@ limitation); OKF export of lens outputs (M4.4).
       conflicting proposals are dropped; hardening only)
 - [ ] Test-strength nicety: e2e smoke's canned embedder could carry a
       "values unused, only counts asserted" comment
+
+**From M4.6 final review (2026-07-16):**
+- [ ] Project-aware over-fetch for the vector/fulltext ask channels — both run a
+      global top-k then filter to the project, so recall decays as unrelated
+      projects grow; over-fetch (k × projects heuristic) or index-side scoping
+- [ ] Per-index try/except in the vector channel — one block spans both the
+      fragment and utterance index queries, so a missing utterance index kills
+      the whole vector channel instead of degrading to fragments-only
+- [ ] Ensure the fulltext index once per process — `ensure_fulltext_index`
+      (incl. `db.awaitIndexes`) runs on every ask and could stall asks during a
+      re-embedding backfill
+- [ ] Amend the M4.6 spec's "three channels, concurrent" wording — the
+      implementation is sequential by design (embed once, then per-channel
+      queries); spec should match
+- [ ] CLI test coverage for `python -m src.ask` (incl. non-zero-exit leg) and
+      `--top-k` validation (negative values silently slice `scored[:-1]`)
+- [ ] Fulltext sanitizer strips non-ASCII word characters — accented names
+      never reach the fulltext channel
+- [ ] Reader returns an unused interview `title` field in context rows — use it
+      in context blocks or drop it
+- [ ] Test-strength nicety: engine tests can't distinguish the
+      ValidationError-vs-generic-Exception branch order in synthesis error
+      handling; assert on the distinct messages
 
 **Feature deferrals (each waits for a real need or its milestone):**
 - [ ] Persona lens — second lens, proves zero-per-lens-code for real (YAML + prompts)
