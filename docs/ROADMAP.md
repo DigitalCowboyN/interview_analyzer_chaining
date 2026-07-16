@@ -767,6 +767,14 @@ limitation); OKF export of lens outputs (M4.4).
       route for novel inquiries (aggregations, exotic traversals) the fixed
       vector/fulltext/graph channels can't shape. Nice-to-have, not a necessity
       (M4.6 spec's non-goals)
+- [ ] Event-store edit observability (owner, 2026-07-16) — derive metrics from
+      the event store on how much end users manipulate/change what the system
+      produced: correction/override/removal event volumes
+      (`LensExtractionOverridden`, `SegmentRemoved`, resolution corrections,
+      sentence edits) per interview/extractor/lens vs. what ingestion emitted.
+      Goal: use that data to inform ingestion improvements (new features, and
+      eventually automated learning) as input gets more varied. Future feature;
+      the M4.7 content corpus provides the varied-input baseline it needs
 - [ ] Corpus-level / multi-interview OKF bundles; incremental/diff exports;
       importing arbitrary OKF bundles (ingest reads front matter only)
 - [ ] Layer-1 leftovers: `OVERLAPS` edges; `StitchCorrected` as a distinct event;

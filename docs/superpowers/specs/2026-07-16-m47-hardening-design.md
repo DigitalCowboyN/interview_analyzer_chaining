@@ -18,7 +18,9 @@ read-side, config, infra, or prompt/YAML assets.
 
 All four shortlisted candidates are in — deployed-path fix, overlay indexes,
 persona lens, ask-channel hardening — plus judgment-picked backlog items that
-fit the hardening theme. Priority order below is execution order.
+fit the hardening theme, plus an owner-added workstream: an authored corpus of
+interview content for live analysis (W6). Priority order below is execution
+order.
 
 ## Workstreams (priority order)
 
@@ -126,7 +128,37 @@ the existing generic engine, events, projection, export, and API serve it
 unchanged. Verified by extending the lens smoke (or an e2e-smoke leg) to apply
 `persona` with canned extractions through the real registry.
 
-### W6 — Minor consistency sweep
+### W6 — Interview content corpus (for live analysis)
+
+Authored, realistic transcript content under `data/samples/`, built to exercise
+the pipeline's distinct capabilities — today the only real input is one
+category-3 file (`data/input/GMT20231026-210203_Recording.txt`). Work starts
+with a **content-needs analysis**: map each pipeline capability (speaker
+genesis/stitching, front-matter participants, entity extraction + resolution,
+person linking, segments, lenses incl. persona, ask retrieval) to the content
+properties that exercise it, recorded in a `data/samples/MANIFEST.md` that
+describes every file: category, scenario type, participants, and what it is
+designed to stress.
+
+Three categories minimum (owner-specified):
+
+1. **Mature transcript** — speakers identified (front matter + `Name:`
+   notation), clean human-readable text.
+2. **Messy speaker identification** — a mix of unique names and generic labels
+   (`Speaker 1`, `Interviewer`), including one labeled "speaker" that is
+   actually multiple people sharing a mic in a conference room (stresses
+   resolution, person linking, and future speaker-split needs).
+3. **Continuous unlabeled text** — no transcript notation, one long string
+   (the existing recording's shape; stresses stitching and speaker genesis).
+
+Multiples per category across scenario types — user interview, persona-style
+interview, meetings of different types, a generic interview — sized by the
+needs analysis, not a fixed count. Each sample must ingest cleanly: a
+validation test runs every sample through the ingestion parse/map path (no
+LLM) and asserts fragments materialize. The corpus feeds live analysis runs;
+it is NOT wired into the default automated suites beyond that parse check.
+
+### W7 — Minor consistency sweep
 
 - `GET /interviews/{id}/segments` 404s for unknown interviews (today: 200 +
   empty list, while the DELETE leg 404s).
@@ -152,7 +184,8 @@ validation errors reject at the boundary (W3 CLI). No silent fallbacks.
   gate.
 - Integration: deployed-path smoke is docker-gated (own marker + make target,
   excluded from default suites — it manages real containers); persona-lens leg
-  rides the existing in-process smoke pattern; all existing smokes stay green.
+  rides the existing in-process smoke pattern; every W6 sample ingests through
+  the parse/map path (no LLM); all existing smokes stay green.
 - No live-LLM dependencies anywhere.
 
 ## Non-goals (stay backlogged)
@@ -170,3 +203,9 @@ validation errors reject at the boundary (W3 CLI). No silent fallbacks.
   filter only).
 - Corpus-level bundles, Layer-1 leftovers, Prometheus/OTel/etc. (Future
   Improvements list).
+- **Event-store edit observability** (owner-added roadmap feature, future):
+  derive metrics from the event store on how much end users manipulate/change
+  what the system produced (correction and override event volumes vs. what
+  ingestion emitted) to inform ingestion improvements and eventually automated
+  learning. Recorded on the ROADMAP; the W6 corpus is a prerequisite for the
+  varied-input baseline it needs.
