@@ -26,6 +26,7 @@ SCHEMA_DDL: List[str] = [
     # documented dimension-node indexes (kept)
     "CREATE INDEX topic_name IF NOT EXISTS FOR (t:Topic) ON (t.name)",
     "CREATE INDEX keyword_text IF NOT EXISTS FOR (k:Keyword) ON (k.text)",
+    "CREATE INDEX domain_keyword_text IF NOT EXISTS FOR (dk:DomainKeyword) ON (dk.text)",
     "CREATE INDEX function_type_name IF NOT EXISTS FOR (ft:FunctionType) ON (ft.name)",
     "CREATE INDEX structure_type_name IF NOT EXISTS FOR (st:StructureType) ON (st.name)",
     "CREATE INDEX purpose_name IF NOT EXISTS FOR (p:Purpose) ON (p.name)",

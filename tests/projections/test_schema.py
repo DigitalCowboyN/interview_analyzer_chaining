@@ -14,6 +14,7 @@ EXPECTED_SUBSTRINGS = [
     # documented existing indexes
     "FOR (t:Topic) ON (t.name)",
     "FOR (k:Keyword) ON (k.text)",
+    "FOR (dk:DomainKeyword) ON (dk.text)",
     "FOR (ft:FunctionType) ON (ft.name)",
     "FOR (st:StructureType) ON (st.name)",
     "FOR (p:Purpose) ON (p.name)",
