@@ -29,6 +29,7 @@ format, projection handlers remain the sole Neo4j writers.
   own mature async query layer. Adding that dependency would mean a sync-driver
   adapter and an embedder-interface wrapper for what is ~3 Cypher patterns the repo
   already knows how to write and test. Rejected alternatives recorded below.
+- **Sequential by design**: amended 2026-07-16 (M4.7 W3).
 
 ## Architecture & data flow
 
@@ -36,7 +37,7 @@ format, projection handlers remain the sole Neo4j writers.
 question + project_id
   → QUERY ANALYSIS (deterministic, no LLM): match question tokens against the
     project's canonical-entity names/surfaces and person display names
-  → RETRIEVAL (three channels, concurrent):
+  → RETRIEVAL (three channels, sequential — one embed, then per-channel queries):
       vector    — embed the question (same model as the indexed vectors);
                   db.index.vector.queryNodes over the per-model fragment and
                   utterance indexes; hits filtered to the project's interviews

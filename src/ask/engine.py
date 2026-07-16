@@ -50,6 +50,8 @@ class SynthesisUnavailable(Exception):
 class AskEngine:
     """Answers a question against one project's graph."""
 
+    _fulltext_ensured: bool = False  # per-process; ensure_fulltext_index is idempotent DDL
+
     def __init__(self, config_dict: Optional[Dict[str, Any]] = None):
         from src.config import config as global_config
 
@@ -85,30 +87,49 @@ class AskEngine:
         async with await Neo4jConnectionManager.get_session() as session:
             if not await reader.project_exists(session, project_id):
                 raise ValueError(f"Project {project_id} not found")
-            await reader.ensure_fulltext_index(session)
+            if not AskEngine._fulltext_ensured:
+                await reader.ensure_fulltext_index(session)
+                AskEngine._fulltext_ensured = True
 
-            # vector channel (degrades to nothing on embedder failure)
+            # vector channel (embedder failure drops it; a single dead index
+            # degrades to the other index's hits instead of killing the channel)
+            vector = None
             try:
                 embedder = self._build_embedder()
                 vector = (await embedder.embed([question]))[0]
                 model = _sanitize(embedder.model_name)
-                frag_rows = await reader.vector_fragment_rows(
-                    session, project_id, f"fragment_embedding_{model}", vector, CHANNEL_K
-                )
-                utt_rows = await reader.vector_utterance_rows(
-                    session, project_id, f"utterance_embedding_{model}", vector, CHANNEL_K
-                )
+            except Exception as exc:
+                logger.warning(f"ask: vector channel unavailable ({type(exc).__name__})")
+                flags["vector_unavailable"] = type(exc).__name__
+
+            if vector is not None:
+                frag_rows: List[Dict[str, Any]] = []
+                utt_rows: List[Dict[str, Any]] = []
+                try:
+                    frag_rows = await reader.vector_fragment_rows(
+                        session, project_id, f"fragment_embedding_{model}", vector, CHANNEL_K
+                    )
+                except Exception as exc:
+                    logger.warning(f"ask: fragment vector index unavailable ({type(exc).__name__})")
+                    flags["vector_fragment_unavailable"] = type(exc).__name__
+                try:
+                    utt_rows = await reader.vector_utterance_rows(
+                        session, project_id, f"utterance_embedding_{model}", vector, CHANNEL_K
+                    )
+                except Exception as exc:
+                    logger.warning(f"ask: utterance vector index unavailable ({type(exc).__name__})")
+                    flags["vector_utterance_unavailable"] = type(exc).__name__
+                if "vector_fragment_unavailable" in flags and "vector_utterance_unavailable" in flags:
+                    flags["vector_unavailable"] = flags["vector_fragment_unavailable"]
                 seen: Dict[str, float] = {}
                 for row in frag_rows + utt_rows:
                     seen[row["fragment_id"]] = max(
                         seen.get(row["fragment_id"], 0.0), row["score"]
                     )
-                rankings["vector"] = [
-                    fid for fid, _ in sorted(seen.items(), key=lambda x: (-x[1], x[0]))
-                ]
-            except Exception as exc:
-                logger.warning(f"ask: vector channel unavailable ({type(exc).__name__})")
-                flags["vector_unavailable"] = type(exc).__name__
+                if seen:
+                    rankings["vector"] = [
+                        fid for fid, _ in sorted(seen.items(), key=lambda x: (-x[1], x[0]))
+                    ]
 
             # fulltext channel
             query_text = reader.sanitize_fulltext_query(question)

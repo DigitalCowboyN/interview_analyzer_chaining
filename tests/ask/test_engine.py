@@ -22,6 +22,15 @@ NAME_ROWS = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def _reset_fulltext_ensured():
+    """`_fulltext_ensured` is a class-level memo; reset it per test so
+    ensure_fulltext_index assertions don't order-couple across tests."""
+    AskEngine._fulltext_ensured = False
+    yield
+    AskEngine._fulltext_ensured = False
+
+
 def make_session():
     session = AsyncMock()
     session.__aenter__ = AsyncMock(return_value=session)
@@ -62,15 +71,27 @@ def patch_engine(
     anchor_rows=None,
     ctx_rows=None,
     embedder=None,
+    frag_side_effect=None,
+    utt_side_effect=None,
 ):
     session = make_session()
+    frag_mock = (
+        AsyncMock(side_effect=frag_side_effect)
+        if frag_side_effect is not None
+        else AsyncMock(return_value=frag_rows or [])
+    )
+    utt_mock = (
+        AsyncMock(side_effect=utt_side_effect)
+        if utt_side_effect is not None
+        else AsyncMock(return_value=utt_rows or [])
+    )
     patches = [
         patch("src.ask.engine.Neo4jConnectionManager.get_session",
               new=AsyncMock(return_value=session)),
         patch("src.ask.engine.reader.project_exists", new=AsyncMock(return_value=project_exists)),
         patch("src.ask.engine.reader.ensure_fulltext_index", new=AsyncMock(return_value=None)),
-        patch("src.ask.engine.reader.vector_fragment_rows", new=AsyncMock(return_value=frag_rows or [])),
-        patch("src.ask.engine.reader.vector_utterance_rows", new=AsyncMock(return_value=utt_rows or [])),
+        patch("src.ask.engine.reader.vector_fragment_rows", new=frag_mock),
+        patch("src.ask.engine.reader.vector_utterance_rows", new=utt_mock),
         patch("src.ask.engine.reader.fulltext_rows", new=AsyncMock(return_value=ft_rows or [])),
         patch("src.ask.engine.reader.name_rows", new=AsyncMock(return_value=name_rows or [])),
         patch("src.ask.engine.reader.graph_anchor_rows", new=AsyncMock(return_value=anchor_rows or [])),
@@ -125,6 +146,23 @@ async def test_ask_happy_path_fuses_channels_and_attaches_verbatim_quotes():
 
 
 @pytest.mark.asyncio
+async def test_fulltext_ensure_runs_once_per_process():
+    ft_rows = [{"fragment_id": "f1", "score": 1.0}]
+    ctx_rows = [CONTEXT_ROW]
+    agent = make_agent(data={"answer": "Answer.", "citations": []})
+    patches, session = patch_engine(ft_rows=ft_rows, ctx_rows=ctx_rows)
+    apply_all(patches)
+    try:
+        with patch.object(AskEngine, "_build_agent", return_value=agent):
+            await AskEngine(config_dict={}).ask(PID, "why?")
+            await AskEngine(config_dict={}).ask(PID, "why again?")
+        from src.ask import reader
+        reader.ensure_fulltext_index.assert_awaited_once()
+    finally:
+        stop_all(patches)
+
+
+@pytest.mark.asyncio
 async def test_vector_channel_degrades_when_embedder_raises():
     ft_rows = [{"fragment_id": "f1", "score": 1.0}]
     anchor_rows = [{"fragment_id": "f1"}]
@@ -145,6 +183,79 @@ async def test_vector_channel_degrades_when_embedder_raises():
     assert result.retrieval["flags"] == {"vector_unavailable": "RuntimeError"}
     assert set(result.retrieval["channels"].keys()) == {"fulltext", "graph"}
     assert result.answer == "Answer."
+
+
+@pytest.mark.asyncio
+async def test_dead_fragment_index_degrades_to_utterance_hits_only():
+    utt_rows = [{"fragment_id": "f1", "score": 0.7}]
+    ft_rows = [{"fragment_id": "f1", "score": 1.0}]
+    ctx_rows = [CONTEXT_ROW]
+
+    agent = make_agent(data={"answer": "Answer.", "citations": []})
+    patches, session = patch_engine(
+        frag_side_effect=RuntimeError("fragment index down"),
+        utt_rows=utt_rows, ft_rows=ft_rows, ctx_rows=ctx_rows,
+    )
+    apply_all(patches)
+    try:
+        with patch.object(AskEngine, "_build_agent", return_value=agent):
+            result = await AskEngine(config_dict={}).ask(PID, "Why Acme?")
+    finally:
+        stop_all(patches)
+
+    assert result.retrieval["flags"] == {"vector_fragment_unavailable": "RuntimeError"}
+    assert result.retrieval["channels"]["vector"] == 1  # utterance hit survives
+    assert "vector_unavailable" not in result.retrieval["flags"]
+
+
+@pytest.mark.asyncio
+async def test_dead_utterance_index_degrades_to_fragment_hits_only():
+    frag_rows = [{"fragment_id": "f1", "score": 0.7}]
+    ft_rows = [{"fragment_id": "f1", "score": 1.0}]
+    ctx_rows = [CONTEXT_ROW]
+
+    agent = make_agent(data={"answer": "Answer.", "citations": []})
+    patches, session = patch_engine(
+        frag_rows=frag_rows,
+        utt_side_effect=RuntimeError("utterance index down"),
+        ft_rows=ft_rows, ctx_rows=ctx_rows,
+    )
+    apply_all(patches)
+    try:
+        with patch.object(AskEngine, "_build_agent", return_value=agent):
+            result = await AskEngine(config_dict={}).ask(PID, "Why Acme?")
+    finally:
+        stop_all(patches)
+
+    assert result.retrieval["flags"] == {"vector_utterance_unavailable": "RuntimeError"}
+    assert result.retrieval["channels"]["vector"] == 1  # fragment hit survives
+    assert "vector_unavailable" not in result.retrieval["flags"]
+
+
+@pytest.mark.asyncio
+async def test_both_vector_indexes_dead_sets_vector_unavailable_flag():
+    ft_rows = [{"fragment_id": "f1", "score": 1.0}]
+    ctx_rows = [CONTEXT_ROW]
+
+    agent = make_agent(data={"answer": "Answer.", "citations": []})
+    patches, session = patch_engine(
+        frag_side_effect=RuntimeError("fragment index down"),
+        utt_side_effect=ValueError("utterance index down"),
+        ft_rows=ft_rows, ctx_rows=ctx_rows,
+    )
+    apply_all(patches)
+    try:
+        with patch.object(AskEngine, "_build_agent", return_value=agent):
+            result = await AskEngine(config_dict={}).ask(PID, "Why Acme?")
+    finally:
+        stop_all(patches)
+
+    assert result.retrieval["flags"] == {
+        "vector_fragment_unavailable": "RuntimeError",
+        "vector_utterance_unavailable": "ValueError",
+        "vector_unavailable": "RuntimeError",  # mirrors fragment leg for old consumers
+    }
+    assert "vector" not in result.retrieval["channels"]
 
 
 @pytest.mark.asyncio
@@ -187,7 +298,7 @@ async def test_synthesis_failure_raises_with_partial_result():
     apply_all(patches)
     try:
         with patch.object(AskEngine, "_build_agent", return_value=agent):
-            with pytest.raises(SynthesisUnavailable) as exc_info:
+            with pytest.raises(SynthesisUnavailable, match="^synthesis failed:") as exc_info:
                 await AskEngine(config_dict={}).ask(PID, "why?")
     finally:
         stop_all(patches)
@@ -208,7 +319,9 @@ async def test_invalid_synthesis_response_raises_with_partial_result():
     apply_all(patches)
     try:
         with patch.object(AskEngine, "_build_agent", return_value=agent):
-            with pytest.raises(SynthesisUnavailable) as exc_info:
+            with pytest.raises(
+                SynthesisUnavailable, match="^invalid synthesis response:"
+            ) as exc_info:
                 await AskEngine(config_dict={}).ask(PID, "why?")
     finally:
         stop_all(patches)
