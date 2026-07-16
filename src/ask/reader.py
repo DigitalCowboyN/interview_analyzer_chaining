@@ -142,9 +142,10 @@ async def context_rows(session, fragment_ids: List[str]) -> List[Dict[str, Any]]
            f.sequence_order AS sequence_order,
            i.interview_id AS interview_id, i.title AS title,
            sp.display_name AS speaker, person.display_name AS person,
-           collect(DISTINCT seg.topic) AS segment_topics,
-           collect(DISTINCT e.surface) AS entities,
-           collect(DISTINCT {text: sib.text, order: sib.sequence_order}) AS siblings
+           [t IN collect(DISTINCT seg.topic) WHERE t IS NOT NULL] AS segment_topics,
+           [s IN collect(DISTINCT e.surface) WHERE s IS NOT NULL] AS entities,
+           [x IN collect(DISTINCT {text: sib.text, order: sib.sequence_order})
+            WHERE x.text IS NOT NULL] AS siblings
     ORDER BY interview_id, sequence_order
     """
     result = await session.run(query, fragment_ids=fragment_ids)

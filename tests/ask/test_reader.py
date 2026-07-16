@@ -117,6 +117,7 @@ async def test_context_rows_carries_speaker_person_segment_entities_siblings():
     assert "IDENTIFIED_AS" in q and "Segment" in q and "MENTIONS" in q
     assert "PART_OF_UTTERANCE" in q
     assert "ORDER BY interview_id, sequence_order" in q
+    assert "WHERE x.text IS NOT NULL" in q
 
 
 @pytest.mark.asyncio
