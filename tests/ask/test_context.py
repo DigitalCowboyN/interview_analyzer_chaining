@@ -39,3 +39,13 @@ def test_quotes_for_drops_unknown_ids_and_preserves_block_order():
     quotes = quotes_for(["made-up", "f1"], blocks)
     assert quotes == [{"fragment_id": "f1", "interview_id": "i1",
                        "quote": "We chose Acme."}]
+
+
+def test_real_prompt_asset_renders_through_render_prompt():
+    from src.utils.helpers import load_yaml
+
+    template = load_yaml("prompts/ask_prompts.yaml")["ask_synthesis"]["prompt"]
+    rendered = render_prompt(template, "why acme?", build_blocks([ROW]))
+    assert "why acme?" in rendered
+    assert '{"answer":' in rendered  # JSON literal survived formatting
+    assert "[f1]" in rendered

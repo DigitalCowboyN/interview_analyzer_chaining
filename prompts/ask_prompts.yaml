@@ -5,7 +5,7 @@ ask_synthesis:
     block your answer relies on. If the context is insufficient to answer,
     say exactly that in the answer and cite nothing.
 
-    Format: {"answer": "<your answer>", "citations": [{"fragment_id": "<id>"}]}
+    Format: {{"answer": "<your answer>", "citations": [{{"fragment_id": "<id>"}}]}}
 
     Question: {question}
 
