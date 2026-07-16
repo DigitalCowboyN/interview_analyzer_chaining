@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-07-15
+**Last Updated:** 2026-07-17
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -27,15 +27,91 @@
 | **M4.4** | ✅ Complete | Layer 5: OKF Export + front-matter capture + richer queries |
 | **M4.5** | ✅ Complete | Layer 4: schema v2 (a ✅, b ✅, c ✅) |
 | **M4.6** | ✅ Complete | GraphRAG ask-the-corpus (hybrid retrieval + cited synthesis) |
+| **M4.7** | ✅ Complete | Hardening & operational readiness (schema, deploy path, ask/resolution hardening, persona lens, content corpus) |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M4.7 (TBD — pick from Deferred Backlog)
-**Tests:** 1198 unit passing, 3 skipped | **Coverage:** 91.82% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Current Phase:** M4.8 (TBD — strong candidate: `:Sentence` shim drop; or pick from Deferred Backlog)
+**Tests:** 1263 unit passing, 17 skipped | **Coverage:** 92.29% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
 ## Milestone Checklist
+
+### M4.7: Hardening & Operational Readiness ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-16-m47-hardening-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-16-m47-hardening.md`
+
+Hardening pass across the whole stack ahead of a real deploy: programmatic
+schema, a fixed deployed-projection delivery path, ask/resolution
+operational fixes carried from the M4.5b/M4.6 final reviews, a second lens
+proving the generic-lens claim, and an authored content corpus for
+exercising the pipeline against realistic, varied input.
+
+- [x] Task 1: Programmatic schema (`src/projections/schema.py` — 23
+      idempotent DDL statements covering every handler MERGE key, including
+      the Layer 4 overlay keys) applied at projection-service startup
+      (fail-fast `SystemExit` on dead Neo4j) + `python -m
+      src.projections.ensure_schema` CLI
+- [x] Task 2: Compose `neo4j` healthcheck (`cypher-shell`) + `service_healthy`
+      gating for `app`/`worker`/`projection-service`
+- [x] Task 3: Deployed-path smoke (`make deployed-smoke`,
+      `DEPLOYED_SMOKE=1`-gated) — exposed and fixed three pre-existing
+      delivery defects in the dockerized projection service: event-loop
+      starvation (sync subscription iteration blocked the loop; moved to
+      `asyncio.to_thread`), checkpoint callbacks never awaited compatibly
+      (sync/async support via `inspect.isawaitable`), and acks sent with the
+      resolved `event.id` instead of the link `ack_id` (never registered
+      server-side, so every event redelivered 11x then parked). The
+      deployed path now delivers and acks, proven with consumer-group
+      assertions. Also fixed: `SubscriptionManager.stop()` now stops active
+      subscriptions (unblocks worker threads); the reconnect path stops
+      stale subscriptions first
+- [x] Task 4: Ask reader — project-aware over-fetch (`OVERFETCH_FACTOR=5`,
+      `LIMIT $k` applied after the project filter), Unicode-safe fulltext
+      sanitizer
+- [x] Task 5: Ask engine/context/CLI — per-index vector degradation flags,
+      fulltext ensure-once memo, interview title surfaced in context blocks,
+      `--top-k >= 1` validation + CLI tests, synthesis error-message pins;
+      M4.6 spec "concurrent"→sequential wording amendment
+- [x] Task 6: Worklist resilience — embedder-failure degradation
+      (`embedding_unavailable` flag, person suggestions stay intact),
+      engine-deferred auto-band pairs surfaced on the worklist (`band`
+      field), `person_rows` `merged_into` filter, docstring fix, degradation
+      flags threaded through every router branch
+- [x] Task 7: Add-alias correction endpoint — `POST
+      /resolution/{project_id}/entities/{canonical_id}/aliases`
+      (`EntityAliasAdded`, human method bypasses the lock) → 202/404/409
+- [x] Task 8: Persona lens (`lenses/persona.yaml` + `prompts/lens_persona.yaml`
+      + declarative models) — zero engine/handler/event/endpoint code,
+      proving the generic-lens claim for real; smoke leg covering all four
+      node types plus speaker links
+- [x] Task 9 + 10: Content corpus (`data/samples/`) — `MANIFEST.md`
+      (capability map + file registry, including the Room Mic ground truth
+      for the shared-mic multi-person speaker) + 5 authored transcripts
+      across 3 categories (mature labeled; mixed/adversarial labels
+      including one shared-mic multi-person speaker; continuous unlabeled
+      raw) + a data-driven parse-validation test; `.gitignore`'s `data/`
+      rule restructured to track the new corpus
+- [x] Task 11: Minor consistency sweep — `GET
+      /interviews/{id}/segments` 404 consistency, `_link_text` backslash
+      hardening, unique per-export staging directory, e2e embedder comment
+- [x] Task 12: README + ROADMAP updates and full test gates
+
+**Completed:** 2026-07-17
+
+**Deferred:** `:Sentence` shim drop + deprecated alias flips + vector-index
+retarget + migration-CLI deletion (natural M4.8 candidate); Text2Cypher ask
+channel; index-side project scoping for vector search;
+`PersonLinkRemovedHandler` duplicate-delivery guard rework (load-bearing for
+parked-event ordering); `EnrichmentResult.flags` scoping/rename (waits for a
+second document-scope extractor); `normalize_surface` PERSON plural-fold
+exemption; SpeakerMerged × IDENTIFIED_AS full reconciliation (read-side
+filter only shipped); event-store edit observability (future feature — this
+milestone's content corpus is a prerequisite for its varied-input baseline).
+
+---
 
 ### M4.6: GraphRAG Ask-the-Corpus ✅ COMPLETE
 
@@ -664,14 +740,15 @@ limitation); OKF export of lens outputs (M4.4).
 - [x] Dual-label invariant assertion (every `:Sentence` is `:Fragment` and vice
       versa) → closed by `tests/integration/test_layer4_resolution_smoke.py`
       (M4.5b Task 12)
-- [ ] `_link_text` backslash hardening in `src/export/renderer.py` (raw
+- [x] `_link_text` backslash hardening in `src/export/renderer.py` (raw
       trailing `\` can still escape a link's closing bracket; escape
-      backslashes first or rstrip after truncation)
+      backslashes first or rstrip after truncation) → closed by M4.7 Task 11
 - [ ] `FragmentRepository = SentenceRepository` class alias (+ edits.py local
       dependency naming) so M4.5b code doesn't annotate against the old class
       name
-- [ ] Concurrent exports of same interview+lens share one fixed `.staging`
-      path (`bundler.py`) — pre-existing race, not a regression
+- [x] Concurrent exports of same interview+lens share one fixed `.staging`
+      path (`bundler.py`) — pre-existing race, not a regression → closed by
+      M4.7 Task 11 (unique per-export staging directory)
 - [ ] Unit-test gap: projection-handler read-MATCH label shapes covered only
       by integration smokes
 - [ ] Migration CLI uses deprecated `CALL {} IN TRANSACTIONS` syntax
@@ -681,20 +758,28 @@ limitation); OKF export of lens outputs (M4.4).
       back-links and `_render_claim` (DRY)
 
 **From M4.5b (2026-07-15):**
-- [ ] Dockerized projection-service has never worked in this environment: its
+- [x] Dockerized projection-service has never worked in this environment: its
       Neo4j target (dev `neo4j` compose service) has been stopped for months
       and until 278902f subscription groups were created without
       resolve_links (all $ce- events parked). resolve_links is fixed; still
       needed: point the service at a live Neo4j (or drop it from the default
       stack) and add a deployed-path smoke.
+      **M4.7 note:** fixed for real — Task 3 found and fixed three
+      additional pre-existing delivery defects (sync-iteration event-loop
+      starvation, checkpoint callbacks never awaited compatibly, acks sent
+      with the wrong id) and added `make deployed-smoke`
+      (`tests/integration/test_deployed_projection_smoke.py`), which proves
+      the dockerized path delivers and acks against real containers.
 
 **From M4.5b final review (2026-07-15):**
-- [ ] Engine-deferred merge pairs (auto-band, two existing canonicals) never
+- [x] Engine-deferred merge pairs (auto-band, two existing canonicals) never
       appear on the worklist — surface them in compute_suggestions
-      (`src/resolution/suggestions.py` discards the auto band)
-- [ ] No human path to add an alias to a locked canonical: corrections API
+      (`src/resolution/suggestions.py` discards the auto band) → closed by
+      M4.7 Task 6 (`band` field)
+- [x] No human path to add an alias to a locked canonical: corrections API
       lacks add-alias, and skipped_locked surfaces are invisible on the
-      worklist (engine counter only)
+      worklist (engine counter only) → closed by M4.7 Task 7 (`POST
+      /resolution/{project_id}/entities/{canonical_id}/aliases`)
 - [ ] `PersonLinkRemovedHandler` parks on duplicate delivery (removed==0
       guard) — NOTE: the guard is load-bearing for parked-event ordering
       (prevents a replayed parked link from resurrecting a removed edge);
@@ -702,12 +787,13 @@ limitation); OKF export of lens outputs (M4.4).
 - [ ] `suggestions.py` docstring overclaims: entity-merge rows are NOT
       actionable before the first engine run (confirm_entity_merge 404/409s
       until canonicals exist in the aggregate)
-- [ ] Worklist GET degrades hard when the embedder is unavailable (quota) —
+- [x] Worklist GET degrades hard when the embedder is unavailable (quota) —
       500s the whole worklist; add graceful degradation (companion to the
-      deferred embedding cache)
-- [ ] `person_rows` lacks a `sp.merged_into IS NULL` filter; broader:
-      SpeakerMerged x IDENTIFIED_AS/person-link interaction is unhandled
-      (stale links after Layer-1 merges)
+      deferred embedding cache) → closed by M4.7 Task 6
+      (`embedding_unavailable` flag; person suggestions stay intact)
+- [x] `person_rows` lacks a `sp.merged_into IS NULL` filter (closed by M4.7
+      Task 6); broader SpeakerMerged x IDENTIFIED_AS/person-link
+      reconciliation beyond this read-side filter remains open
 - [ ] Consider exempting PERSON-type surfaces from the plural fold in
       normalize_surface ("Jenkins"→"jenkin") — derivation is wire-adjacent
       once minted
@@ -717,45 +803,55 @@ limitation); OKF export of lens outputs (M4.4).
       conventions
 
 **From M4.5c final review (2026-07-16):**
-- [ ] `GET /interviews/{id}/segments` returns 200 + empty list for unknown
+- [x] `GET /interviews/{id}/segments` returns 200 + empty list for unknown
       interviews while the DELETE leg 404s — API consistency sweep candidate
+      → closed by M4.7 Task 11
 - [ ] `EnrichmentResult.flags` is generically named but only the document
       pass populates it; scope/rename before a second document-scope
       extractor lands
-- [ ] Layer 4 overlay node indexes missing from the schema DDL:
+- [x] Layer 4 overlay node indexes missing from the schema DDL:
       `:Segment(segment_id)`, `:CanonicalEntity(canonical_id)`,
-      `:Person(person_id)` — handlers MERGE by these keys
+      `:Person(person_id)` — handlers MERGE by these keys → closed by M4.7
+      Task 1 (`src/projections/schema.py`)
 - [ ] Renderer transcript headings key by start_index and would silently
       drop one of two segments sharing a start_index (unreachable now that
       conflicting proposals are dropped; hardening only)
-- [ ] Test-strength nicety: e2e smoke's canned embedder could carry a
-      "values unused, only counts asserted" comment
+- [x] Test-strength nicety: e2e smoke's canned embedder could carry a
+      "values unused, only counts asserted" comment → closed by M4.7 Task 11
 
 **From M4.6 final review (2026-07-16):**
-- [ ] Project-aware over-fetch for the vector/fulltext ask channels — both run a
+- [x] Project-aware over-fetch for the vector/fulltext ask channels — both run a
       global top-k then filter to the project, so recall decays as unrelated
       projects grow; over-fetch (k × projects heuristic) or index-side scoping
-- [ ] Per-index try/except in the vector channel — one block spans both the
+      → closed via a fixed factor (M4.7 Task 4, `OVERFETCH_FACTOR=5`); true
+      index-side project scoping remains open (see below)
+- [x] Per-index try/except in the vector channel — one block spans both the
       fragment and utterance index queries, so a missing utterance index kills
-      the whole vector channel instead of degrading to fragments-only
-- [ ] Ensure the fulltext index once per process — `ensure_fulltext_index`
+      the whole vector channel instead of degrading to fragments-only →
+      closed by M4.7 Task 5 (separate try/except per index, distinct
+      degradation flags)
+- [x] Ensure the fulltext index once per process — `ensure_fulltext_index`
       (incl. `db.awaitIndexes`) runs on every ask and could stall asks during a
-      re-embedding backfill
-- [ ] Amend the M4.6 spec's "three channels, concurrent" wording — the
+      re-embedding backfill → closed by M4.7 Task 5 (ensure-once memo)
+- [x] Amend the M4.6 spec's "three channels, concurrent" wording — the
       implementation is sequential by design (embed once, then per-channel
-      queries); spec should match
-- [ ] CLI test coverage for `python -m src.ask` (incl. non-zero-exit leg) and
-      `--top-k` validation (negative values silently slice `scored[:-1]`)
-- [ ] Fulltext sanitizer strips non-ASCII word characters — accented names
-      never reach the fulltext channel
-- [ ] Reader returns an unused interview `title` field in context rows — use it
-      in context blocks or drop it
-- [ ] Test-strength nicety: engine tests can't distinguish the
+      queries); spec should match → closed by M4.7 Task 5
+- [x] CLI test coverage for `python -m src.ask` (incl. non-zero-exit leg) and
+      `--top-k` validation (negative values silently slice `scored[:-1]`) →
+      closed by M4.7 Task 5 (`--top-k >= 1` validation + CLI tests)
+- [x] Fulltext sanitizer strips non-ASCII word characters — accented names
+      never reach the fulltext channel → closed by M4.7 Task 4 (Unicode-safe
+      sanitizer)
+- [x] Reader returns an unused interview `title` field in context rows — use it
+      in context blocks or drop it → closed by M4.7 Task 5 (title now
+      surfaced in context blocks)
+- [x] Test-strength nicety: engine tests can't distinguish the
       ValidationError-vs-generic-Exception branch order in synthesis error
-      handling; assert on the distinct messages
+      handling; assert on the distinct messages → closed by M4.7 Task 5
 
 **Feature deferrals (each waits for a real need or its milestone):**
-- [ ] Persona lens — second lens, proves zero-per-lens-code for real (YAML + prompts)
+- [x] ~~Persona lens~~ → done via M4.7 Task 8 (`lenses/persona.yaml` +
+      `prompts/lens_persona.yaml`, zero engine/handler/event/endpoint code)
 - [ ] Lens apply via ingest flag / API endpoint
 - [ ] Same-version `--force` full re-extraction (needs an item-clearing event;
       CLI documents the limitation)
