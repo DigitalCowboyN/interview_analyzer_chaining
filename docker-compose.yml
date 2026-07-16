@@ -22,7 +22,7 @@ services:
       redis:
         condition: service_healthy
       neo4j:
-        condition: service_started
+        condition: service_healthy
       # Add dependency for the test container
       neo4j-test:
         condition: service_started # Or just service_healthy if we re-add healthcheck
@@ -68,7 +68,7 @@ services:
       redis:
         condition: service_healthy
       neo4j:
-        condition: service_started
+        condition: service_healthy
       eventstore:
         condition: service_healthy
     command: ["celery", "-A", "src.celery_app", "worker", "--loglevel=info"]
@@ -87,11 +87,12 @@ services:
       # Use Neo4j 5.x authentication format (hardcoded for now)
       NEO4J_AUTH: "neo4j/aB3cD4eF5gH6iJ7kL8m"
       NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
-    # healthcheck: # Temporarily remove healthcheck
-    #   test: ["CMD-SHELL", "tcpconnect localhost:7687 || exit 1"]
-    #   interval: 5s
-    #   timeout: 10s 
-    #   retries: 20
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p aB3cD4eF5gH6iJ7kL8m 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 40s
     networks:
       - interview_net # Attach to custom network
 
@@ -166,7 +167,7 @@ services:
       eventstore:
         condition: service_healthy
       neo4j:
-        condition: service_started
+        condition: service_healthy
     networks:
       - interview_net
     restart: unless-stopped
