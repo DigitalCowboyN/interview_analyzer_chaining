@@ -341,6 +341,38 @@ class EnrichmentOrchestrator:
             flags["topic_segments_invalid"] = "bad indices or overlapping ranges"
             return 0, flags
 
+        # A forced re-run can propose a segment (e.g. a merge) whose
+        # deterministic id isn't live, yet whose range overlaps a segment
+        # that IS still live (only a PARTIAL removal happened). validate_segments
+        # is proposal-internal and can't see that: catch it here, or we'd
+        # record overlapping (:Segment) nodes and double transcript headings.
+        live_ranges = [
+            (s["start_index"], s["end_index"])
+            for s in interview.segments.values()
+            if not s["removed"]
+        ]
+
+        def _is_live(ordinal: int) -> bool:
+            existing = interview.segments.get(segment_id_for(interview.aggregate_id, ordinal))
+            return existing is not None and not existing["removed"]
+
+        candidate_ranges = [
+            (seg["start_index"], seg["end_index"])
+            for ordinal, seg in enumerate(ordered)
+            if not _is_live(ordinal)
+        ]
+        if any(
+            cand_start <= live_end and live_start <= cand_end
+            for cand_start, cand_end in candidate_ranges
+            for live_start, live_end in live_ranges
+        ):
+            logger.warning(
+                f"topic_segments: forced re-run proposal for {interview.aggregate_id} "
+                f"overlaps surviving live segments; dropping all segments"
+            )
+            flags["topic_segments_conflict"] = "proposal overlaps surviving live segments"
+            return 0, flags
+
         count = 0
         for ordinal, seg in enumerate(ordered):
             segment_id = segment_id_for(interview.aggregate_id, ordinal)

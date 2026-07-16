@@ -140,13 +140,19 @@ async def test_invalid_proposal_drops_all_and_flags():
     executor = make_executor([TOPIC_SEGMENTS_SPEC], canned)
     embedder = make_embedder()
 
-    result = await run_with(interview, sentences, executor, embedder)
+    interview_repo, sentence_repo = make_repos(interview, sentences)
+    with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
+         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
+         patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
+        orchestrator = EnrichmentOrchestrator()
+        result = await orchestrator.enrich_interview(IID, force=False)
 
     assert result.segments_extracted == 0
     assert result.flags == {"topic_segments_invalid": "bad indices or overlapping ranges"}
     assert interview.segments == {}
     # save still called (enrichment continues past a dropped proposal)
-    # (verified indirectly: no exception raised and result returned)
+    interview_repo.save.assert_awaited_once_with(interview)
 
 
 @pytest.mark.asyncio
@@ -210,5 +216,103 @@ async def test_no_document_spec_is_a_noop():
     result = await run_with(interview, sentences, executor, embedder)
 
     executor.run_spec_on_text.assert_not_awaited()
+    assert result.segments_extracted == 0
+    assert result.flags == {}
+
+
+@pytest.mark.asyncio
+async def test_redraw_merge_conflict_drops_all_and_flags():
+    """Partial removal + forced re-run proposing a merge that covers a
+    surviving live segment's range must drop ALL segments, never record
+    an overlap."""
+    interview, sentences, _ = build_world()
+    sid_a = segment_id_for(IID, 0)
+    sid_b = segment_id_for(IID, 1)
+    interview.record_segment(sid_a, "A", 0, 1, 0.9)
+    interview.record_segment(sid_b, "B", 2, 2, 0.9)
+    interview.remove_segment(sid_a)
+    interview.mark_events_as_committed()
+    segments_before = dict(interview.segments)
+
+    canned = SpecOutcome(
+        data={
+            "segments": [
+                {"topic": "Merged", "start_index": 0, "end_index": 2, "confidence": 0.9},
+            ]
+        },
+        provider="anthropic",
+        model="haiku",
+    )
+    executor = make_executor([TOPIC_SEGMENTS_SPEC], canned)
+    embedder = make_embedder()
+
+    result = await run_with(interview, sentences, executor, embedder, force=True)
+
+    assert result.segments_extracted == 0
+    assert result.flags == {"topic_segments_conflict": "proposal overlaps surviving live segments"}
+    # No new SegmentIdentified events: state unchanged apart from the removal.
+    assert interview.segments == segments_before
+
+
+@pytest.mark.asyncio
+async def test_redraw_clean_no_conflict_with_live_survivor():
+    """Removed segment's ordinal can be redrawn as long as the new range
+    doesn't touch any segment that's still live."""
+    interview, sentences, _ = build_world()
+    sid_a = segment_id_for(IID, 0)
+    sid_b = segment_id_for(IID, 1)
+    interview.record_segment(sid_a, "A", 0, 1, 0.9)
+    interview.record_segment(sid_b, "B", 2, 2, 0.9)
+    interview.remove_segment(sid_b)
+    interview.mark_events_as_committed()
+
+    canned = SpecOutcome(
+        data={
+            "segments": [
+                {"topic": "A", "start_index": 0, "end_index": 1, "confidence": 0.9},
+                {"topic": "B redrawn", "start_index": 2, "end_index": 2, "confidence": 0.8},
+            ]
+        },
+        provider="anthropic",
+        model="haiku",
+    )
+    executor = make_executor([TOPIC_SEGMENTS_SPEC], canned)
+    embedder = make_embedder()
+
+    result = await run_with(interview, sentences, executor, embedder, force=True)
+
+    assert result.segments_extracted == 1
+    assert result.flags == {}
+    assert interview.segments[sid_a]["topic"] == "A"
+    assert interview.segments[sid_b]["topic"] == "B redrawn"
+    assert interview.segments[sid_b]["removed"] is False
+
+
+@pytest.mark.asyncio
+async def test_forced_identical_rerun_no_conflict():
+    """Both segments still live, proposal identical: candidate set is empty,
+    so there's nothing to conflict — existing idempotence, no flag."""
+    interview, sentences, _ = build_world()
+    sid_a = segment_id_for(IID, 0)
+    sid_b = segment_id_for(IID, 1)
+    interview.record_segment(sid_a, "A", 0, 1, 0.9)
+    interview.record_segment(sid_b, "B", 2, 2, 0.9)
+    interview.mark_events_as_committed()
+
+    canned = SpecOutcome(
+        data={
+            "segments": [
+                {"topic": "A", "start_index": 0, "end_index": 1, "confidence": 0.9},
+                {"topic": "B", "start_index": 2, "end_index": 2, "confidence": 0.8},
+            ]
+        },
+        provider="anthropic",
+        model="haiku",
+    )
+    executor = make_executor([TOPIC_SEGMENTS_SPEC], canned)
+    embedder = make_embedder()
+
+    result = await run_with(interview, sentences, executor, embedder, force=True)
+
     assert result.segments_extracted == 0
     assert result.flags == {}

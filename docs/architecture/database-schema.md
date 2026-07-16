@@ -356,7 +356,11 @@ Topic segments (M4.5c) join the same overlay:
 `SegmentIdentified` rebuilds the segment's `CONTAINS` edges from its range on
 every apply (a redraw = `SegmentRemoved` + forced re-run re-derives the same
 deterministic `segment_id`); `SegmentRemoved` deletes the node via
-`DETACH DELETE`, taking its `CONTAINS` edges with it.
+`DETACH DELETE`, taking its `CONTAINS` edges with it. The orchestrator never
+partially records a rejected proposal: an internally invalid one drops ALL
+segments and flags `topic_segments_invalid`, and one that would overlap a
+surviving live segment (partial removal + forced re-run) drops ALL segments
+and flags `topic_segments_conflict` — degrade, don't guess, in both cases.
 
 ### Layer 5 export (M4.4) — no graph schema changes
 

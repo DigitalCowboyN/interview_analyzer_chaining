@@ -667,6 +667,21 @@ limitation); OKF export of lens outputs (M4.4).
       frontmatter order asserted as set not list; T9 error-detail/tuple
       conventions
 
+**From M4.5c final review (2026-07-16):**
+- [ ] `GET /interviews/{id}/segments` returns 200 + empty list for unknown
+      interviews while the DELETE leg 404s — API consistency sweep candidate
+- [ ] `EnrichmentResult.flags` is generically named but only the document
+      pass populates it; scope/rename before a second document-scope
+      extractor lands
+- [ ] Layer 4 overlay node indexes missing from the schema DDL:
+      `:Segment(segment_id)`, `:CanonicalEntity(canonical_id)`,
+      `:Person(person_id)` — handlers MERGE by these keys
+- [ ] Renderer transcript headings key by start_index and would silently
+      drop one of two segments sharing a start_index (unreachable now that
+      conflicting proposals are dropped; hardening only)
+- [ ] Test-strength nicety: e2e smoke's canned embedder could carry a
+      "values unused, only counts asserted" comment
+
 **Feature deferrals (each waits for a real need or its milestone):**
 - [ ] Persona lens — second lens, proves zero-per-lens-code for real (YAML + prompts)
 - [ ] Lens apply via ingest flag / API endpoint
