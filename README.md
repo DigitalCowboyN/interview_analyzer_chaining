@@ -22,6 +22,7 @@ An event-sourced system for processing interview transcripts with AI-powered mul
 **Run it:** `python -m src.ingestion <file> --enrich` (ingest + enrich in one shot), or `make ingest FILE=<path>`.
 Then apply a lens: `python -m src.lens <interview_id> meeting_minutes`.
 Then export it: `python -m src.export <interview_id> meeting_minutes`.
+Then ask it a question: `python -m src.ask <project_id> "What did they decide about Acme Corp?"` (or `POST /ask/{project_id}`).
 
 ## Architecture
 
@@ -133,6 +134,7 @@ tests/               # 691 tests (unit, integration, e2e)
 | `/interviews/{interview_id}/lenses/{lens}/items` | GET | List a lens's items for an interview |
 | `/review/worklist` | GET | Low-confidence + unresolved-reference review queue |
 | `/speakers/rollup` | GET | Speaker rollup by display name, across interviews |
+| `/ask/{project_id}` | POST | Ask-the-corpus: hybrid retrieval + cited synthesis (GraphRAG) |
 
 > Full API documentation at http://localhost:8000/docs
 

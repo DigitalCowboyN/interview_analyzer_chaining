@@ -1,0 +1,15 @@
+ask_synthesis:
+  prompt: |
+    Answer the question using ONLY the context blocks below. Each block starts
+    with its fragment id in square brackets. Cite the fragment ids of every
+    block your answer relies on. If the context is insufficient to answer,
+    say exactly that in the answer and cite nothing.
+
+    Format: {{"answer": "<your answer>", "citations": [{{"fragment_id": "<id>"}}]}}
+
+    Question: {question}
+
+    Context:
+    {context}
+
+    Provide your response explicitly formatted as JSON.
