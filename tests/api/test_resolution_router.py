@@ -294,6 +294,90 @@ def test_unlink_missing_project_returns_404(client):
     assert resp.status_code == 404
 
 
+# --- alias ---------------------------------------------------------------
+
+
+def test_add_alias_happy_path_returns_202(client):
+    project, cid = make_project_with_splittable_entity()
+    repo = make_repo(project)
+
+    real_method = project.add_entity_alias
+    captured = {}
+
+    def spy(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return real_method(*args, **kwargs)
+
+    project.add_entity_alias = spy
+    with patch("src.api.routers.resolution.get_project_repository", return_value=repo):
+        resp = client.post(
+            f"/resolution/{PROJECT_ID}/entities/{cid}/aliases",
+            json={"surface": "Alicia"},
+            headers={"X-User-ID": "nathan"},
+        )
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["status"] == "accepted"
+    assert body["version"] == project.version
+    assert captured["args"][:3] == (PROJECT_ID, cid, "Alicia")
+    assert captured["kwargs"]["method"] == "human"
+    assert captured["kwargs"]["confidence"] == 1.0
+    assert captured["kwargs"]["actor"].user_id == "nathan"
+    assert "Alicia" in project.canonical_entities[cid]["surfaces"]
+    repo.save.assert_awaited_once_with(project)
+
+
+def test_add_alias_on_locked_canonical_returns_202(client):
+    """A canonical locked by a prior human action still accepts a human-added alias."""
+    project = Project(AGG_ID)
+    entity_type = "PERSON"
+    cid = canonical_entity_id(PROJECT_ID, normalize_surface("Alice"), entity_type)
+    project.canonicalize_entity(
+        PROJECT_ID, cid, "Alice", entity_type, ["Alice"], "human", 1.0,
+        actor=SYSTEM_ACTOR,
+    )
+    project.mark_events_as_committed()
+    assert project.canonical_entities[cid]["locked"] is True
+
+    repo = make_repo(project)
+    with patch("src.api.routers.resolution.get_project_repository", return_value=repo):
+        resp = client.post(
+            f"/resolution/{PROJECT_ID}/entities/{cid}/aliases",
+            json={"surface": "Alicia"},
+        )
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["status"] == "accepted"
+    assert body["version"] == project.version
+    assert "Alicia" in project.canonical_entities[cid]["surfaces"]
+    repo.save.assert_awaited_once_with(project)
+
+
+def test_add_alias_already_owned_surface_returns_409(client):
+    project, cid_a, cid_b = make_project_with_two_entities()
+    repo = make_repo(project)
+    with patch("src.api.routers.resolution.get_project_repository", return_value=repo):
+        resp = client.post(
+            f"/resolution/{PROJECT_ID}/entities/{cid_a}/aliases",
+            json={"surface": "Bob"},
+        )
+    assert resp.status_code == 409
+    assert "Bob" in resp.json()["detail"]
+    repo.save.assert_not_awaited()
+
+
+def test_add_alias_missing_project_returns_404(client):
+    repo = make_repo(None)
+    with patch("src.api.routers.resolution.get_project_repository", return_value=repo):
+        resp = client.post(
+            f"/resolution/{PROJECT_ID}/entities/some-cid/aliases",
+            json={"surface": "Alicia"},
+        )
+    assert resp.status_code == 404
+    repo.save.assert_not_awaited()
+
+
 # --- actor -------------------------------------------------------------
 
 
