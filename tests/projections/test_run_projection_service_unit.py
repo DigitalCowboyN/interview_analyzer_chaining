@@ -25,6 +25,8 @@ class TestMainFunction:
         mock_service.stop = AsyncMock()
 
         with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
              patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store), \
              patch("src.run_projection_service.ProjectionService", return_value=mock_service), \
              patch("src.run_projection_service.signal.signal"):
@@ -58,6 +60,8 @@ class TestMainFunction:
         mock_service.stop = AsyncMock()
 
         with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
              patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store), \
              patch("src.run_projection_service.ProjectionService", return_value=mock_service) as mock_ps_class, \
              patch("src.run_projection_service.signal.signal"):
@@ -89,6 +93,8 @@ class TestMainFunction:
         mock_service.stop = AsyncMock()
 
         with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
              patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store), \
              patch("src.run_projection_service.ProjectionService", return_value=mock_service), \
              patch("src.run_projection_service.signal.signal"), \
@@ -126,6 +132,8 @@ class TestMainFunction:
             registered_signals.append(sig)
 
         with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
              patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store), \
              patch("src.run_projection_service.ProjectionService", return_value=mock_service), \
              patch("src.run_projection_service.signal.signal", side_effect=mock_signal_register):
@@ -156,6 +164,8 @@ class TestMainFunction:
         mock_service.stop = AsyncMock()
 
         with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
              patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store), \
              patch("src.run_projection_service.ProjectionService", return_value=mock_service), \
              patch("src.run_projection_service.signal.signal"), \
@@ -181,6 +191,8 @@ class TestMainFunction:
         shutdown_event = asyncio.Event()
 
         with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
              patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store), \
              patch("src.run_projection_service.ProjectionService", return_value=mock_service), \
              patch("src.run_projection_service.signal.signal"), \
@@ -198,6 +210,60 @@ class TestMainFunction:
 
             # Verify stop was called
             mock_service.stop.assert_called_once()
+
+
+class TestSchemaFailFast:
+    """Test the ensure_schema startup wiring (fail-fast connectivity check)."""
+
+    @pytest.mark.asyncio
+    async def test_main_exits_nonzero_when_ensure_schema_raises(self):
+        """A dead Neo4j target (or bad DDL) exits non-zero before the service is built."""
+        mock_registry = MagicMock()
+
+        with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock(side_effect=Exception("boom"))), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
+             patch("src.run_projection_service.ProjectionService") as mock_ps_class:
+
+            from src.run_projection_service import main
+
+            with pytest.raises(SystemExit) as exc_info:
+                await main(lane_count=4, log_level="INFO")
+
+            assert exc_info.value.code == 1
+            # Never got far enough to construct the service
+            mock_ps_class.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_main_continues_to_service_construction_when_schema_ok(self):
+        """A healthy ensure_schema call lets startup proceed to service construction."""
+        mock_registry = MagicMock()
+        mock_event_store = MagicMock()
+        mock_service = AsyncMock()
+        mock_service.start = AsyncMock()
+        mock_service.stop = AsyncMock()
+
+        with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()) as mock_ensure_schema, \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
+             patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store), \
+             patch("src.run_projection_service.ProjectionService", return_value=mock_service) as mock_ps_class, \
+             patch("src.run_projection_service.signal.signal"):
+
+            async def run_main_with_timeout():
+                from src.run_projection_service import main
+                main_task = asyncio.create_task(main(lane_count=4, log_level="INFO"))
+                await asyncio.sleep(0.1)
+                main_task.cancel()
+                try:
+                    await main_task
+                except asyncio.CancelledError:
+                    pass
+
+            await run_main_with_timeout()
+
+            mock_ensure_schema.assert_called_once()
+            mock_ps_class.assert_called_once()
 
 
 class TestSignalHandler:
@@ -220,6 +286,8 @@ class TestSignalHandler:
                 captured_handler = handler
 
         with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
              patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store), \
              patch("src.run_projection_service.ProjectionService", return_value=mock_service), \
              patch("src.run_projection_service.signal.signal", side_effect=capture_signal_handler):
@@ -330,6 +398,8 @@ class TestLoggingConfiguration:
         mock_service.stop = AsyncMock()
 
         with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
              patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store), \
              patch("src.run_projection_service.ProjectionService", return_value=mock_service), \
              patch("src.run_projection_service.signal.signal"), \
@@ -367,6 +437,8 @@ class TestEventStoreConnection:
         mock_service.stop = AsyncMock()
 
         with patch("src.run_projection_service.create_handler_registry", return_value=mock_registry), \
+             patch("src.run_projection_service.ensure_schema", new=AsyncMock()), \
+             patch("src.run_projection_service.Neo4jConnectionManager.get_session", new=AsyncMock()), \
              patch("src.run_projection_service.get_event_store_client", return_value=mock_event_store) as mock_get_client, \
              patch("src.run_projection_service.ProjectionService", return_value=mock_service), \
              patch("src.run_projection_service.signal.signal"), \

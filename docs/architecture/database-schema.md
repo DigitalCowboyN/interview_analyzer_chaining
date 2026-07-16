@@ -481,43 +481,24 @@ LIMIT 10
 
 ## Schema Creation Script
 
-```cypher
-// Constraints
-CREATE CONSTRAINT source_file_filename IF NOT EXISTS
-FOR (sf:SourceFile) REQUIRE sf.filename IS UNIQUE;
+The authoritative DDL lives in code, not here: `src/projections/schema.py`
+(`SCHEMA_DDL`). It covers every MERGE key used by the projection handlers —
+including the single-property indexes each `MERGE` anchor needs even where a
+documented composite index also exists (composite indexes don't serve
+single-property lookups).
 
-// Indexes for performance
-// Shim window: `:Sentence` is the write-path MERGE anchor, `:Fragment` is the
-// read-path label — both need indexes until the `:Sentence` shim label drops
-// after M4.5, at which point the `sentence_lookup` / `sentence_sequence`
-// indexes below are removed.
-CREATE INDEX sentence_lookup IF NOT EXISTS
-FOR (s:Sentence) ON (s.sentence_id, s.filename);
+It is applied automatically at projection-service startup
+(`src/run_projection_service.py`, fail-fast if Neo4j is unreachable or DDL
+fails) and can be run manually via:
 
-CREATE INDEX sentence_sequence IF NOT EXISTS
-FOR (s:Sentence) ON (s.filename, s.sequence_order);
-
-CREATE INDEX fragment_lookup IF NOT EXISTS
-FOR (s:Fragment) ON (s.sentence_id, s.filename);
-
-CREATE INDEX fragment_sequence IF NOT EXISTS
-FOR (s:Fragment) ON (s.filename, s.sequence_order);
-
-CREATE INDEX topic_name IF NOT EXISTS
-FOR (t:Topic) ON (t.name);
-
-CREATE INDEX keyword_text IF NOT EXISTS
-FOR (k:Keyword) ON (k.text);
-
-CREATE INDEX function_type_name IF NOT EXISTS
-FOR (ft:FunctionType) ON (ft.name);
-
-CREATE INDEX structure_type_name IF NOT EXISTS
-FOR (st:StructureType) ON (st.name);
-
-CREATE INDEX purpose_name IF NOT EXISTS
-FOR (p:Purpose) ON (p.name);
+```bash
+python -m src.projections.ensure_schema
 ```
+
+Shim window: `:Sentence` is the write-path MERGE anchor, `:Fragment` is the
+read-path label — both carry their own indexes until the `:Sentence` shim
+label drops (see ROADMAP backlog), at which point the `:Sentence`-only index
+entries are removed from `SCHEMA_DDL`.
 
 ## EventStoreDB Streams
 

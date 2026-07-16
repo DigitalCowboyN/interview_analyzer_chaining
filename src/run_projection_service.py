@@ -15,6 +15,8 @@ from src.events.store import get_event_store_client
 from src.projections.bootstrap import create_handler_registry
 from src.projections.config import ESDB_CONNECTION_STRING
 from src.projections.projection_service import ProjectionService
+from src.projections.schema import ensure_schema
+from src.utils.neo4j_driver import Neo4jConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,15 @@ async def main(lane_count: int = 12, log_level: str = "INFO"):
     # Create handler registry
     logger.info("Initializing handler registry...")
     handler_registry = create_handler_registry()
+
+    # Ensure Neo4j schema exists (also doubles as a fail-fast connectivity check)
+    logger.info("Ensuring Neo4j schema...")
+    try:
+        async with await Neo4jConnectionManager.get_session() as session:
+            await ensure_schema(session)
+    except Exception as exc:
+        logger.critical(f"Neo4j unreachable or schema DDL failed: {exc}")
+        raise SystemExit(1)
 
     # Create EventStore client with connection string from config
     logger.info(f"Connecting to EventStore at {ESDB_CONNECTION_STRING}...")
