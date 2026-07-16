@@ -41,3 +41,7 @@ extractors:
     prompt_key: claims
     response_model: ClaimsResult
     scope: utterance  # {sentence} carries the utterance text; no {context} used
+  - name: topic_segments
+    prompt_key: topic_segments
+    response_model: SegmentsResult
+    scope: document

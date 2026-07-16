@@ -104,13 +104,14 @@ class TestCreateHandlerRegistry:
     def test_create_handler_registry_registers_all_handlers(
         self, mock_get_client
     ):
-        """Registry has 29 handlers (7 core + 5 speaker + 3 utterance + 4 enrichment + 3 lens + 7 resolution)."""
+        """Registry has 31 handlers (7 core + 5 speaker + 3 utterance + 4 enrichment
+        + 3 lens + 2 segment + 7 resolution)."""
         mock_get_client.return_value = MagicMock()
 
         registry = create_handler_registry()
 
         registered_types = registry.get_registered_types()
-        assert len(registered_types) == 29
+        assert len(registered_types) == 31
 
     @patch("src.projections.bootstrap.get_event_store_client")
     def test_create_handler_registry_uses_provided_parked_events_manager(
@@ -173,7 +174,7 @@ class TestCreateHandlerRegistry:
             create_handler_registry()
 
         assert "Handler registry initialized" in caplog.text
-        assert "29 handlers" in caplog.text
+        assert "31 handlers" in caplog.text
 
     @patch("src.projections.bootstrap.get_event_store_client")
     def test_create_handler_registry_returns_new_instance_each_call(
@@ -219,6 +220,8 @@ class TestCreateHandlerRegistry:
             "LensApplied",
             "LensExtractionGenerated",
             "LensExtractionOverridden",
+            "SegmentIdentified",
+            "SegmentRemoved",
             "EntityCanonicalized",
             "EntityAliasAdded",
             "EntityMergeConfirmed",

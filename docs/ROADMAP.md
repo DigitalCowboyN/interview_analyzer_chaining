@@ -25,16 +25,65 @@
 | **M3.1** | ✅ Complete | Vector Search (delivered as Layer 2 embeddings + per-model indexes) |
 | **M4.3** | ✅ Complete | Layer 3: Generic Lens Engine (meeting_minutes first) + debt burndown |
 | **M4.4** | ✅ Complete | Layer 5: OKF Export + front-matter capture + richer queries |
-| **M4.5** | ⏳ In Progress | Layer 4: schema v2 (a ✅, b ✅, c: segments) |
+| **M4.5** | ✅ Complete | Layer 4: schema v2 (a ✅, b ✅, c ✅) |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M4.5c (segments)
-**Tests:** 1123 unit passing, 3 skipped | **Coverage:** 91.63% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Current Phase:** M4.6 (GraphRAG retrieval)
+**Tests:** 1163 unit passing, 3 skipped | **Coverage:** 91.86% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
 ## Milestone Checklist
+
+### M4.5c: Topic Segments ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-10-layer4-schema-v2-design.md` (M4.5c section)
+**Plan:** `docs/superpowers/plans/2026-07-15-m45c-segments.md`
+
+Topic segments as a Layer 4 overlay: a document-scope `topic_segments`
+extractor proposes contiguous fragment ranges, the Interview aggregate
+records them as `SegmentIdentified`/`SegmentRemoved` events, and the
+projection materializes `(:Segment)-[:CONTAINS]->(:Fragment)` — surfaced as
+transcript headings in the OKF bundle and a read/correction API.
+Redraw = remove + forced re-run (deterministic `segment_id`).
+
+- [x] Task 1: `SegmentsResult` response model
+      (`src/models/extractor_responses.py`) + `topic_segments`
+      document-scope extractor declaration (`config/extractors.yaml`,
+      prompt in `prompts/core_extractors.yaml`)
+- [x] Task 2: `SegmentIdentified`/`SegmentRemoved` payload models +
+      `segment_id_for` uuid5 helper (`src/events/interview_events.py`);
+      Interview aggregate segment state, `record_segment`/`remove_segment`
+      (live-duplicate raises; re-identifying a removed segment allowed)
+- [x] Task 3: Segment proposal validation (`src/enrichment/segments.py` —
+      drop ALL on any bad index/overlap, flag `topic_segments_invalid`,
+      never a failed enrichment) + orchestrator document pass
+      (`_emit_segment_results`, resume gate on live segments)
+- [x] Task 4: Projection handlers (`SegmentIdentifiedHandler` rebuilds
+      CONTAINS from the range, `SegmentRemovedHandler` DETACH DELETEs) +
+      delivery wiring (bootstrap pin → 31, interview allowlist pin → 19)
+- [x] Task 5: Export — `segment_rows` reader + `## <topic>` segment
+      headings in `transcript.md` (`src/export/reader.py`,
+      `src/export/renderer.py`)
+- [x] Task 6: Segments API (`src/api/routers/segments.py`) — GET
+      `/interviews/{id}/segments`, DELETE correction → 202/404/409
+- [x] Task 7: Converged end-to-end smoke
+      (`tests/integration/test_end_to_end_smoke.py`: ingest → enrich+segments
+      → lens → resolve → export, all canned; exact CONTAINS topology,
+      dual-label invariant, unforced-re-run idempotence, heading order,
+      removal round-trip) + schema v2 docs + full gates
+
+**Completed:** 2026-07-15
+
+**Deferred:** segment redraw as a first-class event (remove + forced re-run
+covers v1); GraphRAG retrieval (M4.6); `:Sentence` shim drop +
+`FragmentRepository` alias flips (existing backlog); LLM-adjudicated
+resolution pairs, nickname dictionaries, cross-project person auto-linking
+(spec non-goals); corpus-level exports; segment coverage metrics (YAGNI
+until a consumer needs them).
+
+---
 
 ### M4.5b: Resolution Core ✅ COMPLETE
 
@@ -617,6 +666,21 @@ limitation); OKF export of lens outputs (M4.4).
       surface of a group; no two-speakers-one-person render test; aliases
       frontmatter order asserted as set not list; T9 error-detail/tuple
       conventions
+
+**From M4.5c final review (2026-07-16):**
+- [ ] `GET /interviews/{id}/segments` returns 200 + empty list for unknown
+      interviews while the DELETE leg 404s — API consistency sweep candidate
+- [ ] `EnrichmentResult.flags` is generically named but only the document
+      pass populates it; scope/rename before a second document-scope
+      extractor lands
+- [ ] Layer 4 overlay node indexes missing from the schema DDL:
+      `:Segment(segment_id)`, `:CanonicalEntity(canonical_id)`,
+      `:Person(person_id)` — handlers MERGE by these keys
+- [ ] Renderer transcript headings key by start_index and would silently
+      drop one of two segments sharing a start_index (unreachable now that
+      conflicting proposals are dropped; hardening only)
+- [ ] Test-strength nicety: e2e smoke's canned embedder could carry a
+      "values unused, only counts asserted" comment
 
 **Feature deferrals (each waits for a real need or its milestone):**
 - [ ] Persona lens — second lens, proves zero-per-lens-code for real (YAML + prompts)

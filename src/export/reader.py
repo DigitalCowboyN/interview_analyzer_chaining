@@ -21,6 +21,19 @@ async def transcript_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     return [dict(r) async for r in result]
 
 
+async def segment_rows(session, interview_id: str) -> List[Dict[str, Any]]:
+    """Topic segments with their fragment ranges (Layer 4 overlay)."""
+    query = """
+    MATCH (seg:Segment {interview_id: $interview_id})-[:CONTAINS]->(f:Fragment)
+    RETURN seg.segment_id AS segment_id, seg.topic AS topic,
+           seg.confidence AS confidence,
+           min(f.sequence_order) AS start_index, max(f.sequence_order) AS end_index
+    ORDER BY start_index
+    """
+    result = await session.run(query, interview_id=interview_id)
+    return [dict(r) async for r in result]
+
+
 async def speaker_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     query = """
     MATCH (i:Interview {interview_id: $interview_id})-[:HAS_PARTICIPANT]->(sp:Speaker)

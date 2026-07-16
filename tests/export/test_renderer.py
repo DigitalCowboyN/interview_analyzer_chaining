@@ -438,3 +438,74 @@ def test_index_lists_persons_section_when_persons_exist():
 def test_index_omits_persons_section_when_no_persons():
     files = render()
     assert "## Persons" not in files["index.md"]
+
+
+_SEGMENT_TRANSCRIPT = [
+    {"sentence_id": "f1", "sequence_order": 0, "text": "Let's talk roadmap.",
+     "speaker_id": "sp1", "speaker": "Alice Johnson", "utterance_id": "u-abc"},
+    {"sentence_id": "f2", "sequence_order": 1, "text": "Ship in Q3.",
+     "speaker_id": "sp1", "speaker": "Alice Johnson", "utterance_id": "u-abc"},
+    {"sentence_id": "f3", "sequence_order": 2, "text": "Now, budget.",
+     "speaker_id": "sp1", "speaker": "Alice Johnson", "utterance_id": "u-abc"},
+]
+_SEGMENTS = [
+    {"segment_id": "s1", "topic": "Roadmap", "confidence": 0.9, "start_index": 0, "end_index": 1},
+    {"segment_id": "s2", "topic": "Budget", "confidence": 0.8, "start_index": 2, "end_index": 2},
+]
+
+
+def test_transcript_renders_segment_headings_at_start_indices():
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(
+        HEADER, _SEGMENT_TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS, ENTITIES, ANALYSIS, lens,
+        exported_at="2026-07-10T12:00:00+00:00", segments=_SEGMENTS,
+    ))
+    content = files["transcript.md"]
+    expected = (
+        "---\ntype: Transcript\n---\n"
+        "\n"
+        "# Transcript\n"
+        "\n"
+        "## Roadmap\n"
+        "\n"
+        '<a id="u-1"></a>\n'
+        "**Speaker:** Alice Johnson\n"
+        "\n"
+        "Let's talk roadmap.\n"
+        "Ship in Q3.\n"
+        "\n"
+        "## Budget\n"
+        "\n"
+        '<a id="u-1"></a>\n'
+        "**Speaker:** Alice Johnson\n"
+        "\n"
+        "Now, budget.\n"
+    )
+    assert content == expected
+    # Order check: "## Roadmap" appears before the first fragment's text, and
+    # "## Budget" appears before the third fragment's text, in that order.
+    assert content.index("## Roadmap") < content.index("Let's talk roadmap.")
+    assert content.index("Let's talk roadmap.") < content.index("## Budget")
+    assert content.index("## Budget") < content.index("Now, budget.")
+
+
+def test_transcript_without_segments_is_byte_identical_to_before():
+    lens = load_lens("meeting_minutes")
+    files = dict(render_bundle(
+        HEADER, _SEGMENT_TRANSCRIPT, SPEAKERS, ITEMS, CLAIMS, ENTITIES, ANALYSIS, lens,
+        exported_at="2026-07-10T12:00:00+00:00",
+    ))
+    content = files["transcript.md"]
+    expected = (
+        "---\ntype: Transcript\n---\n"
+        "\n"
+        "# Transcript\n"
+        "\n"
+        '<a id="u-1"></a>\n'
+        "**Speaker:** Alice Johnson\n"
+        "\n"
+        "Let's talk roadmap.\n"
+        "Ship in Q3.\n"
+        "Now, budget.\n"
+    )
+    assert content == expected

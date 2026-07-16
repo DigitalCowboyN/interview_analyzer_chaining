@@ -204,6 +204,26 @@ class TestLaneManager:
         event.aggregate_id = "abc-123"
         assert manager._extract_interview_id(event) == "abc-123"
 
+    async def test_segment_identified_lane_key_is_aggregate_id(self):
+        """SegmentIdentified (Interview stream, M4.5c) lane-keys by aggregate_id."""
+        handler_registry = MagicMock()
+        manager = LaneManager(handler_registry, lane_count=4)
+        interview_id = str(uuid.uuid4())
+        event = EventEnvelope(
+            event_type="SegmentIdentified",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=interview_id,
+            version=0,
+            data={
+                "segment_id": str(uuid.uuid4()),
+                "topic": "onboarding",
+                "start_index": 0,
+                "end_index": 2,
+                "confidence": 0.9,
+            },
+        )
+        assert manager._extract_interview_id(event) == interview_id
+
     async def test_get_status(self):
         """Test getting status of all lanes."""
         handler_registry = MagicMock()

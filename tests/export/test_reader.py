@@ -151,6 +151,22 @@ async def test_person_rows_shape_and_query():
 
 
 @pytest.mark.asyncio
+async def test_segment_rows_orders_by_start_and_aggregates_range():
+    session = make_session([
+        {"segment_id": "s1", "topic": "Roadmap", "confidence": 0.9,
+         "start_index": 0, "end_index": 1},
+    ])
+    rows = await reader.segment_rows(session, IID)
+    assert rows[0]["topic"] == "Roadmap"
+    query = session.run.call_args[0][0]
+    assert "MATCH (seg:Segment {interview_id: $interview_id})-[:CONTAINS]->(f:Fragment)" in query
+    assert "min(f.sequence_order) AS start_index" in query
+    assert "max(f.sequence_order) AS end_index" in query
+    assert "ORDER BY start_index" in query
+    assert session.run.call_args.kwargs["interview_id"] == IID
+
+
+@pytest.mark.asyncio
 async def test_rollup_groups_linked_speakers_by_person():
     rows = [
         {"display_name": "Jane D.", "node_type": "ActionItem", "relationship": "OWNED_BY",
