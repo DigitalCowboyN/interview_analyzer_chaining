@@ -1,0 +1,53 @@
+---
+title: Ledgerline Weekly Planning Sync
+project: ledgerline-team
+date: 2026-03-18
+participants: [Maya Chen, Priya Nandan, Ravi Okafor, Sam Lindqvist]
+---
+Priya Nandan: Okay, I think we're all here, let's get started. Sam, you're driving notes this week?
+Sam Lindqvist: Yep, got it.
+Priya Nandan: Great. Quick agenda: categorization backlog, the seasonal-bill flexible budget idea, and then Q2 planning. Maya, you wanted to kick off with research findings?
+Maya Chen: Yeah, thanks. So I ran a user interview last week with one of our long-time Ledgerline users, and honestly it lined up with a lot of the support tickets we've been seeing.
+Ravi Okafor: The categorization memory thing again?
+Maya Chen: Exactly that. He described it as "teaching the app the same lesson twice." Every merchant he corrects gets miscategorized again the following month.
+Priya Nandan: That matches what support has been flagging too. Ravi, where's that on the backlog?
+Ravi Okafor: It's ticketed, but it's been sitting behind the sync-reliability work for, I think, two quarters now.
+Priya Nandan: All right, I want to make a call here. We've decided to move persistent categorization memory into the Q2 sprint, ahead of the next round of sync work.
+Maya Chen: That's great to hear. It came up as basically his top trust issue with the product.
+Sam Lindqvist: Should I note that as a decision? "Categorization memory moved ahead of sync work"?
+Priya Nandan: Yes, please log that.
+Ravi Okafor: I can own the technical design for that. Let's say I'll have a design doc by next Friday, the twenty-seventh.
+Sam Lindqvist: Got it, action item, Ravi, design doc, due March twenty-seventh.
+Priya Nandan: Perfect. Second topic — the seasonal or variable-bill budgeting thing. Maya, same interview?
+Maya Chen: Same interview, yeah. He wants something like a flexible range for utilities instead of a flat monthly number, since his electric bill swings a lot seasonally.
+Ravi Okafor: We've talked about range-based budgets before, right? Wasn't that on someone's someday-list?
+Priya Nandan: It was on mine, actually. I think it's a smaller lift than people assume, mostly UI work plus a schema tweak.
+Sam Lindqvist: Do we want to commit to that this quarter, or is that a stretch goal?
+Priya Nandan: Let's call it a stretch goal for Q2, not a hard commitment yet. I don't want to overload Ravi's plate on top of the categorization work.
+Ravi Okafor: Appreciate that.
+Priya Nandan: Sam, can you scope out the range-budget UI on your side, just rough sizing, nothing final?
+Sam Lindqvist: Sure, I can do a rough pass. Action item for me then — range-budget UI sizing, I'll say by April third.
+Priya Nandan: Sounds good, log it.
+Maya Chen: One more thing from that interview worth flagging — he mentioned wanting a per-category transaction list he can sort and filter, instead of drilling into transactions one at a time. He said it costs him real time every Sunday.
+Ravi Okafor: That one feels straightforward, actually, we already have the data model for it.
+Priya Nandan: Agreed, let's fold that into the Q2 sprint alongside categorization memory since it's low-risk.
+Sam Lindqvist: Another decision then — sortable per-category transaction list added to Q2 sprint scope.
+Priya Nandan: Yes, exactly, thank you Sam.
+Priya Nandan: Okay, moving to Q2 planning more broadly. Our two objectives for the quarter, as I see it: one, close the trust gap around categorization that's been showing up in both support tickets and user research. Two, keep sync reliability stable while we do that, we can't regress there.
+Ravi Okafor: I'd add a third, informally — get ahead of the seasonal-budget request before it becomes a bigger theme. Even if it's just a stretch goal.
+Priya Nandan: Fair, let's call that an emerging objective, not a committed one yet.
+Maya Chen: I can keep an eye on that in future interviews and flag if it becomes a pattern.
+Priya Nandan: That'd be great, thanks Maya.
+Sam Lindqvist: Should we talk about Acme Corp's broader roadmap sync? I know there's a call with the wider Acme leadership team next week.
+Priya Nandan: Right, yes. Ravi, are you on that call?
+Ravi Okafor: I am. I'll represent the categorization and range-budget work there so Acme's leadership has visibility into what we're prioritizing.
+Priya Nandan: Great, action item — Ravi represents Ledgerline's Q2 priorities on the Acme leadership sync, that call is Thursday.
+Sam Lindqvist: Got it, logging that as an action item too, owner Ravi, due this Thursday.
+Maya Chen: Quick question — is there a doc I should link my interview notes into, so this doesn't get lost?
+Priya Nandan: Good call, Sam, can you make sure the interview summary gets linked into the Q2 planning doc?
+Sam Lindqvist: Yep, I'll add that as an action item for myself — link Maya's interview notes into the Q2 doc, I'll get that done by end of day tomorrow.
+Priya Nandan: Perfect. I think that covers everything. Let's recap real quick, Sam, can you read back the decisions and action items?
+Sam Lindqvist: Sure. Decisions: one, categorization memory moved ahead of sync work into Q2. Two, sortable per-category transaction list added to Q2 scope. Action items: Ravi, categorization design doc, due March twenty-seventh. Me, range-budget UI sizing, due April third. Ravi, represent priorities on the Acme leadership call, due this Thursday. And me again, link interview notes into the Q2 doc, due tomorrow.
+Priya Nandan: That's exactly right. Great meeting everyone, thanks all.
+Ravi Okafor: Thanks, talk soon.
+Maya Chen: Thanks everyone, this was really productive.

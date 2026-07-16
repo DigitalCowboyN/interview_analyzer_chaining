@@ -1,0 +1,70 @@
+---
+title: Ledgerline User Interview - Jordan Alvarez
+project: ledgerline-ux
+date: 2026-03-12
+participants: [Maya Chen, Jordan Alvarez]
+---
+Maya Chen: Thanks so much for making time today, Jordan. I'm Maya, I'm doing UX research on the budgeting side of the product.
+Jordan Alvarez: Happy to help. I use the app basically every day, so, yeah, I've got opinions.
+Maya Chen: That's exactly what I'm hoping for. Before we get into it, mind if I record this? It's just for our internal notes.
+Jordan Alvarez: Go for it.
+Maya Chen: Great. So just to set the stage, we're talking about Ledgerline, the budgeting app from Acme Corp. How long have you been using it?
+Jordan Alvarez: I want to say... a year and a half? Maybe close to two years now. I switched over after my old spreadsheet setup just fell apart.
+Maya Chen: What do you mean by fell apart?
+Jordan Alvarez: I had this huge Google Sheet with like twelve tabs, one per category, and every month I'd have to manually copy numbers over from my bank. It was error-prone and honestly kind of miserable.
+Maya Chen: Right, that sounds exhausting. So when Acme Corp's app came along, what made you try it?
+Jordan Alvarez: A coworker mentioned it. She said Acme's product actually synced with her bank automatically, which, at the time, felt like magic.
+Maya Chen: Okay, let's talk about how you actually use it day to day. Walk me through a typical week.
+Jordan Alvarez: Sure. So most mornings I'll open the app, just kind of a glance, check if anything weird posted overnight. Then on Sundays I do a real review — that's when I go category by category and see where I'm at against budget.
+Maya Chen: And during that Sunday review, what are you doing exactly, like clicking through screens?
+Jordan Alvarez: Yeah, I go into each category, groceries, dining out, subscriptions, whatever, and I look at the progress bar. If something's over, I try to figure out why.
+Maya Chen: Got it. And how do you figure out why?
+Jordan Alvarez: Honestly this is where it gets annoying. I have to tap into each transaction one at a time. There's no way to just see, like, a list of everything tagged "dining out" for the month sorted by amount. I have to open each one, close it, open the next.
+Maya Chen: That's really useful to hear. So the per-transaction drill-down is a pain point.
+Jordan Alvarez: Big time. My main goal every week is just to understand where my money actually went, and right now that takes way longer than it should.
+Maya Chen: Makes sense. Are there other things that get in the way of that goal?
+Jordan Alvarez: Yeah, actually — the categorization itself. Ledgerline auto-categorizes transactions, and it's wrong maybe one time in five. Coffee shops get tagged as groceries sometimes, I have no idea why.
+Maya Chen: How do you fix a miscategorized transaction?
+Jordan Alvarez: You can tap it and change the category, but it doesn't remember your correction. So the same merchant shows up wrong again the next month, and I have to fix it again.
+Maya Chen: That's a strong signal. So one goal is accurate categorization without repeated manual fixing.
+Jordan Alvarez: Exactly. I shouldn't have to teach the app the same lesson twice.
+Maya Chen: Let's shift a little. Thinking beyond the weekly review, what's your relationship with the app like month to month?
+Jordan Alvarez: Month to month I mostly care about one number: am I under budget overall. Acme's dashboard shows that pretty clearly, actually, I'll give them credit there.
+Maya Chen: Good to know the dashboard's working for you. Any pain points at that level?
+Jordan Alvarez: The biggest one is bills. I have a handful of subscriptions and utilities that are irregular — like my electric bill changes every month — and the app treats them like they should be flat. So it's constantly flagging me as over on "utilities" when really I just have a seasonal bill.
+Maya Chen: So the budgeting model doesn't account for variable recurring expenses.
+Jordan Alvarez: Right. That's probably my third real pain point, if we're counting. Drill-down is one, categorization memory is two, and this seasonal-bill thing is three.
+Maya Chen: That's helpful, I'm tracking all three. Let's talk about goals for a second — if Ledgerline could wave a magic wand, what would you want it to do?
+Jordan Alvarez: Okay, wishlist time. Number one, I want to set a flexible budget for things like utilities — like a range instead of a hard number.
+Maya Chen: A range, got it. What else?
+Jordan Alvarez: Number two, and this is the big one, I want the app to actually learn from my corrections. If I fix a category once, remember it.
+Maya Chen: That lines up with what you said earlier about teaching it twice.
+Jordan Alvarez: Right, exactly the same thing. And third — this one's smaller — I'd love a simple list view of transactions per category that I can sort and filter, instead of tapping through one by one.
+Maya Chen: Those are three really concrete asks. Anything else on the wishlist, even a stretch idea?
+Jordan Alvarez: One stretch idea — some kind of alert before a bill is due, so I'm not surprised. But honestly the three I said matter way more day to day.
+Maya Chen: Understood. Now, stepping back, how would you describe Ledgerline to a friend who's never used it?
+Jordan Alvarez: I'd say it's the app that finally got me to stop dreading my finances. Before this I was just guessing and hoping. Now at least I have a number I trust, most months.
+Maya Chen: "Finally got me to stop dreading my finances" — I love that, mind if I quote you on that?
+Jordan Alvarez: Ha, sure, quote away.
+Maya Chen: And is there anything else memorable you'd say about it, good or bad?
+Jordan Alvarez: I'd say the honest version is: Acme built something that's ninety percent there, and the last ten percent is exactly the stuff we just talked about.
+Maya Chen: That's a great line too. Ninety percent there.
+Jordan Alvarez: Yeah, put that one on a slide if you want.
+Maya Chen: Let's talk about Acme Corp for a second, the company behind it. Any interactions with them directly? Support, community, anything like that?
+Jordan Alvarez: I emailed support once, about the categorization thing actually. Acme's response was polite but basically said "we're aware, it's on the roadmap." That was, gosh, eight months ago.
+Maya Chen: So no resolution yet on that front.
+Jordan Alvarez: Not that I've noticed. I still see the same issue today.
+Maya Chen: Okay, I want to go back to the weekly review one more time, because I want to understand the drill-down pain more specifically. When you tap into a transaction, what do you actually see?
+Jordan Alvarez: Merchant name, amount, date, and the category. That's it. No running total for that category, no way to see the next transaction without backing out first.
+Maya Chen: And how many transactions are you typically drilling into on a Sunday?
+Jordan Alvarez: Depends on the month, but easily twenty or thirty if I'm being thorough. It eats a good chunk of my Sunday morning.
+Maya Chen: That's a lot of taps. Okay, last few questions. If you had to rank your three pain points by how much they cost you in time versus how much they cost you in trust, how would you rank them?
+Jordan Alvarez: Time-wise, definitely the drill-down thing, that's the actual minutes lost. Trust-wise, it's the categorization memory issue, because it makes me feel like the app isn't actually listening to me.
+Maya Chen: And the seasonal bill issue?
+Jordan Alvarez: That one's more of a low-grade annoyance. It doesn't cost me much time, but it does make the budget number feel less trustworthy some months.
+Maya Chen: This has been incredibly helpful, Jordan. Last question — anything you wish I'd asked that I didn't?
+Jordan Alvarez: Maybe just, would I recommend it? And the answer's yes, with caveats. I have recommended it to two friends already, actually.
+Maya Chen: That's great to hear. Thank you so much for your time today.
+Jordan Alvarez: Of course, thanks for listening to me complain about my electric bill for twenty minutes.
+Maya Chen: That's the job. I'll send you a small thank-you gift card in the next few days.
+Jordan Alvarez: Appreciate it, take care Maya.

@@ -135,11 +135,14 @@ ehthumbs.db
 Thumbs.db
 
 # Generated data (Adjust if input should be tracked)
-data/
+# NOTE: data/samples/ is intentionally NOT listed here — it holds the
+# authored parse-validation corpus and is tracked in git.
+data/input/
 data/output/
 data/maps/
+data/old_output/
+data/test_summary.txt
 output/
-# data/input/ # Uncomment if input data should not be tracked
 
 # Log files
 *.log
