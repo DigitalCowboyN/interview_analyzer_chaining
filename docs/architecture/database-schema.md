@@ -317,6 +317,19 @@ a project. Never rewrites the `:Speaker` node it identifies.
 | `display_name` | string | Front-matter spelling if matched, else most common raw speaker name |
 | `project_id` | string | Owning project |
 
+### `:Segment` (Layer 4 / M4.5c)
+
+A topic episode over a contiguous fragment range within one interview. Like
+the rest of Layer 4, a pure overlay: it never rewrites the Layer 1 fragments
+it contains, only links to them.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `segment_id` | string | Deterministic UUID (uuid5 of `{interview_id}:segment:{ordinal}`) |
+| `topic` | string | Short topic label for the episode |
+| `interview_id` | string | Owning interview |
+| `confidence` | float | Extractor confidence (0–1) |
+
 ### Layer 4 resolution overlay (M4.5b)
 
 Canonical/person nodes and their edges are an overlay: they never rewrite
@@ -333,6 +346,17 @@ different canonicals in different projects. A merge (`EntityMergeConfirmed`)
 locks both canonicals and moves the losing one's `ALIAS_OF` edges to the
 survivor; a split (`EntitySplit`) creates a new canonical and moves the
 removed surfaces' edges to it.
+
+Topic segments (M4.5c) join the same overlay:
+
+```
+(:Segment)-[:CONTAINS]->(:Fragment)   // one edge per fragment in [start_index, end_index]
+```
+
+`SegmentIdentified` rebuilds the segment's `CONTAINS` edges from its range on
+every apply (a redraw = `SegmentRemoved` + forced re-run re-derives the same
+deterministic `segment_id`); `SegmentRemoved` deletes the node via
+`DETACH DELETE`, taking its `CONTAINS` edges with it.
 
 ### Layer 5 export (M4.4) — no graph schema changes
 
@@ -528,6 +552,8 @@ While Neo4j is the read model, EventStoreDB holds the authoritative event stream
 | `LensApplied` | `Interview-{id}` | Lens run marker; supersedes prior unlocked items (Layer 3) |
 | `LensExtractionGenerated` | `Interview-{id}` | One lens item (dual-label node, Layer 3) |
 | `LensExtractionOverridden` | `Interview-{id}` | Human correction; locks the item (Layer 3) |
+| `SegmentIdentified` | `Interview-{id}` | Topic segment over a fragment range (Layer 4, M4.5c) |
+| `SegmentRemoved` | `Interview-{id}` | Human correction; removes a segment (redraw = remove + forced re-run) (Layer 4, M4.5c) |
 | `EntityCanonicalized` | `Project-{id}` | New canonical entity created from a surface cluster (Layer 4) |
 | `EntityAliasAdded` | `Project-{id}` | One more surface aliased to an existing canonical (Layer 4) |
 | `EntityMergeConfirmed` | `Project-{id}` | Human merge of two canonicals (Layer 4) |
