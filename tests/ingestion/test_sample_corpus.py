@@ -28,6 +28,23 @@ CATEGORY_1_FILES = {
     "team_meeting_mature.txt",
 }
 
+# Category-2 (messy/mixed speaker identification) files: labels are a mix of
+# unique names and generics (some generics, like "Room Mic", stand in for
+# multiple real people sharing a mic). Detection must still land on LABELED
+# and the raw label SET (verbatim, including generics) must match the
+# manifest's ground truth exactly.
+CATEGORY_2_LABEL_SETS = {
+    "focus_group_mixed.txt": {"Priya Nair", "Speaker 1", "Speaker 2", "Room Mic"},
+    "stakeholder_review_mixed.txt": {"Jordan Alvarez", "Priya Nandan", "Interviewer", "Guest"},
+}
+
+# Category-3 (continuous, unlabeled) files: no speaker labels at all, and the
+# format detector must land on FLAT rather than LABELED.
+CATEGORY_3_FILES = {
+    "persona_interview_raw.txt",
+}
+MIN_CATEGORY_3_SENTENCES = 50
+
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -108,3 +125,35 @@ def test_category_1_every_speaker_has_fragments(sample_path: Path):
     counts = _fragment_texts_by_label(sample_path)
     for speaker, count in counts.items():
         assert count > 0, f"{sample_path.name}: {speaker} has no fragments"
+
+
+def test_category_2_speaker_label_set_matches_manifest(sample_path: Path):
+    """Category-2 files: format is LABELED and the detected label SET matches
+    the manifest verbatim, including generic labels ("Speaker 1", "Room Mic",
+    ...) that stand in for multiple real people sharing a mic."""
+    if sample_path.name not in CATEGORY_2_LABEL_SETS:
+        pytest.skip(f"{sample_path.name} is not a category-2 sample")
+
+    result = normalize(_read(sample_path))
+    assert result.format == TranscriptFormat.LABELED
+
+    expected = CATEGORY_2_LABEL_SETS[sample_path.name]
+    assert set(result.speaker_labels) == expected, (
+        f"{sample_path.name}: speaker labels {sorted(result.speaker_labels)} "
+        f"!= manifest label set {sorted(expected)}"
+    )
+
+
+def test_category_3_unlabeled_continuous(sample_path: Path):
+    """Category-3 files: format is FLAT, zero speaker labels are parsed, and
+    normalization yields at least MIN_CATEGORY_3_SENTENCES fragments."""
+    if sample_path.name not in CATEGORY_3_FILES:
+        pytest.skip(f"{sample_path.name} is not a category-3 sample")
+
+    result = normalize(_read(sample_path))
+    assert result.format == TranscriptFormat.FLAT
+    assert result.speaker_labels == []
+    assert len(result.fragments) >= MIN_CATEGORY_3_SENTENCES, (
+        f"{sample_path.name}: expected >= {MIN_CATEGORY_3_SENTENCES} sentences, "
+        f"got {len(result.fragments)}"
+    )
