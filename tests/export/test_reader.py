@@ -147,6 +147,7 @@ async def test_person_rows_shape_and_query():
     assert rows == [{"speaker_id": "sp1", "person_id": "person-1", "display_name": "Jane Doe"}]
     query = session.run.call_args[0][0]
     assert "HAS_PARTICIPANT" in query and "IDENTIFIED_AS" in query
+    assert "sp.merged_into IS NULL" in query
     assert session.run.call_args.kwargs["interview_id"] == IID
 
 

@@ -48,6 +48,7 @@ def test_worklist_endpoint(client):
     assert body["lens_items"] == [] and body["claims"] == []
     assert body["entity_merge_suggestions"] == []
     assert body["person_link_suggestions"] == []
+    assert body["flags"] == []
     suggestions_mock.assert_not_awaited()
 
 
@@ -56,6 +57,7 @@ def test_worklist_endpoint_with_project_id_includes_suggestions(client):
     suggestions = {
         "entity_merge_suggestions": [{"surviving_canonical_id": "a"}],
         "person_link_suggestions": [{"person_id": "b"}],
+        "flags": ["embedding_unavailable"],
     }
     with patch_session(), \
          patch("src.api.routers.queries.reader.worklist_rows", new=AsyncMock(return_value=result)), \
@@ -68,6 +70,7 @@ def test_worklist_endpoint_with_project_id_includes_suggestions(client):
     body = resp.json()
     assert body["entity_merge_suggestions"] == suggestions["entity_merge_suggestions"]
     assert body["person_link_suggestions"] == suggestions["person_link_suggestions"]
+    assert body["flags"] == suggestions["flags"]
     suggestions_mock.assert_awaited_once()
 
 

@@ -124,6 +124,7 @@ async def person_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     query = """
     MATCH (:Interview {interview_id: $interview_id})-[:HAS_PARTICIPANT]->
           (sp:Speaker)-[:IDENTIFIED_AS]->(p:Person)
+    WHERE sp.merged_into IS NULL
     RETURN sp.speaker_id AS speaker_id, p.person_id AS person_id,
            p.display_name AS display_name
     ORDER BY speaker_id
