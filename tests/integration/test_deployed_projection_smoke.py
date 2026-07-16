@@ -17,6 +17,7 @@ import os
 import uuid as uuid_mod
 
 import pytest
+import requests
 from neo4j import AsyncGraphDatabase
 
 from src.ingestion.orchestrator import IngestionOrchestrator
@@ -36,6 +37,61 @@ DEV_NEO4J_PASSWORD = "aB3cD4eF5gH6iJ7kL8m"
 POLL_TIMEOUT_S = 90
 POLL_INTERVAL_S = 2
 
+ESDB_HTTP_BASE = "http://localhost:2113"
+ESDB_HTTP_AUTH = ("admin", "changeit")
+SENTENCE_GROUP_INFO_URL = f"{ESDB_HTTP_BASE}/subscriptions/%24ce-Sentence/neo4j-projection-sentence-v1/info"
+
+CHECKPOINT_POLL_TIMEOUT_S = 15
+CHECKPOINT_POLL_INTERVAL_S = 1
+
+
+def _get_sentence_group_info() -> dict:
+    """
+    Query the ESDB HTTP API for the Sentence category stream's consumer
+    group info. Returns a dict with at least `parkedMessageCount`,
+    `lastProcessedEventNumber`, and `totalItemsProcessed`; if the group
+    doesn't exist yet (e.g. before any event has ever been ingested),
+    returns a synthetic baseline so callers can treat "no group yet" the
+    same as "group exists but hasn't processed anything".
+    """
+    response = requests.get(SENTENCE_GROUP_INFO_URL, auth=ESDB_HTTP_AUTH, timeout=10)
+    if response.status_code == 404:
+        return {"lastProcessedEventNumber": -1, "parkedMessageCount": 0, "totalItemsProcessed": 0}
+    response.raise_for_status()
+    return response.json()
+
+
+async def _poll_consumer_group_progress(baseline_total_processed: int):
+    """
+    Poll the Sentence consumer group's info (up to CHECKPOINT_POLL_TIMEOUT_S)
+    until `totalItemsProcessed` advances past its pre-ingest baseline.
+
+    `totalItemsProcessed` is a live per-ack counter -- unlike
+    `lastProcessedEventNumber`/`lastCheckpointedEventPosition`, which are
+    only written when esdbclient's persistent-subscription checkpoint
+    logic fires (batched: `minCheckPointCount: 10` acks OR
+    `checkPointAfterMilliseconds: 2000` -- see `_ensure_subscription_exists`
+    config), so on a low-volume smoke run it can legitimately lag behind
+    real, successful acks by one run's worth of events. Polling here
+    (rather than a single point-in-time check) absorbs that checkpoint
+    latency while still proving forward progress.
+    """
+    deadline = asyncio.get_running_loop().time() + CHECKPOINT_POLL_TIMEOUT_S
+    info = _get_sentence_group_info()
+    while asyncio.get_running_loop().time() < deadline:
+        info = _get_sentence_group_info()
+        if info["totalItemsProcessed"] > baseline_total_processed:
+            return info
+        await asyncio.sleep(CHECKPOINT_POLL_INTERVAL_S)
+    pytest.fail(
+        f"Sentence consumer group's totalItemsProcessed did not advance past "
+        f"its pre-ingest baseline ({baseline_total_processed}) within "
+        f"{CHECKPOINT_POLL_TIMEOUT_S}s: still at {info['totalItemsProcessed']}. "
+        f"Events are being redelivered/reprocessed but never acked -- check "
+        f"`docker logs interview_analyzer_projection_service`."
+    )
+
+
 LABELED = """---
 title: Deployed Smoke Interview
 project: deployed-smoke
@@ -51,9 +107,9 @@ Bob: That works for the schedule.
 
 async def _poll_fragment_count(session, interview_id: str, expected: int):
     """Poll dev Neo4j (up to POLL_TIMEOUT_S) for the projected Fragment count."""
-    deadline = asyncio.get_event_loop().time() + POLL_TIMEOUT_S
+    deadline = asyncio.get_running_loop().time() + POLL_TIMEOUT_S
     last_count = -1
-    while asyncio.get_event_loop().time() < deadline:
+    while asyncio.get_running_loop().time() < deadline:
         result = await session.run(
             """
             MATCH (i:Interview {interview_id: $iid})-[:HAS_SENTENCE]->(f:Fragment)
@@ -86,6 +142,14 @@ async def test_dockerized_projection_service_delivers_sentences_to_neo4j(tmp_pat
     input_file = tmp_path / "deployed_smoke.txt"
     input_file.write_text(LABELED)
 
+    # Capture the Sentence consumer group's baseline BEFORE seeding, so we
+    # can assert real forward progress afterward rather than just "some
+    # positive number". The group may not exist yet on a fresh ESDB
+    # instance (never ingested before) -- _get_sentence_group_info()
+    # treats a 404 as a zeroed-out baseline.
+    baseline_info = _get_sentence_group_info()
+    baseline_total_processed = baseline_info["totalItemsProcessed"]
+
     ingest = IngestionOrchestrator(project_id=project_id, map_dir=tmp_path / "maps")
     ingest_result = await ingest.ingest_file(input_file)
     interview_id = ingest_result.interview_id
@@ -108,6 +172,26 @@ async def test_dockerized_projection_service_delivers_sentences_to_neo4j(tmp_pat
             )
             dual_label_record = await dual_label.single()
             assert dual_label_record["mismatched"] == 0
+
+            # Consumer-group progress proof (guards against the C1 ack-id
+            # defect class): now that Neo4j shows the expected Fragment
+            # count, the Sentence subscription's server-side ack tracking
+            # must actually have advanced, and nothing should have been
+            # parked. If acks are silently failing (e.g. acking the wrong
+            # id), events still get delivered/projected via at-least-once
+            # redelivery + idempotent handlers, but totalItemsProcessed
+            # never moves and parkedMessageCount climbs -- so this
+            # assertion catches that defect class even when the Neo4j-side
+            # assertions above would otherwise pass. Polled (rather than a
+            # single point-in-time read) because totalItemsProcessed can
+            # trail the actual acks by a beat under load.
+            post_ingest_info = await _poll_consumer_group_progress(baseline_total_processed)
+            assert post_ingest_info["parkedMessageCount"] == 0, (
+                f"Sentence consumer group has parked messages: "
+                f"{post_ingest_info['parkedMessageCount']}. Acks are likely "
+                f"failing server-side (e.g. wrong ack id) -- check `docker "
+                f"logs interview_analyzer_projection_service`."
+            )
 
             # Schema proof: the service ran ensure_schema on its own target.
             indexes = await session.run("SHOW INDEXES")

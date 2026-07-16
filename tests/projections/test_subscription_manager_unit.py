@@ -223,6 +223,68 @@ class TestSubscriptionManagerStop:
         assert manager.subscriptions == {}
 
     @pytest.mark.asyncio
+    @patch("src.projections.subscription_manager.is_event_allowed", return_value=True)
+    async def test_stop_calls_stop_on_active_subscription(self, mock_is_allowed):
+        """
+        Regression test: stop() must call .stop() on each task's active
+        esdbclient subscription object *before* awaiting the cancelled task.
+
+        Cancelling the asyncio.Task alone does not unblock a worker thread
+        parked in asyncio.to_thread(next, iterator, ...) -- the cancellation
+        is only delivered when the coroutine next resumes on the event
+        loop, which won't happen until that blocking next() call returns.
+        Calling subscription.stop() directly cancels the underlying gRPC
+        stream, which unblocks the worker thread's next() promptly. This
+        test fails (times out / task.cancelled() is False) if stop() is
+        reverted to only cancelling the task.
+        """
+        mock_event_store = MagicMock()
+        subscription = _BlockingQueueSubscription()
+        client = MagicMock()
+        client.read_subscription_to_stream.return_value = subscription
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=client)
+        async_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_event_store.get_client.return_value = async_cm
+
+        manager = SubscriptionManager(event_store=mock_event_store)
+        manager._ensure_subscription_exists = AsyncMock()
+
+        # Make subscription.stop() unblock the fake blocking queue.get(),
+        # mirroring how the real PersistentSubscription.stop() cancels the
+        # gRPC stream and causes the blocked next() call to return/raise.
+        original_stop = subscription.stop
+
+        def stop_and_unblock():
+            original_stop()
+            subscription.put(threading.Event())
+
+        subscription.stop = MagicMock(side_effect=stop_and_unblock)
+
+        manager.is_running = True
+        task = asyncio.create_task(manager._run_subscription("test_sub", {"stream": "$ce-Test", "group": "test-group"}))
+        manager.subscriptions["test_sub"] = task
+
+        # Wait until the subscription is registered as active (i.e. the
+        # task has reached its blocking next() call).
+        async def wait_for_active():
+            while "test_sub" not in manager._active_subscriptions:
+                await asyncio.sleep(0.01)
+
+        await asyncio.wait_for(wait_for_active(), timeout=5.0)
+
+        await asyncio.wait_for(manager.stop(), timeout=5.0)
+
+        # subscription.stop() is idempotent in the real esdbclient (guarded
+        # by an internal _is_stopped flag), so SubscriptionManager.stop()'s
+        # explicit call and _run_subscription's own cleanup-on-exit call may
+        # both fire; what matters is that it was called at least once
+        # *before* stop() finished awaiting the cancelled task (proven by
+        # this test completing at all rather than timing out).
+        subscription.stop.assert_called()
+        assert task.cancelled() or task.done()
+
+    @pytest.mark.asyncio
     @patch("src.projections.subscription_manager.get_event_store_client")
     @patch("src.projections.subscription_manager.SUBSCRIPTION_CONFIG", {
         "test_sub": {"stream": "$ce-Test", "group": "test-group", "allowlist": []}
@@ -456,6 +518,57 @@ class TestRunSubscription:
 
     @pytest.mark.asyncio
     @patch("src.projections.subscription_manager.get_event_store_client")
+    async def test_reconnect_stops_stale_subscription_before_creating_fresh_one(self, mock_get_client):
+        """
+        Regression test (reviewer M1): on the exception/reconnect path, the
+        old subscription object must be .stop()'d before a fresh one is
+        created on the next outer-loop iteration -- otherwise the old
+        object's underlying gRPC response stream leaks.
+
+        Simulates: first outer-loop iteration connects successfully and
+        registers an active subscription, then a second `client.read_
+        subscription_to_stream` call (representing an error surfaced after
+        connecting) raises, which the except-Exception branch catches. The
+        first (stale) subscription object's .stop() must have been called
+        before is_running is flipped off and the loop exits.
+        """
+        mock_event_store = MagicMock()
+
+        first_subscription = MagicMock()
+        first_subscription.stop = MagicMock()
+
+        client = MagicMock()
+        # First connect succeeds and returns a subscription whose iterator
+        # immediately raises RuntimeError (simulating a mid-stream error),
+        # which is caught by the outer except-Exception branch and triggers
+        # a reconnect attempt.
+        first_subscription.__iter__ = MagicMock(side_effect=RuntimeError("stream broke"))
+        client.read_subscription_to_stream.return_value = first_subscription
+
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=client)
+        async_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_event_store.get_client.return_value = async_cm
+
+        manager = SubscriptionManager(event_store=mock_event_store)
+        manager._ensure_subscription_exists = AsyncMock()
+        manager.is_running = True
+
+        # Stop the outer while-loop after the first reconnect sleep so the
+        # test terminates; don't actually sleep.
+        async def patched_sleep(duration):
+            manager.is_running = False
+
+        with patch("asyncio.sleep", patched_sleep):
+            config = {"stream": "$ce-Test", "group": "test-group"}
+            await manager._run_subscription("test_sub", config)
+
+        first_subscription.stop.assert_called_once()
+        # The reference should be cleared once its owning iteration ends.
+        assert "test_sub" not in manager._active_subscriptions
+
+    @pytest.mark.asyncio
+    @patch("src.projections.subscription_manager.get_event_store_client")
     async def test_run_subscription_logs_connection_errors(self, mock_get_client, caplog):
         """Connection errors should be logged and trigger reconnection attempt."""
         mock_event_store = MagicMock()
@@ -557,6 +670,7 @@ class _BlockingQueueSubscription:
     def __init__(self):
         self._queue: "queue.Queue" = queue.Queue()
         self.acked_ids = []
+        self.stopped = False
 
     def __iter__(self):
         return self
@@ -570,12 +684,30 @@ class _BlockingQueueSubscription:
     def ack(self, event_id):
         self.acked_ids.append(event_id)
 
+    def stop(self):
+        """Mirrors esdbclient's PersistentSubscription.stop(): called by
+        SubscriptionManager.stop() and by the reconnect path's cleanup."""
+        self.stopped = True
+
 
 class _FakeEvent:
-    """Minimal stand-in for esdbclient's RecordedEvent."""
+    """
+    Minimal stand-in for esdbclient's RecordedEvent.
 
-    def __init__(self, event_id):
+    Mirrors the real `RecordedEvent.ack_id` property (esdbclient
+    events.py:47-52): for a resolved link event (the shape delivered by
+    $ce- category streams read with resolve_links=True), `ack_id` is the
+    *link's* id, distinct from the resolved event's own `id`. For a
+    non-link event, `ack_id == id`. Tests must use a distinct `link_id` to
+    catch any regression back to acking `event.id` instead of
+    `event.ack_id`.
+    """
+
+    def __init__(self, event_id, link_id=None):
         self.id = event_id
+        # None means "not a resolved link event" -> ack_id falls back to id,
+        # matching esdbclient's own fallback.
+        self.ack_id = link_id if link_id is not None else event_id
 
 
 class _RecordingLaneManager:
@@ -685,21 +817,28 @@ class TestRunSubscriptionConcurrency:
 
 class TestRunSubscriptionAckBinding:
     """
-    Regression test for the late-binding checkpoint_callback defect.
+    Regression tests for the checkpoint_callback ack-id defects.
 
-    The original code used `checkpoint_callback=lambda: subscription.ack(event.id)`,
-    which closes over the loop variable `event` by reference. LaneManager
-    defers invoking checkpoint_callback until its own processing loop picks
-    the event off its queue, by which point `event` may have been rebound to
-    a later iteration -- acking the wrong id. This test uses a fake lane
-    manager that stores (but does not call) checkpoint callbacks, feeds two
-    events through _run_subscription, then invokes the FIRST stored callback
-    and asserts the FIRST event's id was acked.
+    Covers two distinct historical bugs:
+
+    1. Late binding: the original code used
+       `checkpoint_callback=lambda: subscription.ack(event.id)`, which
+       closes over the loop variable `event` by reference. LaneManager
+       defers invoking checkpoint_callback until its own processing loop
+       picks the event off its queue, by which point `event` may have been
+       rebound to a later iteration -- acking the wrong id.
+    2. Wrong id entirely: even with correct binding, acking `event.id`
+       (the resolved event's own id) instead of `event.ack_id` (the link's
+       id, for resolved link events from $ce- category streams) is a
+       no-op server-side ack for the wrong message id -- the real in-flight
+       message is never cleared and gets redelivered until parked. Both
+       tests below use `_FakeEvent`s with a `link_id` distinct from
+       `event_id` so a regression to `.id` would be caught.
     """
 
     @pytest.mark.asyncio
     @patch("src.projections.subscription_manager.is_event_allowed", return_value=True)
-    async def test_first_callback_acks_first_event_id(self, mock_is_allowed):
+    async def test_first_callback_acks_first_event_ack_id(self, mock_is_allowed):
         mock_event_store = MagicMock()
         mock_event_store._recorded_event_to_envelope.side_effect = lambda event: MagicMock(
             event_id=event.id, event_type="TestEvent"
@@ -732,9 +871,12 @@ class TestRunSubscriptionAckBinding:
         task = asyncio.create_task(manager._run_subscription("test_sub", config))
 
         await asyncio.sleep(0.05)
-        subscription.put(_FakeEvent("first-event-id"))
+        # link_id distinct from event_id: mirrors a resolved link event off
+        # a $ce- stream, where ack_id (the link's id) != id (the resolved
+        # event's own id).
+        subscription.put(_FakeEvent("first-event-id", link_id="first-ack-id"))
         await asyncio.sleep(0.05)
-        subscription.put(_FakeEvent("second-event-id"))
+        subscription.put(_FakeEvent("second-event-id", link_id="second-ack-id"))
 
         async def wait_for_two_callbacks():
             while len(lane_manager.stored_callbacks) < 2:
@@ -747,7 +889,7 @@ class TestRunSubscriptionAckBinding:
             # already advanced to (and stored a callback for) the second
             # event -- this is exactly the scenario where late binding
             # would ack the wrong (second) event's id. checkpoint_callback
-            # is `lambda event_id=event.id: subscription.ack(event_id)`, a
+            # is `lambda ack_id=event.ack_id: subscription.ack(ack_id)`, a
             # plain sync callable (matching how SubscriptionManager builds
             # it), so invoke it directly rather than awaiting it.
             first_callback = lane_manager.stored_callbacks[0]
@@ -761,4 +903,97 @@ class TestRunSubscriptionAckBinding:
             except asyncio.CancelledError:
                 pass
 
-        assert subscription.acked_ids == ["first-event-id"]
+        # Must ack the LINK id ("first-ack-id"), not the resolved event's
+        # own id ("first-event-id") -- this is what would catch a
+        # regression back to `event.id`.
+        assert subscription.acked_ids == ["first-ack-id"]
+
+    @pytest.mark.asyncio
+    @patch("src.projections.subscription_manager.is_event_allowed", return_value=False)
+    async def test_skipped_event_acks_ack_id_not_event_id(self, mock_is_allowed):
+        """The ack-on-skip branch (event not in allowlist) must also ack
+        event.ack_id, not event.id."""
+        mock_event_store = MagicMock()
+        mock_event_store._recorded_event_to_envelope.side_effect = lambda event: MagicMock(
+            event_id=event.id, event_type="OtherEvent"
+        )
+
+        subscription = _BlockingQueueSubscription()
+        client = MagicMock()
+        client.read_subscription_to_stream.return_value = subscription
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=client)
+        async_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_event_store.get_client.return_value = async_cm
+
+        manager = SubscriptionManager(event_store=mock_event_store, lane_manager=None)
+        manager._ensure_subscription_exists = AsyncMock()
+        manager.is_running = True
+
+        config = {"stream": "$ce-Test", "group": "test-group"}
+        task = asyncio.create_task(manager._run_subscription("test_sub", config))
+
+        await asyncio.sleep(0.05)
+        subscription.put(_FakeEvent("skipped-event-id", link_id="skipped-ack-id"))
+
+        async def wait_for_ack():
+            while not subscription.acked_ids:
+                await asyncio.sleep(0.05)
+
+        try:
+            await asyncio.wait_for(wait_for_ack(), timeout=5.0)
+        finally:
+            manager.is_running = False
+            subscription.put(threading.Event())
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        assert subscription.acked_ids == ["skipped-ack-id"]
+
+    @pytest.mark.asyncio
+    @patch("src.projections.subscription_manager.is_event_allowed", return_value=True)
+    async def test_no_lane_manager_acks_ack_id_not_event_id(self, mock_is_allowed):
+        """The no-lane-manager branch must also ack event.ack_id, not
+        event.id."""
+        mock_event_store = MagicMock()
+        mock_event_store._recorded_event_to_envelope.side_effect = lambda event: MagicMock(
+            event_id=event.id, event_type="TestEvent"
+        )
+
+        subscription = _BlockingQueueSubscription()
+        client = MagicMock()
+        client.read_subscription_to_stream.return_value = subscription
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=client)
+        async_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_event_store.get_client.return_value = async_cm
+
+        manager = SubscriptionManager(event_store=mock_event_store, lane_manager=None)
+        manager._ensure_subscription_exists = AsyncMock()
+        manager.is_running = True
+
+        config = {"stream": "$ce-Test", "group": "test-group"}
+        task = asyncio.create_task(manager._run_subscription("test_sub", config))
+
+        await asyncio.sleep(0.05)
+        subscription.put(_FakeEvent("no-lane-event-id", link_id="no-lane-ack-id"))
+
+        async def wait_for_ack():
+            while not subscription.acked_ids:
+                await asyncio.sleep(0.05)
+
+        try:
+            await asyncio.wait_for(wait_for_ack(), timeout=5.0)
+        finally:
+            manager.is_running = False
+            subscription.put(threading.Event())
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        assert subscription.acked_ids == ["no-lane-ack-id"]
