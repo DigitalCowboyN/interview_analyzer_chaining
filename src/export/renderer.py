@@ -141,16 +141,22 @@ def _speaker_slug(
 
 
 def _link_text(value: str, limit: int = 80) -> str:
-    """LLM/graph text used as a markdown link label: one line, brackets escaped.
+    r"""LLM/graph text used as a markdown link label: one line, brackets escaped.
 
     Truncates the raw text first, then escapes -- escaping first and
-    truncating second can sever a `\\[`/`\\]` pair at the boundary, leaving a
+    truncating second can sever a `\[`/`\]` pair at the boundary, leaving a
     lone trailing backslash that escapes the link's closing `]` and breaks
     the markdown link. The escaped result may run slightly past `limit`;
     well-formedness beats exact length.
+
+    Backslashes are escaped FIRST, before brackets: a raw trailing `\` in the
+    truncated text can no longer escape the closing `]` once every backslash
+    (including ones the bracket-escaping is about to introduce) is doubled up
+    front.
     """
     collapsed = re.sub(r"\s+", " ", str(value)).strip()
-    return collapsed[:limit].replace("[", "\\[").replace("]", "\\]")
+    truncated = collapsed[:limit]
+    return truncated.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
 
 
 def _cell(value: Any) -> str:

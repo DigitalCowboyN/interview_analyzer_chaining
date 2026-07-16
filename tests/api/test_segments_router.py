@@ -30,10 +30,14 @@ def make_interview_with_segment(topic="Vendor choice"):
     return interview, sid
 
 
-def patch_session():
+def patch_session(found=1):
+    """found: value returned for the interview-existence count record."""
     session = AsyncMock()
     session.__aenter__ = AsyncMock(return_value=session)
     session.__aexit__ = AsyncMock(return_value=False)
+    exists_result = AsyncMock()
+    exists_result.single = AsyncMock(return_value={"found": found})
+    session.run = AsyncMock(return_value=exists_result)
     return patch(
         "src.api.routers.segments.Neo4jConnectionManager.get_session",
         new=AsyncMock(return_value=session),
@@ -53,11 +57,27 @@ def test_list_segments_returns_200_with_rows(client):
         {"segment_id": "s1", "topic": "Vendor choice", "confidence": 0.9,
          "start_index": 0, "end_index": 2},
     ]
-    with patch_session(), \
+    with patch_session(found=1), \
          patch("src.api.routers.segments.reader.segment_rows", new=AsyncMock(return_value=rows)):
         resp = client.get(f"/interviews/{IID}/segments")
     assert resp.status_code == 200
     assert resp.json() == {"segments": rows}
+
+
+def test_list_segments_known_interview_zero_segments_returns_200_empty(client):
+    with patch_session(found=1), \
+         patch("src.api.routers.segments.reader.segment_rows", new=AsyncMock(return_value=[])):
+        resp = client.get(f"/interviews/{IID}/segments")
+    assert resp.status_code == 200
+    assert resp.json() == {"segments": []}
+
+
+def test_list_segments_unknown_interview_returns_404(client):
+    with patch_session(found=0), \
+         patch("src.api.routers.segments.reader.segment_rows", new=AsyncMock(return_value=[])) as segment_rows:
+        resp = client.get(f"/interviews/{IID}/segments")
+    assert resp.status_code == 404
+    segment_rows.assert_not_awaited()
 
 
 # --- DELETE ----------------------------------------------------------------

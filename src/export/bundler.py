@@ -2,6 +2,7 @@
 
 import asyncio
 import shutil
+import uuid
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -97,21 +98,27 @@ class OkfExporter:
         """Write all bundle files into a staging dir, then atomically swap it in.
 
         A failure mid-write leaves the OLD bundle intact: the write phase happens
-        entirely in a sibling `.staging` directory, and only the rename at the end
-        can destroy the previous bundle. Zipping happens after the swap.
+        entirely in a sibling, uniquely-named staging directory (so concurrent
+        exports of the same bundle never collide on one fixed path), and only
+        the rename at the end can destroy the previous bundle. A failure before
+        or during that rename removes its own staging dir on the way out.
+        Zipping happens after the swap.
         """
-        staging = bundle_dir.with_name(bundle_dir.name + ".staging")
-        shutil.rmtree(staging, ignore_errors=True)
+        staging = bundle_dir.with_name(f"{bundle_dir.name}.staging-{uuid.uuid4().hex[:8]}")
 
-        for rel_path, content in files:
-            target = staging / rel_path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content, encoding="utf-8")
-        (staging / "log.md").write_text(log_content, encoding="utf-8")
+        try:
+            for rel_path, content in files:
+                target = staging / rel_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(content, encoding="utf-8")
+            (staging / "log.md").write_text(log_content, encoding="utf-8")
 
-        if bundle_dir.exists():
-            shutil.rmtree(bundle_dir)
-        staging.rename(bundle_dir)
+            if bundle_dir.exists():
+                shutil.rmtree(bundle_dir)
+            staging.rename(bundle_dir)
+        except BaseException:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
 
         bundle_path = str(bundle_dir)
         if zip_bundle:

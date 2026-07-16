@@ -258,6 +258,27 @@ def test_link_text_truncates_before_escaping_so_escapes_never_sever():
     assert not before_paren.endswith("\\]")
 
 
+def test_link_text_escapes_backslashes():
+    r"""A raw trailing backslash must not be able to escape the link's closing
+    `]`: backslashes are escaped first, so `_link_text("bad\\")` ends with two
+    backslashes (the escaped literal), and a link built from a value ending in
+    `\` never yields a *lone* trailing backslash immediately before the
+    label's closing bracket -- i.e. the label's own escaping can never
+    consume the link's closing `]`."""
+    from src.export.renderer import _link_text
+
+    label = _link_text("bad\\")
+    assert label.endswith("\\\\")
+
+    link = f"[{_link_text('trailing' + chr(92))}](x)"
+    assert link.endswith("](x)")
+    # the character immediately before the label's closing `]` must not be a
+    # lone (odd count of) backslash -- an even count is fully escaped and inert.
+    label_end = link.rindex("]")
+    trailing_backslashes = len(link[:label_end]) - len(link[:label_end].rstrip("\\"))
+    assert trailing_backslashes % 2 == 0
+
+
 def test_render_interview_escapes_participant_display_name():
     import copy
 
