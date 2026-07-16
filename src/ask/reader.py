@@ -9,10 +9,14 @@ from typing import Any, Dict, List
 
 FULLTEXT_INDEX = "fragment_text_ft"
 
+# global index hits fetched per requested result, so project filtering
+# doesn't starve recall in multi-project DBs
+OVERFETCH_FACTOR = 5
+
 
 def sanitize_fulltext_query(text: str) -> str:
-    """Strip Lucene special characters — the question is user input."""
-    cleaned = re.sub(r"[^A-Za-z0-9\s]", " ", text)
+    """Strip Lucene specials from user input, keeping Unicode word chars."""
+    cleaned = re.sub(r"[^\w\s]", " ", text)
     return " ".join(cleaned.split())
 
 
@@ -54,15 +58,17 @@ async def vector_fragment_rows(
     session, project_id: str, index_name: str, vector: List[float], k: int
 ) -> List[Dict[str, Any]]:
     query = """
-    CALL db.index.vector.queryNodes($index_name, $k, $vector)
+    CALL db.index.vector.queryNodes($index_name, $fetch_k, $vector)
     YIELD node, score
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
           (:Interview)-[:HAS_SENTENCE]->(node)
     RETURN node.sentence_id AS fragment_id, score
     ORDER BY score DESC
+    LIMIT $k
     """
     result = await session.run(
-        query, index_name=index_name, k=k, vector=vector, project_id=project_id
+        query, index_name=index_name, fetch_k=k * OVERFETCH_FACTOR,
+        vector=vector, project_id=project_id, k=k,
     )
     return [dict(r) async for r in result]
 
@@ -72,15 +78,17 @@ async def vector_utterance_rows(
 ) -> List[Dict[str, Any]]:
     """Utterance hits expand to member fragments, inheriting the hit's score."""
     query = """
-    CALL db.index.vector.queryNodes($index_name, $k, $vector)
+    CALL db.index.vector.queryNodes($index_name, $fetch_k, $vector)
     YIELD node, score
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
           (:Interview)-[:HAS_SENTENCE]->(f:Fragment)-[:PART_OF_UTTERANCE]->(node)
     RETURN f.sentence_id AS fragment_id, score
     ORDER BY score DESC
+    LIMIT $k
     """
     result = await session.run(
-        query, index_name=index_name, k=k, vector=vector, project_id=project_id
+        query, index_name=index_name, fetch_k=k * OVERFETCH_FACTOR,
+        vector=vector, project_id=project_id, k=k,
     )
     return [dict(r) async for r in result]
 
@@ -89,15 +97,17 @@ async def fulltext_rows(
     session, project_id: str, query_text: str, k: int
 ) -> List[Dict[str, Any]]:
     query = f"""
-    CALL db.index.fulltext.queryNodes('{FULLTEXT_INDEX}', $query_text, {{limit: $k}})
+    CALL db.index.fulltext.queryNodes('{FULLTEXT_INDEX}', $query_text, {{limit: $fetch_k}})
     YIELD node, score
     MATCH (:Project {{project_id: $project_id}})-[:CONTAINS_INTERVIEW]->
           (:Interview)-[:HAS_SENTENCE]->(node)
     RETURN node.sentence_id AS fragment_id, score
     ORDER BY score DESC
+    LIMIT $k
     """
     result = await session.run(
-        query, query_text=query_text, k=k, project_id=project_id
+        query, query_text=query_text, fetch_k=k * OVERFETCH_FACTOR,
+        project_id=project_id, k=k,
     )
     return [dict(r) async for r in result]
 
