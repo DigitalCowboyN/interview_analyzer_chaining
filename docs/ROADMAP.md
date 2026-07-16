@@ -687,8 +687,14 @@ limitation); OKF export of lens outputs (M4.4).
 - [ ] Lens apply via ingest flag / API endpoint
 - [ ] Same-version `--force` full re-extraction (needs an item-clearing event;
       CLI documents the limitation)
-- [ ] GraphRAG retrieval (next after Layer 4 — borrow `neo4j-graphrag-python`
-      retrievers only, never its construction pipeline)
+- [ ] ~~GraphRAG retrieval~~ → in progress as M4.6 (spec
+      `docs/superpowers/specs/2026-07-16-m46-graphrag-ask-design.md`; hand-rolled
+      hybrid retrieval, `neo4j-graphrag-python` dependency rejected — RRF idea
+      borrowed only)
+- [ ] Text2Cypher channel for the ask surface — LLM-written Cypher as an alternate
+      route for novel inquiries (aggregations, exotic traversals) the fixed
+      vector/fulltext/graph channels can't shape. Nice-to-have, not a necessity
+      (M4.6 spec's non-goals)
 - [ ] Corpus-level / multi-interview OKF bundles; incremental/diff exports;
       importing arbitrary OKF bundles (ingest reads front matter only)
 - [ ] Layer-1 leftovers: `OVERLAPS` edges; `StitchCorrected` as a distinct event;
