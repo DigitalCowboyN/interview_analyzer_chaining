@@ -1,0 +1,37 @@
+name: persona
+version: 1
+prompts_file: prompts/lens_persona.yaml
+projects_to:
+  Trait:
+    speaker_link: {field: speaker, relationship: EXHIBITED_BY}
+  Goal:
+    speaker_link: {field: speaker, relationship: HELD_BY}
+  PainPoint:
+    speaker_link: {field: speaker, relationship: EXPERIENCED_BY}
+  NotableQuote:
+    speaker_link: {field: speaker, relationship: SAID_BY}
+extractors:
+  - name: traits
+    prompt_key: traits
+    response_model: TraitsResult
+    scope: document
+    node_type: Trait
+    items_field: traits
+  - name: goals
+    prompt_key: goals
+    response_model: GoalsResult
+    scope: utterance
+    node_type: Goal
+    items_field: goals
+  - name: pain_points
+    prompt_key: pain_points
+    response_model: PainPointsResult
+    scope: utterance
+    node_type: PainPoint
+    items_field: pain_points
+  - name: notable_quotes
+    prompt_key: notable_quotes
+    response_model: NotableQuotesResult
+    scope: utterance
+    node_type: NotableQuote
+    items_field: notable_quotes

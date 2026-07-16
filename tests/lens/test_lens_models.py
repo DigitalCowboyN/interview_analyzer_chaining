@@ -70,3 +70,47 @@ def test_lens_response_models_are_openai_strict_compliant():
         _assert_strict(
             decl.to_extractor_spec().resolve_model().model_json_schema(), decl.name
         )
+
+
+def test_load_persona_lens():
+    lens = load_lens("persona")
+    assert lens.name == "persona"
+    assert lens.version == 1
+    assert set(lens.projects_to) == {"Trait", "Goal", "PainPoint", "NotableQuote"}
+    assert lens.projects_to["Goal"].speaker_link == {
+        "field": "speaker",
+        "relationship": "HELD_BY",
+    }
+    scopes = {e.name: e.scope for e in lens.extractors}
+    assert scopes["traits"] == "document"
+    assert scopes["goals"] == "utterance"
+    assert scopes["pain_points"] == "utterance"
+    assert scopes["notable_quotes"] == "utterance"
+
+
+def test_persona_extractor_decls_convert_to_specs_with_lens_module():
+    lens = load_lens("persona")
+    spec = next(e for e in lens.extractors if e.name == "goals").to_extractor_spec()
+    from src.models.lens_responses import GoalsResult
+
+    assert spec.resolve_model() is GoalsResult
+
+
+def test_persona_prompts_format_cleanly():
+    from src.utils.helpers import load_yaml
+
+    lens = load_lens("persona")
+    prompts = load_yaml(lens.prompts_file)
+    for decl in lens.extractors:
+        formatted = prompts[decl.prompt_key]["prompt"].format(sentence="Test text.")
+        assert "{sentence}" not in formatted
+
+
+def test_persona_response_models_are_openai_strict_compliant():
+    from tests.enrichment.test_final_review_fixes import _assert_strict
+
+    lens = load_lens("persona")
+    for decl in lens.extractors:
+        _assert_strict(
+            decl.to_extractor_spec().resolve_model().model_json_schema(), decl.name
+        )
