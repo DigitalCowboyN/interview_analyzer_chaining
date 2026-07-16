@@ -123,9 +123,11 @@ of both worlds: it drains subscriptions it can't project.
 Second lens, YAML + prompts only: `lenses/persona.yaml` +
 `prompts/lens_persona.yaml`. Speaker-scoped persona dimensions (traits, goals,
 pain points, notable quotes — exact dimensions pinned in the plan following the
-`meeting_minutes` YAML shape). Deliverable is the **proof**: zero new Python;
-the existing generic engine, events, projection, export, and API serve it
-unchanged. Verified by extending the lens smoke (or an e2e-smoke leg) to apply
+`meeting_minutes` YAML shape). Deliverable is the **proof**: no new engine,
+handler, event, or endpoint code — only the two YAML assets plus declarative
+response models in `src/models/lens_responses.py` (the registry resolves
+`response_model` by name); the existing generic engine, events, projection,
+export, and API serve it unchanged. Verified by extending the lens smoke (or an e2e-smoke leg) to apply
 `persona` with canned extractions through the real registry.
 
 ### W6 — Interview content corpus (for live analysis)
