@@ -26,15 +26,64 @@
 | **M4.3** | ✅ Complete | Layer 3: Generic Lens Engine (meeting_minutes first) + debt burndown |
 | **M4.4** | ✅ Complete | Layer 5: OKF Export + front-matter capture + richer queries |
 | **M4.5** | ✅ Complete | Layer 4: schema v2 (a ✅, b ✅, c ✅) |
+| **M4.6** | ✅ Complete | GraphRAG ask-the-corpus (hybrid retrieval + cited synthesis) |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M4.6 (GraphRAG retrieval)
+**Current Phase:** M4.7 (TBD — pick from Deferred Backlog)
 **Tests:** 1163 unit passing, 3 skipped | **Coverage:** 91.86% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
 ## Milestone Checklist
+
+### M4.6: GraphRAG Ask-the-Corpus ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-16-m46-graphrag-ask-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-16-m46-ask.md`
+
+`POST /ask/{project_id}` and `python -m src.ask`: a question fans across
+vector/fulltext/graph retrieval channels over the schema-v2 graph, RRF-fuses
+to top-K fragments, and one focused LLM call answers with verbatim fragment
+citations attached by code (never LLM-supplied). Read-side only — no new
+event types, aggregates, or streams; the only DDL anywhere is the lazily
+created `fragment_text_ft` fulltext index (vector-index idiom).
+
+- [x] Task 1: Ask retrieval reader (`src/ask/reader.py`) — `project_exists`,
+      `name_rows`, `vector_fragment_rows`/`vector_utterance_rows`,
+      `fulltext_rows`, `graph_anchor_rows`, `context_rows`,
+      `ensure_fulltext_index`; every channel query pins
+      `(:Project {project_id})-[:CONTAINS_INTERVIEW]->`
+- [x] Task 2: Reciprocal-rank fusion (`src/ask/fusion.py` — pure
+      `rank_by_count`/`rrf_merge`/`top_k`) + context assembly and prompt
+      rendering (`src/ask/context.py` — `build_blocks`/`render_prompt`/
+      `quotes_for`) + synthesis prompt (`prompts/ask_prompts.yaml`)
+- [x] Task 3: `AskEngine` (`src/ask/engine.py`) — retrieve → fuse → assemble
+      → one synthesis call; patchable `_build_embedder`/`_build_agent`
+      seams (resolution-engine precedent); degradation doctrine (dead
+      embedder drops the vector channel with `flags["vector_unavailable"]`,
+      zero hits skip the LLM entirely, synthesis failure/invalid response
+      raises `SynthesisUnavailable` carrying the full retrieval result);
+      `python -m src.ask <project_id> "<question>" [--top-k 12]` CLI
+- [x] Task 4: `POST /ask/{project_id}` (`src/api/routers/ask.py`) — 200
+      `AskResult`, 404 unknown project, 502 synthesis-unavailable with the
+      partial result as body; wired into `src/main.py`
+- [x] Task 5: Live smoke (`tests/integration/test_ask_smoke.py` — two
+      transcripts, overlapping "Acme Corp" surface, canned enrichment +
+      resolution, real replay, hybrid retrieval with a distinctive-vector
+      trick so the vector channel ranks the Acme fragment first, exact
+      verbatim-citation assertion, degradation leg, unknown-project
+      ValueError) + docs + full gates
+
+**Completed:** 2026-07-16
+
+**Deferred:** Text2Cypher channel for novel inquiries (ROADMAP backlog, spec
+non-goal); ask-history events / Q&A review surface; cross-project asking;
+multi-turn memory; reranking beyond RRF; streaming responses;
+embedding-model migration/reindexing tooling (per-model indexes already
+isolate).
+
+---
 
 ### M4.5c: Topic Segments ✅ COMPLETE
 
@@ -687,7 +736,7 @@ limitation); OKF export of lens outputs (M4.4).
 - [ ] Lens apply via ingest flag / API endpoint
 - [ ] Same-version `--force` full re-extraction (needs an item-clearing event;
       CLI documents the limitation)
-- [ ] ~~GraphRAG retrieval~~ → in progress as M4.6 (spec
+- [x] ~~GraphRAG retrieval~~ → done via M4.6 (spec
       `docs/superpowers/specs/2026-07-16-m46-graphrag-ask-design.md`; hand-rolled
       hybrid retrieval, `neo4j-graphrag-python` dependency rejected — RRF idea
       borrowed only)
