@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import TranscriptPage from "@/app/workbench/[projectId]/[interviewId]/page";
 import { useTranscript } from "@/hooks/useTranscript";
 import { useSentenceHistory } from "@/hooks/useSentenceHistory";
@@ -20,6 +22,16 @@ vi.mock("next/navigation", () => ({
 
 function mockParams(projectId: string, interviewId: string) {
   vi.mocked(useParams).mockReturnValue({ projectId, interviewId });
+}
+
+// The LineDetailPanel's correction affordances (Task 5) use TanStack Query's
+// useQueryClient, so page renders need a provider.
+function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  }
+  return render(<TranscriptPage />, { wrapper: Wrapper });
 }
 
 const TRANSCRIPT_WITH_SEGMENTS = {
@@ -80,7 +92,7 @@ describe("TranscriptPage", () => {
       error: null,
     } as never);
 
-    render(<TranscriptPage />);
+    renderPage();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
@@ -93,7 +105,7 @@ describe("TranscriptPage", () => {
       error: new Error("boom"),
     } as never);
 
-    render(<TranscriptPage />);
+    renderPage();
     expect(screen.getByRole("alert")).toHaveTextContent("boom");
   });
 
@@ -106,7 +118,7 @@ describe("TranscriptPage", () => {
       error: null,
     } as never);
 
-    render(<TranscriptPage />);
+    renderPage();
     expect(
       screen.getByText("This interview has no transcript lines yet."),
     ).toBeInTheDocument();
@@ -121,7 +133,7 @@ describe("TranscriptPage", () => {
       error: null,
     } as never);
 
-    render(<TranscriptPage />);
+    renderPage();
 
     // Metadata panel (title + empty-metadata quiet state)
     expect(
@@ -166,7 +178,7 @@ describe("TranscriptPage", () => {
       error: null,
     } as never);
 
-    render(<TranscriptPage />);
+    renderPage();
 
     const buttons = screen.getAllByRole("button");
     const first = buttons.find((b) => b.textContent?.includes("Let's talk about onboarding."))!;
@@ -193,7 +205,7 @@ describe("TranscriptPage", () => {
       error: null,
     } as never);
 
-    render(<TranscriptPage />);
+    renderPage();
 
     expect(screen.queryByRole("dialog", { name: "Line detail" })).not.toBeInTheDocument();
 
@@ -218,7 +230,7 @@ describe("TranscriptPage", () => {
       error: null,
     } as never);
 
-    render(<TranscriptPage />);
+    renderPage();
     expect(screen.getByRole("link", { name: "Workbench" })).toHaveAttribute(
       "href",
       "/workbench",
