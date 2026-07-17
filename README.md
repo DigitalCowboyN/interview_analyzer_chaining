@@ -26,6 +26,8 @@ Then ask it a question: `python -m src.ask <project_id> "What did they decide ab
 
 Want sample content to try any of this against? See `data/samples/` (`MANIFEST.md` maps each transcript to the capability it exercises — mature labeled interviews, mixed/adversarial speaker labeling, and raw unlabeled transcripts).
 
+There's also a Next.js UI in `frontend/` (`make ui-dev` to run it) — full docs land with the M5.0 milestone completion.
+
 ## Architecture
 
 ```

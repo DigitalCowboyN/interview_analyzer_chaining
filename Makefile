@@ -84,6 +84,36 @@ run-worker:
 	@echo "Starting Celery worker..."
 	celery -A src.celery_app worker --loglevel=info
 
+# --- Frontend (Next.js UI in frontend/) --- #
+
+# Run the frontend dev server
+.PHONY: ui-dev
+ui-dev:
+	@echo "Starting frontend dev server..."
+	cd frontend && npm run dev
+
+# Production build of the frontend
+.PHONY: ui-build
+ui-build:
+	@echo "Building frontend for production..."
+	cd frontend && npm run build
+
+# Frontend gates: lint + typecheck + vitest
+.PHONY: ui-test
+ui-test:
+	@echo "Running frontend lint, typecheck, and tests..."
+	cd frontend && npm run lint && npm run typecheck && npm test
+
+# Regenerate frontend/openapi.json + src/api/schema.d.ts from the backend
+# app object (no running server needed) — commit both after backend
+# contract changes.
+.PHONY: ui-typegen
+ui-typegen:
+	@echo "Regenerating frontend OpenAPI types..."
+	cd frontend && npm run typegen
+
+# --- End Frontend --- #
+
 # Clean (optional)
 .PHONY: clean
 clean:
@@ -140,6 +170,12 @@ help:
 	@echo "  run-api              Run FastAPI server (local)"
 	@echo "  run-worker           Run Celery worker (local)"
 	@echo "  ingest FILE=<path>   Ingest + enrich a transcript (Layer 1+2)"
+	@echo ""
+	@echo "Frontend (Next.js UI, in frontend/):"
+	@echo "  ui-dev               Run the frontend dev server"
+	@echo "  ui-build             Production build of the frontend"
+	@echo "  ui-test              Frontend gates: lint + typecheck + vitest"
+	@echo "  ui-typegen           Regenerate OpenAPI types from the backend app object"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint                 Run flake8 linter"

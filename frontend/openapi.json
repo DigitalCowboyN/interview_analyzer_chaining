@@ -1,0 +1,2718 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Interview Analyzer API",
+    "description": "API for analyzing interview transcripts.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/files/": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "List Available Analysis Files",
+        "description": "Retrieves a list of completed analysis filenames.\n\nScans the configured output directory for files ending with the analysis suffix.\nReturns an empty list if the directory doesn't exist or no files are found.\nRaises HTTPException 500 on internal server errors during listing.",
+        "operationId": "list_analysis_files_files__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{filename}": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Get Analysis File Content",
+        "description": "Retrieves the content of a specific analysis file.\n\nReads the specified .jsonl file from the output directory, parses each line\nas JSON, and returns the results. Malformed JSON lines are skipped and logged.\n\nArgs:\n    filename (str): The name of the analysis file (e.g., \"interview1_analysis.jsonl\").\n\nReturns:\n    FileContentResponse: The content of the file including filename and results.\n\nRaises:\n    HTTPException(404): If the specified file does not exist.\n    HTTPException(500): If there's an OS error reading the file or another internal error.",
+        "operationId": "get_analysis_file_content_files__filename__get",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{filename}/sentences/{sentence_id}": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Get Specific Sentence Analysis",
+        "description": "Retrieves the analysis result for a specific sentence within a file.\n\nReads the specified .jsonl analysis file line by line, searching for the\nentry matching the given `sentence_id`. Skips malformed lines.\n\nArgs:\n    filename (str): The name of the analysis file.\n    sentence_id (int): The ID of the sentence to retrieve.\n\nReturns:\n    AnalysisResult: The analysis data for the specified sentence.\n\nRaises:\n    HTTPException(404): If the file is not found, or the sentence_id is not found\n                        within the file (after skipping malformed lines).\n    HTTPException(500): If there's an OS error reading the file, a validation error\n                        for the target sentence's data, or another internal error.",
+        "operationId": "get_specific_sentence_analysis_files__filename__sentences__sentence_id__get",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          },
+          {
+            "name": "sentence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sentence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/": {
+      "post": {
+        "tags": [
+          "Analysis"
+        ],
+        "summary": "Trigger Analysis Pipeline",
+        "description": "Triggers the analysis pipeline for a specific input file to run in the background.\n\n- Validates the input filename format.\n- Checks if the specified file exists in the configured input directory.\n- Schedules the `run_pipeline` function using background tasks.\n\nReturns an immediate `202 Accepted` response indicating the task has been scheduled.\nErrors during the background task execution itself are logged but do not affect this response.\n\nArgs:\n    request (AnalysisTriggerRequest): Request body containing the `input_filename`.\n    background_tasks (BackgroundTasks): FastAPI mechanism for running background tasks.\n\nReturns:\n    AnalysisTriggerResponse: Confirmation message and the input filename.\n\nRaises:\n    HTTPException(400): If the `input_filename` has an invalid format (e.g., contains `/` or `..`).\n    HTTPException(404): If the specified `input_filename` is not found in the input directory.\n    HTTPException(500): If there is an unexpected internal server error during request\n    validation or task scheduling.",
+        "operationId": "trigger_analysis_analysis__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisTriggerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisTriggerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ask/{project_id}": {
+      "post": {
+        "tags": [
+          "ask"
+        ],
+        "summary": "Ask Project",
+        "description": "Answer a question from one project's graph, with verbatim citations.",
+        "operationId": "ask_project_ask__project_id__post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edits/sentences/{interview_id}/{sentence_index}/edit": {
+      "post": {
+        "tags": [
+          "Edits"
+        ],
+        "summary": "Edit Sentence Text",
+        "description": "Edit the text of a sentence. Generates SentenceEdited event.",
+        "operationId": "edit_sentence_edits_sentences__interview_id___sentence_index__edit_post",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "sentence_index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sentence Index"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Correlation-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditSentenceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edits/sentences/{interview_id}/{sentence_index}/analysis/override": {
+      "post": {
+        "tags": [
+          "Edits"
+        ],
+        "summary": "Override Analysis Results",
+        "description": "Override AI analysis results with human corrections. Generates AnalysisOverridden event.",
+        "operationId": "override_analysis_edits_sentences__interview_id___sentence_index__analysis_override_post",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "sentence_index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sentence Index"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Correlation-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideAnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edits/sentences/{interview_id}/{sentence_index}/history": {
+      "get": {
+        "tags": [
+          "Edits"
+        ],
+        "summary": "Get Sentence Edit History",
+        "description": "Get complete edit history for a sentence (all events).",
+        "operationId": "get_sentence_history_edits_sentences__interview_id___sentence_index__history_get",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "sentence_index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sentence Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Sentence History Edits Sentences  Interview Id   Sentence Index  History Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/speakers/{interview_id}/{speaker_id}/rename": {
+      "post": {
+        "tags": [
+          "speakers"
+        ],
+        "summary": "Rename Speaker",
+        "description": "Human correction: give a provisional speaker a real name.",
+        "operationId": "rename_speaker_speakers__interview_id___speaker_id__rename_post",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "speaker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Speaker Id"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameSpeakerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/speakers/{interview_id}/merge": {
+      "post": {
+        "tags": [
+          "speakers"
+        ],
+        "summary": "Merge Speakers",
+        "description": "Human correction: two provisional handles were the same person.",
+        "operationId": "merge_speakers_speakers__interview_id__merge_post",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeSpeakersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/speakers/{interview_id}/split": {
+      "post": {
+        "tags": [
+          "speakers"
+        ],
+        "summary": "Split Speaker",
+        "description": "Create a new speaker and reattribute the listed fragments to them.\n\nComposition of existing events (SpeakerCreated + SpeakerReattributed per\nfragment); no dedicated split event type. All fragments are loaded before\nany event is emitted, so a missing fragment aborts the whole operation.",
+        "operationId": "split_speaker_speakers__interview_id__split_post",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SplitSpeakerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/speakers/{interview_id}/fragments/{index}/reattribute": {
+      "post": {
+        "tags": [
+          "speakers"
+        ],
+        "summary": "Reattribute Fragment",
+        "description": "Human correction: this fragment was said by someone else.",
+        "operationId": "reattribute_fragment_speakers__interview_id__fragments__index__reattribute_post",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReattributeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stitches/{interview_id}/{utterance_id}": {
+      "delete": {
+        "tags": [
+          "speakers"
+        ],
+        "summary": "Remove Stitch",
+        "description": "Human correction: an identified utterance overlay was wrong; remove it.\n\n`reason` is a query parameter (DELETE request bodies are stripped by some\nproxies/clients).",
+        "operationId": "remove_stitch_stitches__interview_id___utterance_id__delete",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "utterance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Utterance Id"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/interviews/{interview_id}/segments": {
+      "get": {
+        "tags": [
+          "segments"
+        ],
+        "summary": "List Segments",
+        "description": "Topic segments with their fragment ranges, in transcript order.",
+        "operationId": "list_segments_interviews__interview_id__segments_get",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/segments/{interview_id}/{segment_id}": {
+      "delete": {
+        "tags": [
+          "segments"
+        ],
+        "summary": "Remove Segment",
+        "description": "Human correction: a segment was wrong; remove it (redraw = remove + re-run).\n\n`reason` is a query parameter (DELETE request bodies are stripped by some\nproxies/clients).",
+        "operationId": "remove_segment_segments__interview_id___segment_id__delete",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Segment Id"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resolution/{project_id}/entities/merge": {
+      "post": {
+        "tags": [
+          "resolution"
+        ],
+        "summary": "Merge Entities",
+        "operationId": "merge_entities_resolution__project_id__entities_merge_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resolution/{project_id}/entities/{canonical_id}/split": {
+      "post": {
+        "tags": [
+          "resolution"
+        ],
+        "summary": "Split Entity",
+        "operationId": "split_entity_resolution__project_id__entities__canonical_id__split_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "canonical_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Canonical Id"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SplitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resolution/{project_id}/entities/{canonical_id}/aliases": {
+      "post": {
+        "tags": [
+          "resolution"
+        ],
+        "summary": "Add Alias",
+        "description": "Human correction: attach a surface to a canonical (works on locked ones).",
+        "operationId": "add_alias_resolution__project_id__entities__canonical_id__aliases_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "canonical_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Canonical Id"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AliasRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resolution/{project_id}/persons/{person_id}/link": {
+      "post": {
+        "tags": [
+          "resolution"
+        ],
+        "summary": "Link Speaker",
+        "operationId": "link_speaker_resolution__project_id__persons__person_id__link_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Person Id"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resolution/{project_id}/persons/{person_id}/unlink": {
+      "post": {
+        "tags": [
+          "resolution"
+        ],
+        "summary": "Unlink Speaker",
+        "operationId": "unlink_speaker_resolution__project_id__persons__person_id__unlink_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Person Id"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lenses/{interview_id}/items/{item_id}/override": {
+      "post": {
+        "tags": [
+          "lenses"
+        ],
+        "summary": "Override Lens Item",
+        "description": "Human correction: fix a lens item's fields and lock it against re-runs.",
+        "operationId": "override_lens_item_lenses__interview_id__items__item_id__override_post",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideLensItemRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exports/{interview_id}/{lens_name}": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "summary": "Download Bundle",
+        "description": "Export the interview x lens as an OKF bundle and return it zipped.",
+        "operationId": "download_bundle_exports__interview_id___lens_name__get",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "lens_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lens Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/interviews/{interview_id}/lenses/{lens}/items": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "Lens Items",
+        "operationId": "lens_items_interviews__interview_id__lenses__lens__items_get",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "lens",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Lens"
+            }
+          },
+          {
+            "name": "node_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Node Type"
+            }
+          },
+          {
+            "name": "min_confidence",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.0,
+                  "minimum": 0.0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Confidence"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/review/worklist": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "Review Worklist",
+        "operationId": "review_worklist_review_worklist_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "threshold",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "default": 0.7,
+              "title": "Threshold"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/speakers/rollup": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "Speakers Rollup",
+        "operationId": "speakers_rollup_speakers_rollup_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/projects": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "List Projects",
+        "operationId": "list_projects_ui_projects_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/projects/{project_id}/interviews": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "List Interviews",
+        "operationId": "list_interviews_ui_projects__project_id__interviews_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/interviews/{interview_id}/transcript": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "Get Transcript",
+        "operationId": "get_transcript_ui_interviews__interview_id__transcript_get",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Interview Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/projects/{project_id}/personas": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "List Personas",
+        "operationId": "list_personas_ui_projects__project_id__personas_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/personas/{project_id}/{person_id}": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "Get Persona",
+        "operationId": "get_persona_ui_personas__project_id___person_id__get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Person Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/projects/{project_id}/persons": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "List Persons",
+        "operationId": "list_persons_ui_projects__project_id__persons_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/persons/{project_id}/{person_id}": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "Get Person",
+        "operationId": "get_person_ui_persons__project_id___person_id__get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Person Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/projects/{project_id}/person-id": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "Derive Person Id",
+        "description": "Compute-only id derivation for the create-new-person flow \u2014 the\nfrontend must never derive ids itself (loose-coupling requirement).",
+        "operationId": "derive_person_id_ui_projects__project_id__person_id_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "display_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Display Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "Health Check"
+        ],
+        "summary": "Read Root",
+        "description": "Basic health check endpoint.",
+        "operationId": "read_root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AliasRequest": {
+        "properties": {
+          "surface": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Surface"
+          }
+        },
+        "type": "object",
+        "required": [
+          "surface"
+        ],
+        "title": "AliasRequest"
+      },
+      "AnalysisResult": {
+        "properties": {
+          "sentence_id": {
+            "type": "integer",
+            "title": "Sentence Id",
+            "description": "Unique identifier for the sentence within the file."
+          },
+          "sequence_order": {
+            "type": "integer",
+            "title": "Sequence Order",
+            "description": "Original sequence order of the sentence."
+          },
+          "sentence": {
+            "type": "string",
+            "title": "Sentence",
+            "description": "The original sentence text."
+          },
+          "function_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Type"
+          },
+          "structure_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structure Type"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "topic_level_1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Level 1"
+          },
+          "topic_level_3": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Level 3"
+          },
+          "overall_keywords": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Keywords"
+          },
+          "domain_keywords": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Keywords"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "sentence_id",
+          "sequence_order",
+          "sentence"
+        ],
+        "title": "AnalysisResult",
+        "description": "Represents the analysis result for a single sentence."
+      },
+      "AnalysisTriggerRequest": {
+        "properties": {
+          "input_filename": {
+            "type": "string",
+            "title": "Input Filename",
+            "description": "Name of the input file (e.g., 'interview1.txt') located in the configured input directory."
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_filename"
+        ],
+        "title": "AnalysisTriggerRequest",
+        "description": "Request model for triggering analysis on a specific input file."
+      },
+      "AnalysisTriggerResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Status message indicating analysis started."
+          },
+          "input_filename": {
+            "type": "string",
+            "title": "Input Filename",
+            "description": "The input filename for which analysis was triggered."
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Unique identifier assigned to this analysis task."
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "input_filename",
+          "task_id"
+        ],
+        "title": "AnalysisTriggerResponse",
+        "description": "Response model after successfully triggering an analysis task."
+      },
+      "AskRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Question"
+          },
+          "top_k": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "default": 12
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "AskRequest"
+      },
+      "EditResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Operation status (accepted, error)"
+          },
+          "sentence_id": {
+            "type": "string",
+            "title": "Sentence Id",
+            "description": "Sentence UUID"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "New version number after edit"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count",
+            "description": "Number of events generated"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "sentence_id",
+          "version",
+          "event_count",
+          "message"
+        ],
+        "title": "EditResponse",
+        "description": "Response model for edit operations."
+      },
+      "EditSentenceRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text",
+            "description": "New sentence text"
+          },
+          "editor_type": {
+            "type": "string",
+            "title": "Editor Type",
+            "description": "Type of editor making the change",
+            "default": "human"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Optional edit note/reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "EditSentenceRequest",
+        "description": "Request model for editing sentence text."
+      },
+      "FileContentResponse": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "The name of the analysis file."
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "List of analysis results for each sentence."
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "results"
+        ],
+        "title": "FileContentResponse",
+        "description": "Response model for returning the content of an analysis file."
+      },
+      "FileListResponse": {
+        "properties": {
+          "filenames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filenames",
+            "description": "List of filenames for completed analyses."
+          }
+        },
+        "type": "object",
+        "required": [
+          "filenames"
+        ],
+        "title": "FileListResponse",
+        "description": "Response model for listing available analysis filenames."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LinkRequest": {
+        "properties": {
+          "interview_id": {
+            "type": "string",
+            "title": "Interview Id"
+          },
+          "speaker_id": {
+            "type": "string",
+            "title": "Speaker Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "interview_id",
+          "speaker_id"
+        ],
+        "title": "LinkRequest"
+      },
+      "MergeRequest": {
+        "properties": {
+          "surviving_canonical_id": {
+            "type": "string",
+            "title": "Surviving Canonical Id"
+          },
+          "merged_canonical_id": {
+            "type": "string",
+            "title": "Merged Canonical Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "surviving_canonical_id",
+          "merged_canonical_id"
+        ],
+        "title": "MergeRequest"
+      },
+      "MergeSpeakersRequest": {
+        "properties": {
+          "surviving_speaker_id": {
+            "type": "string",
+            "title": "Surviving Speaker Id"
+          },
+          "merged_speaker_id": {
+            "type": "string",
+            "title": "Merged Speaker Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "surviving_speaker_id",
+          "merged_speaker_id"
+        ],
+        "title": "MergeSpeakersRequest"
+      },
+      "OverrideAnalysisRequest": {
+        "properties": {
+          "function_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Type",
+            "description": "Override function type"
+          },
+          "structure_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structure Type",
+            "description": "Override structure type"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose",
+            "description": "Override purpose"
+          },
+          "keywords": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keywords",
+            "description": "Override keywords"
+          },
+          "topics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topics",
+            "description": "Override topics"
+          },
+          "domain_keywords": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Keywords",
+            "description": "Override domain keywords"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Optional override note/reason"
+          }
+        },
+        "type": "object",
+        "title": "OverrideAnalysisRequest",
+        "description": "Request model for overriding analysis results."
+      },
+      "OverrideLensItemRequest": {
+        "properties": {
+          "fields_overridden": {
+            "additionalProperties": true,
+            "type": "object",
+            "minProperties": 1,
+            "title": "Fields Overridden"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields_overridden"
+        ],
+        "title": "OverrideLensItemRequest"
+      },
+      "ReattributeRequest": {
+        "properties": {
+          "new_speaker_id": {
+            "type": "string",
+            "title": "New Speaker Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_speaker_id"
+        ],
+        "title": "ReattributeRequest"
+      },
+      "RenameSpeakerRequest": {
+        "properties": {
+          "new_display_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "New Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_display_name"
+        ],
+        "title": "RenameSpeakerRequest"
+      },
+      "SplitRequest": {
+        "properties": {
+          "surfaces": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Surfaces"
+          },
+          "new_name": {
+            "type": "string",
+            "title": "New Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "surfaces",
+          "new_name"
+        ],
+        "title": "SplitRequest"
+      },
+      "SplitSpeakerRequest": {
+        "properties": {
+          "new_handle": {
+            "type": "string",
+            "minLength": 1,
+            "title": "New Handle"
+          },
+          "new_display_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "New Display Name"
+          },
+          "fragment_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Fragment Indices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_handle",
+          "new_display_name",
+          "fragment_indices"
+        ],
+        "title": "SplitSpeakerRequest"
+      },
+      "UnlinkRequest": {
+        "properties": {
+          "interview_id": {
+            "type": "string",
+            "title": "Interview Id"
+          },
+          "speaker_id": {
+            "type": "string",
+            "title": "Speaker Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "interview_id",
+          "speaker_id"
+        ],
+        "title": "UnlinkRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
