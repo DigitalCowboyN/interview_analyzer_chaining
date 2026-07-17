@@ -418,7 +418,7 @@ class TestSentenceHandlers:
         params = call_args[1]
 
         assert "MATCH (i:Interview" in query
-        assert "MERGE (s:Sentence" in query  # Changed to MERGE for deduplication during dual-write
+        assert "MERGE (s:Fragment" in query  # MERGE for deduplication during dual-write
         assert "HAS_SENTENCE" in query
         assert params["interview_id"] == interview_id
         assert params["sentence_id"] == sentence_id
@@ -427,8 +427,8 @@ class TestSentenceHandlers:
         # Verify result was consumed
         mock_result.consume.assert_called_once()
 
-    async def test_sentence_created_sets_fragment_label(self):
-        """Test SentenceCreated handler dual-labels the node with :Fragment."""
+    async def test_sentence_created_uses_fragment_anchor_only(self):
+        """Test SentenceCreated handler anchors on :Fragment alone (shim dropped)."""
         handler = SentenceCreatedHandler()
 
         # Mock transaction with proper result consumption
@@ -461,8 +461,8 @@ class TestSentenceHandlers:
         call_args = mock_tx.run.call_args
         query = call_args[0][0]
 
-        assert "MERGE (s:Sentence {sentence_id: $sentence_id})" in query  # anchor unchanged
-        assert "s:Fragment" in query  # dual label
+        assert "MERGE (s:Fragment {sentence_id: $sentence_id})" in query  # new anchor
+        assert "SET s:Fragment" not in query  # shim dual-label SET is gone
 
     async def test_sentence_edited_handler(self):
         """Test SentenceEdited handler updates text and sets edited flag."""

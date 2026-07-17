@@ -28,7 +28,7 @@ async def test_labeled_ingestion_emits_events_and_writes_map(tmp_path: Path):
     mock_repo.save = AsyncMock(side_effect=capture_save)
 
     with patch("src.ingestion.orchestrator.get_interview_repository", return_value=mock_repo), \
-         patch("src.ingestion.orchestrator.get_sentence_repository", return_value=mock_repo):
+         patch("src.ingestion.orchestrator.get_fragment_repository", return_value=mock_repo):
         orchestrator = IngestionOrchestrator(project_id="proj-1", map_dir=map_dir)
         result = await orchestrator.ingest_file(input_file)
 
@@ -71,7 +71,7 @@ async def test_flat_ingestion_uses_inference_and_counts_low_confidence(tmp_path:
     stitch_response = {"utterances": [], "interruptions": []}
 
     with patch("src.ingestion.orchestrator.get_interview_repository", return_value=mock_repo), \
-         patch("src.ingestion.orchestrator.get_sentence_repository", return_value=mock_repo), \
+         patch("src.ingestion.orchestrator.get_fragment_repository", return_value=mock_repo), \
          patch("src.ingestion.speaker_inference.agent") as sp_agent, \
          patch("src.ingestion.stitcher.agent") as st_agent:
         sp_agent.call_model = AsyncMock(return_value=inference_response)

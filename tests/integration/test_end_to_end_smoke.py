@@ -97,7 +97,7 @@ async def _replay_all(project_id, interview_ids, registry):
     consumer in this environment)."""
     factory = get_repository_factory()
     interview_repo = factory.create_interview_repository()
-    sentence_repo = factory.create_sentence_repository()
+    fragment_repo = factory.create_fragment_repository()
     project_repo = factory.create_project_repository()
 
     events = []
@@ -105,7 +105,7 @@ async def _replay_all(project_id, interview_ids, registry):
         events.extend(await interview_repo.event_store.read_stream(f"Interview-{interview_id}"))
         for index in range(fragment_count):
             sid = str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{interview_id}:{index}"))
-            events.extend(await sentence_repo.event_store.read_stream(f"Sentence-{sid}"))
+            events.extend(await fragment_repo.event_store.read_stream(f"Sentence-{sid}"))
 
     project_stream = f"Project-{project_aggregate_id(project_id)}"
     try:
@@ -259,15 +259,20 @@ async def test_full_pipeline_ingest_enrich_segments_lens_resolve_export(tmp_path
         assert record["linked_speakers"] == 1
         assert record["methods"] == ["front_matter"]
 
-        # Dual-label invariant (the layer4 smoke's exact query).
-        dual_label = await session.run(
+        # Single-label invariant (M4.8 shim drop): fragments projected by this
+        # smoke carry :Fragment only -- no :Sentence label on new nodes.
+        fragment_labels = await session.run(
             """
-            MATCH (n) WHERE (n:Sentence AND NOT n:Fragment) OR (n:Fragment AND NOT n:Sentence)
-            RETURN count(n) AS mismatched
-            """
+            MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
+                  (:Interview)-[:HAS_SENTENCE]->(f:Fragment)
+            RETURN count(f) AS total,
+                   count(CASE WHEN f:Sentence THEN 1 END) AS mislabeled
+            """,
+            project_id=project_id,
         )
-        dual_label_record = await dual_label.single()
-        assert dual_label_record["mismatched"] == 0
+        fragment_labels_record = await fragment_labels.single()
+        assert fragment_labels_record["total"] > 0
+        assert fragment_labels_record["mislabeled"] == 0
 
     # --- 7. Idempotent segment re-run (unforced) -----------------------------
     second_result = await EnrichmentOrchestrator().enrich_interview(interview_id)

@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from src.events.aggregates import Fragment, Interview
 from src.events.envelope import Actor, ActorType, generate_correlation_id
-from src.events.repository import get_interview_repository, get_sentence_repository
+from src.events.repository import get_interview_repository, get_fragment_repository
 from src.ingestion.models import NormalizedTranscript, TranscriptFormat
 from src.ingestion.normalizer import normalize
 from src.ingestion.speaker_inference import (
@@ -228,7 +228,7 @@ class IngestionOrchestrator:
         correlation_id: str,
     ) -> Dict[int, str]:
         """Create Fragment aggregates with offsets and speaker attribution."""
-        sentence_repo = get_sentence_repository()
+        fragment_repo = get_fragment_repository()
         assignment_by_seq = {a.sequence_order: a for a in assignments}
         fragment_uuids: Dict[int, str] = {}
         for frag in transcript.fragments:
@@ -256,7 +256,7 @@ class IngestionOrchestrator:
                     actor=actor,
                     correlation_id=correlation_id,
                 )
-            await sentence_repo.save(sentence)
+            await fragment_repo.save(sentence)
         return fragment_uuids
 
     async def _stitch(

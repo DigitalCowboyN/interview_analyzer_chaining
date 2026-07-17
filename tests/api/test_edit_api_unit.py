@@ -462,7 +462,7 @@ class TestGetSentenceHistoryEndpoint:
 
     @pytest.fixture
     def mock_repository(self):
-        """Mock SentenceRepository."""
+        """Mock FragmentRepository."""
         repo = MagicMock()
         repo.load = AsyncMock()
         return repo
@@ -489,14 +489,14 @@ class TestGetSentenceHistoryEndpoint:
     ):
         """Test successful retrieval of sentence history."""
         # Arrange
-        from src.events.aggregates import Sentence
+        from src.events.aggregates import Fragment
         from src.events.envelope import EventEnvelope
 
         # Mock sentence aggregate
         sentence_id = str(
             uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}")
         )
-        sentence = Sentence(aggregate_id=sentence_id)
+        sentence = Fragment(aggregate_id=sentence_id)
         sentence.version = 2
         sentence.text = "Current text"
         mock_repository.load.return_value = sentence
@@ -528,7 +528,7 @@ class TestGetSentenceHistoryEndpoint:
 
         # Act
         with patch(
-            "src.api.routers.edits.get_sentence_repository", return_value=mock_repository
+            "src.api.routers.edits.get_fragment_repository", return_value=mock_repository
         ), patch("src.api.routers.edits.get_event_store", return_value=mock_event_store):
             history = await get_sentence_history(
                 interview_id=interview_id, sentence_index=sentence_index
@@ -561,7 +561,7 @@ class TestGetSentenceHistoryEndpoint:
 
         # Act & Assert
         with patch(
-            "src.api.routers.edits.get_sentence_repository", return_value=mock_repository
+            "src.api.routers.edits.get_fragment_repository", return_value=mock_repository
         ):
             with pytest.raises(HTTPException) as exc_info:
                 await get_sentence_history(

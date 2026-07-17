@@ -46,7 +46,7 @@ async def _ensure_vector_index(ensured: set, label: str, prefix: str, model: str
 
 
 class EmbeddingGeneratedHandler(BaseProjectionHandler):
-    """Writes a fragment embedding onto its Sentence node."""
+    """Writes a fragment embedding onto its Fragment node."""
 
     def __init__(self, parked_events_manager=None):
         super().__init__(parked_events_manager)
@@ -55,7 +55,7 @@ class EmbeddingGeneratedHandler(BaseProjectionHandler):
     async def apply(self, tx, event: EventEnvelope):
         data = event.data
         await _ensure_vector_index(
-            self._ensured_models, "Sentence", "fragment_embedding", data["model"], data["dim"]
+            self._ensured_models, "Fragment", "fragment_embedding", data["model"], data["dim"]
         )
         vector = decode_vector(data["vector_b64"])
         prop = f"embedding_{_sanitize(data['model'])}"  # sanitized, never raw input

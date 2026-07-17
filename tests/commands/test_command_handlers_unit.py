@@ -22,7 +22,7 @@ from src.commands.sentence_commands import (
     GenerateAnalysisCommand,
     OverrideAnalysisCommand,
 )
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Interview, Fragment
 from src.events.envelope import Actor, ActorType
 from src.events.interview_events import InterviewStatus
 
@@ -191,7 +191,7 @@ class TestSentenceCommandHandlerUnit:
         mock_repo.save = AsyncMock()
 
         mock_factory = MagicMock()
-        mock_factory.create_sentence_repository.return_value = mock_repo
+        mock_factory.create_fragment_repository.return_value = mock_repo
 
         with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
             handler = SentenceCommandHandler()
@@ -214,7 +214,7 @@ class TestSentenceCommandHandlerUnit:
 
             mock_repo.save.assert_called_once()
             saved_aggregate = mock_repo.save.call_args[0][0]
-            assert isinstance(saved_aggregate, Sentence)
+            assert isinstance(saved_aggregate, Fragment)
             assert saved_aggregate.text == "This is a test sentence."
 
     async def test_edit_sentence_success(self):
@@ -223,7 +223,7 @@ class TestSentenceCommandHandlerUnit:
         interview_id = str(uuid.uuid4())
 
         # Create existing sentence and mark events as committed (simulating loaded from repo)
-        existing_sentence = Sentence(sentence_id)
+        existing_sentence = Fragment(sentence_id)
         existing_sentence.create(
             interview_id=interview_id,
             index=0,
@@ -240,7 +240,7 @@ class TestSentenceCommandHandlerUnit:
         mock_repo.save = AsyncMock()
 
         mock_factory = MagicMock()
-        mock_factory.create_sentence_repository.return_value = mock_repo
+        mock_factory.create_fragment_repository.return_value = mock_repo
 
         with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
             handler = SentenceCommandHandler()
@@ -271,7 +271,7 @@ class TestSentenceCommandHandlerUnit:
         interview_id = str(uuid.uuid4())
 
         # Create existing sentence and mark events as committed
-        existing_sentence = Sentence(sentence_id)
+        existing_sentence = Fragment(sentence_id)
         existing_sentence.create(
             interview_id=interview_id,
             index=0,
@@ -285,7 +285,7 @@ class TestSentenceCommandHandlerUnit:
         mock_repo.save = AsyncMock()
 
         mock_factory = MagicMock()
-        mock_factory.create_sentence_repository.return_value = mock_repo
+        mock_factory.create_fragment_repository.return_value = mock_repo
 
         with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
             handler = SentenceCommandHandler()
@@ -317,7 +317,7 @@ class TestSentenceCommandHandlerUnit:
         interview_id = str(uuid.uuid4())
 
         # Create existing sentence
-        existing_sentence = Sentence(sentence_id)
+        existing_sentence = Fragment(sentence_id)
         existing_sentence.create(
             interview_id=interview_id,
             index=0,
@@ -329,7 +329,7 @@ class TestSentenceCommandHandlerUnit:
         mock_repo.load.return_value = existing_sentence
 
         mock_factory = MagicMock()
-        mock_factory.create_sentence_repository.return_value = mock_repo
+        mock_factory.create_fragment_repository.return_value = mock_repo
 
         with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
             handler = SentenceCommandHandler()
@@ -355,12 +355,12 @@ class TestSentenceCommandHandlerUnit:
         interview_id = str(uuid.uuid4())
 
         # Mock repository that returns existing sentence
-        existing_sentence = Sentence(sentence_id)
+        existing_sentence = Fragment(sentence_id)
         mock_repo = AsyncMock()
         mock_repo.load.return_value = existing_sentence
 
         mock_factory = MagicMock()
-        mock_factory.create_sentence_repository.return_value = mock_repo
+        mock_factory.create_fragment_repository.return_value = mock_repo
 
         with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
             handler = SentenceCommandHandler()
@@ -389,7 +389,7 @@ class TestSentenceCommandHandlerUnit:
         mock_repo.load.return_value = None
 
         mock_factory = MagicMock()
-        mock_factory.create_sentence_repository.return_value = mock_repo
+        mock_factory.create_fragment_repository.return_value = mock_repo
 
         with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
             handler = SentenceCommandHandler()
@@ -418,7 +418,7 @@ class TestSentenceCommandHandlerUnit:
         mock_repo.load.return_value = None
 
         mock_factory = MagicMock()
-        mock_factory.create_sentence_repository.return_value = mock_repo
+        mock_factory.create_fragment_repository.return_value = mock_repo
 
         with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
             handler = SentenceCommandHandler()
@@ -447,7 +447,7 @@ class TestSentenceCommandHandlerUnit:
         interview_id = str(uuid.uuid4())
 
         # Create existing sentence with analysis
-        existing_sentence = Sentence(sentence_id)
+        existing_sentence = Fragment(sentence_id)
         existing_sentence.create(
             interview_id=interview_id,
             index=0,
@@ -468,7 +468,7 @@ class TestSentenceCommandHandlerUnit:
         mock_repo.save = AsyncMock()
 
         mock_factory = MagicMock()
-        mock_factory.create_sentence_repository.return_value = mock_repo
+        mock_factory.create_fragment_repository.return_value = mock_repo
 
         with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
             handler = SentenceCommandHandler()
@@ -496,7 +496,7 @@ class TestSentenceCommandHandlerUnit:
         mock_repo.load.return_value = None
 
         mock_factory = MagicMock()
-        mock_factory.create_sentence_repository.return_value = mock_repo
+        mock_factory.create_fragment_repository.return_value = mock_repo
 
         with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
             handler = SentenceCommandHandler()

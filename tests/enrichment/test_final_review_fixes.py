@@ -7,7 +7,7 @@ import pytest
 
 from src.enrichment.executor import FragmentEnrichment, UtteranceEnrichment
 from src.enrichment.orchestrator import EnrichmentOrchestrator
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Interview, Fragment
 
 IID = "22222222-2222-2222-2222-222222222222"
 SP1 = "33333333-3333-3333-3333-333333333333"
@@ -44,7 +44,7 @@ def test_all_sentence_stream_events_carry_interview_id():
     command method on the Sentence aggregate must include it."""
     from src.events.sentence_events import EditorType
 
-    s = Sentence(str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{IID}:0")))
+    s = Fragment(str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{IID}:0")))
     s.create(interview_id=IID, index=0, text="Original text.")
     s.attribute_speaker(SP1, 0.9, "inference")
     s.reattribute_speaker(SP1)
@@ -72,7 +72,7 @@ def build_world(analyzed_indices=(), with_claims=False):
     f_ids = [str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{IID}:{i}")) for i in range(3)]
     sentences = []
     for i, fid in enumerate(f_ids):
-        s = Sentence(fid)
+        s = Fragment(fid)
         s.create(interview_id=IID, index=i, text=f"Fragment {i}.")
         s.attribute_speaker(SP1, 0.9, "inference")
         if i in analyzed_indices:
@@ -93,10 +93,10 @@ def make_repos(interview, sentences):
     interview_repo = MagicMock()
     interview_repo.load = AsyncMock(return_value=interview)
     interview_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
-    sentence_repo = MagicMock()
-    sentence_repo.load = AsyncMock(side_effect=lambda sid: sentences.get(sid))
-    sentence_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
-    return interview_repo, sentence_repo
+    fragment_repo = MagicMock()
+    fragment_repo.load = AsyncMock(side_effect=lambda sid: sentences.get(sid))
+    fragment_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
+    return interview_repo, fragment_repo
 
 
 def make_executor(claims=True):
@@ -121,13 +121,13 @@ def make_executor(claims=True):
 @pytest.mark.asyncio
 async def test_second_run_skips_claimed_utterances_no_crash():
     interview, sentences = build_world(analyzed_indices=(0, 1, 2), with_claims=True)
-    interview_repo, sentence_repo = make_repos(interview, sentences)
+    interview_repo, fragment_repo = make_repos(interview, sentences)
     executor = make_executor()
     embedder = MagicMock(model_name="m", dim=3)
     embedder.embed = AsyncMock(side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
 
     with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch("src.enrichment.orchestrator.get_fragment_repository", return_value=fragment_repo), \
          patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
          patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
         result = await EnrichmentOrchestrator().enrich_interview(IID)  # second run
@@ -141,13 +141,13 @@ async def test_second_run_skips_claimed_utterances_no_crash():
 @pytest.mark.asyncio
 async def test_forced_rerun_is_idempotent_on_existing_claim_ids():
     interview, sentences = build_world(analyzed_indices=(0, 1, 2), with_claims=True)
-    interview_repo, sentence_repo = make_repos(interview, sentences)
+    interview_repo, fragment_repo = make_repos(interview, sentences)
     executor = make_executor()  # returns the same claim -> same deterministic id
     embedder = MagicMock(model_name="m", dim=3)
     embedder.embed = AsyncMock(side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
 
     with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch("src.enrichment.orchestrator.get_fragment_repository", return_value=fragment_repo), \
          patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
          patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
         result = await EnrichmentOrchestrator().enrich_interview(IID, force=True)  # no crash
@@ -161,13 +161,13 @@ async def test_forced_rerun_is_idempotent_on_existing_claim_ids():
 @pytest.mark.asyncio
 async def test_resume_contexts_include_skipped_neighbors():
     interview, sentences = build_world(analyzed_indices=(0, 2))  # only middle needs work
-    interview_repo, sentence_repo = make_repos(interview, sentences)
+    interview_repo, fragment_repo = make_repos(interview, sentences)
     executor = make_executor(claims=False)
     embedder = MagicMock(model_name="m", dim=3)
     embedder.embed = AsyncMock(side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
 
     with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch("src.enrichment.orchestrator.get_fragment_repository", return_value=fragment_repo), \
          patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
          patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
         await EnrichmentOrchestrator().enrich_interview(IID)
@@ -186,7 +186,7 @@ async def test_resume_contexts_include_skipped_neighbors():
 @pytest.mark.asyncio
 async def test_total_call_failure_leaves_fragment_unanalyzed():
     interview, sentences = build_world()
-    interview_repo, sentence_repo = make_repos(interview, sentences)
+    interview_repo, fragment_repo = make_repos(interview, sentences)
     executor = MagicMock()
     executor.enrich_fragments = AsyncMock(side_effect=lambda views, ctxs: [
         FragmentEnrichment(index=v.index, flags={"purpose_call_error": "RuntimeError"})
@@ -197,7 +197,7 @@ async def test_total_call_failure_leaves_fragment_unanalyzed():
     embedder.embed = AsyncMock(side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
 
     with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch("src.enrichment.orchestrator.get_fragment_repository", return_value=fragment_repo), \
          patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
          patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
         await EnrichmentOrchestrator().enrich_interview(IID)

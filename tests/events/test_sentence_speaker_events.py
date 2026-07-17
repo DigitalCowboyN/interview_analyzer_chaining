@@ -1,10 +1,10 @@
 import pytest
 
-from src.events.aggregates import Sentence
+from src.events.aggregates import Fragment
 
 
-def make_sentence() -> Sentence:
-    s = Sentence("11111111-1111-1111-1111-111111111111")
+def make_sentence() -> Fragment:
+    s = Fragment("11111111-1111-1111-1111-111111111111")
     s.create(
         interview_id="22222222-2222-2222-2222-222222222222",
         index=0,
@@ -47,7 +47,7 @@ def test_reattribute_speaker_locks_against_system_overwrite():
 
 
 def test_attribute_speaker_requires_created_sentence():
-    s = Sentence("11111111-1111-1111-1111-111111111111")
+    s = Fragment("11111111-1111-1111-1111-111111111111")
     with pytest.raises(ValueError):
         s.attribute_speaker("33333333-3333-3333-3333-333333333333", 0.5, "inference")
 
@@ -80,7 +80,7 @@ def test_replay_reconstructs_speaker_state():
     source.reattribute_speaker("44444444-4444-4444-4444-444444444444")
     history = source.get_uncommitted_events()
 
-    replayed = Sentence("11111111-1111-1111-1111-111111111111")
+    replayed = Fragment("11111111-1111-1111-1111-111111111111")
     replayed.load_from_history(history)
 
     assert replayed.start_char == 10

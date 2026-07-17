@@ -8,8 +8,7 @@ from tests.projections.conftest import FakeSession
 EXPECTED_SUBSTRINGS = [
     # constraint
     "CREATE CONSTRAINT source_file_filename IF NOT EXISTS",
-    # frozen-wire anchors (single-property MERGE keys)
-    "FOR (s:Sentence) ON (s.sentence_id)",
+    # frozen-wire anchor (single-property MERGE key)
     "FOR (f:Fragment) ON (f.sentence_id)",
     # documented existing indexes
     "FOR (t:Topic) ON (t.name)",
@@ -41,6 +40,10 @@ def test_ddl_covers_every_merge_key():
     joined = "\n".join(SCHEMA_DDL)
     for fragment in EXPECTED_SUBSTRINGS:
         assert fragment in joined, f"missing DDL: {fragment}"
+
+
+def test_no_sentence_label_in_schema():
+    assert not any(":Sentence" in s for s in SCHEMA_DDL)
 
 
 def test_every_statement_is_idempotent():

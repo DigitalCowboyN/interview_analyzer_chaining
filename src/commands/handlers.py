@@ -230,7 +230,7 @@ class SentenceCommandHandler(CommandHandler):
     async def _handle_create(self, command: CreateSentenceCommand) -> CommandResult:
         """Handle CreateSentenceCommand."""
         try:
-            repo = self.repo_factory.create_sentence_repository()
+            repo = self.repo_factory.create_fragment_repository()
 
             # Check if sentence already exists
             existing = await repo.load(command.sentence_id)
@@ -276,7 +276,7 @@ class SentenceCommandHandler(CommandHandler):
     async def _handle_edit(self, command: EditSentenceCommand) -> CommandResult:
         """Handle EditSentenceCommand."""
         try:
-            repo = self.repo_factory.create_sentence_repository()
+            repo = self.repo_factory.create_fragment_repository()
 
             # Load existing sentence
             sentence = await repo.load(command.sentence_id)
@@ -321,7 +321,7 @@ class SentenceCommandHandler(CommandHandler):
     async def _handle_generate_analysis(self, command: GenerateAnalysisCommand) -> CommandResult:
         """Handle GenerateAnalysisCommand."""
         try:
-            repo = self.repo_factory.create_sentence_repository()
+            repo = self.repo_factory.create_fragment_repository()
 
             # Load existing sentence
             sentence = await repo.load(command.sentence_id)
@@ -363,7 +363,7 @@ class SentenceCommandHandler(CommandHandler):
     async def _handle_override_analysis(self, command: OverrideAnalysisCommand) -> CommandResult:
         """Handle OverrideAnalysisCommand."""
         try:
-            repo = self.repo_factory.create_sentence_repository()
+            repo = self.repo_factory.create_fragment_repository()
 
             # Load existing sentence
             sentence = await repo.load(command.sentence_id)

@@ -38,7 +38,7 @@ async def test_ingested_interview_projects_speaker_utterance_subgraph(tmp_path):
     # projection service without needing persistent subscriptions running).
     factory = get_repository_factory()
     interview_repo = factory.create_interview_repository()
-    sentence_repo = factory.create_sentence_repository()
+    fragment_repo = factory.create_fragment_repository()
     registry = create_handler_registry()
 
     events = []
@@ -47,7 +47,7 @@ async def test_ingested_interview_projects_speaker_utterance_subgraph(tmp_path):
     events.extend(await interview_repo.event_store.read_stream(f"Interview-{result.interview_id}"))
     for index in range(result.fragment_count):
         sid = str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{result.interview_id}:{index}"))
-        events.extend(await sentence_repo.event_store.read_stream(f"Sentence-{sid}"))
+        events.extend(await fragment_repo.event_store.read_stream(f"Sentence-{sid}"))
 
     # Replay in commit order (approximates $all ordering): sentence fragments
     # land before the utterance overlay that references them. Note: replaying

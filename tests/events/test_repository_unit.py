@@ -9,17 +9,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Interview, Fragment
 from src.events.envelope import Actor, ActorType, EventEnvelope
 from src.events.interview_events import InterviewStatus
 from src.events.repository import (
     InterviewRepository,
     Repository,
     RepositoryFactory,
-    SentenceRepository,
+    FragmentRepository,
     get_interview_repository,
     get_repository_factory,
-    get_sentence_repository,
+    get_fragment_repository,
 )
 from src.events.sentence_events import SentenceStatus
 from src.events.store import ConcurrencyError, StreamNotFoundError
@@ -87,13 +87,13 @@ class TestInterviewRepositoryBasics:
         assert aggregate.aggregate_id == aggregate_id
 
 
-class TestSentenceRepositoryBasics:
-    """Test basic SentenceRepository functionality."""
+class TestFragmentRepositoryBasics:
+    """Test basic FragmentRepository functionality."""
 
     def test_stream_naming_convention(self):
         """Test that stream name follows Sentence-{id} convention."""
         mock_store = MagicMock()
-        repo = SentenceRepository(mock_store)
+        repo = FragmentRepository(mock_store)
 
         aggregate_id = str(uuid.uuid4())
         stream_name = repo._get_stream_name(aggregate_id)
@@ -101,14 +101,14 @@ class TestSentenceRepositoryBasics:
         assert stream_name == f"Sentence-{aggregate_id}"
 
     def test_create_aggregate_returns_sentence(self):
-        """Test that _create_aggregate returns a Sentence instance."""
+        """Test that _create_aggregate returns a Fragment instance."""
         mock_store = MagicMock()
-        repo = SentenceRepository(mock_store)
+        repo = FragmentRepository(mock_store)
 
         aggregate_id = str(uuid.uuid4())
         aggregate = repo._create_aggregate(aggregate_id)
 
-        assert isinstance(aggregate, Sentence)
+        assert isinstance(aggregate, Fragment)
         assert aggregate.aggregate_id == aggregate_id
 
 
@@ -377,14 +377,14 @@ class TestRepositoryFactory:
         assert isinstance(repo, InterviewRepository)
         assert repo.event_store is mock_store
 
-    def test_create_sentence_repository(self):
+    def test_create_fragment_repository(self):
         """Test creating sentence repository from factory."""
         mock_store = MagicMock()
         factory = RepositoryFactory(mock_store)
 
-        repo = factory.create_sentence_repository()
+        repo = factory.create_fragment_repository()
 
-        assert isinstance(repo, SentenceRepository)
+        assert isinstance(repo, FragmentRepository)
         assert repo.event_store is mock_store
 
 
@@ -438,29 +438,29 @@ class TestGlobalRepositoryFunctions:
 
         repo_module._global_factory = None
 
-    def test_get_sentence_repository(self):
-        """Test get_sentence_repository returns SentenceRepository."""
+    def test_get_fragment_repository(self):
+        """Test get_fragment_repository returns FragmentRepository."""
         import src.events.repository as repo_module
 
         repo_module._global_factory = None
 
         mock_store = MagicMock()
         with patch("src.events.store.get_event_store_client", return_value=mock_store):
-            repo = get_sentence_repository()
+            repo = get_fragment_repository()
 
-            assert isinstance(repo, SentenceRepository)
+            assert isinstance(repo, FragmentRepository)
 
         repo_module._global_factory = None
 
 
 @pytest.mark.asyncio
-class TestSentenceRepositorySpecific:
-    """Test SentenceRepository-specific functionality."""
+class TestFragmentRepositorySpecific:
+    """Test FragmentRepository-specific functionality."""
 
     async def test_load_sentence_aggregate(self):
         """Test loading a sentence aggregate."""
         mock_store = AsyncMock()
-        repo = SentenceRepository(mock_store)
+        repo = FragmentRepository(mock_store)
 
         aggregate_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
@@ -479,11 +479,11 @@ class TestSentenceRepositorySpecific:
         """Test saving a sentence aggregate."""
         mock_store = AsyncMock()
         mock_store.append_events.return_value = 0
-        repo = SentenceRepository(mock_store)
+        repo = FragmentRepository(mock_store)
 
         aggregate_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
-        sentence = Sentence(aggregate_id)
+        sentence = Fragment(aggregate_id)
         sentence.create(interview_id=interview_id, index=0, text="New sentence.")
 
         await repo.save(sentence)

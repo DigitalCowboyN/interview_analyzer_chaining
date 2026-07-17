@@ -210,7 +210,7 @@ class InterviewRepository(Repository[Interview]):
         return f"Interview-{aggregate_id}"
 
 
-class SentenceRepository(Repository[Fragment]):
+class FragmentRepository(Repository[Fragment]):
     """Repository for Fragment aggregates."""
 
     def _create_aggregate(self, aggregate_id: str) -> Fragment:
@@ -269,21 +269,14 @@ class RepositoryFactory:
         """
         return ProjectRepository(self.event_store)
 
-    def create_fragment_repository(self) -> SentenceRepository:
+    def create_fragment_repository(self) -> FragmentRepository:
         """
-        Create a SentenceRepository instance.
+        Create a FragmentRepository instance.
 
         Returns:
-            SentenceRepository: Configured repository instance
+            FragmentRepository: Configured repository instance
         """
-        return SentenceRepository(self.event_store)
-
-    # deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop.
-    # Consumer modules (ingestion/lens/enrichment orchestrators, command handlers, speakers
-    # router) intentionally keep calling this old name: ~18 existing tests patch it by
-    # consumer-module dotted path (e.g. patch("src.ingestion.orchestrator.get_sentence_repository")).
-    # Call sites and test patch paths flip to the fragment_ names together, post-M4.5.
-    create_sentence_repository = create_fragment_repository
+        return FragmentRepository(self.event_store)
 
 
 # Global repository factory instance
@@ -335,18 +328,12 @@ def get_project_repository() -> ProjectRepository:
     return factory.create_project_repository()
 
 
-def get_fragment_repository() -> SentenceRepository:
+def get_fragment_repository() -> FragmentRepository:
     """
-    Get a SentenceRepository instance using the global factory.
+    Get a FragmentRepository instance using the global factory.
 
     Returns:
-        SentenceRepository: Configured repository instance
+        FragmentRepository: Configured repository instance
     """
     factory = get_repository_factory()
     return factory.create_fragment_repository()
-
-
-# deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop.
-# See create_sentence_repository above: consumer call sites keep this old name intentionally
-# (test patch paths depend on it), and flip together with the aliases dropping post-M4.5.
-get_sentence_repository = get_fragment_repository

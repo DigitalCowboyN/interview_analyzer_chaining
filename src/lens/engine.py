@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from src.enrichment.executor import EnrichmentExecutor
 from src.events.aggregates import Fragment, Interview
 from src.events.envelope import Actor, ActorType, generate_correlation_id
-from src.events.repository import get_interview_repository, get_sentence_repository
+from src.events.repository import get_interview_repository, get_fragment_repository
 from src.lens.models import LensExtractorDecl, LensSpec, load_lens
 from src.utils.logger import get_logger
 
@@ -146,12 +146,12 @@ class LensEngine:
 
     async def _load_fragments(self, interview: Interview) -> List[Fragment]:
         """Load fragments by deterministic uuid5 id, in index order."""
-        sentence_repo = get_sentence_repository()
+        fragment_repo = get_fragment_repository()
         fragment_count = interview.metadata.get("fragment_count", 0)
         ordered: List[Fragment] = []
         for index in range(fragment_count):
             sid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview.aggregate_id}:{index}"))
-            sentence = await sentence_repo.load(sid)
+            sentence = await fragment_repo.load(sid)
             if sentence is not None:
                 ordered.append(sentence)
         ordered.sort(key=lambda s: s.index)

@@ -94,7 +94,7 @@ async def _replay_all(project_id, interview_ids, registry):
     in this environment)."""
     factory = get_repository_factory()
     interview_repo = factory.create_interview_repository()
-    sentence_repo = factory.create_sentence_repository()
+    fragment_repo = factory.create_fragment_repository()
     project_repo = factory.create_project_repository()
 
     events = []
@@ -102,7 +102,7 @@ async def _replay_all(project_id, interview_ids, registry):
         events.extend(await interview_repo.event_store.read_stream(f"Interview-{interview_id}"))
         for index in range(fragment_count):
             sid = str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{interview_id}:{index}"))
-            events.extend(await sentence_repo.event_store.read_stream(f"Sentence-{sid}"))
+            events.extend(await fragment_repo.event_store.read_stream(f"Sentence-{sid}"))
 
     project_stream = f"Project-{project_aggregate_id(project_id)}"
     try:

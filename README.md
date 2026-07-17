@@ -2,7 +2,7 @@
 
 An event-sourced system for processing interview transcripts with AI-powered multi-dimensional sentence analysis.
 
-> **Status:** M4.7 Complete (Hardening & operational readiness: schema, deploy path, ask/resolution hardening, persona lens, content corpus)
+> **Status:** M4.8 Complete (`:Sentence` shim drop — `Fragment`-only label, deprecated aliases removed, one-shot migration for pre-existing graphs)
 >
 > See [ROADMAP.md](docs/ROADMAP.md) for milestones, exact test/coverage stats, and [docs/architecture/](docs/architecture/) for detailed diagrams.
 
@@ -85,6 +85,12 @@ The projection service creates its Neo4j schema (indexes/constraints) automatica
 startup and fails fast if Neo4j is unreachable. To apply it standalone (e.g. before the
 service is up), run `python -m src.projections.ensure_schema`. `make deployed-smoke`
 proves the fully dockerized ingest → projection path end-to-end against real containers.
+
+**Upgrading an existing deployment:** graphs created before M4.8 still carry the
+`:Sentence` shim label. After deploying this version, run
+`python -m src.projections.migrate_shim_drop` once — it retargets the fragment
+vector indexes to `:Fragment` and strips the `:Sentence` label (idempotent).
+Fresh databases need nothing.
 
 ### Access Points
 

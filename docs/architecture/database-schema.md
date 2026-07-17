@@ -1,6 +1,6 @@
 # Database Schema
 
-> **Last Updated:** 2026-07-15
+> **Last Updated:** 2026-07-17
 
 ## Neo4j Graph Schema
 
@@ -108,10 +108,11 @@ FOR (sf:SourceFile) REQUIRE sf.filename IS UNIQUE
 
 ### `:Fragment`
 
-Represents an individual sentence-level fragment from a transcript. Carries
-the deprecated `:Sentence` shim label through M4.5 (dual-labeled on write,
-`:Fragment` is the primary name for reads); the shim is dropped in a later
-backlog item. Event types (`SentenceCreated`, `SentenceEdited`, …) and the
+Represents an individual sentence-level fragment from a transcript.
+`:Fragment` is the only label — the transitional `:Sentence` shim label
+(dual-labeled on write during M4.5-M4.7) was dropped in M4.8; pre-existing
+graphs are retargeted by the one-shot `migrate_shim_drop` migration (see
+below). Event types (`SentenceCreated`, `SentenceEdited`, …) and the
 `Sentence-{id}` EventStoreDB stream pattern are frozen wire format and are
 unaffected by this rename.
 
@@ -123,17 +124,15 @@ unaffected by this rename.
 | `sequence_order` | integer | Order in document |
 | `event_version` | integer | Latest event version (for idempotency) |
 
-During the shim window both labels need their own index — the write path
-still `MERGE`s on `:Sentence {sentence_id}` while reads query `:Fragment`.
-The `:Sentence`-label index is dropped together with the shim label
-after M4.5.
-
 ```cypher
-CREATE INDEX sentence_id_idx IF NOT EXISTS
-FOR (s:Sentence) ON (s.sentence_id, s.filename)
+CREATE INDEX fragment_sentence_id IF NOT EXISTS
+FOR (f:Fragment) ON (f.sentence_id)
 
-CREATE INDEX fragment_id_idx IF NOT EXISTS
-FOR (s:Fragment) ON (s.sentence_id, s.filename)
+CREATE INDEX fragment_lookup IF NOT EXISTS
+FOR (f:Fragment) ON (f.sentence_id, f.filename)
+
+CREATE INDEX fragment_sequence IF NOT EXISTS
+FOR (f:Fragment) ON (f.filename, f.sequence_order)
 ```
 
 ### `:FunctionType`
@@ -495,10 +494,14 @@ fails) and can be run manually via:
 python -m src.projections.ensure_schema
 ```
 
-Shim window: `:Sentence` is the write-path MERGE anchor, `:Fragment` is the
-read-path label — both carry their own indexes until the `:Sentence` shim
-label drops (see ROADMAP backlog), at which point the `:Sentence`-only index
-entries are removed from `SCHEMA_DDL`.
+`:Fragment` is the sole write- and read-path label (the `:Sentence` shim
+label and its indexes were dropped in M4.8 — 26 → 23 `SCHEMA_DDL`
+statements). Pre-existing graphs created before M4.8 must run the one-shot
+`python -m src.projections.migrate_shim_drop` migration once after
+deploying this version; it recreates the `fragment_embedding_*` vector
+indexes on `:Fragment`, strips the `:Sentence` label from every node, and
+drops the shim's btree indexes. It is idempotent — safe to re-run. Fresh
+databases (no `:Sentence`-labeled nodes) need nothing.
 
 ## EventStoreDB Streams
 
