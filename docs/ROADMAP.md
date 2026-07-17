@@ -968,6 +968,15 @@ limitation); OKF export of lens outputs (M4.4).
       route for novel inquiries (aggregations, exotic traversals) the fixed
       vector/fulltext/graph channels can't shape. Nice-to-have, not a necessity
       (M4.6 spec's non-goals)
+- [ ] Persona synthesis (owner model, 2026-07-17) — first-class archetype
+      Personas: a persona is a general domain representation fulfilled by
+      anyone who takes on that domain; person ↔ persona is MANY-TO-MANY and
+      loosely coupled (a person wears multiple hats; person data contributes
+      to persona data without owning it). Today the persona lens attributes
+      items to speakers/persons only — synthesis mints Persona entities
+      aggregating contributions across persons. The M5.0 UI types/routes
+      already treat Persona as its own entity so the gallery extends, not
+      rewrites (spec: docs/superpowers/specs/2026-07-17-m50-ui-scaffolding-design.md)
 - [ ] Event-store edit observability (owner, 2026-07-16) — derive metrics from
       the event store on how much end users manipulate/change what the system
       produced: correction/override/removal event volumes
