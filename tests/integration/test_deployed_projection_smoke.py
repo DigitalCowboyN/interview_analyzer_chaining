@@ -175,17 +175,20 @@ async def test_dockerized_projection_service_delivers_sentences_to_neo4j(tmp_pat
             )
             assert fragment_count == ingest_result.fragment_count
 
-            # Dual-label invariant on this interview's projected nodes.
-            dual_label = await session.run(
+            # Single-label invariant on this interview's projected nodes
+            # (M4.8 shim drop): :Fragment only -- no :Sentence label on new
+            # nodes written by the deployed (dockerized) projection service.
+            fragment_labels = await session.run(
                 """
-                MATCH (i:Interview {interview_id: $iid})-[:HAS_SENTENCE]->(f)
-                WHERE NOT (f:Sentence AND f:Fragment)
-                RETURN count(f) AS mismatched
+                MATCH (i:Interview {interview_id: $iid})-[:HAS_SENTENCE]->(f:Fragment)
+                RETURN count(f) AS total,
+                       count(CASE WHEN f:Sentence THEN 1 END) AS mislabeled
                 """,
                 iid=interview_id,
             )
-            dual_label_record = await dual_label.single()
-            assert dual_label_record["mismatched"] == 0
+            fragment_labels_record = await fragment_labels.single()
+            assert fragment_labels_record["total"] > 0
+            assert fragment_labels_record["mislabeled"] == 0
 
             # Consumer-group settlement proof: now that Neo4j shows the
             # expected Fragment count, the Sentence subscription's delivery

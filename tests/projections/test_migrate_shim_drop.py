@@ -81,6 +81,12 @@ async def test_discovers_only_stale_sentence_fragment_embedding_vector_indexes()
         q for q in session.queries if q.strip().startswith("SHOW INDEXES")
     ]
     assert len(show_indexes_calls) == 1
+    # Regression guard: bare `SHOW INDEXES` doesn't return an `options`
+    # column on Neo4j 5.26 (confirmed against the live test DB) -- it must
+    # be explicitly YIELDed or `_recreate_vector_index_on_fragment` KeyErrors
+    # reading row["options"].
+    assert "YIELD" in show_indexes_calls[0]
+    assert "options" in show_indexes_calls[0]
     drop_stale = [
         q for q in session.queries if "DROP INDEX fragment_embedding_testmodel" in q
     ]

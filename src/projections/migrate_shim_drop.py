@@ -31,7 +31,11 @@ from src.utils.neo4j_driver import Neo4jConnectionManager
 
 BTREE_SHIM_INDEXES = ["sentence_sentence_id", "sentence_lookup", "sentence_sequence"]
 
-SHOW_INDEXES_QUERY = "SHOW INDEXES"
+SHOW_INDEXES_QUERY = """
+SHOW INDEXES
+YIELD name, type, labelsOrTypes, properties, options
+RETURN name, type, labelsOrTypes, properties, options
+"""
 
 COUNT_SENTENCE_QUERY = "MATCH (s:Sentence) RETURN count(s)"
 

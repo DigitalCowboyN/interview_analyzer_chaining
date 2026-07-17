@@ -5,8 +5,8 @@ overlapping entity surfaces through the Fragment aggregate (Layer 2's canned
 pattern), replays everything through the real handler registry, runs
 ResolutionEngine with a fake embedder, replays the resulting Project-stream
 events through the same registry, and asserts the canonical-entity / person
-overlay materializes in Neo4j. Also closes the M4.5a "dual-label invariant"
-backlog item. Requires `make test-infra-up`.
+overlay materializes in Neo4j. Also asserts the M4.8 single-label invariant
+(:Fragment only, no :Sentence on new nodes). Requires `make test-infra-up`.
 """
 
 import uuid as uuid_mod
@@ -161,15 +161,20 @@ async def test_resolution_engine_canonicalizes_entities_and_links_persons(tmp_pa
         assert record["speakers"] == 2
         assert record["methods"] == ["front_matter"]
 
-        # Dual-label invariant (M4.5a backlog item — closed by this smoke).
-        dual_label = await session.run(
+        # Single-label invariant (M4.8 shim drop): fragments projected by this
+        # smoke carry :Fragment only -- no :Sentence label on new nodes.
+        fragment_labels = await session.run(
             """
-            MATCH (n) WHERE (n:Sentence AND NOT n:Fragment) OR (n:Fragment AND NOT n:Sentence)
-            RETURN count(n) AS mismatched
-            """
+            MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
+                  (:Interview)-[:HAS_SENTENCE]->(f:Fragment)
+            RETURN count(f) AS total,
+                   count(CASE WHEN f:Sentence THEN 1 END) AS mislabeled
+            """,
+            project_id=project_id,
         )
-        dual_label_record = await dual_label.single()
-        assert dual_label_record["mismatched"] == 0
+        fragment_labels_record = await fragment_labels.single()
+        assert fragment_labels_record["total"] > 0
+        assert fragment_labels_record["mislabeled"] == 0
 
     # Idempotent re-run: second pass over the same (already-resolved) project
     # state emits no new events and writes nothing new to the graph.

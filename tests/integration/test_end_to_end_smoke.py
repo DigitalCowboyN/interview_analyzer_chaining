@@ -259,15 +259,20 @@ async def test_full_pipeline_ingest_enrich_segments_lens_resolve_export(tmp_path
         assert record["linked_speakers"] == 1
         assert record["methods"] == ["front_matter"]
 
-        # Dual-label invariant (the layer4 smoke's exact query).
-        dual_label = await session.run(
+        # Single-label invariant (M4.8 shim drop): fragments projected by this
+        # smoke carry :Fragment only -- no :Sentence label on new nodes.
+        fragment_labels = await session.run(
             """
-            MATCH (n) WHERE (n:Sentence AND NOT n:Fragment) OR (n:Fragment AND NOT n:Sentence)
-            RETURN count(n) AS mismatched
-            """
+            MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
+                  (:Interview)-[:HAS_SENTENCE]->(f:Fragment)
+            RETURN count(f) AS total,
+                   count(CASE WHEN f:Sentence THEN 1 END) AS mislabeled
+            """,
+            project_id=project_id,
         )
-        dual_label_record = await dual_label.single()
-        assert dual_label_record["mismatched"] == 0
+        fragment_labels_record = await fragment_labels.single()
+        assert fragment_labels_record["total"] > 0
+        assert fragment_labels_record["mislabeled"] == 0
 
     # --- 7. Idempotent segment re-run (unforced) -----------------------------
     second_result = await EnrichmentOrchestrator().enrich_interview(interview_id)
