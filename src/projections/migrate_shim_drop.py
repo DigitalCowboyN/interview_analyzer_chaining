@@ -6,8 +6,8 @@ Run AFTER deploying the M4.8 code (write path is :Fragment-only from that
 point). Against a pre-M4.8 graph this:
 
 1. Recreates every stale `fragment_embedding_*` vector index (built on the
-   :Sentence label) on :Fragment instead, matching the DDL shape
-   `embedding_handlers._ensure_vector_index` now uses for new indexes. This
+   :Sentence label) on :Fragment instead, using the same label/property/options
+   as `embedding_handlers._ensure_vector_index` for new indexes. This
    runs BEFORE the label strip below: stripping :Sentence first would empty
    the old :Sentence-anchored index, and `IF NOT EXISTS` would mask the gap
    when the lazy ensure later tries to create the (already-named) index on
@@ -63,8 +63,8 @@ async def _discover_stale_vector_indexes(session) -> list:
 async def _recreate_vector_index_on_fragment(session, row: dict) -> None:
     """Drop the :Sentence-anchored index, recreate it same-named on :Fragment.
 
-    DDL shape mirrors embedding_handlers._ensure_vector_index exactly (label,
-    options/similarity function) so the lazy-ensure and migration paths agree.
+    DDL shape uses the same label/property/options as
+    embedding_handlers._ensure_vector_index so the lazy-ensure and migration paths agree.
     """
     name = row["name"]
     prop = row["properties"][0]

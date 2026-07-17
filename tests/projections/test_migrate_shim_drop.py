@@ -121,9 +121,7 @@ async def test_recreates_discovered_vector_index_on_fragment_matching_ensure_ddl
 
     create_query = session.queries[create_idx]
     assert "IF NOT EXISTS" in create_query
-    assert "FOR (f:Fragment) ON (f.embedding_testmodel)" in create_query or (
-        "FOR (n:Fragment) ON n.embedding_testmodel" in create_query
-    )
+    assert "FOR (f:Fragment) ON (f.embedding_testmodel)" in create_query
     assert "vector.dimensions" in create_query
     assert "vector.similarity_function" in create_query
     assert "cosine" in create_query

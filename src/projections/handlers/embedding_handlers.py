@@ -46,7 +46,7 @@ async def _ensure_vector_index(ensured: set, label: str, prefix: str, model: str
 
 
 class EmbeddingGeneratedHandler(BaseProjectionHandler):
-    """Writes a fragment embedding onto its Sentence node."""
+    """Writes a fragment embedding onto its Fragment node."""
 
     def __init__(self, parked_events_manager=None):
         super().__init__(parked_events_manager)
