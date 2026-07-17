@@ -73,7 +73,7 @@ async def interview_rows(session, project_id: str) -> List[Dict[str, Any]]:
     OPTIONAL MATCH (i)-[:HAS_SENTENCE]->(f:Fragment)
     RETURN i.interview_id AS interview_id, i.title AS title,
            toString(i.created_at) AS created_at, count(f) AS fragment_count
-    ORDER BY i.created_at
+    ORDER BY created_at
     """
     result = await session.run(query, project_id=project_id)
     return [dict(r) async for r in result]

@@ -94,6 +94,7 @@ async def test_interview_rows_scopes_to_project_and_counts_fragments():
     assert "(:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->" in q
     assert "HAS_SENTENCE" in q
     assert session.last_params["project_id"] == PID
+    assert "ORDER BY created_at" in q
 
 
 @pytest.mark.asyncio
