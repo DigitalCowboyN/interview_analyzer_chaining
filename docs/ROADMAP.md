@@ -28,15 +28,64 @@
 | **M4.5** | ✅ Complete | Layer 4: schema v2 (a ✅, b ✅, c ✅) |
 | **M4.6** | ✅ Complete | GraphRAG ask-the-corpus (hybrid retrieval + cited synthesis) |
 | **M4.7** | ✅ Complete | Hardening & operational readiness (schema, deploy path, ask/resolution hardening, persona lens, content corpus) |
+| **M4.8** | 📋 Planned | `:Sentence` shim drop (alias flips, vector-index retarget, migration-CLI deletion) — closes the M4.x arc |
+| **M5.0** | 📋 Planned | UI scaffolding (Next.js): two-surface app shell — workbench + gallery |
+| **M5.1** | 📋 Planned | Live workbench: real-time projection feed (SSE/WebSocket), dynamic transcript |
+| **M5.2** | 📋 Planned | Edit observability: human-vs-machine event metrics, visualized in the gallery |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M4.8 (TBD — strong candidate: `:Sentence` shim drop; or pick from Deferred Backlog)
+**Current Phase:** M4.8 (`:Sentence` shim drop — small rider before the UI arc)
 **Tests:** 1263 unit passing, 17 skipped | **Coverage:** 92.29% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
 ## Milestone Checklist
+
+### Upcoming — the UI arc (mapped 2026-07-17, decisions by owner)
+
+The M5.x arc builds the user interface as **two distinct surfaces** mirroring
+the backend's CQRS split:
+
+- **Workbench** (write side): projects → interviews → line-by-line transcript.
+  The user sees and manipulates interview metadata and line items — every
+  action is a command that lands in ESDB and feeds the projection. Includes
+  correcting transcript content itself via the existing event-sourced edit API
+  (verbatim originals preserved in event history — overlay-not-rewrite holds).
+- **Gallery** (read side): dynamic views that consume projections — personas,
+  canonical entities, worklists, segments, ask. Read-only visualization.
+
+**M4.8 — `:Sentence` shim drop** (pre-UI rider): drop the shim label +
+deprecated code aliases (`Sentence = Fragment`, `get_sentence_repository`),
+flip call sites/test patch paths together, retarget vector-index DDL to
+`:Fragment`, drop the shim-window indexes from `SCHEMA_DDL`, delete
+`migrate_fragment_label` CLI. Wire format stays frozen (event names/
+`aggregate_type: "Sentence"`/stream names unchanged — code surface only).
+
+**M5.0 — UI scaffolding (Next.js)**: app shell in `frontend/`; dev identity
+switcher (X-User-ID header on every call; real auth deferred to its own
+milestone); two-surface navigation; workbench v1 = project/interview nav +
+transcript display + metadata and line-item panels wired to the EXISTING
+correction endpoints (edit_sentence, override_analysis, lens overrides,
+segments, resolution merge/split/link/alias); gallery v1 = persona view +
+review worklist. Freshness via polling/refresh (real-time is M5.1, committed).
+
+**M5.1 — Live workbench (real-time, committed)**: a UI-notification projection
+consumer — a new projection-service consumer type that fans event notifications
+to browsers (SSE or WebSocket, per-interview subscription) instead of writing
+Neo4j. The transcript becomes the dynamic surface: line items appear and
+resequence live (by `sequence_order`) as enrichment/lens/resolution events
+process. Supersedes the old "WebSocket for real-time Neo4j updates" future
+item.
+
+**M5.2 — Edit observability**: metrics over how much end users manipulate/
+change what the system produced. v1 = on-demand reader over ESDB category
+streams (every event already carries an Actor: human vs machine, per
+interview/extractor/lens) + endpoint, visualized in the gallery; a standing
+metrics projection only if replay-on-demand gets slow. Goal: feed ingestion
+improvements and eventually automated learning.
+
+---
 
 ### M4.7: Hardening & Operational Readiness ✅ COMPLETE
 
