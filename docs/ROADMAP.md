@@ -28,15 +28,15 @@
 | **M4.5** | ✅ Complete | Layer 4: schema v2 (a ✅, b ✅, c ✅) |
 | **M4.6** | ✅ Complete | GraphRAG ask-the-corpus (hybrid retrieval + cited synthesis) |
 | **M4.7** | ✅ Complete | Hardening & operational readiness (schema, deploy path, ask/resolution hardening, persona lens, content corpus) |
-| **M4.8** | 📋 Planned | `:Sentence` shim drop (alias flips, vector-index retarget, migration-CLI deletion) — closes the M4.x arc |
+| **M4.8** | ✅ Complete | `:Sentence` shim drop (alias flips, vector-index retarget, migration-CLI deletion) — closes the M4.x arc |
 | **M5.0** | 📋 Planned | UI scaffolding (Next.js): two-surface app shell — workbench + gallery |
 | **M5.1** | 📋 Planned | Live workbench: real-time projection feed (SSE/WebSocket), dynamic transcript |
 | **M5.2** | 📋 Planned | Edit observability: human-vs-machine event metrics, visualized in the gallery |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M4.8 (`:Sentence` shim drop — small rider before the UI arc)
-**Tests:** 1263 unit passing, 17 skipped | **Coverage:** 92.29% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Current Phase:** M5.0 (UI scaffolding — Next.js)
+**Tests:** 1271 unit passing, 17 skipped | **Coverage:** 92.32% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
@@ -55,12 +55,14 @@ the backend's CQRS split:
 - **Gallery** (read side): dynamic views that consume projections — personas,
   canonical entities, worklists, segments, ask. Read-only visualization.
 
-**M4.8 — `:Sentence` shim drop** (pre-UI rider): drop the shim label +
+**M4.8 — `:Sentence` shim drop** (pre-UI rider, done): dropped the shim label +
 deprecated code aliases (`Sentence = Fragment`, `get_sentence_repository`),
-flip call sites/test patch paths together, retarget vector-index DDL to
-`:Fragment`, drop the shim-window indexes from `SCHEMA_DDL`, delete
-`migrate_fragment_label` CLI. Wire format stays frozen (event names/
-`aggregate_type: "Sentence"`/stream names unchanged — code surface only).
+flipped call sites/test patch paths together, retargeted vector-index DDL to
+`:Fragment`, dropped the shim-window indexes from `SCHEMA_DDL` (26 → 23),
+deleted the `migrate_fragment_label` CLI in favor of `migrate_shim_drop`.
+Wire format stayed frozen throughout (event names/`aggregate_type:
+"Sentence"`/stream names unchanged — code surface only). See the M4.8
+milestone section below.
 
 **M5.0 — UI scaffolding (Next.js)**: app shell in `frontend/`; dev identity
 switcher (X-User-ID header on every call; real auth deferred to its own
@@ -84,6 +86,45 @@ streams (every event already carries an Actor: human vs machine, per
 interview/extractor/lens) + endpoint, visualized in the gallery; a standing
 metrics projection only if replay-on-demand gets slow. Goal: feed ingestion
 improvements and eventually automated learning.
+
+---
+
+### M4.8: `:Sentence` Shim Drop ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-17-m48-shim-drop-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-17-m48-shim-drop.md`
+
+Retires the M4.5a transition shim: `:Fragment` becomes the only fragment
+label, the deprecated code aliases disappear, `SentenceRepository` finishes
+its rename, and a one-shot migration retargets live graphs. Wire format
+untouched throughout (event type names, `AggregateType.SENTENCE`'s value
+`"Sentence"`, `Sentence-{uuid}` stream names, `sentence_id` payload/property
+names, and handler file names all stayed).
+
+- [x] Task 1 (`c6fd54f`): Atomic flip — write anchor `MERGE (s:Fragment
+      ...)`, `SET s:Fragment` dropped; aliases `Sentence = Fragment` /
+      `create_sentence_repository` / `get_sentence_repository` deleted;
+      `class SentenceRepository` → `FragmentRepository`; ~39 files
+      including all call sites + test patch paths in one commit;
+      `SCHEMA_DDL` 26 → 23; fragment vector-index DDL label → `Fragment`
+- [x] Task 2 (`315040c`): `python -m src.projections.migrate_shim_drop` —
+      recreates `fragment_embedding_*` vector indexes on `:Fragment` BEFORE
+      stripping labels, batched `REMOVE` via the new `CALL (s) {...} IN
+      TRANSACTIONS` syntax (the deprecated form died with the deleted
+      `migrate_fragment_label` CLI), drops the shim btree indexes;
+      idempotent JSON summary
+- [x] Task 3 (`56d415a`): Dual-label smoke assertions retired to
+      `:Fragment`-only + no-`:Sentence`; live migration proof (seeds a
+      pre-drop world, proves retarget + repopulation + idempotence) — which
+      caught and fixed a real Task 2 bug (bare `SHOW INDEXES` omits
+      `options` on Neo4j 5.26, needed an explicit `YIELD`)
+- [x] Task 4: Docs (this section + schema-doc/README cleanup), full gates,
+      deployed proof
+
+**Completed:** 2026-07-17
+
+**Deferred:** none — this milestone was itself the deferred backlog item
+from M4.5a/M4.5b/M4.5c/M4.7 (see below).
 
 ---
 
@@ -154,8 +195,8 @@ exercising the pipeline against realistic, varied input.
 
 **Completed:** 2026-07-17
 
-**Deferred:** `:Sentence` shim drop + deprecated alias flips + vector-index
-retarget + migration-CLI deletion (natural M4.8 candidate); Text2Cypher ask
+**Deferred:** ~~`:Sentence` shim drop + deprecated alias flips + vector-index
+retarget + migration-CLI deletion~~ → closed by M4.8; Text2Cypher ask
 channel; index-side project scoping for vector search;
 `PersonLinkRemovedHandler` duplicate-delivery guard rework (load-bearing for
 parked-event ordering); `EnrichmentResult.flags` scoping/rename (waits for a
@@ -255,8 +296,8 @@ Redraw = remove + forced re-run (deterministic `segment_id`).
 **Completed:** 2026-07-15
 
 **Deferred:** segment redraw as a first-class event (remove + forced re-run
-covers v1); GraphRAG retrieval (M4.6); `:Sentence` shim drop +
-`FragmentRepository` alias flips (existing backlog); LLM-adjudicated
+covers v1); GraphRAG retrieval (M4.6); ~~`:Sentence` shim drop +
+`FragmentRepository` alias flips~~ → closed by M4.8; LLM-adjudicated
 resolution pairs, nickname dictionaries, cross-project person auto-linking
 (spec non-goals); corpus-level exports; segment coverage metrics (YAGNI
 until a consumer needs them).
@@ -305,9 +346,9 @@ canonical-keyed OKF bundles).
 pairs (deterministic + review only, spec non-goal); cross-project person
 linking (human-only, future); embedding cache beyond a single run;
 suggestion pagination on the worklist; front-matter participant matching
-inside on-demand suggestions (engine-only); `FragmentRepository =
-SentenceRepository` class alias + call-site/patch-path flips (existing
-backlog, rides the alias drop).
+inside on-demand suggestions (engine-only); ~~`FragmentRepository =
+SentenceRepository` class alias + call-site/patch-path flips~~ → closed by
+M4.8.
 
 ---
 
@@ -352,14 +393,15 @@ Sentence → Fragment rename (dual-label overlay + migration CLI; wire format fr
 
 **Completed:** 2026-07-11
 
-**Deploy prerequisite:** any environment with pre-existing graph data MUST run
-`python -m src.projections.migrate_fragment_label` when deploying this branch
-(reads already query `:Fragment`); verified idempotent live.
+**Deploy prerequisite (historical):** `migrate_fragment_label` was the
+one-shot migration for this milestone; it was deleted at the M4.8 shim drop
+and replaced by `python -m src.projections.migrate_shim_drop`, which is now
+the required one-shot step for pre-existing graphs (see M4.8 section above).
 
 **Deferred to M4.5b (since completed — see M4.5b section above):** Project
-aggregate, resolution engine, corrections. Still outstanding: M4.5c (segments);
-dropping the `:Sentence` shim label and deprecated code aliases; re-targeting
-vector index DDL to `:Fragment` (rides the shim drop).
+aggregate, resolution engine, corrections. Still outstanding at the time:
+M4.5c (segments); dropping the `:Sentence` shim label and deprecated code
+aliases; re-targeting vector index DDL to `:Fragment` — both closed by M4.8.
 
 ---
 
@@ -787,26 +829,28 @@ limitation); OKF export of lens outputs (M4.4).
       not atomic on OS/IO failure (consider temp-dir + rename staging)
 
 **From M4.5a final review (2026-07-11):**
-- [ ] Flip repository getter/factory call sites + test patch paths to
+- [x] Flip repository getter/factory call sites + test patch paths to
       `get_fragment_repository`/`create_fragment_repository` together when the
-      deprecated aliases drop (post-M4.5)
+      deprecated aliases drop (post-M4.5) → closed by M4.8 Task 1
 - [x] Dual-label invariant assertion (every `:Sentence` is `:Fragment` and vice
       versa) → closed by `tests/integration/test_layer4_resolution_smoke.py`
       (M4.5b Task 12)
 - [x] `_link_text` backslash hardening in `src/export/renderer.py` (raw
       trailing `\` can still escape a link's closing bracket; escape
       backslashes first or rstrip after truncation) → closed by M4.7 Task 11
-- [ ] `FragmentRepository = SentenceRepository` class alias (+ edits.py local
+- [x] `FragmentRepository = SentenceRepository` class alias (+ edits.py local
       dependency naming) so M4.5b code doesn't annotate against the old class
-      name
+      name → closed by M4.8 Task 1 (alias removed entirely; class renamed to
+      `FragmentRepository`)
 - [x] Concurrent exports of same interview+lens share one fixed `.staging`
       path (`bundler.py`) — pre-existing race, not a regression → closed by
       M4.7 Task 11 (unique per-export staging directory)
 - [ ] Unit-test gap: projection-handler read-MATCH label shapes covered only
       by integration smokes
-- [ ] Migration CLI uses deprecated `CALL {} IN TRANSACTIONS` syntax
+- [x] Migration CLI uses deprecated `CALL {} IN TRANSACTIONS` syntax
       (non-fatal notice; CLI deleted at shim drop — fix only if it outlives
-      that)
+      that) → closed by M4.8 Task 2 (`migrate_fragment_label` deleted;
+      `migrate_shim_drop` uses the new `CALL (s) {...} IN TRANSACTIONS` form)
 - [ ] Claim `(path, title)` derivation duplicated between render_bundle
       back-links and `_render_claim` (DRY)
 
