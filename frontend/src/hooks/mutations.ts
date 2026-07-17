@@ -12,8 +12,9 @@ import { apiFetch } from "@/api/client";
  *
  * Lifecycle:
  *   fire → "pending" (optimistic marker on the caller's element) →
- *   202 → bounded confirm-poll (every 2s, max 10 tries) against a caller-
- *     supplied predicate over a freshly-refetched query →
+ *   202 → bounded confirm-poll (every 2s, max 10 tries by default — both are
+ *     injectable so tests can shrink them) against a caller-supplied
+ *     predicate over a freshly-refetched query →
  *     - predicate true  → invalidate + "settled"
  *     - bounds exceeded → "timeout" (NOT an error — "still processing,
  *       check back later")
@@ -25,8 +26,9 @@ import { apiFetch } from "@/api/client";
  * "processing" — per the spec's loose-coupling section.
  */
 
-const POLL_INTERVAL_MS = 2000;
-const MAX_POLL_ATTEMPTS = 10;
+/** Production defaults: poll every 2s, up to 10 attempts (20s bound). */
+const DEFAULT_POLL_INTERVAL_MS = 2000;
+const DEFAULT_MAX_POLL_ATTEMPTS = 10;
 
 export type CorrectionStatus = "idle" | "pending" | "settled" | "timeout" | "reverted";
 
@@ -46,6 +48,11 @@ export interface RunCorrectionIntentArgs {
   queryKey: QueryKey;
   /** Predicate over the freshly-refetched query data: has the change landed? */
   isReflected: (data: unknown) => boolean;
+  /** Override the poll interval (ms). Defaults to 2000 in production; tests
+   * inject a small value so real-timer flows stay fast. */
+  pollIntervalMs?: number;
+  /** Override the max poll attempts. Defaults to 10 in production. */
+  maxPollAttempts?: number;
 }
 
 export interface CorrectionOutcome {
@@ -61,9 +68,11 @@ async function pollUntilReflected(
   queryClient: QueryClient,
   queryKey: QueryKey,
   isReflected: (data: unknown) => boolean,
+  pollIntervalMs: number,
+  maxPollAttempts: number,
 ): Promise<boolean> {
-  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt += 1) {
-    await sleep(POLL_INTERVAL_MS);
+  for (let attempt = 0; attempt < maxPollAttempts; attempt += 1) {
+    await sleep(pollIntervalMs);
     const data = await queryClient.refetchQueries({ queryKey, exact: true }).then(
       () => queryClient.getQueryData(queryKey),
     );
@@ -90,7 +99,14 @@ async function extractDetail(response: Response): Promise<string> {
 export async function runCorrectionIntent(
   args: RunCorrectionIntentArgs,
 ): Promise<CorrectionOutcome> {
-  const { queryClient, request, queryKey, isReflected } = args;
+  const {
+    queryClient,
+    request,
+    queryKey,
+    isReflected,
+    pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+    maxPollAttempts = DEFAULT_MAX_POLL_ATTEMPTS,
+  } = args;
 
   let response: Response;
   try {
@@ -115,7 +131,13 @@ export async function runCorrectionIntent(
     return { status: "reverted", notice: { kind: "network", message: detail } };
   }
 
-  const reflected = await pollUntilReflected(queryClient, queryKey, isReflected);
+  const reflected = await pollUntilReflected(
+    queryClient,
+    queryKey,
+    isReflected,
+    pollIntervalMs,
+    maxPollAttempts,
+  );
   if (!reflected) {
     return {
       status: "timeout",
@@ -129,6 +151,10 @@ export async function runCorrectionIntent(
 
 export interface UseCorrectionIntentOptions {
   queryKey: QueryKey;
+  /** Override the poll interval (ms). Defaults to 2000 in production. */
+  pollIntervalMs?: number;
+  /** Override the max poll attempts. Defaults to 10 in production. */
+  maxPollAttempts?: number;
 }
 
 export interface UseCorrectionIntentResult {
@@ -167,12 +193,14 @@ export function useCorrectionIntent(
         request,
         queryKey: options.queryKey,
         isReflected,
+        pollIntervalMs: options.pollIntervalMs,
+        maxPollAttempts: options.maxPollAttempts,
       });
       setStatus(outcome.status);
       setNotice(outcome.notice ?? null);
       return outcome;
     },
-    [queryClient, options.queryKey],
+    [queryClient, options.queryKey, options.pollIntervalMs, options.maxPollAttempts],
   );
 
   const reset = useCallback(() => {
@@ -211,9 +239,19 @@ function findLine(
   return transcript?.lines?.find(match);
 }
 
+/** Optional poll-timing overrides shared by every flow hook (test injection point). */
+export interface FlowIntentPollOptions {
+  pollIntervalMs?: number;
+  maxPollAttempts?: number;
+}
+
 /** Flow 1: transcript text edit. POST /edits/sentences/{interview_id}/{sentence_index}/edit */
-export function useTextEditIntent(interviewId: string, transcriptQueryKey: QueryKey) {
-  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey });
+export function useTextEditIntent(
+  interviewId: string,
+  transcriptQueryKey: QueryKey,
+  pollOptions?: FlowIntentPollOptions,
+) {
+  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey, ...pollOptions });
 
   const editText = useCallback(
     (sentenceIndex: number, text: string, note?: string) =>
@@ -236,8 +274,12 @@ export function useTextEditIntent(interviewId: string, transcriptQueryKey: Query
 }
 
 /** Flow 2a: speaker rename. POST /speakers/{interview_id}/{speaker_id}/rename */
-export function useSpeakerRenameIntent(interviewId: string, transcriptQueryKey: QueryKey) {
-  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey });
+export function useSpeakerRenameIntent(
+  interviewId: string,
+  transcriptQueryKey: QueryKey,
+  pollOptions?: FlowIntentPollOptions,
+) {
+  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey, ...pollOptions });
 
   const renameSpeaker = useCallback(
     (speakerId: string, newDisplayName: string) =>
@@ -265,8 +307,12 @@ export function useSpeakerRenameIntent(interviewId: string, transcriptQueryKey: 
 }
 
 /** Flow 2b: fragment reattribute. POST /speakers/{interview_id}/fragments/{index}/reattribute */
-export function useFragmentReattributeIntent(interviewId: string, transcriptQueryKey: QueryKey) {
-  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey });
+export function useFragmentReattributeIntent(
+  interviewId: string,
+  transcriptQueryKey: QueryKey,
+  pollOptions?: FlowIntentPollOptions,
+) {
+  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey, ...pollOptions });
 
   const reattributeFragment = useCallback(
     (fragmentIndex: number, newSpeakerId: string) =>
@@ -294,8 +340,12 @@ export function useFragmentReattributeIntent(interviewId: string, transcriptQuer
 }
 
 /** Flow 3: segment remove. DELETE /segments/{interview_id}/{segment_id}?reason=… */
-export function useSegmentRemoveIntent(interviewId: string, transcriptQueryKey: QueryKey) {
-  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey });
+export function useSegmentRemoveIntent(
+  interviewId: string,
+  transcriptQueryKey: QueryKey,
+  pollOptions?: FlowIntentPollOptions,
+) {
+  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey, ...pollOptions });
 
   const removeSegment = useCallback(
     (segmentId: string, reason?: string) => {
@@ -312,8 +362,12 @@ export function useSegmentRemoveIntent(interviewId: string, transcriptQueryKey: 
 }
 
 /** Flow 4: lens-item override. POST /lenses/{interview_id}/items/{item_id}/override */
-export function useLensItemOverrideIntent(interviewId: string, transcriptQueryKey: QueryKey) {
-  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey });
+export function useLensItemOverrideIntent(
+  interviewId: string,
+  transcriptQueryKey: QueryKey,
+  pollOptions?: FlowIntentPollOptions,
+) {
+  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey, ...pollOptions });
 
   const overrideLensItem = useCallback(
     (itemId: string, fieldsOverridden: Record<string, unknown>, note?: string) =>

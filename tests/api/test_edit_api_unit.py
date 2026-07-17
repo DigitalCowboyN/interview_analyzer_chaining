@@ -24,7 +24,7 @@ from src.api.routers.edits import (
     get_sentence_history,
     override_analysis,
 )
-from src.commands.handlers import CommandResult
+from src.commands.handlers import CommandResult, CommandValidationError
 from src.events.envelope import Actor, ActorType
 
 
@@ -203,13 +203,13 @@ class TestEditSentenceEndpoint:
     async def test_edit_sentence_sentence_not_found(
         self, mock_handler, interview_id, sentence_index
     ):
-        """Test error handling when sentence not found."""
+        """Test error handling when sentence not found (CommandValidationError -> 409)."""
         # Arrange
         request = EditSentenceRequest(text="New text")
 
-        # Mock handler to raise ValueError (sentence not found)
-        mock_handler.handle.side_effect = ValueError(
-            "Sentence not found"
+        # Mock handler to raise CommandValidationError (sentence not found)
+        mock_handler.handle.side_effect = CommandValidationError(
+            "Sentence not found", field="sentence_id"
         )
 
         # Act & Assert
@@ -226,8 +226,36 @@ class TestEditSentenceEndpoint:
                     x_correlation_id=None,
                 )
 
-            assert exc_info.value.status_code == 404
+            assert exc_info.value.status_code == 409
             assert "not found" in str(exc_info.value.detail).lower()
+
+    async def test_edit_sentence_command_validation_error_yields_409(
+        self, mock_handler, interview_id, sentence_index
+    ):
+        """Test that any CommandValidationError (e.g. bad editor_type) maps to 409."""
+        # Arrange
+        request = EditSentenceRequest(text="New text")
+
+        mock_handler.handle.side_effect = CommandValidationError(
+            "Invalid editor type: bogus", field="editor_type"
+        )
+
+        # Act & Assert
+        with patch(
+            "src.api.routers.edits.get_sentence_command_handler",
+            return_value=mock_handler,
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                await edit_sentence(
+                    interview_id=interview_id,
+                    sentence_index=sentence_index,
+                    request=request,
+                    x_user_id=None,
+                    x_correlation_id=None,
+                )
+
+            assert exc_info.value.status_code == 409
+            assert "invalid editor type" in str(exc_info.value.detail).lower()
 
     async def test_edit_sentence_internal_error(
         self, mock_handler, interview_id, sentence_index
@@ -295,8 +323,8 @@ class TestOverrideAnalysisEndpoint:
 
         # Mock handler response
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
-        mock_handler.handle.return_value = CommandResult(aggregate_id=sentence_id, 
-            version=2, event_count=1
+        mock_handler.handle.return_value = CommandResult(
+            aggregate_id=sentence_id, version=2, event_count=1
         )
 
         # Act
@@ -340,8 +368,8 @@ class TestOverrideAnalysisEndpoint:
         )
 
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
-        mock_handler.handle.return_value = CommandResult(aggregate_id=sentence_id, 
-            version=2, event_count=1
+        mock_handler.handle.return_value = CommandResult(
+            aggregate_id=sentence_id, version=2, event_count=1
         )
 
         # Act
@@ -394,13 +422,13 @@ class TestOverrideAnalysisEndpoint:
     async def test_override_analysis_sentence_not_found(
         self, mock_handler, interview_id, sentence_index
     ):
-        """Test error handling when sentence not found."""
+        """Test error handling when sentence not found (CommandValidationError -> 409)."""
         # Arrange
         request = OverrideAnalysisRequest(function_type="question")
 
-        # Mock handler to raise ValueError
-        mock_handler.handle.side_effect = ValueError(
-            "Sentence not found"
+        # Mock handler to raise CommandValidationError
+        mock_handler.handle.side_effect = CommandValidationError(
+            "Sentence not found", field="sentence_id"
         )
 
         # Act & Assert
@@ -417,7 +445,36 @@ class TestOverrideAnalysisEndpoint:
                     x_correlation_id=None,
                 )
 
-            assert exc_info.value.status_code == 404
+            assert exc_info.value.status_code == 409
+            assert "not found" in str(exc_info.value.detail).lower()
+
+    async def test_override_analysis_command_validation_error_yields_409(
+        self, mock_handler, interview_id, sentence_index
+    ):
+        """Test that any CommandValidationError maps to 409, not just not-found."""
+        # Arrange
+        request = OverrideAnalysisRequest(function_type="question")
+
+        mock_handler.handle.side_effect = CommandValidationError(
+            "Invalid field value", field="function_type"
+        )
+
+        # Act & Assert
+        with patch(
+            "src.api.routers.edits.get_sentence_command_handler",
+            return_value=mock_handler,
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                await override_analysis(
+                    interview_id=interview_id,
+                    sentence_index=sentence_index,
+                    request=request,
+                    x_user_id=None,
+                    x_correlation_id=None,
+                )
+
+            assert exc_info.value.status_code == 409
+            assert "invalid field value" in str(exc_info.value.detail).lower()
 
     async def test_override_analysis_generates_deterministic_uuid(
         self, mock_handler, interview_id, sentence_index
@@ -427,8 +484,8 @@ class TestOverrideAnalysisEndpoint:
         request = OverrideAnalysisRequest(function_type="question")
 
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
-        mock_handler.handle.return_value = CommandResult(aggregate_id=sentence_id, 
-            version=2, event_count=1
+        mock_handler.handle.return_value = CommandResult(
+            aggregate_id=sentence_id, version=2, event_count=1
         )
 
         # Act
@@ -503,7 +560,7 @@ class TestGetSentenceHistoryEndpoint:
 
         # Mock events
         from datetime import datetime, timezone
-        
+
         event1 = MagicMock()
         event1.event_type = "SentenceCreated"
         event1.version = 0

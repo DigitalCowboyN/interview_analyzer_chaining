@@ -17,10 +17,15 @@ import { apiFetch } from "@/api/client";
  * shared wrapper itself (settle/timeout/409/network) is covered by
  * mutations.test.ts against the framework-agnostic core with fake timers.
  * These tests use real timers (the poll predicate is satisfied on the very
- * first tick, so each test waits out one real 2s poll interval) — mixing
- * fake timers with RTL's `waitFor` (which itself polls via setTimeout) is
- * unreliable, so real timers keep these deterministic.
+ * first tick, so each test waits out one real poll interval) — mixing fake
+ * timers with RTL's `waitFor` (which itself polls via setTimeout) is
+ * unreliable, so real timers keep these deterministic. Each hook is given a
+ * small injected poll interval (POLL_OPTIONS below) so the suite doesn't pay
+ * the production 2s cost per test; the default (2s x 10 tries) is asserted
+ * separately in mutations.test.ts.
  */
+
+const POLL_OPTIONS = { pollIntervalMs: 10, maxPollAttempts: 10 };
 
 vi.mock("@/api/client", async () => {
   const actual = await vi.importActual<typeof import("@/api/client")>("@/api/client");
@@ -58,7 +63,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
       lines: [{ fragment_id: "f1", sequence_order: 3, edited: true, speaker: null, segment: null, lens_items: [] }],
     });
 
-    const { result } = renderHook(() => useTextEditIntent("i1", QUERY_KEY), { wrapper });
+    const { result } = renderHook(() => useTextEditIntent("i1", QUERY_KEY, POLL_OPTIONS), { wrapper });
     const outcomePromise = result.current.editText(3, "corrected text", "typo fix");
 
     expect(apiFetch).toHaveBeenCalledWith("/edits/sentences/i1/3/edit", {
@@ -69,7 +74,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
 
     const outcome = await outcomePromise;
     expect(outcome).toMatchObject({ status: "settled" });
-  }, 10000);
+  });
 
   it("text edit omits note when not provided", async () => {
     vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
@@ -77,7 +82,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
       lines: [{ fragment_id: "f1", sequence_order: 0, edited: true, speaker: null, segment: null, lens_items: [] }],
     });
 
-    const { result } = renderHook(() => useTextEditIntent("i1", QUERY_KEY), { wrapper });
+    const { result } = renderHook(() => useTextEditIntent("i1", QUERY_KEY, POLL_OPTIONS), { wrapper });
     const outcomePromise = result.current.editText(0, "new text");
 
     expect(apiFetch).toHaveBeenCalledWith("/edits/sentences/i1/0/edit", {
@@ -87,7 +92,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
     });
 
     await outcomePromise;
-  }, 10000);
+  });
 
   it("speaker rename: POST /speakers/{interview_id}/{speaker_id}/rename", async () => {
     vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
@@ -104,7 +109,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
       ],
     });
 
-    const { result } = renderHook(() => useSpeakerRenameIntent("i1", QUERY_KEY), { wrapper });
+    const { result } = renderHook(() => useSpeakerRenameIntent("i1", QUERY_KEY, POLL_OPTIONS), { wrapper });
     const outcomePromise = result.current.renameSpeaker("s1", "Jane Doe");
 
     expect(apiFetch).toHaveBeenCalledWith("/speakers/i1/s1/rename", {
@@ -115,7 +120,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
 
     const outcome = await outcomePromise;
     expect(outcome).toMatchObject({ status: "settled" });
-  }, 10000);
+  });
 
   it("fragment reattribute: POST /speakers/{interview_id}/fragments/{index}/reattribute", async () => {
     vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
@@ -132,7 +137,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
       ],
     });
 
-    const { result } = renderHook(() => useFragmentReattributeIntent("i1", QUERY_KEY), { wrapper });
+    const { result } = renderHook(() => useFragmentReattributeIntent("i1", QUERY_KEY, POLL_OPTIONS), { wrapper });
     const outcomePromise = result.current.reattributeFragment(4, "s2");
 
     expect(apiFetch).toHaveBeenCalledWith("/speakers/i1/fragments/4/reattribute", {
@@ -143,7 +148,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
 
     const outcome = await outcomePromise;
     expect(outcome).toMatchObject({ status: "settled" });
-  }, 10000);
+  });
 
   it("segment remove: DELETE /segments/{interview_id}/{segment_id}?reason=", async () => {
     vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
@@ -152,7 +157,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
       lines: [{ fragment_id: "f1", sequence_order: 0, edited: false, speaker: null, segment: null, lens_items: [] }],
     });
 
-    const { result } = renderHook(() => useSegmentRemoveIntent("i1", QUERY_KEY), { wrapper });
+    const { result } = renderHook(() => useSegmentRemoveIntent("i1", QUERY_KEY, POLL_OPTIONS), { wrapper });
     const outcomePromise = result.current.removeSegment("seg1", "wrong boundary");
 
     expect(apiFetch).toHaveBeenCalledWith(
@@ -162,7 +167,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
 
     const outcome = await outcomePromise;
     expect(outcome).toMatchObject({ status: "settled" });
-  }, 10000);
+  });
 
   it("segment remove without a reason omits the query string", async () => {
     vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
@@ -170,13 +175,13 @@ describe("correction flow hooks — endpoint/body pinning", () => {
       lines: [{ fragment_id: "f1", sequence_order: 0, edited: false, speaker: null, segment: null, lens_items: [] }],
     });
 
-    const { result } = renderHook(() => useSegmentRemoveIntent("i1", QUERY_KEY), { wrapper });
+    const { result } = renderHook(() => useSegmentRemoveIntent("i1", QUERY_KEY, POLL_OPTIONS), { wrapper });
     const outcomePromise = result.current.removeSegment("seg1");
 
     expect(apiFetch).toHaveBeenCalledWith("/segments/i1/seg1", { method: "DELETE" });
 
     await outcomePromise;
-  }, 10000);
+  });
 
   it("lens-item override: POST /lenses/{interview_id}/items/{item_id}/override", async () => {
     vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
@@ -193,7 +198,7 @@ describe("correction flow hooks — endpoint/body pinning", () => {
       ],
     });
 
-    const { result } = renderHook(() => useLensItemOverrideIntent("i1", QUERY_KEY), { wrapper });
+    const { result } = renderHook(() => useLensItemOverrideIntent("i1", QUERY_KEY, POLL_OPTIONS), { wrapper });
     const outcomePromise = result.current.overrideLensItem(
       "li1",
       { text: "Ships faster" },
@@ -211,5 +216,5 @@ describe("correction flow hooks — endpoint/body pinning", () => {
 
     const outcome = await outcomePromise;
     expect(outcome).toMatchObject({ status: "settled" });
-  }, 10000);
+  });
 });

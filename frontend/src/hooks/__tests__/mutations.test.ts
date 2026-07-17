@@ -63,6 +63,34 @@ describe("runCorrectionIntent", () => {
     expect(outcome.notice).toBeUndefined();
   });
 
+  it("defaults to a 2s interval with 10 max attempts when not overridden", async () => {
+    const queryFn = vi.fn().mockResolvedValue({ reflected: false });
+    queryClient.setQueryDefaults(QUERY_KEY, { queryFn });
+    queryClient.setQueryData(QUERY_KEY, { reflected: false });
+
+    const request = vi.fn().mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    const isReflected = vi.fn(() => false);
+
+    // No pollIntervalMs/maxPollAttempts passed — production defaults apply.
+    const outcomePromise = runCorrectionIntent({
+      queryClient,
+      request,
+      queryKey: QUERY_KEY,
+      isReflected,
+    });
+
+    // Advancing by anything less than the 2s default should not trigger a
+    // poll tick yet; advancing by the full 2s x 10 bound exhausts all tries.
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(isReflected).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(2000 * 10);
+
+    const outcome = await outcomePromise;
+    expect(outcome.status).toBe("timeout");
+    expect(isReflected).toHaveBeenCalledTimes(10);
+  });
+
   it("times out (NOT an error) after 10 bounded polls with no reflection", async () => {
     const queryFn = vi.fn().mockResolvedValue({ reflected: false });
     queryClient.setQueryDefaults(QUERY_KEY, { queryFn });

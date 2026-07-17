@@ -37,7 +37,7 @@ function TextEditControl({
   interviewId: string;
   line: TranscriptLineData;
 }) {
-  const { editText, isPending, notice, status } = useTextEditIntent(
+  const { editText, isPending, notice } = useTextEditIntent(
     interviewId,
     queryKeys.transcript(interviewId),
   );
@@ -57,7 +57,7 @@ function TextEditControl({
         >
           Edit text
         </button>
-        {status !== "pending" && <CorrectionNoticeBanner notice={notice} />}
+        <CorrectionNoticeBanner notice={notice} />
       </div>
     );
   }
