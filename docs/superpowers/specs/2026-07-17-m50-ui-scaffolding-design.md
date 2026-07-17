@@ -15,8 +15,16 @@ polling/refetch; the real-time feed is M5.1 (committed, not optional).
 
 ## Domain model the UI encodes (owner-defined, 2026-07-17)
 
-- **Person** = identity construct: the resolved human (`IDENTIFIED_AS`
-  overlay — linked speakers, aliases, interviews they appear in).
+- **Speaker ≠ Person** (clarified 2026-07-17): a Speaker is a per-interview
+  artifact from ingestion (each interview mints its own speakers from labels
+  or inference — the same human in three interviews is three Speaker nodes).
+  A **Person** is the project-scoped identity construct that unifies them
+  (`Speaker —IDENTIFIED_AS→ Person`, 1:N across interviews). Automation
+  links them ONLY in the reliable case (front-matter participants matching
+  speaker display names — the ResolutionEngine's auto band); name heuristics
+  produce worklist *suggestions* (human accepts); messy transcripts (generic
+  labels, shared mics) have NO automation by design — the UI must provide the
+  manual path (below).
 - **Persona** = interpretive construct: a general domain representation (a
   role/archetype) built from persona-lens data (traits, goals, pain points,
   notable quotes).
@@ -97,8 +105,14 @@ All project-scoped queries pin `(:Project {project_id})-[:CONTAINS_INTERVIEW]->`
   via the existing history endpoint).
 - **Core corrections wired in v1** (existing endpoints, nothing new):
   transcript text edit (`edit_sentence`), speaker rename + fragment
-  reattribute, segment remove, lens-item override. Resolution corrections are
-  NOT on the workbench — they live on the gallery worklist (below).
+  reattribute, segment remove, lens-item override, AND **manual
+  speaker→person linking** (owner decision 2026-07-17): a per-speaker
+  "identify as person…" affordance with a person picker (existing persons in
+  the project, or create-new via the deterministic person id) calling the
+  existing link endpoint, plus unlink. This is the escape hatch for speakers
+  automation can't reach (generic labels, shared mics). Entity-level
+  resolution corrections (merge/split/alias) stay off the workbench — they
+  live on the gallery worklist (below).
 - Every correction: optimistic/pending state → poll/refetch until the
   projection reflects it (bounded, with a "still processing" state) → settled.
 
