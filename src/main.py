@@ -24,6 +24,7 @@ from src.api.routers import queries as queries_router
 from src.api.routers import resolution as resolution_router
 from src.api.routers import segments as segments_router
 from src.api.routers import speakers as speakers_router
+from src.api.routers import ui as ui_router
 from src.config import config
 from src.utils.logger import get_logger
 from src.utils.metrics import metrics_tracker
@@ -46,6 +47,7 @@ app.include_router(resolution_router.router)
 app.include_router(lenses_router.router)
 app.include_router(exports_router.router)
 app.include_router(queries_router.router)
+app.include_router(ui_router.router)
 
 
 @app.get("/", tags=["Health Check"])
