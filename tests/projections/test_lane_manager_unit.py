@@ -414,3 +414,88 @@ class TestLane:
 
         finally:
             await lane.stop()
+
+    async def test_sync_checkpoint_callback_is_called_without_raising(self):
+        """Regression (defect 1): SubscriptionManager passes a SYNC checkpoint
+        callback (e.g. `lambda event_id=...: subscription.ack(event_id)`),
+        which returns None. `_process_event` must call it and must not treat
+        the None return value as awaitable (previously raised
+        `TypeError: object NoneType can't be used in 'await' expression`,
+        swallowed by the lane's broad exception handler, so acks silently
+        never happened)."""
+        checkpoint_calls = []
+
+        def sync_checkpoint_callback():
+            checkpoint_calls.append(1)
+
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock()
+
+        handler_registry = MagicMock()
+        handler_registry.get_handler = MagicMock(return_value=mock_handler)
+
+        lane = Lane(lane_id=0, handler_registry=handler_registry)
+        await lane.start()
+
+        try:
+            event = EventEnvelope(
+                event_type="SentenceCreated",
+                aggregate_type=AggregateType.SENTENCE,
+                aggregate_id=str(uuid.uuid4()),
+                version=0,
+                data={"interview_id": "test", "text": "Test"},
+            )
+
+            await lane.enqueue(event, sync_checkpoint_callback)
+
+            # Wait for processing
+            await asyncio.sleep(0.1)
+
+            assert checkpoint_calls == [1]
+            # No error should have been recorded (the old bug raised a
+            # TypeError, caught by the broad handler and counted as failed).
+            assert lane.events_failed == 0
+            assert lane.events_processed == 1
+
+        finally:
+            await lane.stop()
+
+    async def test_async_checkpoint_callback_still_awaited(self):
+        """Regression: async checkpoint callbacks (the old contract, still
+        used by existing tests/callers) must continue to be awaited."""
+        checkpoint_called = False
+
+        async def async_checkpoint_callback():
+            nonlocal checkpoint_called
+            await asyncio.sleep(0)  # prove it actually runs as a coroutine
+            checkpoint_called = True
+
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock()
+
+        handler_registry = MagicMock()
+        handler_registry.get_handler = MagicMock(return_value=mock_handler)
+
+        lane = Lane(lane_id=0, handler_registry=handler_registry)
+        await lane.start()
+
+        try:
+            event = EventEnvelope(
+                event_type="SentenceCreated",
+                aggregate_type=AggregateType.SENTENCE,
+                aggregate_id=str(uuid.uuid4()),
+                version=0,
+                data={"interview_id": "test", "text": "Test"},
+            )
+
+            await lane.enqueue(event, async_checkpoint_callback)
+
+            # Wait for processing
+            await asyncio.sleep(0.1)
+
+            assert checkpoint_called is True
+            assert lane.events_failed == 0
+            assert lane.events_processed == 1
+
+        finally:
+            await lane.stop()

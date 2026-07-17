@@ -1,0 +1,88 @@
+---
+title: Ledgerline Product Focus Group - Categorization & Budgeting
+project: ledgerline-ux
+date: 2026-04-02
+participants: [Priya Nair]
+---
+Priya Nair: Thanks everyone for hopping on. I'm Priya, I'll be moderating today. We've got a few folks dialed in remotely and three of you sharing the room mic in the conference room, so bear with us on the audio.
+Speaker 1: No problem, can you hear us okay?
+Priya Nair: Coming through fine. Can you all introduce yourselves quickly, just so we have it on the recording?
+Room Mic: This is Marcus, by the way. I'm on the ops side, I manage a small team and we use Ledgerline for the department budget.
+Room Mic: Hey, this is Denise. I'm more of a casual user, personal finance, nothing fancy.
+Room Mic: And I'm Carlos. I've been using it about a year, mostly for tracking shared expenses with my partner.
+Speaker 2: I'm dialed in from home, I'll just go by Speaker 2 if that's fine, I don't love being recorded by name.
+Priya Nair: Totally fine, whatever's comfortable. Let's start broad. What's the first thing that comes to mind when you think about Ledgerline?
+Speaker 1: For me it's the automatic categorization. When it works it's great, when it doesn't it's a little maddening.
+Room Mic: Same here, this is Marcus again. My team lead flagged three transactions last week that got miscategorized as travel when they were actually office supplies.
+Priya Nair: Carlos, you had a comment on that too, right?
+Room Mic: Yeah, this is Carlos. It happens to me maybe once a month. Not a dealbreaker but it's annoying to fix.
+Speaker 2: I don't get many miscategorizations, honestly. Maybe because my spending is pretty routine, groceries, gas, rent.
+Priya Nair: That's useful, thanks. Let's talk about the budgeting side specifically. Ledgerline lets you set monthly budgets per category, has anyone run into friction there?
+Room Mic: This is Denise. My electric bill swings a lot with the seasons, and the app treats every month the same, so I'm constantly "over budget" on utilities in summer.
+Speaker 1: We hit something similar on the team side. Our software licensing costs spike quarterly, not monthly, and the monthly budget view doesn't really capture that.
+Priya Nair: Got it, so seasonal or non-monthly recurring costs are a pain point for more than one of you.
+Room Mic: As I said earlier about the pricing, this is Marcus, our finance lead actually asked if there's a quarterly budgeting view, and right now there isn't.
+Speaker 2: I'd use a quarterly view too, even for personal stuff, insurance premiums for example.
+Priya Nair: Noted. Let's shift to the drill-down experience. When you tap into a transaction, what are you hoping to see?
+Room Mic: This is Carlos again. I want to see the merchant, sure, but also a running total for that category so I know where I stand without backing out and checking a different screen.
+Speaker 1: Agreed, and ideally a way to sort a whole category by amount, so I can spot the outliers fast.
+Priya Nair: That lines up with feedback we've heard elsewhere too. Anyone have a strong opinion on the mobile app versus the desktop dashboard?
+Room Mic: This is Denise, I basically only use mobile. I've never even opened the desktop site.
+Speaker 2: I use both, but the desktop dashboard is where I do my real monthly review, mobile is just for quick checks.
+Room Mic: This is Marcus, for my team it's split, some people live in the mobile app, some prefer the desktop reports for exporting to spreadsheets.
+Priya Nair: Speaking of exporting, does anyone export data out of Ledgerline regularly?
+Speaker 1: We do, monthly, into a shared spreadsheet for the department rollup.
+Room Mic: This is Carlos, I've exported maybe twice ever, mostly for tax season.
+Priya Nair: Okay. Let's talk about Acme Corp as a company for a second, separate from the app itself. Any interactions with their support team?
+Speaker 2: I emailed them once about a sync issue, got a reasonably quick response actually, maybe two days.
+Room Mic: This is Denise, I haven't contacted support directly, but I've seen the community forum, people post there when Ledgerline has an outage.
+Room Mic: This is Marcus, our team went through a whole onboarding call with an Acme rep when we first set up the department account. It was thorough, I'll give them that.
+Priya Nair: Good to know. Let's talk wishlist. If you could add one feature to Ledgerline tomorrow, what would it be?
+Speaker 1: Quarterly budgeting, like I mentioned, hands down.
+Room Mic: This is Carlos, category-level running totals, same as I said before.
+Speaker 2: A way to flag a transaction as "irregular" so it doesn't count against a flat monthly budget.
+Room Mic: This is Denise, and honestly the same thing Speaker 2 just said, flagging irregular bills would fix my utilities complaint completely.
+Priya Nair: Interesting, so there's real overlap between the seasonal-bill and irregular-expense asks.
+Room Mic: This is Marcus, agreed, and for my team it would mean fewer false "over budget" alerts going to my manager.
+Priya Nair: Let's talk about trust for a moment. On a gut level, do you trust the numbers Ledgerline shows you?
+Speaker 1: Mostly yes, the sync with the bank feels reliable, it's really just the categorization layer I don't fully trust.
+Room Mic: This is Carlos, same, I trust the totals, I just double check anything tagged weird.
+Speaker 2: I trust it enough that I don't keep a backup spreadsheet anymore, which says something.
+Room Mic: This is Denise, I still keep a backup spreadsheet, old habits.
+Priya Nair: Fair enough. Let's do a quick round on pricing, since that's come up a couple times already.
+Room Mic: As I said earlier about the pricing, this is Marcus, our team is on the business tier, and honestly the per-seat cost adds up fast once you cross ten users.
+Speaker 1: We're right around that threshold too, it's something finance keeps asking about.
+Speaker 2: I'm on the free personal tier, no complaints there, but I also don't need the team features.
+Room Mic: This is Carlos, same as Speaker 2, personal tier, no pricing complaints from me.
+Priya Nair: Let's switch topics for a bit. What about notifications and alerts, does Ledgerline keep you informed the way you want?
+Room Mic: This is Marcus, our team gets a Slack digest from Ledgerline every morning, that part works great.
+Speaker 1: We rely on that digest too, honestly it's the main reason the team checks the app at all some weeks.
+Speaker 2: I get push notifications on my phone, sometimes too many honestly, like a notification for every single transaction under five dollars.
+Room Mic: This is Denise, same complaint, I'd love to set a minimum dollar threshold before I get pinged.
+Priya Nair: That's a clear ask, a notification threshold. Anyone have the opposite problem, not enough alerts?
+Room Mic: This is Carlos, actually yes, I never get warned before a bill is due, only after it's already posted.
+Speaker 1: We'd want that on the team side too, a heads-up before a subscription renews, not after.
+Priya Nair: Good, that lines up with something we've heard before, a pre-due-date alert. Let's talk onboarding for a minute. How was your first week with Ledgerline?
+Room Mic: This is Marcus, for the team account it was smooth, the Acme rep walked us through the whole setup on a call.
+Speaker 2: Mine was a little bumpy honestly, I didn't realize I had to manually confirm the bank link, I thought it happened automatically.
+Room Mic: This is Denise, same, the bank-link confirmation step wasn't obvious to me either, I almost gave up on day one.
+Room Mic: This is Carlos, mine went fine, but I do remember being confused about how categories worked at first.
+Speaker 1: We didn't have that issue since Acme walked us through it directly, but I could see a solo user getting stuck there.
+Priya Nair: That's helpful, sounds like the self-serve onboarding path could use some polish around the bank-link step specifically.
+Room Mic: This is Denise, yes, exactly that, a clearer prompt would've saved me twenty minutes of confusion.
+Priya Nair: Last topic before we wrap, let's talk about how Ledgerline compares to whatever you used before, if anything.
+Speaker 1: We were on a shared spreadsheet before, honestly this is night and day better for the team.
+Room Mic: This is Marcus, agreed, the old spreadsheet had version conflicts constantly, people overwriting each other's edits.
+Speaker 2: I used a different budgeting app for about a year before switching, Ledgerline's categorization is actually worse than that one was, ironically.
+Room Mic: This is Carlos, I came from a plain spreadsheet too, so for me almost anything automated feels like an upgrade.
+Room Mic: This is Denise, same as Carlos, I was doing everything by hand before, so I'm just grateful for the automatic sync even with the categorization hiccups.
+Priya Nair: That's a really useful contrast, thank you. Any final thoughts before we wrap? Anything we haven't covered?
+Room Mic: This is Denise, just that overall I like the product, the seasonal budgeting thing is my one real ask.
+Speaker 1: Quarterly budgeting for teams, that's mine.
+Room Mic: This is Carlos, running totals per category, and I'm happy.
+Speaker 2: The irregular-expense flag, that's the one thing that would change my day to day.
+Priya Nair: Perfect, that's a great note to end on. Thanks everyone for your time today, this was genuinely useful.
+Room Mic: This is Marcus, thanks Priya, good session.
+Speaker 1: Thanks, bye everyone.
+Speaker 2: Thanks, take care.
+Room Mic: This is Denise, thanks, bye!

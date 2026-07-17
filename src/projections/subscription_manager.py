@@ -7,7 +7,7 @@ event delivery and automatic checkpoint management.
 
 import asyncio
 import logging
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from esdbclient import EventStoreDBClient
 from esdbclient.exceptions import NotFound
@@ -18,6 +18,11 @@ from src.events.store import EventStoreClient, get_event_store_client
 from .config import SUBSCRIPTION_CONFIG, is_event_allowed
 
 logger = logging.getLogger(__name__)
+
+# Sentinel returned by asyncio.to_thread(next, iterator, _SUBSCRIPTION_ENDED)
+# when the underlying (blocking) subscription iterator is exhausted, so we
+# can distinguish "no more events" from a real event without next() raising.
+_SUBSCRIPTION_ENDED = object()
 
 
 class SubscriptionManager:
@@ -43,6 +48,11 @@ class SubscriptionManager:
         self.event_store = event_store or get_event_store_client()
         self.lane_manager = lane_manager
         self.subscriptions: Dict[str, asyncio.Task] = {}
+        # Active esdbclient PersistentSubscription object per subscription
+        # name, for as long as that subscription's outer loop iteration is
+        # connected. Held so stop() can call .stop() on it directly -- see
+        # stop()'s docstring for why this is required for a clean shutdown.
+        self._active_subscriptions: Dict[str, Any] = {}
         self.is_running = False
 
     async def start(self):
@@ -64,12 +74,31 @@ class SubscriptionManager:
         logger.info(f"All {len(self.subscriptions)} subscriptions started")
 
     async def stop(self):
-        """Stop all subscriptions."""
+        """
+        Stop all subscriptions.
+
+        Each subscription task spends most of its life blocked inside
+        `asyncio.to_thread(next, iterator, ...)`, waiting on the esdbclient
+        PersistentSubscription's blocking network read. Cancelling the
+        asyncio.Task alone does not unblock that worker thread -- the
+        cancellation is only delivered the next time the coroutine resumes
+        on the event loop, which won't happen until the blocking next()
+        call itself returns. So before cancelling/awaiting each task, call
+        `.stop()` on its active esdbclient subscription object directly:
+        that cancels the subscription's underlying gRPC response stream,
+        which unblocks the worker thread's next() call promptly instead of
+        leaving it hung until the network call times out on its own.
+        """
         if not self.is_running:
             return
 
         self.is_running = False
         logger.info("Stopping subscriptions...")
+
+        for sub_name in self.subscriptions:
+            subscription = self._active_subscriptions.get(sub_name)
+            if subscription is not None:
+                subscription.stop()
 
         for sub_name, task in self.subscriptions.items():
             task.cancel()
@@ -80,6 +109,7 @@ class SubscriptionManager:
             logger.info(f"Stopped subscription '{sub_name}'")
 
         self.subscriptions.clear()
+        self._active_subscriptions.clear()
         logger.info("All subscriptions stopped")
 
     async def _run_subscription(self, sub_name: str, config: Dict):
@@ -106,9 +136,29 @@ class SubscriptionManager:
                         group_name=group_name,
                         stream_name=stream_name,
                     )
+                    # Keep a reference so stop() (and the reconnect path
+                    # below, on the next exception) can call .stop() on
+                    # this exact object to unblock a worker thread that's
+                    # parked in its blocking next() call.
+                    self._active_subscriptions[sub_name] = subscription
 
-                    for event in subscription:
-                        if not self.is_running:
+                    # `subscription` is a synchronous (blocking) esdbclient
+                    # generator. Iterating it directly with `for event in
+                    # subscription:` inside this coroutine would block the
+                    # event loop indefinitely on network I/O, starving the
+                    # other subscription tasks (they'd never get a turn to
+                    # run) -- this was the defect that kept the deployed
+                    # service from ever creating the 'sentence'/'project'
+                    # persistent subscriptions. Offload each blocking next()
+                    # call to a worker thread via asyncio.to_thread so the
+                    # loop stays free; one worker thread is held per
+                    # subscription for as long as it's waiting on the next
+                    # event, which is fine for our fixed, small subscription
+                    # count.
+                    iterator = iter(subscription)
+                    while self.is_running:
+                        event = await asyncio.to_thread(next, iterator, _SUBSCRIPTION_ENDED)
+                        if event is _SUBSCRIPTION_ENDED:
                             break
 
                         # Convert to EventEnvelope
@@ -120,17 +170,38 @@ class SubscriptionManager:
                                 f"Skipping event {envelope.event_id} "
                                 f"(type: {envelope.event_type}) - not in allowlist"
                             )
-                            subscription.ack(event.id)
+                            # Ack by the LINK's id (event.ack_id), not the
+                            # resolved event's id (event.id). On $ce- category
+                            # streams read with resolve_links=True, the server
+                            # tracks in-flight messages by the link's id
+                            # (esdbclient RecordedEvent.ack_id: link.id if
+                            # resolved, else id); acking a bare event.id is a
+                            # no-op ack for a different (nonexistent) message
+                            # id, so the real in-flight message is never
+                            # cleared server-side and gets redelivered until
+                            # parked.
+                            subscription.ack(event.ack_id)
                             continue
 
                         # Route to lane manager
                         if self.lane_manager:
+                            # Bind event.ack_id as a default arg so the
+                            # callback captures *this* event's ack id at
+                            # creation time. LaneManager.route_event enqueues
+                            # (event, checkpoint_callback) and invokes the
+                            # callback later, from the lane's processing loop
+                            # -- a plain `lambda: subscription.ack(event.ack_id)`
+                            # would close over the loop variable `event` by
+                            # reference, so by the time the callback ran it
+                            # could have already been rebound to a later
+                            # iteration's event, acking the wrong id.
                             await self.lane_manager.route_event(
-                                envelope, checkpoint_callback=lambda: subscription.ack(event.id)
+                                envelope,
+                                checkpoint_callback=lambda ack_id=event.ack_id: subscription.ack(ack_id),
                             )
                         else:
-                            # No lane manager, just ack
-                            subscription.ack(event.id)
+                            # No lane manager, just ack (by link id, see above)
+                            subscription.ack(event.ack_id)
 
             except asyncio.CancelledError:
                 logger.info(f"Subscription '{sub_name}' cancelled")
@@ -142,6 +213,17 @@ class SubscriptionManager:
                     await asyncio.sleep(5.0)
                 else:
                     break
+            finally:
+                # This subscription's outer loop iteration has ended (clean
+                # exhaustion, cancellation, or an exception handled above) --
+                # stop the subscription object (if still active) so its
+                # underlying gRPC response stream doesn't leak into the next
+                # reconnect attempt, then drop the reference so stop()
+                # doesn't try to re-stop a subscription that's no longer
+                # active for this iteration.
+                stale_subscription = self._active_subscriptions.pop(sub_name, None)
+                if stale_subscription is not None:
+                    stale_subscription.stop()
 
     async def _ensure_subscription_exists(self, stream_name: str, group_name: str):
         """

@@ -60,7 +60,11 @@ async def review_worklist(
                 suggest_thr=resolution_cfg.get("suggest_threshold", 0.80),
             )
         else:
-            suggestions = {"entity_merge_suggestions": [], "person_link_suggestions": []}
+            suggestions = {
+                "entity_merge_suggestions": [],
+                "person_link_suggestions": [],
+                "flags": [],
+            }
         payload.update(suggestions)
     return payload
 

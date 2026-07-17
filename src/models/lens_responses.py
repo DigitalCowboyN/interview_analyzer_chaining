@@ -1,4 +1,4 @@
-"""Response models for lens extractors (meeting_minutes lens).
+"""Response models for lens extractors (meeting_minutes, persona).
 
 Same strict-mode contract as extractor_responses: closed schemas, numeric
 confidence. Optional fields are declared WITHOUT defaults (required, nullable)
@@ -50,3 +50,43 @@ class FollowupItem(StrictResult):
 
 class FollowupsResult(StrictResult):
     followups: List[FollowupItem]
+
+
+class TraitItem(StrictResult):
+    text: str
+    speaker: Optional[str]
+    confidence: float = Field(..., ge=0.0, le=1.0)
+
+
+class TraitsResult(StrictResult):
+    traits: List[TraitItem]
+
+
+class GoalItem(StrictResult):
+    text: str
+    speaker: Optional[str]
+    confidence: float = Field(..., ge=0.0, le=1.0)
+
+
+class GoalsResult(StrictResult):
+    goals: List[GoalItem]
+
+
+class PainPointItem(StrictResult):
+    text: str
+    speaker: Optional[str]
+    confidence: float = Field(..., ge=0.0, le=1.0)
+
+
+class PainPointsResult(StrictResult):
+    pain_points: List[PainPointItem]
+
+
+class NotableQuoteItem(StrictResult):
+    text: str
+    speaker: Optional[str]
+    confidence: float = Field(..., ge=0.0, le=1.0)
+
+
+class NotableQuotesResult(StrictResult):
+    notable_quotes: List[NotableQuoteItem]

@@ -69,9 +69,12 @@ async def test_vector_fragment_rows_scopes_to_project():
     rows = await reader.vector_fragment_rows(session, "proj-1", "fragment_embedding_m", [0.1], 5)
     assert rows[0]["fragment_id"] == "f1"
     q = session.last_query
-    assert "CALL db.index.vector.queryNodes($index_name, $k, $vector)" in q
+    assert "CALL db.index.vector.queryNodes($index_name, $fetch_k, $vector)" in q
     assert "(:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->" in q
+    assert "LIMIT $k" in q
     assert session.last_params["index_name"] == "fragment_embedding_m"
+    assert session.last_params["fetch_k"] == 5 * reader.OVERFETCH_FACTOR
+    assert session.last_params["k"] == 5
 
 
 @pytest.mark.asyncio
@@ -81,6 +84,10 @@ async def test_vector_utterance_rows_expands_to_member_fragments():
     q = session.last_query
     assert "PART_OF_UTTERANCE" in q
     assert "f.sentence_id AS fragment_id" in q
+    assert "CALL db.index.vector.queryNodes($index_name, $fetch_k, $vector)" in q
+    assert "LIMIT $k" in q
+    assert session.last_params["fetch_k"] == 5 * reader.OVERFETCH_FACTOR
+    assert session.last_params["k"] == 5
 
 
 @pytest.mark.asyncio
@@ -89,12 +96,30 @@ async def test_fulltext_rows_uses_named_index_and_scopes_to_project():
     await reader.fulltext_rows(session, "proj-1", "vendor timeline", 5)
     q = session.last_query
     assert "db.index.fulltext.queryNodes('fragment_text_ft'" in q
+    assert "{limit: $fetch_k}" in q
     assert "(:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->" in q
+    assert "LIMIT $k" in q
+    assert session.last_params["fetch_k"] == 5 * reader.OVERFETCH_FACTOR
+    assert session.last_params["k"] == 5
 
 
 def test_sanitize_fulltext_query_strips_lucene_specials():
     assert reader.sanitize_fulltext_query('who said "X+Y" (really)?') == "who said X Y really"
     assert reader.sanitize_fulltext_query("///***") == ""
+
+
+def test_sanitize_keeps_unicode_word_chars():
+    assert reader.sanitize_fulltext_query("Où est Müller?") == "Où est Müller"
+    assert reader.sanitize_fulltext_query("café + résumé") == "café résumé"
+
+
+def test_sanitize_still_strips_lucene_specials():
+    result = reader.sanitize_fulltext_query('a:b AND (c || d) "e"~2^')
+    assert result == "a b AND c d e 2"
+    lucene_specials = ['+', '-', '&&', '||', '!', '(', ')', '{', '}',
+                       '[', ']', '^', '"', '~', '*', '?', ':', '\\', '/']
+    for token in lucene_specials:
+        assert token not in result
 
 
 @pytest.mark.asyncio

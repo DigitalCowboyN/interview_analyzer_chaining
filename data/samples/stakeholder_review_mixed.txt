@@ -1,0 +1,75 @@
+---
+title: Ledgerline Q1 Stakeholder Review
+project: ledgerline-team
+date: 2026-04-15
+participants: [Jordan Alvarez, Priya Nandan]
+---
+Priya Nandan: Thanks for joining, everyone. This is our Q1 stakeholder review for Ledgerline. Jordan, you're here representing the power-user advisory panel, welcome back.
+Jordan Alvarez: Happy to be here, glad to give an update from the user side.
+Interviewer: And I'll be running through the questions today on behalf of the exec team, just flag me if anything's unclear.
+Priya Nandan: Sounds good. Let's start with the categorization work. Jordan, has the persistent-memory fix from Q2 last year actually held up for you?
+Jordan Alvarez: Mostly, yeah. I still see the occasional miscategorized coffee shop, but it doesn't repeat the next month anymore, so that's the big win.
+Priya Nandan: That matches what we're seeing in the support ticket volume, it's down about thirty percent quarter over quarter.
+Guest: Can I jump in here? I'm one of the newer power users on the panel, and I'd echo that, categorization feels noticeably more reliable than when I started.
+Interviewer: Good to hear from both perspectives. Let's move to the range-budget feature, since that shipped in Q1. Jordan, any experience with it yet?
+Jordan Alvarez: I turned it on for my utilities category right away, it's been great honestly. My electric bill doesn't trigger the over-budget flag every summer anymore.
+Priya Nandan: That's exactly the use case we designed it for. Guest, have you tried it?
+Guest: Not yet, actually, I didn't realize it existed. Is it opt-in?
+Priya Nandan: It is, it's buried in the category settings right now, we're planning to surface it more prominently in the next release.
+Interviewer: Noted, that's useful feedback on discoverability. Let's talk about the transaction list view. Jordan, how's that working for you?
+Jordan Alvarez: It's the feature I use the most now, honestly. Being able to sort a category by amount instead of tapping through one at a time saved me a huge amount of time on my Sunday reviews.
+Guest: I use it too, though I wish it supported filtering by merchant name, not just by amount.
+Priya Nandan: That's a good ask, let's log that as a follow-up for the panel to weigh in on.
+Interviewer: Moving on, let's cover acme corp's broader platform priorities for the year, since Ledgerline sits under that umbrella.
+Priya Nandan: Right, so acme corp as a whole is investing in sync reliability across all their financial products this year, Ledgerline included.
+Jordan Alvarez: Good, because sync reliability is actually the thing I worry about most now that categorization's improved. If a transaction doesn't show up for a day, I start second-guessing the whole budget number.
+Guest: Agreed, sync gaps erode trust fast, even a short one.
+Priya Nandan: That's consistent with what we've heard elsewhere, sync reliability is officially one of our two Q2 objectives again this year.
+Interviewer: Let's talk pricing for a moment, since that's come up in a few tickets. Jordan, any thoughts from the panel on the current tiers?
+Jordan Alvarez: Personally I'm fine with the free tier, but a few people on the panel who manage shared household budgets have asked for a mid-tier option between free and the business plan.
+Priya Nandan: We've discussed that internally too, it's on the roadmap for consideration but nothing decided yet.
+Guest: I'd be one of those people asking for a mid-tier, for what it's worth. My partner and I share an account and the business tier feels like overkill for two people.
+Interviewer: Good context, I'll make sure that's captured in the notes. Let's talk about the notification threshold request from the last review cycle. Did that ship?
+Priya Nandan: It did, in February. Users can now set a minimum dollar amount before getting a push notification.
+Jordan Alvarez: I set mine to twenty dollars, it's cut my notifications by more than half. Much better.
+Guest: Same here, I went with fifteen dollars, works well for my spending patterns.
+Interviewer: Great, that's a clean win to report up. Let's talk about the pre-due-date bill alert, another item from last cycle.
+Priya Nandan: That one's still in development, targeting a Q2 release. It's more complex than the notification threshold because it needs to predict recurring bill dates from transaction history.
+Jordan Alvarez: Makes sense, that's a harder problem. I can wait, as long as it's coming.
+Guest: Same, no urgency from me on that one.
+Interviewer: Understood. Let's shift to onboarding. Acme corp mentioned a redesigned onboarding flow, any update?
+Priya Nandan: Yes, the bank-link confirmation step that used to confuse new users got a clearer prompt in the March release.
+Jordan Alvarez: I didn't hit that issue myself since I onboarded a while back, but I've heard from newer panel members that it's smoother now.
+Guest: I onboarded in March actually, right after the change, and it was clear to me, no confusion on the bank-link step.
+Priya Nandan: Good, that's the outcome we were hoping for.
+Interviewer: Let's cover mobile app performance for a moment, since that came up in a couple of tickets last quarter.
+Jordan Alvarez: For me it's been solid, no crashes, loads fast. I check it most mornings on my commute.
+Priya Nandan: Good, our crash-rate metrics are down significantly since the February release.
+Guest: I did have one crash a few weeks back, right after opening the transaction list view, but it hasn't happened since.
+Priya Nandan: That's useful, can you send me the date if you remember it, I'd like to cross-reference it against our crash logs.
+Guest: I'll dig through my notifications and find it.
+Interviewer: Thanks. Let's talk exporting and reporting. Jordan, do you export data out of Ledgerline?
+Jordan Alvarez: Occasionally, mostly around tax season, I'll pull a CSV of the year's transactions.
+Priya Nandan: That workflow should be unchanged this year, we haven't touched the export format.
+Guest: I've never exported anything, honestly didn't know it was possible until just now.
+Interviewer: Good to flag, maybe a discoverability issue there too, similar to the range-budget one.
+Priya Nandan: Agreed, we should look at surfacing export more clearly, possibly in the same settings-visibility pass as range budgets.
+Jordan Alvarez: That would help. I only found the export option because a friend told me where to look.
+Interviewer: Let's talk about acme corp's support response times, since that's been tracked separately this quarter.
+Priya Nandan: Average first-response time is down to under four hours, from about a day and a half last year.
+Jordan Alvarez: I noticed that actually, I emailed about a sync gap last month and got a reply same day.
+Guest: Same, my one support ticket this quarter got resolved within a day.
+Interviewer: That's a strong improvement to report up. Anything else on support before we move on?
+Jordan Alvarez: Just that the support agent actually understood the categorization-memory issue right away, didn't have to re-explain it from scratch.
+Priya Nandan: Good, that means our internal documentation for support agents is doing its job.
+Interviewer: Let's do a quick round on overall satisfaction before we close out. Jordan, one to ten, how are you feeling about Ledgerline this quarter?
+Jordan Alvarez: I'd say an eight. Categorization memory and the range budgets addressed my two biggest complaints. Sync reliability keeps it from being a nine or ten.
+Priya Nandan: That's a fair and specific answer, thank you.
+Guest: I'd say a seven from me, mostly because of the discoverability issue with range budgets, once that's more visible I think it goes up.
+Interviewer: Great, both very actionable. Any final asks before we close the review?
+Jordan Alvarez: Just the merchant-name filtering Guest mentioned earlier, that would be my one ask.
+Guest: And the mid-tier pricing option, that's mine.
+Priya Nandan: Got it, both logged. Thanks everyone, this was a genuinely productive session.
+Jordan Alvarez: Thanks Priya, talk next quarter.
+Guest: Thanks all, take care.
+Interviewer: Appreciate everyone's time today, that's a wrap.

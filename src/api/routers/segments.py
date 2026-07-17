@@ -40,6 +40,13 @@ async def _load_interview(interview_id: str) -> Tuple[InterviewRepository, Inter
 async def list_segments(interview_id: str):
     """Topic segments with their fragment ranges, in transcript order."""
     async with await Neo4jConnectionManager.get_session() as session:
+        exists = await session.run(
+            "MATCH (i:Interview {interview_id: $interview_id}) RETURN count(i) AS found",
+            interview_id=interview_id,
+        )
+        record = await exists.single()
+        if not (record and record["found"]):
+            raise HTTPException(status_code=404, detail=f"Interview {interview_id} not found")
         rows = await reader.segment_rows(session, interview_id)
     return {"segments": rows}
 

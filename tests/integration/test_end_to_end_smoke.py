@@ -191,6 +191,7 @@ async def test_full_pipeline_ingest_enrich_segments_lens_resolve_export(tmp_path
         return_value=SpecOutcome(data=SEGMENTS_PROPOSAL, provider="anthropic", model="haiku")
     )
     embedder = MagicMock(model_name="smoke-embed", dim=3)
+    # values unused by assertions — only counts/labels are asserted
     embedder.embed = AsyncMock(side_effect=lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
 
     monkeypatch.setattr(EnrichmentOrchestrator, "_build_executor", lambda self: executor)

@@ -7,11 +7,18 @@ import sys
 from src.ask.engine import AskEngine, SynthesisUnavailable
 
 
+def _positive_int(value: str) -> int:
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError("--top-k must be >= 1")
+    return n
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ask a project a question (M4.6)")
     parser.add_argument("project_id")
     parser.add_argument("question")
-    parser.add_argument("--top-k", type=int, default=12)
+    parser.add_argument("--top-k", type=_positive_int, default=12)
     args = parser.parse_args()
 
     try:

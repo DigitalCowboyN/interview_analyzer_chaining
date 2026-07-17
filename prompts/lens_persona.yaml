@@ -1,0 +1,85 @@
+traits:
+  prompt: |
+    The full transcript of a conversation follows, speaker-labeled (labels like
+    [S1] identify who is talking). Extract observable PERSONA TRAITS — durable
+    characteristics, attitudes, or dispositions a speaker exhibits across the
+    conversation ("detail-oriented", "skeptical of new tools", "collaborative").
+    A trait is a characterization of the person, not a one-off statement they
+    made.
+
+    For each trait, set speaker to that speaker's display name as it appears
+    in the transcript labels (e.g. "Alice"); if you cannot attribute the trait
+    to a specific speaker, set speaker to null.
+
+    Format: {{"traits": [{{"text": "<the trait>", "speaker": "<name or null>", "confidence": <number between 0 and 1>}}]}}
+    If there are no discernible traits, return {{"traits": []}}.
+
+    Transcript:
+    """
+    {sentence}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+goals:
+  prompt: |
+    The following is one speaker's complete utterance from a conversation.
+    Extract any GOALS — what the speaker is trying to achieve, stated or
+    clearly implied in this utterance ("get the migration done by Q3", "find
+    a cheaper vendor"). A goal is something the speaker wants, not something
+    they already have or a fact they are stating.
+
+    Set speaker to that speaker's display name as it appears in the transcript
+    labels; if the utterance is unattributed, set speaker to null.
+
+    Format: {{"goals": [{{"text": "<the goal>", "speaker": "<name or null>", "confidence": <number between 0 and 1>}}]}}
+    If there are none, return {{"goals": []}}.
+
+    Utterance:
+    """
+    {sentence}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+pain_points:
+  prompt: |
+    The following is one speaker's complete utterance from a conversation.
+    Extract any PAIN POINTS — frustrations, obstacles, or difficulties the
+    speaker expresses ("the current process is too slow", "I can't get
+    approval in time"). A pain point is a problem the speaker is experiencing,
+    not a goal or a neutral fact.
+
+    Set speaker to that speaker's display name as it appears in the transcript
+    labels; if the utterance is unattributed, set speaker to null.
+
+    Format: {{"pain_points": [{{"text": "<the pain point>", "speaker": "<name or null>", "confidence": <number between 0 and 1>}}]}}
+    If there are none, return {{"pain_points": []}}.
+
+    Utterance:
+    """
+    {sentence}
+    """
+
+    Provide your response explicitly formatted as JSON.
+
+notable_quotes:
+  prompt: |
+    The following is one speaker's complete utterance from a conversation.
+    Extract any NOTABLE QUOTES — verbatim, self-contained, quotable statements
+    worth surfacing on their own. The text MUST be copied exactly from the
+    utterance, with no paraphrasing, summarizing, or trimming beyond
+    selecting a self-contained span.
+
+    Set speaker to that speaker's display name as it appears in the transcript
+    labels; if the utterance is unattributed, set speaker to null.
+
+    Format: {{"notable_quotes": [{{"text": "<verbatim quote>", "speaker": "<name or null>", "confidence": <number between 0 and 1>}}]}}
+    If there are none, return {{"notable_quotes": []}}.
+
+    Utterance:
+    """
+    {sentence}
+    """
+
+    Provide your response explicitly formatted as JSON.

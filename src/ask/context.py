@@ -20,6 +20,7 @@ def build_blocks(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             {
                 "fragment_id": row["fragment_id"],
                 "interview_id": row["interview_id"],
+                "title": row.get("title"),
                 "quote": row["text"],
                 "speaker_line": speaker_line,
                 "utterance_text": utterance_text,
@@ -34,8 +35,9 @@ def _block_lines(block: Dict[str, Any]) -> str:
     topics = ", ".join(block["segment_topics"]) or "-"
     entities = ", ".join(block["entities"]) or "-"
     return (
-        f"[{block['fragment_id']}] {block['speaker_line']} "
-        f"(interview {block['interview_id']}; topics: {topics}; entities: {entities})\n"
+        f"[{block['fragment_id']}] {block['speaker_line']}"
+        + (f" — {block['title']}" if block.get("title") else "")
+        + f" (interview {block['interview_id']}; topics: {topics}; entities: {entities})\n"
         f"{block['utterance_text']}"
     )
 

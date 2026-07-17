@@ -2,9 +2,9 @@
 
 An event-sourced system for processing interview transcripts with AI-powered multi-dimensional sentence analysis.
 
-> **Status:** M4.4 Complete (Layer 5: OKF export, front-matter capture, query endpoints) | **Tests:** 997 passing | **Coverage:** 90.8%
+> **Status:** M4.7 Complete (Hardening & operational readiness: schema, deploy path, ask/resolution hardening, persona lens, content corpus)
 >
-> See [ROADMAP.md](docs/ROADMAP.md) for milestones and [docs/architecture/](docs/architecture/) for detailed diagrams.
+> See [ROADMAP.md](docs/ROADMAP.md) for milestones, exact test/coverage stats, and [docs/architecture/](docs/architecture/) for detailed diagrams.
 
 ## What It Does
 
@@ -20,9 +20,11 @@ An event-sourced system for processing interview transcripts with AI-powered mul
 10. **Exposes** REST API for querying and user corrections (edits, speakers, stitches, lens items)
 
 **Run it:** `python -m src.ingestion <file> --enrich` (ingest + enrich in one shot), or `make ingest FILE=<path>`.
-Then apply a lens: `python -m src.lens <interview_id> meeting_minutes`.
+Then apply a lens: `python -m src.lens <interview_id> meeting_minutes` (or `persona` — a second lens, same generic engine, zero per-lens code).
 Then export it: `python -m src.export <interview_id> meeting_minutes`.
 Then ask it a question: `python -m src.ask <project_id> "What did they decide about Acme Corp?"` (or `POST /ask/{project_id}`).
+
+Want sample content to try any of this against? See `data/samples/` (`MANIFEST.md` maps each transcript to the capability it exercises — mature labeled interviews, mixed/adversarial speaker labeling, and raw unlabeled transcripts).
 
 ## Architecture
 
@@ -79,6 +81,11 @@ EOF
 docker compose up -d
 ```
 
+The projection service creates its Neo4j schema (indexes/constraints) automatically at
+startup and fails fast if Neo4j is unreachable. To apply it standalone (e.g. before the
+service is up), run `python -m src.projections.ensure_schema`. `make deployed-smoke`
+proves the fully dockerized ingest → projection path end-to-end against real containers.
+
 ### Access Points
 
 | Service | URL |
@@ -117,7 +124,7 @@ docs/
 ├── onboarding/      # Getting started guides
 └── ROADMAP.md       # Project status and milestones
 
-tests/               # 691 tests (unit, integration, e2e)
+tests/               # unit, integration, e2e (counts in ROADMAP.md)
 ```
 
 ## API Endpoints

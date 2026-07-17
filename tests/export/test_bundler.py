@@ -150,3 +150,62 @@ async def test_failed_write_preserves_previous_bundle(tmp_path, monkeypatch):
         monkeypatch.setattr(Path, "write_text", real_write)
 
     assert (bundle / "index.md").read_text() == original_index  # old bundle intact
+
+
+def _staging_dirs(tmp_path):
+    return [p for p in tmp_path.iterdir() if ".staging-" in p.name]
+
+
+@pytest.mark.asyncio
+async def test_consecutive_writes_leave_no_staging_residue(tmp_path):
+    patches = patch_world(make_interview(), PROJECTED)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8]:
+        await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+        await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+    assert _staging_dirs(tmp_path) == []
+
+
+@pytest.mark.asyncio
+async def test_staging_dir_name_is_unique_per_write(tmp_path, monkeypatch):
+    """Two writes must not stage under the same fixed sibling path -- a fixed
+    name lets concurrent exports collide (one export's in-progress staging
+    dir gets rmtree'd by the other). Capture the staging path each write
+    actually uses and assert they differ."""
+    patches = patch_world(make_interview(), PROJECTED)
+    seen_staging_paths = []
+    real_rename = Path.rename
+
+    def spy_rename(self, target):
+        seen_staging_paths.append(self)
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", spy_rename)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8]:
+        await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+        await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+
+    assert len(seen_staging_paths) == 2
+    assert seen_staging_paths[0].name != seen_staging_paths[1].name
+
+
+@pytest.mark.asyncio
+async def test_failed_write_removes_its_own_staging_dir(tmp_path, monkeypatch):
+    patches = patch_world(make_interview(), PROJECTED)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8]:
+        await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+
+        real_write = Path.write_text
+        calls = {"n": 0}
+
+        def flaky_write(self, *a, **k):
+            calls["n"] += 1
+            if calls["n"] >= 3:
+                raise OSError("disk full")
+            return real_write(self, *a, **k)
+
+        monkeypatch.setattr(Path, "write_text", flaky_write)
+        with pytest.raises(OSError):
+            await OkfExporter().export(IID, "meeting_minutes", out_dir=str(tmp_path))
+        monkeypatch.setattr(Path, "write_text", real_write)
+
+    assert _staging_dirs(tmp_path) == []

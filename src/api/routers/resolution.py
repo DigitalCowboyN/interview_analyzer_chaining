@@ -7,7 +7,7 @@ Speakers-router pattern: load aggregate, call domain method, save; 202
 from typing import List, Optional
 
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.events.envelope import Actor, ActorType
 from src.events.project_events import canonical_entity_id, project_aggregate_id
@@ -37,6 +37,10 @@ class UnlinkRequest(BaseModel):
     interview_id: str
     speaker_id: str
     note: Optional[str] = None
+
+
+class AliasRequest(BaseModel):
+    surface: str = Field(..., min_length=1)
 
 
 def _human_actor(x_user_id: Optional[str]) -> Actor:
@@ -91,6 +95,26 @@ async def split_entity(
         project.split_entity(
             project_id, canonical_id, body.surfaces, new_canonical_id, body.new_name,
             actor=_human_actor(x_user_id),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    await repo.save(project)
+    return _accepted(project.version)
+
+
+@router.post("/resolution/{project_id}/entities/{canonical_id}/aliases", status_code=202)
+async def add_alias(
+    project_id: str,
+    canonical_id: str,
+    body: AliasRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+):
+    """Human correction: attach a surface to a canonical (works on locked ones)."""
+    repo, project = await _load_project(project_id)
+    try:
+        project.add_entity_alias(
+            project_id, canonical_id, body.surface,
+            method="human", confidence=1.0, actor=_human_actor(x_user_id),
         )
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
