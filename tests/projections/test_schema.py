@@ -30,6 +30,10 @@ EXPECTED_SUBSTRINGS = [
     "FOR (p:Person) ON (p.person_id)",
     "FOR (s:Segment) ON (s.segment_id)",
     "FOR (n:LensItem) ON (n.item_id)",
+    # fulltext + aggregate_id handler MATCH anchors (final review addition)
+    "CREATE FULLTEXT INDEX fragment_text_ft IF NOT EXISTS FOR (f:Fragment) ON EACH [f.text]",
+    "CREATE INDEX fragment_aggregate_id IF NOT EXISTS FOR (f:Fragment) ON (f.aggregate_id)",
+    "CREATE INDEX interview_aggregate_id IF NOT EXISTS FOR (i:Interview) ON (i.aggregate_id)",
 ]
 
 

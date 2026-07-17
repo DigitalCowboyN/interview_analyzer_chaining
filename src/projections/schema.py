@@ -42,6 +42,13 @@ SCHEMA_DDL: List[str] = [
     "CREATE INDEX person_person_id IF NOT EXISTS FOR (p:Person) ON (p.person_id)",
     "CREATE INDEX segment_segment_id IF NOT EXISTS FOR (s:Segment) ON (s.segment_id)",
     "CREATE INDEX lens_item_item_id IF NOT EXISTS FOR (n:LensItem) ON (n.item_id)",
+    # Fulltext index for the ask surface's free-text search. The name here
+    # must stay in sync with FULLTEXT_INDEX in src/ask/reader.py (kept as a
+    # string literal, not imported, to avoid a schema -> ask dependency).
+    "CREATE FULLTEXT INDEX fragment_text_ft IF NOT EXISTS FOR (f:Fragment) ON EACH [f.text]",
+    # handler MATCH anchors (see sentence_handlers.py aggregate_id usage)
+    "CREATE INDEX fragment_aggregate_id IF NOT EXISTS FOR (f:Fragment) ON (f.aggregate_id)",
+    "CREATE INDEX interview_aggregate_id IF NOT EXISTS FOR (i:Interview) ON (i.aggregate_id)",
 ]
 
 

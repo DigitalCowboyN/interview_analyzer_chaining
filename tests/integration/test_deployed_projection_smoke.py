@@ -56,7 +56,12 @@ def _get_sentence_group_info() -> dict:
     """
     response = requests.get(SENTENCE_GROUP_INFO_URL, auth=ESDB_HTTP_AUTH, timeout=10)
     if response.status_code == 404:
-        return {"lastProcessedEventNumber": -1, "parkedMessageCount": 0, "totalItemsProcessed": 0}
+        return {
+            "lastProcessedEventNumber": -1,
+            "parkedMessageCount": 0,
+            "totalItemsProcessed": 0,
+            "totalInFlightMessages": 0,
+        }
     response.raise_for_status()
     return response.json()
 
@@ -66,29 +71,38 @@ async def _poll_consumer_group_progress(baseline_total_processed: int):
     Poll the Sentence consumer group's info (up to CHECKPOINT_POLL_TIMEOUT_S)
     until `totalItemsProcessed` advances past its pre-ingest baseline.
 
-    `totalItemsProcessed` is a live per-ack counter -- unlike
+    `totalItemsProcessed` counts DELIVERIES, not acks -- a redelivery
+    (e.g. from a failed or wrong-id ack) also advances it, so this alone
+    cannot prove acks are succeeding. It's still useful as a liveness
+    signal (the group is receiving/processing events at all), unlike
     `lastProcessedEventNumber`/`lastCheckpointedEventPosition`, which are
     only written when esdbclient's persistent-subscription checkpoint
     logic fires (batched: `minCheckPointCount: 10` acks OR
     `checkPointAfterMilliseconds: 2000` -- see `_ensure_subscription_exists`
-    config), so on a low-volume smoke run it can legitimately lag behind
+    config), so on a low-volume smoke run those can legitimately lag behind
     real, successful acks by one run's worth of events. Polling here
     (rather than a single point-in-time check) absorbs that checkpoint
-    latency while still proving forward progress.
+    latency while still proving forward progress. The deterministic
+    ack-id regression guard lives in
+    tests/projections/test_subscription_manager_unit.py, not here.
     """
     deadline = asyncio.get_running_loop().time() + CHECKPOINT_POLL_TIMEOUT_S
     info = _get_sentence_group_info()
     while asyncio.get_running_loop().time() < deadline:
         info = _get_sentence_group_info()
-        if info["totalItemsProcessed"] > baseline_total_processed:
+        if (
+            info["totalItemsProcessed"] > baseline_total_processed
+            and info["totalInFlightMessages"] == 0
+        ):
             return info
         await asyncio.sleep(CHECKPOINT_POLL_INTERVAL_S)
     pytest.fail(
-        f"Sentence consumer group's totalItemsProcessed did not advance past "
-        f"its pre-ingest baseline ({baseline_total_processed}) within "
-        f"{CHECKPOINT_POLL_TIMEOUT_S}s: still at {info['totalItemsProcessed']}. "
-        f"Events are being redelivered/reprocessed but never acked -- check "
-        f"`docker logs interview_analyzer_projection_service`."
+        f"Sentence consumer group did not settle within "
+        f"{CHECKPOINT_POLL_TIMEOUT_S}s: totalItemsProcessed="
+        f"{info['totalItemsProcessed']} (baseline {baseline_total_processed}), "
+        f"totalInFlightMessages={info['totalInFlightMessages']}. Events may be "
+        f"stuck in-flight (never acked) -- check `docker logs "
+        f"interview_analyzer_projection_service`."
     )
 
 
@@ -173,18 +187,18 @@ async def test_dockerized_projection_service_delivers_sentences_to_neo4j(tmp_pat
             dual_label_record = await dual_label.single()
             assert dual_label_record["mismatched"] == 0
 
-            # Consumer-group progress proof (guards against the C1 ack-id
-            # defect class): now that Neo4j shows the expected Fragment
-            # count, the Sentence subscription's server-side ack tracking
-            # must actually have advanced, and nothing should have been
-            # parked. If acks are silently failing (e.g. acking the wrong
-            # id), events still get delivered/projected via at-least-once
-            # redelivery + idempotent handlers, but totalItemsProcessed
-            # never moves and parkedMessageCount climbs -- so this
-            # assertion catches that defect class even when the Neo4j-side
-            # assertions above would otherwise pass. Polled (rather than a
-            # single point-in-time read) because totalItemsProcessed can
-            # trail the actual acks by a beat under load.
+            # Consumer-group settlement proof: now that Neo4j shows the
+            # expected Fragment count, the Sentence subscription's delivery
+            # counter must have advanced past baseline, nothing left
+            # in-flight, and nothing parked. Note totalItemsProcessed counts
+            # DELIVERIES (a redelivery advances it too), so this does not by
+            # itself distinguish "acked once" from "acked never, delivered
+            # repeatedly" -- it's a liveness/settlement check, not an ack-id
+            # regression guard. The deterministic ack-id regression guard
+            # (acking `event.ack_id` vs. `event.id` on resolved link events)
+            # lives in tests/projections/test_subscription_manager_unit.py.
+            # Polled (rather than a single point-in-time read) because these
+            # counters can trail the actual acks by a beat under load.
             post_ingest_info = await _poll_consumer_group_progress(baseline_total_processed)
             assert post_ingest_info["parkedMessageCount"] == 0, (
                 f"Sentence consumer group has parked messages: "
@@ -203,8 +217,12 @@ async def test_dockerized_projection_service_delivers_sentences_to_neo4j(tmp_pat
                 """
                 MATCH (i:Interview {interview_id: $iid})
                 OPTIONAL MATCH (i)-[:HAS_SENTENCE]->(f:Fragment)
-                DETACH DELETE i, f
+                OPTIONAL MATCH (i)-[:HAS_PARTICIPANT]->(sp:Speaker)
+                OPTIONAL MATCH (f)-[:PART_OF_UTTERANCE]->(u:Utterance)
+                MATCH (p:Project {project_id: $pid})
+                DETACH DELETE i, f, sp, u, p
                 """,
                 iid=interview_id,
+                pid=project_id,
             )
         await driver.close()

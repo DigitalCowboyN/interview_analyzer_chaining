@@ -124,7 +124,7 @@ docs/
 ├── onboarding/      # Getting started guides
 └── ROADMAP.md       # Project status and milestones
 
-tests/               # 691 tests (unit, integration, e2e)
+tests/               # unit, integration, e2e (counts in ROADMAP.md)
 ```
 
 ## API Endpoints

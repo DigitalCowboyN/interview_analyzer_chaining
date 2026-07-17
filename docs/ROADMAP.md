@@ -54,6 +54,10 @@ exercising the pipeline against realistic, varied input.
       the Layer 4 overlay keys) applied at projection-service startup
       (fail-fast `SystemExit` on dead Neo4j) + `python -m
       src.projections.ensure_schema` CLI
+      - Final review (2026-07-17) added `fragment_text_ft` (fulltext,
+        name kept in sync with `FULLTEXT_INDEX` in `src/ask/reader.py`) plus
+        `fragment_aggregate_id`/`interview_aggregate_id` MATCH-anchor
+        indexes — now 26 statements
 - [x] Task 2: Compose `neo4j` healthcheck (`cypher-shell`) + `service_healthy`
       gating for `app`/`worker`/`projection-service`
 - [x] Task 3: Deployed-path smoke (`make deployed-smoke`,
@@ -848,6 +852,14 @@ limitation); OKF export of lens outputs (M4.4).
 - [x] Test-strength nicety: engine tests can't distinguish the
       ValidationError-vs-generic-Exception branch order in synthesis error
       handling; assert on the distinct messages → closed by M4.7 Task 5
+
+**From M4.7 final review (2026-07-17):**
+- [ ] Subscription concurrency regression test fails-by-hang without a
+      `pytest-timeout` dependency — add the dependency (or restructure the
+      test to fail fast some other way) someday
+- [ ] `SubscriptionManager`'s sentinel-exhaustion reconnect path has no
+      backoff — the exception path waits 5s before reconnecting, but a
+      clean sentinel exhaustion breaks out and reconnects immediately (hot)
 
 **Feature deferrals (each waits for a real need or its milestone):**
 - [x] ~~Persona lens~~ → done via M4.7 Task 8 (`lenses/persona.yaml` +
