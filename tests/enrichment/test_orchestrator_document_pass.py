@@ -8,7 +8,7 @@ import pytest
 from src.enrichment.executor import SpecOutcome
 from src.enrichment.models import ExtractorSpec
 from src.enrichment.orchestrator import EnrichmentOrchestrator
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Interview, Fragment
 from src.events.interview_events import segment_id_for
 
 IID = "22222222-2222-2222-2222-222222222222"
@@ -31,7 +31,7 @@ def build_world():
     sentences = []
     texts = ["Let's discuss roadmap.", "Roadmap continues.", "Now budget."]
     for i, fid in enumerate(f_ids):
-        s = Sentence(fid)
+        s = Fragment(fid)
         s.create(interview_id=IID, index=i, text=texts[i])
         s.attribute_speaker(SP1, 0.9, "inference")
         s.generate_analysis(model="haiku", model_version="m4.2", classification={"purpose": "Q"})
@@ -55,10 +55,10 @@ def make_repos(interview, sentences):
     interview_repo = MagicMock()
     interview_repo.load = AsyncMock(return_value=interview)
     interview_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
-    sentence_repo = MagicMock()
-    sentence_repo.load = AsyncMock(side_effect=lambda sid: sentences.get(sid))
-    sentence_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
-    return interview_repo, sentence_repo
+    fragment_repo = MagicMock()
+    fragment_repo.load = AsyncMock(side_effect=lambda sid: sentences.get(sid))
+    fragment_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
+    return interview_repo, fragment_repo
 
 
 def make_executor(document_specs, run_spec_on_text_return):
@@ -77,9 +77,9 @@ def make_embedder():
 
 
 async def run_with(interview, sentences, executor, embedder, force=False):
-    interview_repo, sentence_repo = make_repos(interview, sentences)
+    interview_repo, fragment_repo = make_repos(interview, sentences)
     with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch("src.enrichment.orchestrator.get_fragment_repository", return_value=fragment_repo), \
          patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
          patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
         orchestrator = EnrichmentOrchestrator()
@@ -140,9 +140,9 @@ async def test_invalid_proposal_drops_all_and_flags():
     executor = make_executor([TOPIC_SEGMENTS_SPEC], canned)
     embedder = make_embedder()
 
-    interview_repo, sentence_repo = make_repos(interview, sentences)
+    interview_repo, fragment_repo = make_repos(interview, sentences)
     with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch("src.enrichment.orchestrator.get_fragment_repository", return_value=fragment_repo), \
          patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
          patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
         orchestrator = EnrichmentOrchestrator()

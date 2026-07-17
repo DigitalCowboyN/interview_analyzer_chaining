@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.enrichment.executor import SpecOutcome
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Interview, Fragment
 from src.lens.engine import LensEngine
 
 IID = "22222222-2222-2222-2222-222222222222"
@@ -19,7 +19,7 @@ def build_world():
     f_ids = [str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{IID}:{i}")) for i in range(2)]
     sentences = {}
     for i, fid in enumerate(f_ids):
-        s = Sentence(fid)
+        s = Fragment(fid)
         s.create(interview_id=IID, index=i, text=f"Fragment {i}.")
         s.attribute_speaker(SP1, 0.9, "inference")
         s.mark_events_as_committed()
@@ -45,13 +45,13 @@ def patch_engine(interview, sentences):
     interview_repo = MagicMock()
     interview_repo.load = AsyncMock(return_value=interview)
     interview_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
-    sentence_repo = MagicMock()
-    sentence_repo.load = AsyncMock(side_effect=lambda sid: sentences.get(sid))
+    fragment_repo = MagicMock()
+    fragment_repo.load = AsyncMock(side_effect=lambda sid: sentences.get(sid))
     executor = MagicMock()
     executor.run_spec_on_text = AsyncMock(side_effect=lambda spec, text, ctx=None: outcome_for(spec.name))
     return (
         patch("src.lens.engine.get_interview_repository", return_value=interview_repo),
-        patch("src.lens.engine.get_sentence_repository", return_value=sentence_repo),
+        patch("src.lens.engine.get_fragment_repository", return_value=fragment_repo),
         patch.object(LensEngine, "_build_executor", return_value=executor),
         executor,
     )

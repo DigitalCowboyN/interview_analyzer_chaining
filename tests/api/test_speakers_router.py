@@ -69,7 +69,7 @@ def test_reattribute_fragment_returns_202(client):
     interview_repo = make_repo(make_interview_mock())
     repo = make_repo(sentence)
     with patch("src.api.routers.speakers.get_interview_repository", return_value=interview_repo), \
-         patch("src.api.routers.speakers.get_sentence_repository", return_value=repo):
+         patch("src.api.routers.speakers.get_fragment_repository", return_value=repo):
         resp = client.post(
             f"/speakers/{IID}/fragments/3/reattribute", json={"new_speaker_id": SP2}
         )
@@ -81,7 +81,7 @@ def test_reattribute_missing_fragment_returns_404(client):
     interview_repo = make_repo(make_interview_mock())
     repo = make_repo(None)
     with patch("src.api.routers.speakers.get_interview_repository", return_value=interview_repo), \
-         patch("src.api.routers.speakers.get_sentence_repository", return_value=repo):
+         patch("src.api.routers.speakers.get_fragment_repository", return_value=repo):
         resp = client.post(
             f"/speakers/{IID}/fragments/3/reattribute", json={"new_speaker_id": SP2}
         )
@@ -90,14 +90,14 @@ def test_reattribute_missing_fragment_returns_404(client):
 
 def test_reattribute_missing_interview_returns_404(client):
     interview_repo = make_repo(None)
-    sentence_repo = make_repo(MagicMock())
+    fragment_repo = make_repo(MagicMock())
     with patch("src.api.routers.speakers.get_interview_repository", return_value=interview_repo), \
-         patch("src.api.routers.speakers.get_sentence_repository", return_value=sentence_repo):
+         patch("src.api.routers.speakers.get_fragment_repository", return_value=fragment_repo):
         resp = client.post(
             f"/speakers/{IID}/fragments/3/reattribute", json={"new_speaker_id": SP2}
         )
     assert resp.status_code == 404
-    sentence_repo.load.assert_not_awaited()
+    fragment_repo.load.assert_not_awaited()
 
 
 def test_rename_domain_error_returns_409(client):
@@ -116,9 +116,9 @@ def test_split_speaker_creates_and_reattributes(client):
     interview_repo = make_repo(interview)
     sentence = MagicMock()
     sentence.version = 1
-    sentence_repo = make_repo(sentence)
+    fragment_repo = make_repo(sentence)
     with patch("src.api.routers.speakers.get_interview_repository", return_value=interview_repo), \
-         patch("src.api.routers.speakers.get_sentence_repository", return_value=sentence_repo):
+         patch("src.api.routers.speakers.get_fragment_repository", return_value=fragment_repo):
         resp = client.post(
             f"/speakers/{IID}/split",
             json={
@@ -165,11 +165,11 @@ def test_split_missing_fragment_aborts_before_any_event(client):
     interview_repo = make_repo(interview)
     sentence = MagicMock()
     sentence.version = 1
-    sentence_repo = MagicMock()
-    sentence_repo.load = AsyncMock(side_effect=[sentence, None])
-    sentence_repo.save = AsyncMock()
+    fragment_repo = MagicMock()
+    fragment_repo.load = AsyncMock(side_effect=[sentence, None])
+    fragment_repo.save = AsyncMock()
     with patch("src.api.routers.speakers.get_interview_repository", return_value=interview_repo), \
-         patch("src.api.routers.speakers.get_sentence_repository", return_value=sentence_repo):
+         patch("src.api.routers.speakers.get_fragment_repository", return_value=fragment_repo):
         resp = client.post(
             f"/speakers/{IID}/split",
             json={
@@ -182,4 +182,4 @@ def test_split_missing_fragment_aborts_before_any_event(client):
     interview.add_speaker.assert_not_called()
     interview_repo.save.assert_not_awaited()
     sentence.reattribute_speaker.assert_not_called()
-    sentence_repo.save.assert_not_awaited()
+    fragment_repo.save.assert_not_awaited()

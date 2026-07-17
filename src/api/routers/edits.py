@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from src.commands.handlers import SentenceCommandHandler
 from src.commands.sentence_commands import EditSentenceCommand, OverrideAnalysisCommand
 from src.events.envelope import Actor, ActorType
-from src.events.repository import SentenceRepository
+from src.events.repository import FragmentRepository
 from src.events.store import EventStoreClient
 from src.utils.logger import get_logger
 
@@ -87,10 +87,10 @@ def get_sentence_command_handler() -> SentenceCommandHandler:
     return SentenceCommandHandler(event_store)
 
 
-def get_sentence_repository() -> SentenceRepository:
-    """Get SentenceRepository instance for loading sentences."""
+def get_fragment_repository() -> FragmentRepository:
+    """Get FragmentRepository instance for loading sentences."""
     event_store = get_event_store()
-    return SentenceRepository(event_store)
+    return FragmentRepository(event_store)
 
 
 def create_actor_from_request(
@@ -328,7 +328,7 @@ async def get_sentence_history(
         )
 
         # Load sentence from repository (which loads all events)
-        repo = get_sentence_repository()
+        repo = get_fragment_repository()
         sentence = await repo.load(sentence_id)
 
         if sentence is None:

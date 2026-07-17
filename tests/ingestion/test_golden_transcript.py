@@ -34,7 +34,7 @@ async def test_crosstalk_excerpt_end_to_end(tmp_path: Path):
     mock_repo.save = AsyncMock(side_effect=fake_save)
 
     with patch("src.ingestion.orchestrator.get_interview_repository", return_value=mock_repo), \
-         patch("src.ingestion.orchestrator.get_sentence_repository", return_value=mock_repo), \
+         patch("src.ingestion.orchestrator.get_fragment_repository", return_value=mock_repo), \
          patch("src.ingestion.speaker_inference.agent") as sp_agent, \
          patch("src.ingestion.stitcher.agent") as st_agent:
         sp_agent.call_model = AsyncMock(return_value=expected_doc["speaker_window_response"])

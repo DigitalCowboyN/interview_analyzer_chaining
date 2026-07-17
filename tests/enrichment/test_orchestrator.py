@@ -5,7 +5,7 @@ import pytest
 
 from src.enrichment.executor import FragmentEnrichment, UtteranceEnrichment
 from src.enrichment.orchestrator import EnrichmentOrchestrator
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Interview, Fragment
 
 IID = "22222222-2222-2222-2222-222222222222"
 SP1 = "33333333-3333-3333-3333-333333333333"
@@ -19,7 +19,7 @@ def build_world(analyzed_indices=()):
     f_ids = [str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{IID}:{i}")) for i in range(2)]
     sentences = []
     for i, fid in enumerate(f_ids):
-        s = Sentence(fid)
+        s = Fragment(fid)
         s.create(interview_id=IID, index=i, text=f"Fragment {i}.")
         s.attribute_speaker(SP1, 0.9, "inference")
         if i in analyzed_indices:
@@ -36,16 +36,16 @@ def make_repos(interview, sentences):
     interview_repo = MagicMock()
     interview_repo.load = AsyncMock(return_value=interview)
     interview_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
-    sentence_repo = MagicMock()
-    sentence_repo.load = AsyncMock(side_effect=lambda sid: sentences.get(sid))
-    sentence_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
-    return interview_repo, sentence_repo
+    fragment_repo = MagicMock()
+    fragment_repo.load = AsyncMock(side_effect=lambda sid: sentences.get(sid))
+    fragment_repo.save = AsyncMock(side_effect=lambda a, **k: a.mark_events_as_committed())
+    return interview_repo, fragment_repo
 
 
 @pytest.mark.asyncio
 async def test_enrich_interview_emits_analysis_entities_claims_embeddings():
     interview, sentences = build_world()
-    interview_repo, sentence_repo = make_repos(interview, sentences)
+    interview_repo, fragment_repo = make_repos(interview, sentences)
 
     executor = MagicMock()
     executor.enrich_fragments = AsyncMock(return_value=[
@@ -65,7 +65,7 @@ async def test_enrich_interview_emits_analysis_entities_claims_embeddings():
     embedder.embed = AsyncMock(return_value=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
 
     with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch("src.enrichment.orchestrator.get_fragment_repository", return_value=fragment_repo), \
          patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
          patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
         orchestrator = EnrichmentOrchestrator()
@@ -84,7 +84,7 @@ async def test_enrich_interview_emits_analysis_entities_claims_embeddings():
 @pytest.mark.asyncio
 async def test_resume_skips_already_analyzed():
     interview, sentences = build_world(analyzed_indices=(0,))
-    interview_repo, sentence_repo = make_repos(interview, sentences)
+    interview_repo, fragment_repo = make_repos(interview, sentences)
 
     executor = MagicMock()
     executor.enrich_fragments = AsyncMock(return_value=[
@@ -96,7 +96,7 @@ async def test_resume_skips_already_analyzed():
     embedder.embed = AsyncMock(return_value=[[0.1, 0.2, 0.3]])
 
     with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch("src.enrichment.orchestrator.get_fragment_repository", return_value=fragment_repo), \
          patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
          patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
         orchestrator = EnrichmentOrchestrator()
@@ -111,7 +111,7 @@ async def test_resume_skips_already_analyzed():
 @pytest.mark.asyncio
 async def test_force_reenriches_all():
     interview, sentences = build_world(analyzed_indices=(0, 1))
-    interview_repo, sentence_repo = make_repos(interview, sentences)
+    interview_repo, fragment_repo = make_repos(interview, sentences)
 
     executor = MagicMock()
     executor.enrich_fragments = AsyncMock(return_value=[
@@ -123,7 +123,7 @@ async def test_force_reenriches_all():
     embedder.embed = AsyncMock(return_value=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
 
     with patch("src.enrichment.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.enrichment.orchestrator.get_sentence_repository", return_value=sentence_repo), \
+         patch("src.enrichment.orchestrator.get_fragment_repository", return_value=fragment_repo), \
          patch.object(EnrichmentOrchestrator, "_build_executor", return_value=executor), \
          patch("src.enrichment.orchestrator.get_embedder", return_value=embedder):
         orchestrator = EnrichmentOrchestrator()

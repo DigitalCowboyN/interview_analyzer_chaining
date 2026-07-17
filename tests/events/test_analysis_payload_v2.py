@@ -1,8 +1,8 @@
-from src.events.aggregates import Sentence
+from src.events.aggregates import Fragment
 
 
 def make_sentence():
-    s = Sentence("11111111-1111-1111-1111-111111111111")
+    s = Fragment("11111111-1111-1111-1111-111111111111")
     s.create(interview_id="22222222-2222-2222-2222-222222222222", index=0, text="Hi.")
     return s
 
@@ -29,7 +29,7 @@ def test_v1_events_still_apply():
     event = s.generate_analysis(model="gpt", model_version="1.0", classification={"purpose": "Q"})
     assert event.data["dimension_confidences"] == {}
     assert event.data["provider"] is None
-    replayed = Sentence("11111111-1111-1111-1111-111111111111")
+    replayed = Fragment("11111111-1111-1111-1111-111111111111")
     replayed.load_from_history(s.get_uncommitted_events())
     assert replayed.classification == {"purpose": "Q"}
     assert replayed.dimension_confidences == {}
@@ -42,7 +42,7 @@ def test_replay_reconstructs_v2_state():
         model="m", model_version="m4.2", classification={"purpose": "Q"},
         dimension_confidences={"purpose": 0.7}, flags={"x": "y"}, provider="claude_code",
     )
-    replayed = Sentence("11111111-1111-1111-1111-111111111111")
+    replayed = Fragment("11111111-1111-1111-1111-111111111111")
     replayed.load_from_history(s.get_uncommitted_events())
     assert replayed.dimension_confidences == {"purpose": 0.7}
     assert replayed.flags == {"x": "y"}

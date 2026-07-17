@@ -1,6 +1,6 @@
 import pytest
 
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Interview, Fragment
 
 IID = "22222222-2222-2222-2222-222222222222"
 SP1 = "33333333-3333-3333-3333-333333333333"
@@ -12,7 +12,7 @@ ENTITY = {"text": "Neo4j", "entity_type": "product", "start": 4, "end": 9, "conf
 
 
 def make_sentence():
-    s = Sentence(F1)
+    s = Fragment(F1)
     s.create(interview_id=IID, index=0, text="Use Neo4j here.")
     return s
 
@@ -35,7 +35,7 @@ def test_record_entities_event_and_state():
 
 
 def test_record_entities_requires_created_sentence():
-    s = Sentence(F1)
+    s = Fragment(F1)
     with pytest.raises(ValueError, match="created"):
         s.record_entities([ENTITY], model="haiku", provider="anthropic")
 
@@ -73,6 +73,6 @@ def test_claim_replay_reconstructs():
 def test_entities_replay_reconstructs():
     s = make_sentence()
     s.record_entities([ENTITY], model="haiku", provider="anthropic")
-    replayed = Sentence(F1)
+    replayed = Fragment(F1)
     replayed.load_from_history(s.get_uncommitted_events())
     assert replayed.entities == [ENTITY]

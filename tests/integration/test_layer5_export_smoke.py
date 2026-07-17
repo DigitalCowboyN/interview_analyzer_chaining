@@ -86,12 +86,12 @@ async def test_front_matter_ingest_through_okf_bundle(tmp_path, monkeypatch):
     # Replay all events in commit order through the real registry.
     factory = get_repository_factory()
     interview_repo = factory.create_interview_repository()
-    sentence_repo = factory.create_sentence_repository()
+    fragment_repo = factory.create_fragment_repository()
     registry = create_handler_registry()
     events = list(await interview_repo.event_store.read_stream(f"Interview-{interview_id}"))
     for index in range(ingest_result.fragment_count):
         sid = str(uuid_mod.uuid5(uuid_mod.NAMESPACE_DNS, f"{interview_id}:{index}"))
-        events.extend(await sentence_repo.event_store.read_stream(f"Sentence-{sid}"))
+        events.extend(await fragment_repo.event_store.read_stream(f"Sentence-{sid}"))
     events.sort(key=lambda e: e.occurred_at)
     for event in events:
         handler = registry.get_handler(event.event_type)

@@ -33,9 +33,9 @@ async def test_labeled_ingest_seeds_confirmed_speakers(tmp_path):
         agg.mark_events_as_committed()
 
     interview_repo = MagicMock(save=AsyncMock(side_effect=fake_save))
-    sentence_repo = MagicMock(save=AsyncMock())
+    fragment_repo = MagicMock(save=AsyncMock())
     with patch("src.ingestion.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.ingestion.orchestrator.get_sentence_repository", return_value=sentence_repo):
+         patch("src.ingestion.orchestrator.get_fragment_repository", return_value=fragment_repo):
         orch = IngestionOrchestrator(project_id="p", map_dir=tmp_path / "maps")
         await orch.ingest_file(input_file)
 
@@ -59,9 +59,9 @@ async def _ingest_with_front_matter(tmp_path, fm_text: str):
         agg.mark_events_as_committed()
 
     interview_repo = MagicMock(save=AsyncMock(side_effect=fake_save))
-    sentence_repo = MagicMock(save=AsyncMock())
+    fragment_repo = MagicMock(save=AsyncMock())
     with patch("src.ingestion.orchestrator.get_interview_repository", return_value=interview_repo), \
-         patch("src.ingestion.orchestrator.get_sentence_repository", return_value=sentence_repo):
+         patch("src.ingestion.orchestrator.get_fragment_repository", return_value=fragment_repo):
         orch = IngestionOrchestrator(project_id="p", map_dir=tmp_path / "maps")
         await orch.ingest_file(input_file)
     return saved["interview"]

@@ -1525,7 +1525,3 @@ class Project(AggregateRoot):
         ]
         self.blocked_links.add((d["interview_id"], d["speaker_id"]))
         self.updated_at = event.occurred_at
-
-
-# deprecated alias — wire format keeps "Sentence"; removal rides the :Sentence shim-label drop
-Sentence = Fragment

@@ -18,7 +18,7 @@ from src.events.envelope import Actor, ActorType
 from src.events.repository import (
     InterviewRepository,
     get_interview_repository,
-    get_sentence_repository,
+    get_fragment_repository,
 )
 from src.utils.logger import get_logger
 
@@ -124,10 +124,10 @@ async def split_speaker(
 
     # Load every fragment up front: missing fragments must abort before any
     # event is appended (the log cannot be rolled back).
-    sentence_repo = get_sentence_repository()
+    fragment_repo = get_fragment_repository()
     sentences = []
     for index in body.fragment_indices:
-        sentence = await sentence_repo.load(_fragment_uuid(interview_id, index))
+        sentence = await fragment_repo.load(_fragment_uuid(interview_id, index))
         if sentence is None:
             raise HTTPException(status_code=404, detail=f"Fragment {index} not found")
         sentences.append(sentence)
@@ -151,7 +151,7 @@ async def split_speaker(
 
     for sentence in sentences:
         sentence.reattribute_speaker(new_speaker_id, actor=actor)
-        await sentence_repo.save(sentence)
+        await fragment_repo.save(sentence)
     return _accepted(interview.version)
 
 
@@ -166,15 +166,15 @@ async def reattribute_fragment(
     # interview_id is load-bearing for UUID derivation; verify it exists so a
     # fabricated id cannot reattribute an unrelated sentence.
     await _load_interview(interview_id)
-    sentence_repo = get_sentence_repository()
-    sentence = await sentence_repo.load(_fragment_uuid(interview_id, index))
+    fragment_repo = get_fragment_repository()
+    sentence = await fragment_repo.load(_fragment_uuid(interview_id, index))
     if sentence is None:
         raise HTTPException(status_code=404, detail="Fragment not found")
     try:
         sentence.reattribute_speaker(body.new_speaker_id, actor=_human_actor(x_user_id))
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    await sentence_repo.save(sentence)
+    await fragment_repo.save(sentence)
     return _accepted(sentence.version)
 
 

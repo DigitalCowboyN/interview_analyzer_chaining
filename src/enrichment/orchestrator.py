@@ -18,7 +18,7 @@ from src.enrichment.segments import validate_segments
 from src.events.aggregates import Fragment, Interview
 from src.events.envelope import Actor, ActorType, generate_correlation_id
 from src.events.interview_events import segment_id_for
-from src.events.repository import get_interview_repository, get_sentence_repository
+from src.events.repository import get_interview_repository, get_fragment_repository
 from src.utils.logger import get_logger
 
 logger = get_logger()
@@ -71,7 +71,7 @@ class EnrichmentOrchestrator:
         if interview is None:
             raise ValueError(f"Interview {interview_id} not found")
 
-        sentence_repo = get_sentence_repository()
+        fragment_repo = get_fragment_repository()
         fragment_count = interview.metadata.get("fragment_count", 0)
 
         # Load all fragments; select which to enrich (resume-awareness).
@@ -80,7 +80,7 @@ class EnrichmentOrchestrator:
         skipped = 0
         for index in range(fragment_count):
             sid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{index}"))
-            sentence = await sentence_repo.load(sid)
+            sentence = await fragment_repo.load(sid)
             if sentence is None:
                 continue
             all_sentences[index] = sentence
@@ -122,7 +122,7 @@ class EnrichmentOrchestrator:
         embedder = get_embedder(self.config)
 
         entities_count, embeddings_count = await self._emit_fragment_results(
-            executor, embedder, to_enrich, fragment_views, contexts, sentence_repo,
+            executor, embedder, to_enrich, fragment_views, contexts, fragment_repo,
             actor, correlation_id,
         )
         claims_count, utt_embeddings = await self._emit_utterance_results(
@@ -168,7 +168,7 @@ class EnrichmentOrchestrator:
 
     async def _emit_fragment_results(
         self, executor, embedder, to_enrich, fragment_views, contexts,
-        sentence_repo, actor, correlation_id,
+        fragment_repo, actor, correlation_id,
     ):
         entities_count = 0
         embeddings_count = 0
@@ -219,7 +219,7 @@ class EnrichmentOrchestrator:
                 actor=actor, correlation_id=correlation_id,
             )
             embeddings_count += 1
-            await sentence_repo.save(sentence)
+            await fragment_repo.save(sentence)
         return entities_count, embeddings_count
 
     async def _emit_utterance_results(

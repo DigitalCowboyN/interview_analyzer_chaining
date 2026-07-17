@@ -55,7 +55,7 @@ class EmbeddingGeneratedHandler(BaseProjectionHandler):
     async def apply(self, tx, event: EventEnvelope):
         data = event.data
         await _ensure_vector_index(
-            self._ensured_models, "Sentence", "fragment_embedding", data["model"], data["dim"]
+            self._ensured_models, "Fragment", "fragment_embedding", data["model"], data["dim"]
         )
         vector = decode_vector(data["vector_b64"])
         prop = f"embedding_{_sanitize(data['model'])}"  # sanitized, never raw input

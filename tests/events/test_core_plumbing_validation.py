@@ -15,10 +15,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.events.aggregates import Interview, Sentence
+from src.events.aggregates import Interview, Fragment
 from src.events.envelope import Actor, ActorType, EventEnvelope
 from src.events.interview_events import InterviewStatus, create_interview_created_event
-from src.events.repository import InterviewRepository, SentenceRepository
+from src.events.repository import InterviewRepository, FragmentRepository
 from src.events.sentence_events import (
     EditorType,
     SentenceStatus,
@@ -205,7 +205,7 @@ class TestSentenceAggregate:
     def test_create_new_sentence(self):
         """Test creating a new sentence aggregate."""
         aggregate_id = str(uuid.uuid4())
-        sentence = Sentence(aggregate_id)
+        sentence = Fragment(aggregate_id)
 
         assert sentence.aggregate_id == aggregate_id
         assert sentence.version == -1
@@ -216,7 +216,7 @@ class TestSentenceAggregate:
         """Test sentence create command generates correct event."""
         aggregate_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
-        sentence = Sentence(aggregate_id)
+        sentence = Fragment(aggregate_id)
 
         event = sentence.create(interview_id=interview_id, index=0, text="Test sentence.")
 
@@ -234,7 +234,7 @@ class TestSentenceAggregate:
         """Test sentence edit command."""
         aggregate_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
-        sentence = Sentence(aggregate_id)
+        sentence = Fragment(aggregate_id)
 
         # Create first
         sentence.create(interview_id=interview_id, index=0, text="Original text.")
@@ -251,7 +251,7 @@ class TestSentenceAggregate:
         """Test sentence analysis generation."""
         aggregate_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
-        sentence = Sentence(aggregate_id)
+        sentence = Fragment(aggregate_id)
 
         # Create first
         sentence.create(interview_id=interview_id, index=0, text="Analyze this sentence.")
@@ -287,10 +287,10 @@ class TestRepositoryPattern:
 
         assert stream_name == f"Interview-{aggregate_id}"
 
-    async def test_sentence_repository_stream_naming(self):
+    async def test_fragment_repository_stream_naming(self):
         """Test sentence repository stream naming convention."""
         mock_store = MagicMock()
-        repo = SentenceRepository(mock_store)
+        repo = FragmentRepository(mock_store)
 
         aggregate_id = str(uuid.uuid4())
         stream_name = repo._get_stream_name(aggregate_id)
@@ -335,7 +335,7 @@ class TestM1ValidationComplete:
         """Test that all M1 components can be imported successfully."""
         # Event infrastructure
         # Aggregates
-        from src.events.aggregates import Interview, Sentence  # noqa: F401
+        from src.events.aggregates import Interview, Fragment  # noqa: F401
         from src.events.envelope import (  # noqa: F401
             Actor,
             ActorType,
@@ -350,7 +350,7 @@ class TestM1ValidationComplete:
         # Repository pattern
         from src.events.repository import (  # noqa: F401
             InterviewRepository,
-            SentenceRepository,
+            FragmentRepository,
         )
         from src.events.sentence_events import (  # noqa: F401, E501
             SentenceStatus,
@@ -393,7 +393,7 @@ class TestM1ValidationComplete:
         # Create sentence
         sentence_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
-        sentence = Sentence(sentence_id)
+        sentence = Fragment(sentence_id)
 
         # Execute workflow
         created_event = sentence.create(
@@ -422,7 +422,7 @@ class TestM1ValidationComplete:
         assert len(sentence.get_uncommitted_events()) == 3
 
         # Verify event reconstruction preserves all state
-        new_sentence = Sentence(sentence_id)
+        new_sentence = Fragment(sentence_id)
         new_sentence.load_from_history([created_event, analysis_event, override_event])
 
         assert new_sentence.text == sentence.text

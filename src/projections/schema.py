@@ -6,8 +6,7 @@ startup and via `python -m src.projections.ensure_schema`.
 
 Composite indexes do not serve single-property MERGE lookups, so every MERGE
 anchor gets its own single-property index even where a documented composite
-index exists. The `:Sentence` entries are the shim-window write anchors and
-drop together with the shim label (see ROADMAP backlog).
+index exists.
 """
 
 from typing import Dict, List
@@ -15,12 +14,9 @@ from typing import Dict, List
 SCHEMA_DDL: List[str] = [
     "CREATE CONSTRAINT source_file_filename IF NOT EXISTS "
     "FOR (sf:SourceFile) REQUIRE sf.filename IS UNIQUE",
-    # frozen-wire write anchors (single property — MERGE uses these alone)
-    "CREATE INDEX sentence_sentence_id IF NOT EXISTS FOR (s:Sentence) ON (s.sentence_id)",
+    # frozen-wire write anchor (single property — MERGE uses this alone)
     "CREATE INDEX fragment_sentence_id IF NOT EXISTS FOR (f:Fragment) ON (f.sentence_id)",
     # documented composite read-path indexes (kept)
-    "CREATE INDEX sentence_lookup IF NOT EXISTS FOR (s:Sentence) ON (s.sentence_id, s.filename)",
-    "CREATE INDEX sentence_sequence IF NOT EXISTS FOR (s:Sentence) ON (s.filename, s.sequence_order)",
     "CREATE INDEX fragment_lookup IF NOT EXISTS FOR (f:Fragment) ON (f.sentence_id, f.filename)",
     "CREATE INDEX fragment_sequence IF NOT EXISTS FOR (f:Fragment) ON (f.filename, f.sequence_order)",
     # documented dimension-node indexes (kept)

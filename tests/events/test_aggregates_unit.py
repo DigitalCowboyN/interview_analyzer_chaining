@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.events.aggregates import AggregateRoot, Interview, Sentence
+from src.events.aggregates import AggregateRoot, Interview, Fragment
 from src.events.envelope import Actor, ActorType, AggregateType, EventEnvelope
 from src.events.interview_events import InterviewStatus
 from src.events.sentence_events import EditorType, SentenceStatus
@@ -281,7 +281,7 @@ class TestSentenceAggregate:
 
     def test_create_sentence(self):
         """Test creating a new sentence."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
         interview_id = str(uuid.uuid4())
 
         event = sentence.create(
@@ -304,7 +304,7 @@ class TestSentenceAggregate:
 
     def test_create_sentence_already_created_raises_error(self):
         """Test that creating an already-created sentence raises error."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
         sentence.create(interview_id=str(uuid.uuid4()), index=0, text="Test")
 
         with pytest.raises(ValueError, match="already been created"):
@@ -312,7 +312,7 @@ class TestSentenceAggregate:
 
     def test_edit_sentence(self):
         """Test editing a sentence."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
         sentence.create(interview_id=str(uuid.uuid4()), index=0, text="Original text")
 
         event = sentence.edit(
@@ -328,14 +328,14 @@ class TestSentenceAggregate:
 
     def test_edit_sentence_not_created_raises_error(self):
         """Test that editing a non-created sentence raises error."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
 
         with pytest.raises(ValueError, match="must be created before editing"):
             sentence.edit(new_text="New text", editor_type=EditorType.HUMAN)
 
     def test_edit_sentence_same_text_raises_error(self):
         """Test that editing with same text raises error."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
         sentence.create(interview_id=str(uuid.uuid4()), index=0, text="Same text")
 
         with pytest.raises(ValueError, match="same as current text"):
@@ -343,7 +343,7 @@ class TestSentenceAggregate:
 
     def test_generate_analysis(self):
         """Test generating analysis for a sentence."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
         sentence.create(interview_id=str(uuid.uuid4()), index=0, text="Test sentence")
 
         event = sentence.generate_analysis(
@@ -369,7 +369,7 @@ class TestSentenceAggregate:
 
     def test_generate_analysis_not_created_raises_error(self):
         """Test that generating analysis on non-created sentence raises error."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
 
         with pytest.raises(ValueError, match="must be created before generating"):
             sentence.generate_analysis(
@@ -380,7 +380,7 @@ class TestSentenceAggregate:
 
     def test_override_analysis(self):
         """Test overriding analysis results."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
         sentence.create(interview_id=str(uuid.uuid4()), index=0, text="Test")
         sentence.generate_analysis(model="gpt-4", model_version="1.0", classification={})
 
@@ -395,14 +395,14 @@ class TestSentenceAggregate:
 
     def test_override_analysis_not_created_raises_error(self):
         """Test that overriding analysis on non-created sentence raises error."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
 
         with pytest.raises(ValueError, match="must be created before overriding"):
             sentence.override_analysis(fields_overridden={"purpose": "test"})
 
     def test_apply_unknown_event_raises_error(self):
         """Test that applying unknown event type raises error."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
 
         unknown_event = create_event(
             event_type="UnknownEvent",
@@ -418,7 +418,7 @@ class TestSentenceAggregate:
     def test_apply_analysis_regenerated(self):
         """Test applying AnalysisRegenerated event."""
         aggregate_id = str(uuid.uuid4())
-        sentence = Sentence(aggregate_id=aggregate_id)
+        sentence = Fragment(aggregate_id=aggregate_id)
 
         # First create and analyze
         sentence.create(interview_id=str(uuid.uuid4()), index=0, text="Test")
@@ -452,7 +452,7 @@ class TestSentenceAggregate:
     def test_apply_analysis_cleared(self):
         """Test applying AnalysisCleared event."""
         aggregate_id = str(uuid.uuid4())
-        sentence = Sentence(aggregate_id=aggregate_id)
+        sentence = Fragment(aggregate_id=aggregate_id)
 
         # First create and analyze
         sentence.create(interview_id=str(uuid.uuid4()), index=0, text="Test")
@@ -498,7 +498,7 @@ class TestAggregateTypeDetection:
 
     def test_sentence_aggregate_type(self):
         """Test that Sentence correctly identifies its aggregate type."""
-        sentence = Sentence(aggregate_id=str(uuid.uuid4()))
+        sentence = Fragment(aggregate_id=str(uuid.uuid4()))
         event = sentence.create(
             interview_id=str(uuid.uuid4()),
             index=0,
