@@ -5,11 +5,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { LineDetailPanel } from "@/components/LineDetailPanel";
 import { useSentenceHistory } from "@/hooks/useSentenceHistory";
+import { usePersons, usePersonId } from "@/hooks/usePersons";
 import type { TranscriptLineData } from "@/hooks/useTranscript";
 import { apiFetch } from "@/api/client";
 
 vi.mock("@/hooks/useSentenceHistory", () => ({
   useSentenceHistory: vi.fn(),
+}));
+
+vi.mock("@/hooks/usePersons", () => ({
+  usePersons: vi.fn(),
+  usePersonId: vi.fn(),
 }));
 
 vi.mock("@/api/client", async () => {
@@ -44,9 +50,10 @@ function renderPanel(line: TranscriptLineData = LINE, onClose = vi.fn()) {
   function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   }
-  return render(<LineDetailPanel interviewId="i1" line={line} onClose={onClose} />, {
-    wrapper: Wrapper,
-  });
+  return render(
+    <LineDetailPanel projectId="p1" interviewId="i1" line={line} onClose={onClose} />,
+    { wrapper: Wrapper },
+  );
 }
 
 describe("LineDetailPanel", () => {
@@ -58,6 +65,15 @@ describe("LineDetailPanel", () => {
       error: null,
     } as never);
     vi.mocked(apiFetch).mockReset();
+    vi.mocked(usePersons).mockReturnValue({
+      data: [{ person_id: "p1", display_name: "Jane Doe", speaker_count: 1, interview_count: 1 }],
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(usePersonId).mockReturnValue({
+      derivePersonId: vi.fn().mockResolvedValue("person-new"),
+    });
   });
 
   afterEach(() => {
@@ -237,6 +253,61 @@ describe("LineDetailPanel", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fields_overridden: { text: "Ships faster now" } }),
+    });
+  });
+
+  // --- Manual speaker→person linking (M5.0 Task 6) ---
+
+  it('shows "Identify as person…" for an unlinked speaker, opens the picker, and links an existing person', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiFetch).mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: async () => ({ status: "accepted" }),
+    } as Response);
+
+    renderPanel();
+
+    const openButton = screen.getByRole("button", { name: "Identify as person…" });
+    await user.click(openButton);
+    expect(screen.getByRole("dialog", { name: "Identify as person" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Jane Doe" }));
+
+    expect(apiFetch).toHaveBeenCalledWith("/resolution/p1/persons/p1/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interview_id: "i1", speaker_id: "s1" }),
+    });
+  });
+
+  it("does not show the identify affordance for a speakerless line", () => {
+    renderPanel({ ...LINE, speaker: null });
+    expect(
+      screen.queryByRole("button", { name: "Identify as person…" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows an unlink affordance for an already-linked speaker and calls the unlink endpoint", async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiFetch).mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: async () => ({ status: "accepted" }),
+    } as Response);
+
+    renderPanel({ ...LINE, person: { person_id: "p1", display_name: "Jane Doe" } });
+
+    expect(
+      screen.queryByRole("button", { name: "Identify as person…" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Unlink person" }));
+
+    expect(apiFetch).toHaveBeenCalledWith("/resolution/p1/persons/p1/unlink", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interview_id: "i1", speaker_id: "s1" }),
     });
   });
 });

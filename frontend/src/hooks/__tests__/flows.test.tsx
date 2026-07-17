@@ -8,6 +8,8 @@ import {
   useFragmentReattributeIntent,
   useSegmentRemoveIntent,
   useLensItemOverrideIntent,
+  usePersonLinkIntent,
+  usePersonUnlinkIntent,
 } from "@/hooks/mutations";
 import { apiFetch } from "@/api/client";
 
@@ -216,5 +218,139 @@ describe("correction flow hooks — endpoint/body pinning", () => {
 
     const outcome = await outcomePromise;
     expect(outcome).toMatchObject({ status: "settled" });
+  });
+
+  // --- Manual speaker→person linking (M5.0 Task 6) ---
+
+  it("person link (existing person): POST /resolution/{project_id}/persons/{person_id}/link omits display_name", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    const wrapper = makeWrapper({
+      lines: [
+        {
+          fragment_id: "f1",
+          sequence_order: 0,
+          edited: false,
+          speaker: { speaker_id: "s1", display_name: "Speaker A" },
+          person: { person_id: "p1", display_name: "Jane Doe" },
+          segment: null,
+          lens_items: [],
+        },
+      ],
+    });
+
+    const { result } = renderHook(
+      () => usePersonLinkIntent("proj1", "i1", QUERY_KEY, POLL_OPTIONS),
+      { wrapper },
+    );
+    const outcomePromise = result.current.linkPerson("p1", "s1");
+
+    expect(apiFetch).toHaveBeenCalledWith("/resolution/proj1/persons/p1/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interview_id: "i1", speaker_id: "s1" }),
+    });
+
+    const outcome = await outcomePromise;
+    expect(outcome).toMatchObject({ status: "settled" });
+  });
+
+  it("person link (create-new): includes display_name so the backend mints the person", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    const wrapper = makeWrapper({
+      lines: [
+        {
+          fragment_id: "f1",
+          sequence_order: 0,
+          edited: false,
+          speaker: { speaker_id: "s1", display_name: "Speaker A" },
+          person: { person_id: "person-new", display_name: "New Person" },
+          segment: null,
+          lens_items: [],
+        },
+      ],
+    });
+
+    const { result } = renderHook(
+      () => usePersonLinkIntent("proj1", "i1", QUERY_KEY, POLL_OPTIONS),
+      { wrapper },
+    );
+    const outcomePromise = result.current.linkPerson("person-new", "s1", "New Person");
+
+    expect(apiFetch).toHaveBeenCalledWith("/resolution/proj1/persons/person-new/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        interview_id: "i1",
+        speaker_id: "s1",
+        display_name: "New Person",
+      }),
+    });
+
+    const outcome = await outcomePromise;
+    expect(outcome).toMatchObject({ status: "settled" });
+  });
+
+  it("person unlink: POST /resolution/{project_id}/persons/{person_id}/unlink", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    // Reflected = the speaker no longer carries this person link.
+    const wrapper = makeWrapper({
+      lines: [
+        {
+          fragment_id: "f1",
+          sequence_order: 0,
+          edited: false,
+          speaker: { speaker_id: "s1", display_name: "Speaker A" },
+          person: null,
+          segment: null,
+          lens_items: [],
+        },
+      ],
+    });
+
+    const { result } = renderHook(
+      () => usePersonUnlinkIntent("proj1", "i1", QUERY_KEY, POLL_OPTIONS),
+      { wrapper },
+    );
+    const outcomePromise = result.current.unlinkPerson("p1", "s1", "wrong link");
+
+    expect(apiFetch).toHaveBeenCalledWith("/resolution/proj1/persons/p1/unlink", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interview_id: "i1", speaker_id: "s1", note: "wrong link" }),
+    });
+
+    const outcome = await outcomePromise;
+    expect(outcome).toMatchObject({ status: "settled" });
+  });
+
+  it("person unlink omits note when not provided", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    const wrapper = makeWrapper({
+      lines: [
+        {
+          fragment_id: "f1",
+          sequence_order: 0,
+          edited: false,
+          speaker: { speaker_id: "s1", display_name: "Speaker A" },
+          person: null,
+          segment: null,
+          lens_items: [],
+        },
+      ],
+    });
+
+    const { result } = renderHook(
+      () => usePersonUnlinkIntent("proj1", "i1", QUERY_KEY, POLL_OPTIONS),
+      { wrapper },
+    );
+    const outcomePromise = result.current.unlinkPerson("p1", "s1");
+
+    expect(apiFetch).toHaveBeenCalledWith("/resolution/proj1/persons/p1/unlink", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interview_id: "i1", speaker_id: "s1" }),
+    });
+
+    await outcomePromise;
   });
 });

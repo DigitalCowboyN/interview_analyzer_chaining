@@ -222,6 +222,7 @@ interface TranscriptLineShape {
   sequence_order: number;
   text: string;
   speaker: { speaker_id: string; display_name: string } | null;
+  person: { person_id: string; display_name: string } | null;
   segment: { segment_id: string; topic: string | null } | null;
   lens_items: { item_id: string; human_locked: boolean }[];
   edited: boolean;
@@ -359,6 +360,92 @@ export function useSegmentRemoveIntent(
   );
 
   return { ...intent, removeSegment };
+}
+
+/**
+ * Flow 5a: link a speaker to a person (M5.0 Task 6 — the manual
+ * speaker→person escape hatch). POST /resolution/{project_id}/persons/{person_id}/link
+ *
+ * body `{interview_id, speaker_id, display_name?}` — per src/api/routers/resolution.py::link_speaker:
+ * `display_name` is REQUIRED to mint a new person and must be OMITTED when
+ * linking to an existing person (its presence there is harmless server-side,
+ * but the loose-coupling contract is: pass it only when creating). Callers
+ * (the person picker) decide which case they're in; this hook just shapes
+ * the request.
+ */
+export function usePersonLinkIntent(
+  projectId: string,
+  interviewId: string,
+  transcriptQueryKey: QueryKey,
+  pollOptions?: FlowIntentPollOptions,
+) {
+  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey, ...pollOptions });
+
+  const linkPerson = useCallback(
+    (personId: string, speakerId: string, displayName?: string) =>
+      intent.run(
+        () =>
+          apiFetch(`/resolution/${projectId}/persons/${personId}/link`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              interview_id: interviewId,
+              speaker_id: speakerId,
+              ...(displayName ? { display_name: displayName } : {}),
+            }),
+          }),
+        (data) =>
+          Boolean(
+            findLine(
+              data,
+              (line) =>
+                line.speaker?.speaker_id === speakerId && line.person?.person_id === personId,
+            ),
+          ),
+      ),
+    [intent, projectId, interviewId],
+  );
+
+  return { ...intent, linkPerson };
+}
+
+/**
+ * Flow 5b: unlink a speaker from a person. POST /resolution/{project_id}/persons/{person_id}/unlink
+ * body `{interview_id, speaker_id, note?}` (src/api/routers/resolution.py::unlink_speaker).
+ * Reflected predicate: the person suffix has disappeared from the line(s)
+ * for that speaker.
+ */
+export function usePersonUnlinkIntent(
+  projectId: string,
+  interviewId: string,
+  transcriptQueryKey: QueryKey,
+  pollOptions?: FlowIntentPollOptions,
+) {
+  const intent = useCorrectionIntent({ queryKey: transcriptQueryKey, ...pollOptions });
+
+  const unlinkPerson = useCallback(
+    (personId: string, speakerId: string, note?: string) =>
+      intent.run(
+        () =>
+          apiFetch(`/resolution/${projectId}/persons/${personId}/unlink`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              interview_id: interviewId,
+              speaker_id: speakerId,
+              ...(note ? { note } : {}),
+            }),
+          }),
+        (data) =>
+          !findLine(
+            data,
+            (line) => line.speaker?.speaker_id === speakerId && line.person?.person_id === personId,
+          ),
+      ),
+    [intent, projectId, interviewId],
+  );
+
+  return { ...intent, unlinkPerson };
 }
 
 /** Flow 4: lens-item override. POST /lenses/{interview_id}/items/{item_id}/override */

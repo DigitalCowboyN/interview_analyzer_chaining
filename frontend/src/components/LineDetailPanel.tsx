@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { TranscriptLineData } from "@/hooks/useTranscript";
 import { useSentenceHistory } from "@/hooks/useSentenceHistory";
 import { StateGate } from "@/components/StateGate";
+import { PersonPicker } from "@/components/PersonPicker";
 import { queryKeys } from "@/hooks/queryKeys";
 import {
   useTextEditIntent,
@@ -9,10 +10,12 @@ import {
   useFragmentReattributeIntent,
   useSegmentRemoveIntent,
   useLensItemOverrideIntent,
+  usePersonUnlinkIntent,
   type CorrectionNotice,
 } from "@/hooks/mutations";
 
 export interface LineDetailPanelProps {
+  projectId: string;
   interviewId: string;
   line: TranscriptLineData;
   onClose: () => void;
@@ -238,6 +241,82 @@ function FragmentReattributeControl({
   );
 }
 
+/**
+ * Flow 6 (M5.0 Task 6): manual speaker→person linking — the identity escape
+ * hatch for speakers automation can't reach. Unlinked speakers get an
+ * "identify as person…" affordance opening the PersonPicker; linked
+ * speakers (person suffix already shown per Task 4) get an unlink
+ * affordance instead.
+ */
+function PersonLinkControl({
+  projectId,
+  interviewId,
+  line,
+}: {
+  projectId: string;
+  interviewId: string;
+  line: TranscriptLineData;
+}) {
+  const { unlinkPerson, isPending, notice } = usePersonUnlinkIntent(
+    projectId,
+    interviewId,
+    queryKeys.transcript(interviewId),
+  );
+  const [picking, setPicking] = useState(false);
+
+  if (!line.speaker) return null;
+
+  if (line.person) {
+    return (
+      <div className="mt-2">
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => unlinkPerson(line.person!.person_id, line.speaker!.speaker_id)}
+          className="text-xs text-red-700 hover:underline disabled:opacity-50"
+        >
+          {isPending ? "Unlinking…" : "Unlink person"}
+        </button>
+        <PersonNoticeBanner notice={notice} />
+      </div>
+    );
+  }
+
+  if (picking) {
+    return (
+      <PersonPicker
+        projectId={projectId}
+        interviewId={interviewId}
+        speakerId={line.speaker.speaker_id}
+        onClose={() => setPicking(false)}
+        onLinked={() => setPicking(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setPicking(true)}
+        className="text-xs text-blue-700 hover:underline"
+      >
+        Identify as person…
+      </button>
+    </div>
+  );
+}
+
+function PersonNoticeBanner({ notice }: { notice: CorrectionNotice | null }) {
+  if (!notice) return null;
+  const tone = notice.kind === "timeout" ? "text-neutral-500" : "text-red-600";
+  return (
+    <p role={notice.kind === "timeout" ? "status" : "alert"} className={`mt-1 text-xs ${tone}`}>
+      {notice.message}
+    </p>
+  );
+}
+
 /** Flow 3: segment remove (only rendered when the line belongs to a segment). */
 function SegmentRemoveControl({
   interviewId,
@@ -380,13 +459,14 @@ function LensItemOverrideControl({
 /**
  * Detail panel opened from a transcript line: full text, entities, lens
  * items (lens, node type, text, confidence, lock state), edit history
- * fetched lazily, and the four correction affordances (M5.0 Task 5):
- * text edit, speaker rename, segment remove, lens-item override. Each
- * affordance is a small inline form built on the shared correction-intent
+ * fetched lazily, the four correction affordances (M5.0 Task 5): text edit,
+ * speaker rename, segment remove, lens-item override — plus manual
+ * speaker→person linking (M5.0 Task 6): identify/unlink. Each
  * hooks in `@/hooks/mutations` — this component stays prop-driven for its
  * own line data; all write state lives in those hooks.
  */
 export function LineDetailPanel({
+  projectId,
   interviewId,
   line,
   onClose,
@@ -425,6 +505,7 @@ export function LineDetailPanel({
         </h3>
         <SpeakerRenameControl interviewId={interviewId} line={line} />
         {line.speaker && <FragmentReattributeControl interviewId={interviewId} line={line} />}
+        <PersonLinkControl projectId={projectId} interviewId={interviewId} line={line} />
       </section>
 
       <section className="mt-4">

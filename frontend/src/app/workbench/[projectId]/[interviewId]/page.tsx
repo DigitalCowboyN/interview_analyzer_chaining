@@ -79,6 +79,7 @@ export default function TranscriptPage() {
       </div>
       {selectedLine && (
         <LineDetailPanel
+          projectId={projectId}
           interviewId={interviewId}
           line={selectedLine}
           onClose={() => setSelectedLine(null)}
