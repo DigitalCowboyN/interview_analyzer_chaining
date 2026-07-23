@@ -10,6 +10,8 @@ import {
   useLensItemOverrideIntent,
   usePersonLinkIntent,
   usePersonUnlinkIntent,
+  useEntityMergeAcceptIntent,
+  useWorklistPersonLinkAcceptIntent,
 } from "@/hooks/mutations";
 import { apiFetch } from "@/api/client";
 
@@ -352,5 +354,119 @@ describe("correction flow hooks — endpoint/body pinning", () => {
     });
 
     await outcomePromise;
+  });
+});
+
+// --- Worklist accept flows (M5.0 Task 8) ---
+//
+// Distinct query key/shape from the transcript flows above — worklist rows
+// have nothing to do with a transcript line, so these get their own
+// wrapper keyed to a worklist query.
+
+const WORKLIST_QUERY_KEY = ["projects", "proj1", "worklist"] as const;
+
+function makeWorklistWrapper(initialData: unknown) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryDefaults(WORKLIST_QUERY_KEY, { queryFn: async () => initialData });
+  client.setQueryData(WORKLIST_QUERY_KEY, initialData);
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  }
+  return Wrapper;
+}
+
+describe("worklist accept flow hooks — endpoint/body pinning", () => {
+  beforeEach(() => {
+    vi.mocked(apiFetch).mockReset();
+  });
+
+  it("entity-merge accept: POST /resolution/{project_id}/entities/merge", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    const wrapper = makeWorklistWrapper({
+      entity_merge_suggestions: [],
+      person_link_suggestions: [],
+    });
+
+    const { result } = renderHook(
+      () => useEntityMergeAcceptIntent("proj1", WORKLIST_QUERY_KEY, POLL_OPTIONS),
+      { wrapper },
+    );
+    const outcomePromise = result.current.acceptMerge("cn1", "cn2");
+
+    expect(apiFetch).toHaveBeenCalledWith("/resolution/proj1/entities/merge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ surviving_canonical_id: "cn1", merged_canonical_id: "cn2" }),
+    });
+
+    const outcome = await outcomePromise;
+    expect(outcome).toMatchObject({ status: "settled" });
+  });
+
+  it("entity-merge accept does not settle while the suggestion is still present", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    const wrapper = makeWorklistWrapper({
+      entity_merge_suggestions: [
+        { surviving_canonical_id: "cn1", merged_canonical_id: "cn2" },
+      ],
+      person_link_suggestions: [],
+    });
+
+    const { result } = renderHook(
+      () => useEntityMergeAcceptIntent("proj1", WORKLIST_QUERY_KEY, { pollIntervalMs: 10, maxPollAttempts: 2 }),
+      { wrapper },
+    );
+    const outcome = await result.current.acceptMerge("cn1", "cn2");
+
+    expect(outcome.status).toBe("timeout");
+  });
+
+  it("worklist person-link accept: POST /resolution/{project_id}/persons/{person_id}/link with display_name", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    const wrapper = makeWorklistWrapper({
+      entity_merge_suggestions: [],
+      person_link_suggestions: [],
+    });
+
+    const { result } = renderHook(
+      () => useWorklistPersonLinkAcceptIntent("proj1", WORKLIST_QUERY_KEY, POLL_OPTIONS),
+      { wrapper },
+    );
+    const outcomePromise = result.current.acceptLink("p1", "i1", "s1", "Jane Doe");
+
+    expect(apiFetch).toHaveBeenCalledWith("/resolution/proj1/persons/p1/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        interview_id: "i1",
+        speaker_id: "s1",
+        display_name: "Jane Doe",
+      }),
+    });
+
+    const outcome = await outcomePromise;
+    expect(outcome).toMatchObject({ status: "settled" });
+  });
+
+  it("worklist person-link accept does not settle while the suggestion is still present", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    const wrapper = makeWorklistWrapper({
+      entity_merge_suggestions: [],
+      person_link_suggestions: [
+        { person_id: "p1", interview_id: "i1", speaker_id: "s1" },
+      ],
+    });
+
+    const { result } = renderHook(
+      () =>
+        useWorklistPersonLinkAcceptIntent("proj1", WORKLIST_QUERY_KEY, {
+          pollIntervalMs: 10,
+          maxPollAttempts: 2,
+        }),
+      { wrapper },
+    );
+    const outcome = await result.current.acceptLink("p1", "i1", "s1", "Jane Doe");
+
+    expect(outcome.status).toBe("timeout");
   });
 });

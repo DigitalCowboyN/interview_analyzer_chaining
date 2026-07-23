@@ -479,3 +479,114 @@ export function useLensItemOverrideIntent(
 
   return { ...intent, overrideLensItem };
 }
+
+// --- Worklist accept flows (M5.0 Task 8) ---
+//
+// The worklist's rows (lens items, claims, entity-merge suggestions,
+// person-link suggestions) have nothing to do with the transcript shape the
+// flow hooks above poll — `usePersonLinkIntent` above is keyed to a
+// transcript query and its reflected-predicate checks a transcript line's
+// `person` field, which a worklist row disappearing has no bearing on. So
+// these get their own minimal flow hooks, built on the same
+// `useCorrectionIntent` core, keyed to the worklist query instead.
+
+interface WorklistEntityMergeSuggestionShape {
+  surviving_canonical_id: string;
+  merged_canonical_id: string;
+}
+
+interface WorklistPersonLinkSuggestionShape {
+  person_id: string;
+  interview_id: string;
+  speaker_id: string;
+}
+
+interface WorklistShape {
+  entity_merge_suggestions?: WorklistEntityMergeSuggestionShape[];
+  person_link_suggestions?: WorklistPersonLinkSuggestionShape[];
+}
+
+/**
+ * Flow 7a: worklist — accept an entity-merge suggestion.
+ * POST /resolution/{project_id}/entities/merge
+ * Reflected predicate: the freshly-refetched worklist no longer contains a
+ * suggestion for this exact (surviving, merged) pair.
+ */
+export function useEntityMergeAcceptIntent(
+  projectId: string,
+  worklistQueryKey: QueryKey,
+  pollOptions?: FlowIntentPollOptions,
+) {
+  const intent = useCorrectionIntent({ queryKey: worklistQueryKey, ...pollOptions });
+
+  const acceptMerge = useCallback(
+    (survivingCanonicalId: string, mergedCanonicalId: string) =>
+      intent.run(
+        () =>
+          apiFetch(`/resolution/${projectId}/entities/merge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              surviving_canonical_id: survivingCanonicalId,
+              merged_canonical_id: mergedCanonicalId,
+            }),
+          }),
+        (data) => {
+          const worklist = data as WorklistShape | undefined;
+          return !worklist?.entity_merge_suggestions?.some(
+            (s) =>
+              s.surviving_canonical_id === survivingCanonicalId &&
+              s.merged_canonical_id === mergedCanonicalId,
+          );
+        },
+      ),
+    [intent, projectId],
+  );
+
+  return { ...intent, acceptMerge };
+}
+
+/**
+ * Flow 7b: worklist — accept a person-link suggestion.
+ * POST /resolution/{project_id}/persons/{person_id}/link
+ * Worklist suggestions always carry a `display_name`; passing it is what
+ * lets the backend mint the person if it doesn't already exist (harmless
+ * when the person already exists — see usePersonLinkIntent's note above).
+ * Reflected predicate: the freshly-refetched worklist no longer contains a
+ * suggestion for this exact (person, interview, speaker) triple.
+ */
+export function useWorklistPersonLinkAcceptIntent(
+  projectId: string,
+  worklistQueryKey: QueryKey,
+  pollOptions?: FlowIntentPollOptions,
+) {
+  const intent = useCorrectionIntent({ queryKey: worklistQueryKey, ...pollOptions });
+
+  const acceptLink = useCallback(
+    (personId: string, interviewId: string, speakerId: string, displayName: string) =>
+      intent.run(
+        () =>
+          apiFetch(`/resolution/${projectId}/persons/${personId}/link`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              interview_id: interviewId,
+              speaker_id: speakerId,
+              display_name: displayName,
+            }),
+          }),
+        (data) => {
+          const worklist = data as WorklistShape | undefined;
+          return !worklist?.person_link_suggestions?.some(
+            (s) =>
+              s.person_id === personId &&
+              s.interview_id === interviewId &&
+              s.speaker_id === speakerId,
+          );
+        },
+      ),
+    [intent, projectId],
+  );
+
+  return { ...intent, acceptLink };
+}
