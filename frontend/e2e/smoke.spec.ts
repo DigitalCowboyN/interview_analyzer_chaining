@@ -30,6 +30,10 @@ import { expect, test } from "@playwright/test";
  *   3. Frontend: `npm run dev` on :3000 (its next.config.ts `/api/*` rewrite
  *      proxies to :8000) — also started by the `webServer` config.
  *
+ * ONE-TIME SETUP: on a machine that has never run Playwright, install its
+ * browser binary first — `npx playwright install chromium` (from `frontend/`)
+ * — or this spec fails before reaching any of the above.
+ *
  * Seeding: frontend/e2e/seed_smoke.py ingests one small LABELED transcript
  * through the real command path (IngestionOrchestrator — same idiom as
  * test_deployed_projection_smoke.py), shelled out to from this spec's

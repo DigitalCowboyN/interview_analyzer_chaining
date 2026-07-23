@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { PersonPicker } from "@/components/PersonPicker";
 import { usePersons, usePersonId } from "@/hooks/usePersons";
 import { queryKeys } from "@/hooks/queryKeys";
-import { apiFetch } from "@/api/client";
+import { apiFetch, ApiError } from "@/api/client";
 
 vi.mock("@/hooks/usePersons", () => ({
   usePersons: vi.fn(),
@@ -173,6 +173,32 @@ describe("PersonPicker", () => {
     const deriveOrder = derivePersonId.mock.invocationCallOrder[0];
     const linkOrder = vi.mocked(apiFetch).mock.invocationCallOrder[0];
     expect(deriveOrder).toBeLessThan(linkOrder);
+  });
+
+  it("surfaces a notice (not an unhandled rejection) when derivePersonId rejects", async () => {
+    const user = userEvent.setup();
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      unhandledRejections.push(event.reason);
+    };
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+
+    const derivePersonId = vi.fn().mockRejectedValue(new ApiError(404, "Project not found"));
+    vi.mocked(usePersonId).mockReturnValue({ derivePersonId });
+    const onLinked = vi.fn();
+    renderPicker(onLinked);
+
+    await user.type(screen.getByLabelText("New person display name"), "New Person");
+    await user.click(screen.getByRole("button", { name: "Create and link" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Project not found");
+    expect(onLinked).not.toHaveBeenCalled();
+    expect(apiFetch).not.toHaveBeenCalled();
+
+    // Give any unhandled-rejection microtask a turn to fire before asserting.
+    await Promise.resolve();
+    window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    expect(unhandledRejections).toHaveLength(0);
   });
 
   it("does not submit create-new with a blank name", async () => {

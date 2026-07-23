@@ -221,6 +221,60 @@ describe("TranscriptPage", () => {
     expect(screen.queryByRole("dialog", { name: "Line detail" })).not.toBeInTheDocument();
   });
 
+  it("reflects refetched line data in the detail panel instead of the stale clicked snapshot", async () => {
+    mockParams("p1", "i1");
+    vi.mocked(useSentenceHistory).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+    } as never);
+
+    const original = TRANSCRIPT_WITH_SEGMENTS;
+    const updated = {
+      ...TRANSCRIPT_WITH_SEGMENTS,
+      lines: TRANSCRIPT_WITH_SEGMENTS.lines.map((line) =>
+        line.fragment_id === "f1"
+          ? { ...line, text: "Let's talk about corrections instead.", edited: true }
+          : line,
+      ),
+    };
+
+    vi.mocked(useTranscript).mockReturnValue({
+      data: original,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    const { rerender } = renderPage();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Let's talk about onboarding\./ }),
+    );
+    expect(screen.getByRole("dialog", { name: "Line detail" })).toHaveTextContent(
+      "Let's talk about onboarding.",
+    );
+
+    // Simulate the transcript refetch settling after a correction (e.g. a
+    // text edit) with the same fragment id but changed content.
+    vi.mocked(useTranscript).mockReturnValue({
+      data: updated,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    rerender(<TranscriptPage />);
+
+    expect(screen.getByRole("dialog", { name: "Line detail" })).toHaveTextContent(
+      "Let's talk about corrections instead.",
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "Line detail" }),
+    ).not.toHaveTextContent("Let's talk about onboarding.");
+  });
+
   it("renders the Workbench / project / interview breadcrumb trail", () => {
     mockParams("p1", "i1");
     vi.mocked(useTranscript).mockReturnValue({

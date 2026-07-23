@@ -289,13 +289,19 @@ class SentenceCommandHandler(CommandHandler):
             except ValueError:
                 raise CommandValidationError(f"Invalid editor type: {command.editor_type}", field="editor_type")
 
-            # Execute command
-            sentence.edit(
-                new_text=command.new_text,
-                editor_type=editor_type,
-                actor=command.actor,
-                correlation_id=command.correlation_id or generate_correlation_id(),
-            )
+            # Execute command. The aggregate raises ValueError for domain
+            # validation failures (e.g. saving unmodified text) — re-raise as
+            # CommandValidationError so the router's existing 409 mapping
+            # applies instead of falling through to the generic 500 below.
+            try:
+                sentence.edit(
+                    new_text=command.new_text,
+                    editor_type=editor_type,
+                    actor=command.actor,
+                    correlation_id=command.correlation_id or generate_correlation_id(),
+                )
+            except ValueError as e:
+                raise CommandValidationError(str(e), field="new_text")
 
             # Capture event count before saving (save clears uncommitted events)
             event_count = len(sentence.get_uncommitted_events())

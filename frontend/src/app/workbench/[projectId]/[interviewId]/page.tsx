@@ -3,7 +3,6 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useTranscript } from "@/hooks/useTranscript";
-import type { TranscriptLineData } from "@/hooks/useTranscript";
 import { StateGate } from "@/components/StateGate";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { MetadataPanel } from "@/components/MetadataPanel";
@@ -18,7 +17,14 @@ export default function TranscriptPage() {
     interviewId: string;
   }>();
   const { data: transcript, isLoading, isError, error } = useTranscript(interviewId);
-  const [selectedLine, setSelectedLine] = useState<TranscriptLineData | null>(null);
+  const [selectedFragmentId, setSelectedFragmentId] = useState<string | null>(null);
+  // Derive the selected line from the latest transcript data each render,
+  // rather than caching the clicked line object — otherwise a refetch after
+  // a correction (text edit, speaker rename, ...) leaves the panel showing
+  // stale pre-correction content. If the line disappears from a refetch,
+  // this resolves to null and the panel closes naturally.
+  const selectedLine =
+    transcript?.lines.find((l) => l.fragment_id === selectedFragmentId) ?? null;
 
   return (
     <div className="flex">
@@ -67,7 +73,7 @@ export default function TranscriptPage() {
                       <TranscriptLine
                         line={line}
                         continuesUtterance={continuesUtterance}
-                        onSelect={setSelectedLine}
+                        onSelect={(l) => setSelectedFragmentId(l.fragment_id)}
                       />
                     </div>
                   );
@@ -82,7 +88,7 @@ export default function TranscriptPage() {
           projectId={projectId}
           interviewId={interviewId}
           line={selectedLine}
-          onClose={() => setSelectedLine(null)}
+          onClose={() => setSelectedFragmentId(null)}
         />
       )}
     </div>

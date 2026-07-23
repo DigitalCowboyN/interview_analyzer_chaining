@@ -4,7 +4,7 @@ import { queryKeys } from "@/hooks/queryKeys";
 
 /**
  * Row/response shapes for `GET /review/worklist` — pinned to
- * src/api/routers/review.py::review_worklist. The endpoint returns a raw
+ * src/api/routers/queries.py::review_worklist. The endpoint returns a raw
  * dict, so the generated `schema.d.ts` types its 200 response as `unknown`
  * (see openapi-typescript output); these local shapes follow the same
  * precedent as useTranscript.ts/mutations.ts casting `unknown` to a typed

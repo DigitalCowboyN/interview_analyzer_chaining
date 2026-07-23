@@ -3,6 +3,7 @@ import { usePersons, usePersonId } from "@/hooks/usePersons";
 import { usePersonLinkIntent, type CorrectionNotice, type FlowIntentPollOptions } from "@/hooks/mutations";
 import { queryKeys } from "@/hooks/queryKeys";
 import { StateGate } from "@/components/StateGate";
+import { ApiError } from "@/api/client";
 
 export interface PersonPickerProps {
   projectId: string;
@@ -40,6 +41,7 @@ export function PersonPicker({
   );
   const [newName, setNewName] = useState("");
   const [deriving, setDeriving] = useState(false);
+  const [deriveNotice, setDeriveNotice] = useState<CorrectionNotice | null>(null);
 
   async function handleLinkExisting(personId: string) {
     const outcome = await linkPerson(personId, speakerId);
@@ -50,6 +52,7 @@ export function PersonPicker({
     const displayName = newName.trim();
     if (!displayName) return;
     setDeriving(true);
+    setDeriveNotice(null);
     try {
       const personId = await derivePersonId(projectId, displayName);
       const outcome = await linkPerson(personId, speakerId, displayName);
@@ -57,6 +60,16 @@ export function PersonPicker({
         setNewName("");
         onLinked?.();
       }
+    } catch (err) {
+      // derivePersonId rejects on 4xx (e.g. project 404) or network failure —
+      // without this catch the rejection is unhandled and the user gets no
+      // notice at all. Surface it through the same notice slot the link
+      // intent uses.
+      const message =
+        err instanceof ApiError && typeof err.detail === "string"
+          ? err.detail
+          : "Could not create the person. Check the project and try again.";
+      setDeriveNotice({ kind: "network", message });
     } finally {
       setDeriving(false);
     }
@@ -125,7 +138,7 @@ export function PersonPicker({
         </button>
       </div>
 
-      <PersonPickerNotice notice={notice} />
+      <PersonPickerNotice notice={notice ?? deriveNotice} />
     </div>
   );
 }

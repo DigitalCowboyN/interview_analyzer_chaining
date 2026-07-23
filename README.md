@@ -214,7 +214,9 @@ the dockerized dev stack (`neo4j`, `eventstore`, `projection-service`) up
 since only that stack's projection consumer delivers events to Neo4j; it
 brings those containers up itself, starts the backend + frontend dev servers
 via Playwright's `webServer` config, seeds one interview through the real
-ingestion command path, and drives a full browser journey. See
+ingestion command path, and drives a full browser journey. On a machine
+that's never run Playwright before, first run the one-time browser install:
+`npx playwright install chromium` (from `frontend/`). See
 `frontend/e2e/smoke.spec.ts`'s header for the exact requirements.
 
 ## Documentation
