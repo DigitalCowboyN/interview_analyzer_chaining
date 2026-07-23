@@ -36,7 +36,7 @@
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** M5.1 (Live workbench — real-time feed)
-**Tests:** 1271 unit passing, 17 skipped | **Coverage:** 92.32% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Tests:** 1304 unit passing, 17 skipped (+146 frontend Vitest) | **Coverage:** 92.41% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
