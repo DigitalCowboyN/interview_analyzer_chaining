@@ -112,6 +112,25 @@ ui-typegen:
 	@echo "Regenerating frontend OpenAPI types..."
 	cd frontend && npm run typegen
 
+# UI Playwright smoke (M5.0 Task 9): proves a real ingest is navigable in the
+# workbench AND that a UI-driven text edit round-trips through the real
+# event-sourced write path (command -> ESDB -> dockerized projection-service
+# -> Neo4j -> refetch). Mirrors `deployed-smoke`'s structure: same dev-stack
+# containers (the test-infra-up Neo4j/ESDB have no projection consumer), same
+# "don't rely on $(PYTHON)" pyenv pin. Playwright itself starts uvicorn + next
+# dev via its `webServer` config (frontend/playwright.config.ts); seeding is
+# a Python helper the spec shells out to (frontend/e2e/seed_smoke.py) — see
+# frontend/e2e/smoke.spec.ts's header for the full required-services list.
+# UI_SMOKE=1 gates the spec so a bare `npx playwright test` (or `npm test`,
+# which vitest.config.ts excludes e2e/ from entirely) never runs it.
+.PHONY: ui-smoke
+ui-smoke:
+	@echo "Building + starting neo4j, eventstore, projection-service (dev stack)..."
+	docker compose up -d --build neo4j eventstore projection-service
+	@echo "Waiting for services..."
+	docker compose ps
+	cd frontend && UI_SMOKE=1 npx playwright test
+
 # --- End Frontend --- #
 
 # Clean (optional)
@@ -176,6 +195,7 @@ help:
 	@echo "  ui-build             Production build of the frontend"
 	@echo "  ui-test              Frontend gates: lint + typecheck + vitest"
 	@echo "  ui-typegen           Regenerate OpenAPI types from the backend app object"
+	@echo "  ui-smoke             Playwright smoke: seeded interview -> transcript -> text-edit settle"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint                 Run flake8 linter"

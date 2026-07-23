@@ -13,6 +13,12 @@
 # testing
 /coverage
 
+# playwright (frontend/e2e/smoke.spec.ts, `make ui-smoke`)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # next.js
 /.next/
 /out/

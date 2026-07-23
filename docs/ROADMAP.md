@@ -29,13 +29,13 @@
 | **M4.6** | ✅ Complete | GraphRAG ask-the-corpus (hybrid retrieval + cited synthesis) |
 | **M4.7** | ✅ Complete | Hardening & operational readiness (schema, deploy path, ask/resolution hardening, persona lens, content corpus) |
 | **M4.8** | ✅ Complete | `:Sentence` shim drop (alias flips, vector-index retarget, migration-CLI deletion) — closes the M4.x arc |
-| **M5.0** | 📋 Planned | UI scaffolding (Next.js): two-surface app shell — workbench + gallery |
+| **M5.0** | ✅ Complete | UI scaffolding (Next.js): two-surface app shell — workbench + gallery |
 | **M5.1** | 📋 Planned | Live workbench: real-time projection feed (SSE/WebSocket), dynamic transcript |
 | **M5.2** | 📋 Planned | Edit observability: human-vs-machine event metrics, visualized in the gallery |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M5.0 (UI scaffolding — Next.js)
+**Current Phase:** M5.1 (Live workbench — real-time feed)
 **Tests:** 1271 unit passing, 17 skipped | **Coverage:** 92.32% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
@@ -86,6 +86,69 @@ streams (every event already carries an Actor: human vs machine, per
 interview/extractor/lens) + endpoint, visualized in the gallery; a standing
 metrics projection only if replay-on-demand gets slow. Goal: feed ingestion
 improvements and eventually automated learning.
+
+---
+
+### M5.0: UI Scaffolding (Next.js) ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-17-m50-ui-scaffolding-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-17-m50-ui-scaffolding.md`
+
+The first UI: a Next.js 15 app in `frontend/` split into the two surfaces the
+backend's CQRS split already implies — workbench (write side: projects →
+interviews → line-by-line transcript, every action a command against the
+existing correction endpoints) and gallery (read side: persona/person cards
+and core views, an actionable review worklist). No auth (dev `X-User-ID`
+identity switcher only), no upload, no real-time (polling/refetch-on-settle;
+live projection feed is M5.1), no synthesis.
+
+- [x] Task 1 (`cf0fb54`, fix `824f5ce`): `/ui/*` read layer
+      (`src/ui/reader.py` + `src/api/routers/ui.py`) — nav (projects,
+      interviews), transcript aggregate (lines with speaker/person/segment/
+      entities/lens-items), persona/person card + core-view reads, the
+      person-id derivation endpoint the loose-coupling section requires
+- [x] Task 2 (`f6536b1`): Next.js scaffold — app shell, dev identity switcher
+      (`X-User-ID` on every request, localStorage-persisted), typed API
+      client generated from OpenAPI (`openapi-typescript`,
+      `npm run typegen`/`typegen:check` drift gate)
+- [x] Task 3 (`19cde2b`): workbench navigation — projects list, interviews
+      list, click-through
+- [x] Task 4 (`4658a58`): transcript screen — lines, segment headings,
+      utterance grouping, metadata panel, line detail panel
+- [x] Task 5 (`f69e1bf`, fix `3e3660f`): correction intents — the one
+      intent-pattern wrapper (`frontend/src/hooks/mutations.ts`: fire →
+      pending → bounded confirm-poll → settled/timeout/reverted) plus its
+      first four flows: text edit, speaker rename/reattribute, segment
+      remove, lens-item override
+- [x] Task 6 (`f6209ee`): manual speaker→person linking — picker, create-new
+      (person-id derived server-side, never by the frontend), unlink; reuses
+      the Task 5 intent pattern verbatim
+- [x] Task 7 (`32d5e53`): gallery — persona/person card grids and core
+      views, respecting the person↔persona m:n / loosely-coupled model
+- [x] Task 8 (`34f1e53`): worklist — review rows (lens items, claims,
+      entity-merge and person-link suggestions), accept actions (Task 5's
+      intent pattern again, keyed to the worklist query instead of the
+      transcript), embedder-unavailable degradation banner
+- [x] Task 9: Playwright smoke (`frontend/e2e/smoke.spec.ts`,
+      `UI_SMOKE=1`-gated, `make ui-smoke`) — seeds one interview through the
+      real ingestion command path against the shared dev ESDB (mirroring
+      `test_deployed_projection_smoke.py`'s idiom, since only the
+      dockerized `projection-service` — not `test-infra-up`'s Neo4j — has a
+      live consumer), drives workbench nav → transcript render → a real
+      text edit through the UI → asserts the "edited" badge settles (proves
+      command → ESDB → projection → Neo4j → refetch end to end, not just a
+      202); README `frontend/` section; this ROADMAP update
+
+**Completed:** 2026-07-23
+
+**Deferred:** real auth (dev `X-User-ID` switcher stands in); file upload;
+real-time updates (M5.1 — a UI-notification projection consumer, committed);
+edit observability visualized in the gallery (M5.2, committed); persona
+synthesis — first-class archetype Personas aggregating contributions across
+persons (owner model, tracked under Technical Debt → Feature deferrals, not
+an M5.0 non-goal regression: the M5.0 UI types/routes already treat Persona
+as its own entity so the gallery extends rather than rewrites when this
+lands).
 
 ---
 
