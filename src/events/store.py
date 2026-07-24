@@ -340,6 +340,7 @@ class EventStoreClient:
             trace_id=metadata_dict.get("trace_id"),
             project_id=metadata_dict.get("project_id"),
             tags=metadata_dict.get("tags", []),
+            commit_position=recorded_event.commit_position,
         )
 
 
