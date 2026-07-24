@@ -215,6 +215,13 @@ async def stream_events(
             # connection fed by a dead watcher.
             subscription = hub.subscribe(interview_id=interview_id, project_id=project_id)
             await watcher.ensure_started()
+            # Prelude: flush one comment immediately so the response head
+            # reaches the client at connection time, not at the first
+            # heartbeat. A proxy (or Next route handler) that defers the
+            # response head until the first body byte would otherwise delay
+            # EventSource `onopen` by up to HEARTBEAT_SECONDS; the browser
+            # ignores SSE comment lines, so this is inert to the parser.
+            yield ": connected\n\n"
             while True:
                 if await request.is_disconnected():
                     break
