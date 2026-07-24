@@ -9,13 +9,26 @@ used deliberately: speaker assignment is parsed from labels, not inferred, so
 no LLM call happens during seeding (matches the brief: "seeding does NOT need
 enrichment/LLM calls").
 
-Two subcommands, both print one JSON line to stdout (spec parses it):
+Three subcommands, all print one JSON line to stdout (spec parses it):
 
-  seed     ingest a small fixed transcript; prints
-           {"project_id", "interview_id", "title", "first_line_text"}
-  cleanup  delete the seeded Interview/Fragment/Speaker/Utterance/Project
-           nodes from dev Neo4j (mirrors test_deployed_projection_smoke.py's
-           teardown query); takes --project-id and --interview-id
+  seed         ingest a small fixed transcript; prints
+               {"project_id", "interview_id", "title", "first_line_text",
+               "fragment_count"}
+  append-line  append ONE new line to an ALREADY-seeded interview via the
+               real command path (CreateSentenceCommand/SentenceCommandHandler
+               -- the same genesis event ingestion itself emits per fragment,
+               just issued directly instead of through IngestionOrchestrator
+               since that only ever creates a brand-new interview_id). This is
+               M5.1's live-append smoke leg: the transcript page must show
+               this line with NO user action, driven by the SSE bridge.
+               Takes --interview-id, --index (use the seed's fragment_count
+               so it doesn't collide with the seeded indices), --text; prints
+               {"sentence_id", "interview_id", "index", "text"}
+  cleanup      delete the seeded Interview/Fragment/Speaker/Utterance/Project
+               nodes from dev Neo4j (mirrors test_deployed_projection_smoke.py's
+               teardown query); takes --project-id and --interview-id (also
+               cleans up anything append-line added, via the same
+               interview_id-scoped DETACH DELETE)
 
 Self-contained: loads the repo-root .env (like tests/conftest.py's
 `_load_env_file`, so ANTHROPIC_API_KEY etc. are present for the agent-factory
@@ -98,6 +111,35 @@ async def _seed() -> dict:
         "interview_id": result.interview_id,
         "title": TITLE,
         "first_line_text": "We will go with Acme Corp and I'll draft the doc by Friday.",
+        "fragment_count": result.fragment_count,
+    }
+
+
+async def _append_line(interview_id: str, index: int, text: str) -> dict:
+    # Deferred import: same rationale as _seed()'s IngestionOrchestrator
+    # import -- only needed for this subcommand, not `cleanup`.
+    import uuid
+
+    from src.commands.handlers import get_sentence_command_handler
+    from src.commands.sentence_commands import CreateSentenceCommand
+    from src.events.envelope import Actor, ActorType
+
+    sentence_id = str(uuid.uuid4())
+    handler = get_sentence_command_handler()
+    command = CreateSentenceCommand(
+        sentence_id=sentence_id,
+        interview_id=interview_id,
+        index=index,
+        text=text,
+        actor=Actor(actor_type=ActorType.SYSTEM, user_id="ui-smoke-append"),
+    )
+    await handler.handle(command)
+
+    return {
+        "sentence_id": sentence_id,
+        "interview_id": interview_id,
+        "index": index,
+        "text": text,
     }
 
 
@@ -126,6 +168,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("seed")
+    append_parser = sub.add_parser("append-line")
+    append_parser.add_argument("--interview-id", required=True)
+    append_parser.add_argument("--index", required=True, type=int)
+    append_parser.add_argument("--text", required=True)
     cleanup_parser = sub.add_parser("cleanup")
     cleanup_parser.add_argument("--project-id", required=True)
     cleanup_parser.add_argument("--interview-id", required=True)
@@ -134,6 +180,8 @@ def main() -> None:
 
     if args.command == "seed":
         output = asyncio.run(_seed())
+    elif args.command == "append-line":
+        output = asyncio.run(_append_line(args.interview_id, args.index, args.text))
     else:
         output = asyncio.run(_cleanup(args.project_id, args.interview_id))
 

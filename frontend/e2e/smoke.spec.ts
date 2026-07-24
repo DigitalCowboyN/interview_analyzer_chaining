@@ -14,6 +14,16 @@ import { expect, test } from "@playwright/test";
  * "edited" badge settles (proves the projection consumer delivered the
  * SentenceEdited event, not just that the POST returned 202).
  *
+ * M5.1 Task 6 adds a second journey below: the "money shot" — with the
+ * transcript page already OPEN, a brand-new line is appended SERVER-SIDE
+ * (no UI interaction) and must appear on the page with NO user action at
+ * all (no click, no reload) — proof that the SSE bridge
+ * (src/ui/notifications.py's EsdbWatcher -> src/api/routers/ui.py's
+ * `/ui/streams/events` -> the frontend's `useLiveInvalidation` hook) is
+ * wired end to end, not just that a plain refetch-on-navigate works (the
+ * M5.0 journey above never proves that — it reloads the page fresh each
+ * time via `page.goto`/nav clicks).
+ *
  * REQUIRED SERVICES (all must be up before running; `make ui-smoke` handles
  * all of this):
  *   1. Dockerized dev stack: `docker compose up -d --build neo4j eventstore
@@ -62,6 +72,21 @@ interface SeedResult {
   interview_id: string;
   title: string;
   first_line_text: string;
+  fragment_count: number;
+}
+
+/** Shells out to seed_smoke.py's `append-line` subcommand — appends ONE new
+ * line to the ALREADY-seeded interview via the real command path
+ * (CreateSentenceCommand), independent of the UI. Used by the live-append
+ * journey below; see seed_smoke.py's header for why this needs a separate
+ * subcommand from `seed` (that one only ever creates a brand-new
+ * interview_id, never appends to an existing one). */
+function appendLine(interviewId: string, index: number, text: string): void {
+  execFileSync(
+    PYTHON_BIN,
+    [SEED_SCRIPT, "append-line", "--interview-id", interviewId, "--index", String(index), "--text", text],
+    { encoding: "utf-8", cwd: REPO_ROOT },
+  );
 }
 
 let seeded: SeedResult | undefined;
@@ -128,4 +153,37 @@ test("workbench nav renders seeded transcript, and a text edit settles", async (
   // text is a separate node, so this doesn't need exact to disambiguate
   // from it, but pins the intent precisely).
   await expect(lineButton.getByText("edited", { exact: true })).toBeVisible({ timeout: 40_000 });
+});
+
+test("a server-side line append appears live on an open transcript page with no user action", async ({
+  page,
+}) => {
+  const data = seeded!;
+
+  await page.goto(`/workbench/${encodeURIComponent(data.project_id)}/${data.interview_id}`);
+
+  // Baseline: the seeded lines are up, and the live indicator has connected
+  // (its EventSource onopen fired) -- both must be true before the append,
+  // or a later false-positive ("line appeared") could just be an ordinary
+  // slow initial render rather than a live update.
+  await expect(page.getByRole("button", { name: new RegExp(data.first_line_text) })).toBeVisible();
+  await expect(page.getByText("Live updates on")).toBeVisible({ timeout: 10_000 });
+
+  const liveText = "This line arrived live via the M5.1 UI smoke -- no reload, no click.";
+  const newLineButton = page.getByRole("button", { name: new RegExp(liveText) });
+  await expect(newLineButton).toHaveCount(0); // not present before the append
+
+  // Append server-side, through the real command path -- NOT through the
+  // page. No Playwright action (click/reload/goto) follows this call: the
+  // whole point is that the page updates itself.
+  appendLine(data.interview_id, data.fragment_count, liveText);
+
+  // Generous timeout in the same spirit as the text-edit journey above:
+  // command -> ESDB -> dockerized projection-service -> Neo4j -> the SSE
+  // bridge's ESDB catch-up subscription -> the browser's EventSource ->
+  // useLiveInvalidation's debounced invalidate -> refetch -> render. Each
+  // hop adds real latency; none of it involves a client-side poll loop
+  // (unlike the edit journey), so this is the only timeout budget covering
+  // the whole live path end to end.
+  await expect(newLineButton).toBeVisible({ timeout: 40_000 });
 });

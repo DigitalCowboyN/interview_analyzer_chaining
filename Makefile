@@ -182,6 +182,7 @@ help:
 	@echo ""
 	@echo "Deployed-Path Smoke:"
 	@echo "  deployed-smoke       Prove the dockerized projection path end-to-end (real containers)"
+	@echo "  live-feed-smoke      Prove the SSE live-feed bridge delivers a real ESDB event"
 	@echo ""
 	@echo "Application:"
 	@echo "  build                Build Docker images"
@@ -357,6 +358,35 @@ projection-smoke:
 	PROJECTION_SMOKE=1 ESDB_CONNECTION_STRING=esdb://localhost:2113?tls=false $$HOME/.pyenv/versions/3.10.7/bin/python -m pytest tests/integration/test_projection_ordering_smoke.py -q --no-cov
 
 # --- End Projection-Ordering Smoke --- #
+
+# --- Live-Feed Smoke (M5.1 Task 6) --- #
+# Proves the SSE bridge (src/ui/notifications.py's EsdbWatcher/NotificationHub
+# feeding src/api/routers/ui.py's `/ui/streams/events` route) delivers a real
+# ESDB event to a live subscriber -- see tests/integration/
+# test_live_feed_smoke.py's header for exactly what is and isn't exercised
+# (only ESDB directly; Neo4j/projection-service are brought up for a single
+# consistent dev-stack recipe across all three smokes, not because this
+# test's assertions touch them).
+# ESDB_CONNECTION_STRING is overridden here for the same reason as
+# frontend/e2e/seed_smoke.py's identical override: the committed .env points
+# ESDB at the docker-internal "eventstore" hostname, unresolvable from this
+# host-run pytest process. get_event_store_client() reads the env var lazily
+# on first use (not at import time), and tests/conftest.py's .env loader only
+# sets a key if it ISN'T already present -- so setting it here on the command
+# line (already in the environment before pytest/conftest ever runs) wins.
+# NOTE: deliberately NOT using $(PYTHON) here -- same rationale as
+# deployed-smoke above: $(PYTHON) can resolve to a pytest-less Homebrew
+# python in non-interactive shells, so the pyenv interpreter is pinned
+# directly, mirroring scripts/test.sh's convention.
+.PHONY: live-feed-smoke
+live-feed-smoke:
+	@echo "Building + starting neo4j, eventstore, projection-service (dev stack)..."
+	docker compose up -d --build neo4j eventstore projection-service
+	@echo "Waiting for services..."
+	docker compose ps
+	LIVE_FEED_SMOKE=1 ESDB_CONNECTION_STRING=esdb://localhost:2113?tls=false $$HOME/.pyenv/versions/3.10.7/bin/python -m pytest tests/integration/test_live_feed_smoke.py -q --no-cov
+
+# --- End Live-Feed Smoke --- #
 
 # --- Event Sourcing System Management --- #
 
