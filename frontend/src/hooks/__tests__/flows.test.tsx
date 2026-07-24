@@ -14,6 +14,7 @@ import {
   useWorklistPersonLinkAcceptIntent,
 } from "@/hooks/mutations";
 import { apiFetch } from "@/api/client";
+import { queryKeys } from "@/hooks/queryKeys";
 
 /**
  * One test per correction flow (M5.0 Task 5): asserts the exact endpoint and
@@ -96,6 +97,35 @@ describe("correction flow hooks — endpoint/body pinning", () => {
     });
 
     await outcomePromise;
+  });
+
+  it("text edit settle also invalidates the sentence-history query so an open history panel refreshes", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    const initialData = {
+      lines: [{ fragment_id: "f1", sequence_order: 3, edited: true, speaker: null, segment: null, lens_items: [] }],
+    };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryDefaults(QUERY_KEY, { queryFn: async () => initialData });
+    client.setQueryData(QUERY_KEY, initialData);
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+
+    function Wrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    }
+
+    const { result } = renderHook(() => useTextEditIntent("i1", QUERY_KEY, POLL_OPTIONS), {
+      wrapper: Wrapper,
+    });
+    const outcome = await result.current.editText(3, "corrected text");
+
+    expect(outcome.status).toBe("settled");
+    // Both the transcript query (the shared intent core's own invalidation)
+    // AND the sentence-history query for this exact sentence must be
+    // invalidated — not just one or the other.
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEY });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.sentenceHistory("i1", 3),
+    });
   });
 
   it("speaker rename: POST /speakers/{interview_id}/{speaker_id}/rename", async () => {

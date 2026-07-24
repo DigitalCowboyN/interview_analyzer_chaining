@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/api/client";
+import { apiFetch, encodePath } from "@/api/client";
+import { queryKeys } from "@/hooks/queryKeys";
 
 /**
  * The correction-intent pattern (M5.0 Task 5). Every write in the workbench
@@ -76,6 +77,12 @@ async function pollUntilReflected(
     const data = await queryClient.refetchQueries({ queryKey, exact: true }).then(
       () => queryClient.getQueryData(queryKey),
     );
+    // The query may not have landed in the cache yet. Absence-style
+    // predicates (e.g. "the segment is gone" -> `!findLine(...)`) would
+    // otherwise read `undefined` as a false settle on the very first tick —
+    // treat "no data at all" as NOT reflected instead of handing `undefined`
+    // to the predicate.
+    if (data === undefined) continue;
     if (isReflected(data)) return true;
   }
   return false;
@@ -253,12 +260,13 @@ export function useTextEditIntent(
   pollOptions?: FlowIntentPollOptions,
 ) {
   const intent = useCorrectionIntent({ queryKey: transcriptQueryKey, ...pollOptions });
+  const queryClient = useQueryClient();
 
   const editText = useCallback(
-    (sentenceIndex: number, text: string, note?: string) =>
-      intent.run(
+    async (sentenceIndex: number, text: string, note?: string) => {
+      const outcome = await intent.run(
         () =>
-          apiFetch(`/edits/sentences/${interviewId}/${sentenceIndex}/edit`, {
+          apiFetch(encodePath`/edits/sentences/${interviewId}/${sentenceIndex}/edit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text, editor_type: "human", ...(note ? { note } : {}) }),
@@ -267,8 +275,19 @@ export function useTextEditIntent(
           Boolean(
             findLine(data, (line) => line.sequence_order === sentenceIndex && line.edited),
           ),
-      ),
-    [intent, interviewId],
+      );
+      // An open history panel (useSentenceHistory) polls its own query key —
+      // the transcript invalidation above doesn't touch it, so a settled
+      // edit would otherwise leave a stale history list until something
+      // else happens to refetch it.
+      if (outcome.status === "settled") {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.sentenceHistory(interviewId, sentenceIndex),
+        });
+      }
+      return outcome;
+    },
+    [intent, interviewId, queryClient],
   );
 
   return { ...intent, editText };
@@ -286,7 +305,7 @@ export function useSpeakerRenameIntent(
     (speakerId: string, newDisplayName: string) =>
       intent.run(
         () =>
-          apiFetch(`/speakers/${interviewId}/${speakerId}/rename`, {
+          apiFetch(encodePath`/speakers/${interviewId}/${speakerId}/rename`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ new_display_name: newDisplayName }),
@@ -319,7 +338,7 @@ export function useFragmentReattributeIntent(
     (fragmentIndex: number, newSpeakerId: string) =>
       intent.run(
         () =>
-          apiFetch(`/speakers/${interviewId}/fragments/${fragmentIndex}/reattribute`, {
+          apiFetch(encodePath`/speakers/${interviewId}/fragments/${fragmentIndex}/reattribute`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ new_speaker_id: newSpeakerId }),
@@ -352,7 +371,10 @@ export function useSegmentRemoveIntent(
     (segmentId: string, reason?: string) => {
       const query = reason ? `?reason=${encodeURIComponent(reason)}` : "";
       return intent.run(
-        () => apiFetch(`/segments/${interviewId}/${segmentId}${query}`, { method: "DELETE" }),
+        () =>
+          apiFetch(`${encodePath`/segments/${interviewId}/${segmentId}`}${query}`, {
+            method: "DELETE",
+          }),
         (data) => !findLine(data, (line) => line.segment?.segment_id === segmentId),
       );
     },
@@ -385,7 +407,7 @@ export function usePersonLinkIntent(
     (personId: string, speakerId: string, displayName?: string) =>
       intent.run(
         () =>
-          apiFetch(`/resolution/${projectId}/persons/${personId}/link`, {
+          apiFetch(encodePath`/resolution/${projectId}/persons/${personId}/link`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -427,7 +449,7 @@ export function usePersonUnlinkIntent(
     (personId: string, speakerId: string, note?: string) =>
       intent.run(
         () =>
-          apiFetch(`/resolution/${projectId}/persons/${personId}/unlink`, {
+          apiFetch(encodePath`/resolution/${projectId}/persons/${personId}/unlink`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -460,7 +482,7 @@ export function useLensItemOverrideIntent(
     (itemId: string, fieldsOverridden: Record<string, unknown>, note?: string) =>
       intent.run(
         () =>
-          apiFetch(`/lenses/${interviewId}/items/${itemId}/override`, {
+          apiFetch(encodePath`/lenses/${interviewId}/items/${itemId}/override`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ fields_overridden: fieldsOverridden, ...(note ? { note } : {}) }),
@@ -523,7 +545,7 @@ export function useEntityMergeAcceptIntent(
     (survivingCanonicalId: string, mergedCanonicalId: string) =>
       intent.run(
         () =>
-          apiFetch(`/resolution/${projectId}/entities/merge`, {
+          apiFetch(encodePath`/resolution/${projectId}/entities/merge`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -566,7 +588,7 @@ export function useWorklistPersonLinkAcceptIntent(
     (personId: string, interviewId: string, speakerId: string, displayName: string) =>
       intent.run(
         () =>
-          apiFetch(`/resolution/${projectId}/persons/${personId}/link`, {
+          apiFetch(encodePath`/resolution/${projectId}/persons/${personId}/link`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

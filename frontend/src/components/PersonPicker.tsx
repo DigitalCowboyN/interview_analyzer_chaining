@@ -3,6 +3,7 @@ import { usePersons, usePersonId } from "@/hooks/usePersons";
 import { usePersonLinkIntent, type CorrectionNotice, type FlowIntentPollOptions } from "@/hooks/mutations";
 import { queryKeys } from "@/hooks/queryKeys";
 import { StateGate } from "@/components/StateGate";
+import { NoticeText } from "@/components/NoticeText";
 import { ApiError } from "@/api/client";
 
 export interface PersonPickerProps {
@@ -138,17 +139,7 @@ export function PersonPicker({
         </button>
       </div>
 
-      <PersonPickerNotice notice={notice ?? deriveNotice} />
+      <NoticeText notice={notice ?? deriveNotice} className="mt-2" />
     </div>
-  );
-}
-
-function PersonPickerNotice({ notice }: { notice: CorrectionNotice | null }) {
-  if (!notice) return null;
-  const tone = notice.kind === "timeout" ? "text-neutral-500" : "text-red-600";
-  return (
-    <p role={notice.kind === "timeout" ? "status" : "alert"} className={`mt-2 text-xs ${tone}`}>
-      {notice.message}
-    </p>
   );
 }

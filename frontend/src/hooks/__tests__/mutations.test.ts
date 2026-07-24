@@ -139,6 +139,46 @@ describe("runCorrectionIntent", () => {
     expect(isReflected).not.toHaveBeenCalled();
   });
 
+  it("treats getQueryData()===undefined as NOT reflected and keeps polling (absence-predicate guard)", async () => {
+    // A fake QueryClient (duck-typed to the two methods pollUntilReflected
+    // actually calls) so we can force the exact race the guard protects
+    // against: the query hasn't landed in the cache yet on the first poll.
+    const fakeQueryClient = {
+      refetchQueries: vi.fn().mockResolvedValue(undefined),
+      getQueryData: vi
+        .fn()
+        .mockReturnValueOnce(undefined) // first poll: not in cache yet
+        .mockReturnValueOnce({ present: false }), // second poll: reflected
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+    } as unknown as QueryClient;
+
+    const request = vi.fn().mockResolvedValue(mockResponse(202, { status: "accepted" }));
+    // An absence-style predicate, like the real `!findLine(...)` /
+    // `!worklist?.foo?.some(...)` shapes this guards: negating an absent
+    // field reads as `true` for `undefined`. Without the guard this would
+    // settle on the very first (undefined) poll.
+    const isReflected = vi.fn((data: unknown) => !(data as { present?: boolean })?.present);
+
+    const outcomePromise = runCorrectionIntent({
+      queryClient: fakeQueryClient,
+      request,
+      queryKey: QUERY_KEY,
+      isReflected,
+    });
+
+    await vi.advanceTimersByTimeAsync(2000); // first poll tick: undefined data
+    await vi.advanceTimersByTimeAsync(2000); // second poll tick: defined data
+
+    const outcome = await outcomePromise;
+    expect(outcome.status).toBe("settled");
+    // The loop must have continued past the undefined poll rather than
+    // settling on it: two getQueryData calls happened, but the predicate
+    // was only ever invoked once, on the defined data.
+    expect(fakeQueryClient.getQueryData).toHaveBeenCalledTimes(2);
+    expect(isReflected).toHaveBeenCalledTimes(1);
+    expect(isReflected).toHaveBeenCalledWith({ present: false });
+  });
+
   it("reverts with a notice on network failure", async () => {
     const request = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
     const isReflected = vi.fn(() => true);

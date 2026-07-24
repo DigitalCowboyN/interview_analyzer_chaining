@@ -13,6 +13,23 @@ import type { paths } from "./schema.d.ts";
 
 const API_BASE = "/api";
 
+/**
+ * Tagged template that percent-encodes every interpolated value in a URL
+ * path — ids (speaker, segment, person, sentence index, …) may contain
+ * characters that are URL-meaningful (e.g. `/`), and a raw `${id}`
+ * interpolation would otherwise corrupt the path or silently address the
+ * wrong resource. Usage: `` encodePath`/segments/${interviewId}/${segmentId}` ``.
+ */
+export function encodePath(
+  strings: TemplateStringsArray,
+  ...ids: (string | number)[]
+): string {
+  return strings.reduce(
+    (acc, part, i) => acc + part + (i < ids.length ? encodeURIComponent(String(ids[i])) : ""),
+    "",
+  );
+}
+
 export class ApiError extends Error {
   status: number;
   detail: unknown;

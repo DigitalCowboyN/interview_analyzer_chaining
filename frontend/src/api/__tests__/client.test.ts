@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { apiFetch, apiGet, ApiError } from "@/api/client";
+import { apiFetch, apiGet, ApiError, encodePath } from "@/api/client";
 
 describe("apiFetch", () => {
   const originalFetch = global.fetch;
@@ -62,5 +62,30 @@ describe("apiFetch", () => {
       status: 404,
       detail: "not found",
     } satisfies Partial<ApiError>);
+  });
+});
+
+describe("encodePath", () => {
+  it("percent-encodes interpolated ids, e.g. a slash becomes %2F", () => {
+    const segmentId = "weird/id";
+    const url = encodePath`/segments/${"i1"}/${segmentId}`;
+    expect(url).toBe("/segments/i1/weird%2Fid");
+  });
+
+  it("leaves plain ids without special characters unchanged", () => {
+    const url = encodePath`/edits/sentences/${"i1"}/${"3"}/edit`;
+    expect(url).toBe("/edits/sentences/i1/3/edit");
+  });
+
+  it("is used by a mutation flow's fetch call — an id containing '/' is encoded in the actual request URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "accepted" }), { status: 202 }),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await apiFetch(encodePath`/segments/${"i1"}/${"weird/id"}`, { method: "DELETE" });
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/segments/i1/weird%2Fid");
   });
 });

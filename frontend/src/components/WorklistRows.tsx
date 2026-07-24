@@ -3,9 +3,9 @@ import { queryKeys } from "@/hooks/queryKeys";
 import {
   useEntityMergeAcceptIntent,
   useWorklistPersonLinkAcceptIntent,
-  type CorrectionNotice,
   type FlowIntentPollOptions,
 } from "@/hooks/mutations";
+import { NoticeText } from "@/components/NoticeText";
 import type {
   WorklistData,
   WorklistLensItem,
@@ -26,16 +26,6 @@ const DEGRADED_MESSAGE = "suggestions degraded — embedding provider unavailabl
 
 function workbenchHref(projectId: string, interviewId: string): string {
   return `/workbench/${encodeURIComponent(projectId)}/${encodeURIComponent(interviewId)}`;
-}
-
-function NoticeText({ notice }: { notice: CorrectionNotice | null }) {
-  if (!notice) return null;
-  const tone = notice.kind === "timeout" ? "text-neutral-500" : "text-red-600";
-  return (
-    <p role={notice.kind === "timeout" ? "status" : "alert"} className={`mt-1 text-xs ${tone}`}>
-      {notice.message}
-    </p>
-  );
 }
 
 function DegradationBanner({ flags }: { flags: string[] }) {

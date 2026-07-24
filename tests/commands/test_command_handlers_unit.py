@@ -392,6 +392,54 @@ class TestSentenceCommandHandlerUnit:
             assert "same as current text" in str(exc_info.value)
             assert not isinstance(exc_info.value, CommandExecutionError)
 
+    async def test_override_analysis_same_value_yields_command_validation_error(self):
+        """Parity with _handle_edit: the aggregate call inside
+        _handle_override_analysis is wrapped so a domain ValueError (e.g. a
+        same-value override) maps to CommandValidationError (-> 409), not
+        CommandExecutionError (-> 500). `override_analysis` has no
+        same-value guard today, so this test drives the wrap directly by
+        having the aggregate call raise ValueError — the same shape
+        `_handle_edit`'s real same-text check produces."""
+        sentence_id = str(uuid.uuid4())
+        interview_id = str(uuid.uuid4())
+
+        existing_sentence = Fragment(sentence_id)
+        existing_sentence.create(
+            interview_id=interview_id,
+            index=0,
+            text="Test sentence.",
+            actor=Actor(user_id="test", actor_type=ActorType.SYSTEM, display="Test"),
+        )
+        existing_sentence.mark_events_as_committed()
+        existing_sentence.override_analysis = MagicMock(
+            side_effect=ValueError("Overridden fields are unchanged from current values")
+        )
+
+        mock_repo = AsyncMock()
+        mock_repo.load.return_value = existing_sentence
+
+        mock_factory = MagicMock()
+        mock_factory.create_fragment_repository.return_value = mock_repo
+
+        with patch("src.commands.handlers.RepositoryFactory", return_value=mock_factory):
+            handler = SentenceCommandHandler()
+            handler.repo_factory = mock_factory
+
+            command = OverrideAnalysisCommand(
+                sentence_id=sentence_id,
+                interview_id=interview_id,
+                fields_overridden={"function_type": "question"},
+                actor=Actor(user_id="test-user", actor_type=ActorType.HUMAN, display="Test User"),
+            )
+
+            from src.commands import CommandExecutionError, CommandValidationError
+
+            with pytest.raises(CommandValidationError) as exc_info:
+                await handler.handle(command)
+
+            assert "unchanged" in str(exc_info.value)
+            assert not isinstance(exc_info.value, CommandExecutionError)
+
     async def test_create_sentence_already_exists(self):
         """Test creating a sentence that already exists."""
         sentence_id = str(uuid.uuid4())
