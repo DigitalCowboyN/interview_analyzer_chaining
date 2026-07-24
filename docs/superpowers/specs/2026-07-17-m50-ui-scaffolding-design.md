@@ -90,6 +90,11 @@ route handlers (an extra hop nothing needs before M5.1).
 | `GET /ui/projects/{project_id}/persons` | Person card data (display name, linked-speaker/interview counts) |
 | `GET /ui/persons/{project_id}/{person_id}` | Person core view: identity facts — linked speakers per interview, aliases, contributes-to persona profile link |
 
+> **Deviation note (final review, 2026-07-24):** "aliases" above was a spec
+> defect — the backend has no person-alias concept, so there was nothing to
+> build. Person aliases are deferred until the backend grows one (owner
+> confirmed at M5.0 merge).
+
 All project-scoped queries pin `(:Project {project_id})-[:CONTAINS_INTERVIEW]->`
 (the M4.5b leak class). Reads only — the router contains zero write paths.
 
