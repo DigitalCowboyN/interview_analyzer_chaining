@@ -458,6 +458,26 @@ class TestInterviewHandlers:
         assert "metadata_json" in read_query
         assert "i.metadata_json" in write_query
 
+    async def test_interview_metadata_updated_none_metadata_diff_skips_write(self):
+        """Payload with metadata_diff=None skips metadata write (guard consistency)."""
+        handler = InterviewMetadataUpdatedHandler()
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=AsyncMock())
+
+        event = EventEnvelope(
+            event_type="InterviewMetadataUpdated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=str(uuid.uuid4()),
+            version=1,
+            data={"metadata_diff": None},
+        )
+
+        await handler.apply(mock_tx, event)
+
+        # Should have no calls since metadata_diff is None (early return due to no updates)
+        mock_tx.run.assert_not_called()
+
     async def test_interview_status_changed_handler(self):
         """Test StatusChanged handler updates status."""
         handler = InterviewStatusChangedHandler()

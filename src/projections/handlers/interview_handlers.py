@@ -118,7 +118,7 @@ class InterviewMetadataUpdatedHandler(BaseProjectionHandler):
             updates.append("i.language = $language")
             params["language"] = data["language"]
 
-        if "metadata_diff" in data:
+        if "metadata_diff" in data and data["metadata_diff"] is not None:
             params["metadata_json"] = await self._merge_metadata_json(tx, event.aggregate_id, data["metadata_diff"])
             updates.append("i.metadata_json = $metadata_json")
 
