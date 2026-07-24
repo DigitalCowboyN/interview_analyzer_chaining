@@ -5,6 +5,7 @@ Tests version checking, idempotency, retry logic, and Neo4j query correctness
 without requiring actual Neo4j or EventStoreDB.
 """
 
+import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, call
 
@@ -350,6 +351,112 @@ class TestInterviewHandlers:
         assert "SET" in query
         assert "i.title" in query
         assert "i.language" in query
+
+    async def test_interview_metadata_updated_diff_onto_empty_node_sets_full_dict(self):
+        """metadata_diff onto a node with no existing metadata_json sets the full dict."""
+        handler = InterviewMetadataUpdatedHandler()
+
+        mock_read_result = AsyncMock()
+        mock_read_result.single = AsyncMock(return_value=None)  # no metadata_json yet
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(side_effect=[mock_read_result, AsyncMock()])
+
+        event = EventEnvelope(
+            event_type="InterviewMetadataUpdated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=str(uuid.uuid4()),
+            version=1,
+            data={"metadata_diff": {"interviewer": "Alice", "location": "Remote"}},
+        )
+
+        await handler.apply(mock_tx, event)
+
+        assert mock_tx.run.call_count == 2
+        write_call = mock_tx.run.call_args_list[1]
+        write_query = write_call[0][0]
+        write_params = write_call[1]
+        assert "i.metadata_json" in write_query
+        assert json.loads(write_params["metadata_json"]) == {
+            "interviewer": "Alice",
+            "location": "Remote",
+        }
+
+    async def test_interview_metadata_updated_diff_merges_over_existing_keys(self):
+        """metadata_diff overwrites matching keys, keeps untouched ones."""
+        handler = InterviewMetadataUpdatedHandler()
+
+        existing = json.dumps({"interviewer": "Bob", "location": "Onsite"}, sort_keys=True)
+        mock_read_result = AsyncMock()
+        mock_read_result.single = AsyncMock(return_value={"metadata_json": existing})
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(side_effect=[mock_read_result, AsyncMock()])
+
+        event = EventEnvelope(
+            event_type="InterviewMetadataUpdated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=str(uuid.uuid4()),
+            version=1,
+            data={"metadata_diff": {"interviewer": "Alice"}},
+        )
+
+        await handler.apply(mock_tx, event)
+
+        write_params = mock_tx.run.call_args_list[1][1]
+        assert json.loads(write_params["metadata_json"]) == {
+            "interviewer": "Alice",
+            "location": "Onsite",
+        }
+
+    async def test_interview_metadata_updated_none_value_deletes_key(self):
+        """A metadata_diff key with value None deletes that key from the merged dict."""
+        handler = InterviewMetadataUpdatedHandler()
+
+        existing = json.dumps({"interviewer": "Alice", "location": "Onsite"}, sort_keys=True)
+        mock_read_result = AsyncMock()
+        mock_read_result.single = AsyncMock(return_value={"metadata_json": existing})
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(side_effect=[mock_read_result, AsyncMock()])
+
+        event = EventEnvelope(
+            event_type="InterviewMetadataUpdated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=str(uuid.uuid4()),
+            version=1,
+            data={"metadata_diff": {"location": None}},
+        )
+
+        await handler.apply(mock_tx, event)
+
+        write_params = mock_tx.run.call_args_list[1][1]
+        assert json.loads(write_params["metadata_json"]) == {"interviewer": "Alice"}
+
+    async def test_interview_metadata_updated_query_text_pins_metadata_json(self):
+        """Both the read-merge query and the write SET clause reference metadata_json."""
+        handler = InterviewMetadataUpdatedHandler()
+
+        mock_read_result = AsyncMock()
+        mock_read_result.single = AsyncMock(return_value=None)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(side_effect=[mock_read_result, AsyncMock()])
+
+        event = EventEnvelope(
+            event_type="InterviewMetadataUpdated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=str(uuid.uuid4()),
+            version=1,
+            data={"metadata_diff": {"interviewer": "Alice"}},
+        )
+
+        await handler.apply(mock_tx, event)
+
+        read_query = mock_tx.run.call_args_list[0][0][0]
+        write_query = mock_tx.run.call_args_list[1][0][0]
+        assert "metadata_json" in read_query
+        assert "i.metadata_json" in write_query
 
     async def test_interview_status_changed_handler(self):
         """Test StatusChanged handler updates status."""

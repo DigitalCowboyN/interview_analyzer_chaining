@@ -4,6 +4,7 @@ Handlers for Interview-related events.
 Handles InterviewCreated, InterviewUpdated, StatusChanged, etc.
 """
 
+import json
 import logging
 
 from src.events.envelope import EventEnvelope
@@ -118,9 +119,8 @@ class InterviewMetadataUpdatedHandler(BaseProjectionHandler):
             params["language"] = data["language"]
 
         if "metadata_diff" in data:
-            # For now, we'll skip complex metadata updates
-            # In a real implementation, you'd merge the metadata JSON
-            pass
+            params["metadata_json"] = await self._merge_metadata_json(tx, event.aggregate_id, data["metadata_diff"])
+            updates.append("i.metadata_json = $metadata_json")
 
         if not updates:
             logger.debug(f"No updates to apply for event {event.event_id}")
@@ -137,6 +137,49 @@ class InterviewMetadataUpdatedHandler(BaseProjectionHandler):
         await tx.run(query, **params)
 
         logger.info(f"Updated Interview metadata for {event.aggregate_id}")
+
+    @staticmethod
+    async def _merge_metadata_json(tx, aggregate_id: str, metadata_diff: dict) -> str:
+        """Read-merge-write the Interview's metadata_json property.
+
+        Neo4j can't store nested maps as node properties, so metadata is kept
+        as a JSON string. Merge semantics: top-level key merge where diff
+        keys overwrite existing keys, and a diff value of None deletes that
+        key from the stored dict.
+
+        Read-then-write here (a preliminary read query before the SET, both
+        within this same handler execution) is safe despite not being a
+        single atomic statement: the projection service's LaneManager
+        serializes events per interview (one lane per interview_id), so no
+        concurrent writer can race this read with another write for the
+        same interview.
+        """
+        read_query = """
+        MATCH (i:Interview {aggregate_id: $aggregate_id})
+        RETURN i.metadata_json AS metadata_json
+        """
+        result = await tx.run(read_query, aggregate_id=aggregate_id)
+        record = await result.single()
+        raw = record["metadata_json"] if record else None
+
+        current = {}
+        if raw:
+            try:
+                current = json.loads(raw)
+            except (TypeError, ValueError) as exc:
+                logger.warning(
+                    f"Malformed metadata_json for interview {aggregate_id}, resetting to {{}}: {exc}"
+                )
+                current = {}
+
+        merged = dict(current)
+        for key, value in metadata_diff.items():
+            if value is None:
+                merged.pop(key, None)
+            else:
+                merged[key] = value
+
+        return json.dumps(merged, sort_keys=True)
 
 
 class InterviewStatusChangedHandler(BaseProjectionHandler):
