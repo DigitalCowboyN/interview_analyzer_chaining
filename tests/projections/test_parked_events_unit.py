@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from esdbclient import StreamState
+from esdbclient.exceptions import WrongCurrentVersion
 
 from src.events.envelope import Actor, ActorType, EventEnvelope
 from src.projections.parked_events import ParkedEvent, ParkedEventsManager
@@ -282,6 +284,81 @@ class TestParkedEventsManagerParkEvent:
         tags = parked_envelope.tags
         assert f"original_event_id:{original_event.event_id}" in tags
         assert f"original_event_type:{original_event.event_type}" in tags
+
+    async def test_park_event_uses_stream_state_any(self):
+        """Parking must pass expected_version=StreamState.ANY (append-only DLQ semantics).
+
+        Without this, the first park to a `parked-<type>` stream implicitly
+        defaults to StreamState.NO_STREAM (create-new-stream), and every
+        subsequent park to the same stream raises WrongCurrentVersion, which
+        park_event swallows -- silently losing the parked event.
+        """
+        mock_store = AsyncMock()
+        mock_store.append_events = AsyncMock()
+        manager = ParkedEventsManager(event_store=mock_store)
+
+        original_event = create_test_envelope(
+            event_type="SentenceCreated",
+            aggregate_type="Sentence",
+        )
+
+        await manager.park_event(
+            event=original_event,
+            error=ValueError("boom"),
+            retry_count=1,
+            lane_id=0,
+        )
+
+        call_kwargs = mock_store.append_events.call_args.kwargs
+        assert call_kwargs.get("expected_version") is StreamState.ANY
+
+    async def test_park_event_second_park_to_same_stream_does_not_raise_or_lose_event(self):
+        """Two parks of the same aggregate_type (same parked-<type> stream) must both succeed.
+
+        Simulates a fake store that models real NO_STREAM concurrency semantics:
+        the first append to a stream succeeds regardless of expected_version,
+        but a second append with expected_version=StreamState.NO_STREAM (or
+        None, which store.append_events defaults to NO_STREAM) raises
+        WrongCurrentVersion -- reproducing today's data-loss bug. Passing
+        StreamState.ANY must let both appends through.
+        """
+        appended_streams = {}
+
+        async def fake_append_events(stream_name, events, expected_version=None):
+            is_new_stream = stream_name not in appended_streams
+            if not is_new_stream and expected_version is not StreamState.ANY:
+                raise WrongCurrentVersion("stream already exists")
+            appended_streams.setdefault(stream_name, []).extend(events)
+            return 0
+
+        mock_store = AsyncMock()
+        mock_store.append_events = AsyncMock(side_effect=fake_append_events)
+        manager = ParkedEventsManager(event_store=mock_store)
+
+        event_one = create_test_envelope(event_type="SentenceCreated", aggregate_type="Sentence")
+        event_two = create_test_envelope(event_type="SentenceUpdated", aggregate_type="Sentence")
+
+        await manager.park_event(event=event_one, error=ValueError("first"), retry_count=1, lane_id=0)
+        await manager.park_event(event=event_two, error=ValueError("second"), retry_count=2, lane_id=1)
+
+        assert mock_store.append_events.call_count == 2
+        for call in mock_store.append_events.call_args_list:
+            assert call.kwargs.get("expected_version") is StreamState.ANY
+
+        # Both parked events landed in the same stream -- neither was lost.
+        stream_name = mock_store.append_events.call_args_list[0].args[0]
+        assert len(appended_streams[stream_name]) == 2
+        parked_payloads = [envelope.data["error"]["message"] for envelope in appended_streams[stream_name]]
+        assert parked_payloads == ["first", "second"]
+
+        # Parked event shape/tags unchanged.
+        first_envelope, second_envelope = appended_streams[stream_name]
+        assert first_envelope.event_type == "EventParked"
+        assert first_envelope.aggregate_type == "Sentence"
+        assert f"original_event_id:{event_one.event_id}" in first_envelope.tags
+        assert f"original_event_type:{event_one.event_type}" in first_envelope.tags
+        assert second_envelope.event_type == "EventParked"
+        assert f"original_event_id:{event_two.event_id}" in second_envelope.tags
 
 
 @pytest.mark.asyncio

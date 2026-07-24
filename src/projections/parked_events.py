@@ -10,6 +10,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from esdbclient import StreamState  # type: ignore[import-untyped]
+
 from src.events.envelope import EventEnvelope
 from src.events.store import EventStoreClient, get_event_store_client
 
@@ -144,7 +146,10 @@ class ParkedEventsManager:
                 ],
             )
 
-            await self.event_store.append_events(stream_name, [parked_envelope])
+            # Parked streams are append-only DLQ logs with no concurrency
+            # invariant: use StreamState.ANY so parking never fails due to
+            # optimistic-concurrency checks against the parked-<type> stream.
+            await self.event_store.append_events(stream_name, [parked_envelope], expected_version=StreamState.ANY)
 
             logger.error(
                 f"Parked event {event.event_id} (type: {event.event_type}, "
