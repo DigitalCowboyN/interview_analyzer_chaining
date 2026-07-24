@@ -2,7 +2,7 @@
 
 An event-sourced system for processing interview transcripts with AI-powered multi-dimensional sentence analysis.
 
-> **Status:** M4.8 Complete (`:Sentence` shim drop — `Fragment`-only label, deprecated aliases removed, one-shot migration for pre-existing graphs)
+> **Status:** M5.0 Complete (UI scaffolding — Next.js workbench + gallery, correction intents, manual speaker→person linking, Playwright smoke)
 >
 > See [ROADMAP.md](docs/ROADMAP.md) for milestones, exact test/coverage stats, and [docs/architecture/](docs/architecture/) for detailed diagrams.
 
@@ -25,6 +25,8 @@ Then export it: `python -m src.export <interview_id> meeting_minutes`.
 Then ask it a question: `python -m src.ask <project_id> "What did they decide about Acme Corp?"` (or `POST /ask/{project_id}`).
 
 Want sample content to try any of this against? See `data/samples/` (`MANIFEST.md` maps each transcript to the capability it exercises — mature labeled interviews, mixed/adversarial speaker labeling, and raw unlabeled transcripts).
+
+There's also a Next.js UI in `frontend/` — see the [Frontend](#frontend-nextjs-ui) section below.
 
 ## Architecture
 
@@ -160,6 +162,62 @@ make test           # Run test suite
 make run-pipeline   # Process input files
 make clean          # Stop and remove containers
 ```
+
+## Frontend (Next.js UI)
+
+A Next.js 15 app in `frontend/` — two surfaces mirroring the backend's CQRS
+split: **workbench** (write side — projects → interviews → transcript, with
+inline correction affordances: text edit, speaker rename/reattribute, segment
+remove, lens-item override, manual speaker→person linking) and **gallery**
+(read side — persona/person cards and core views, an actionable review
+worklist). Every write goes through the existing correction endpoints as a
+command (fire → pending → bounded confirm-poll → settled), never a direct
+state mutation.
+
+**Dev quickstart:**
+
+```bash
+make ui-dev   # cd frontend && npm run dev — http://localhost:3000
+```
+
+`next.config.ts` rewrites the frontend's same-origin `/api/*` calls to the
+FastAPI backend at `:8000` (no CORS) — start the backend separately
+(`make run` or `make run-api`) for the UI to have data to show.
+
+**Identity:** there's no real auth yet (a future milestone). Every API
+request carries an `X-User-ID` header from a small dev identity switcher in
+the app header (localStorage-persisted, defaults to `"dev"`) — corrections
+are attributed to whichever identity is currently selected.
+
+**Typegen workflow:** the frontend's API client is fully typed against the
+backend's OpenAPI schema (`frontend/openapi.json` + generated
+`frontend/src/api/schema.d.ts`). After any backend contract change:
+
+```bash
+make ui-typegen          # regenerate both files (no running server needed)
+```
+
+`npm run typegen:check` (in `frontend/`) diffs a fresh regen against the
+committed files and fails on drift — run it if you're unsure the committed
+types still match the backend.
+
+**Gates:**
+
+```bash
+make ui-test    # cd frontend && npm run lint && npm run typecheck && npm test
+make ui-build   # cd frontend && npm run build (production build)
+make ui-smoke   # Playwright: seeded interview → transcript → text-edit settle
+```
+
+`ui-smoke` is env-gated (`UI_SMOKE=1`) and NOT part of `ui-test` — it needs
+the dockerized dev stack (`neo4j`, `eventstore`, `projection-service`) up
+since only that stack's projection consumer delivers events to Neo4j; it
+brings those containers up itself, starts the backend + frontend dev servers
+via Playwright's `webServer` config, seeds one interview through the real
+ingestion command path, and drives a full browser journey. On a machine
+that's never run Playwright before, first run the one-time browser install:
+`npx playwright install chromium` (from `frontend/`). See
+`frontend/e2e/smoke.spec.ts`'s header for the exact requirements.
 
 ## Documentation
 

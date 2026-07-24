@@ -153,3 +153,9 @@ logs/
 .devcontainer/devcontainer.env
 .aider*
 repomix-output.xml
+
+# Frontend (Next.js) build artifacts — see frontend/ for the app itself
+frontend/node_modules/
+frontend/.next/
+frontend/test-results/
+frontend/coverage/

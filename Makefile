@@ -84,6 +84,55 @@ run-worker:
 	@echo "Starting Celery worker..."
 	celery -A src.celery_app worker --loglevel=info
 
+# --- Frontend (Next.js UI in frontend/) --- #
+
+# Run the frontend dev server
+.PHONY: ui-dev
+ui-dev:
+	@echo "Starting frontend dev server..."
+	cd frontend && npm run dev
+
+# Production build of the frontend
+.PHONY: ui-build
+ui-build:
+	@echo "Building frontend for production..."
+	cd frontend && npm run build
+
+# Frontend gates: lint + typecheck + vitest
+.PHONY: ui-test
+ui-test:
+	@echo "Running frontend lint, typecheck, and tests..."
+	cd frontend && npm run lint && npm run typecheck && npm test
+
+# Regenerate frontend/openapi.json + src/api/schema.d.ts from the backend
+# app object (no running server needed) — commit both after backend
+# contract changes.
+.PHONY: ui-typegen
+ui-typegen:
+	@echo "Regenerating frontend OpenAPI types..."
+	cd frontend && npm run typegen
+
+# UI Playwright smoke (M5.0 Task 9): proves a real ingest is navigable in the
+# workbench AND that a UI-driven text edit round-trips through the real
+# event-sourced write path (command -> ESDB -> dockerized projection-service
+# -> Neo4j -> refetch). Mirrors `deployed-smoke`'s structure: same dev-stack
+# containers (the test-infra-up Neo4j/ESDB have no projection consumer), same
+# "don't rely on $(PYTHON)" pyenv pin. Playwright itself starts uvicorn + next
+# dev via its `webServer` config (frontend/playwright.config.ts); seeding is
+# a Python helper the spec shells out to (frontend/e2e/seed_smoke.py) — see
+# frontend/e2e/smoke.spec.ts's header for the full required-services list.
+# UI_SMOKE=1 gates the spec so a bare `npx playwright test` (or `npm test`,
+# which vitest.config.ts excludes e2e/ from entirely) never runs it.
+.PHONY: ui-smoke
+ui-smoke:
+	@echo "Building + starting neo4j, eventstore, projection-service (dev stack)..."
+	docker compose up -d --build neo4j eventstore projection-service
+	@echo "Waiting for services..."
+	docker compose ps
+	cd frontend && UI_SMOKE=1 npx playwright test
+
+# --- End Frontend --- #
+
 # Clean (optional)
 .PHONY: clean
 clean:
@@ -140,6 +189,13 @@ help:
 	@echo "  run-api              Run FastAPI server (local)"
 	@echo "  run-worker           Run Celery worker (local)"
 	@echo "  ingest FILE=<path>   Ingest + enrich a transcript (Layer 1+2)"
+	@echo ""
+	@echo "Frontend (Next.js UI, in frontend/):"
+	@echo "  ui-dev               Run the frontend dev server"
+	@echo "  ui-build             Production build of the frontend"
+	@echo "  ui-test              Frontend gates: lint + typecheck + vitest"
+	@echo "  ui-typegen           Regenerate OpenAPI types from the backend app object"
+	@echo "  ui-smoke             Playwright smoke: seeded interview -> transcript -> text-edit settle"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint                 Run flake8 linter"

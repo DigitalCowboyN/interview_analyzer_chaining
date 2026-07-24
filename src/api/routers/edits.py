@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
 
-from src.commands.handlers import SentenceCommandHandler
+from src.commands.handlers import CommandValidationError, SentenceCommandHandler
 from src.commands.sentence_commands import EditSentenceCommand, OverrideAnalysisCommand
 from src.events.envelope import Actor, ActorType
 from src.events.repository import FragmentRepository
@@ -187,10 +187,14 @@ async def edit_sentence(
             message=f"Sentence edit accepted. {result.event_count} event(s) generated.",
         )
 
-    except ValueError as e:
-        # Sentence not found or validation error
+    except CommandValidationError as e:
+        # Sentence not found or validation error. CommandValidationError covers
+        # both cases (see field="sentence_id" for missing aggregates); there's
+        # no clean signal to split "not found" from other validation failures,
+        # so we map all of them to 409, consistent with the ValueError->409
+        # convention used by the other correction routers (resolution.py, lenses.py).
         logger.warning(f"Edit sentence validation error: {e}")
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.error(f"Error editing sentence: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
@@ -290,10 +294,11 @@ async def override_analysis(
     except HTTPException:
         # Re-raise HTTPExceptions (e.g., 400 for validation)
         raise
-    except ValueError as e:
-        # Sentence not found or validation error
+    except CommandValidationError as e:
+        # Sentence not found or validation error. See edit_sentence for why
+        # all CommandValidationError cases map to 409 rather than 404.
         logger.warning(f"Override analysis validation error: {e}")
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.error(f"Error overriding analysis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
