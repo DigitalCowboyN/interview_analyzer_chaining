@@ -9,6 +9,10 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    // Unit tests complete in ms; the raised ceiling absorbs jsdom worker
+    // startup contention when docker stacks run alongside — not a license
+    // for slow tests.
+    testTimeout: 15000,
     setupFiles: ["./vitest.setup.ts"],
     css: false,
     // e2e/ holds the Playwright smoke (frontend/e2e/smoke.spec.ts) — it needs
