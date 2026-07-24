@@ -14,6 +14,7 @@ import pytest
 
 from src.events.envelope import AggregateType, EventEnvelope
 from src.projections.lane_manager import Lane, LaneManager
+from src.projections.reorder_buffer import WatermarkTracker
 
 
 @pytest.mark.asyncio
@@ -125,7 +126,11 @@ class TestLaneManager:
         handler_registry = MagicMock()
         handler_registry.get_handler = MagicMock(return_value=mock_handler)
 
-        manager = LaneManager(handler_registry, lane_count=12)
+        # max_hold_s tiny: this test cares about routing correctness, not
+        # commit_position ordering, and the event has no commit_position
+        # (None), so the default 250ms hold would make the 0.1s sleep below
+        # flaky/failing -- force near-immediate release instead.
+        manager = LaneManager(handler_registry, lane_count=12, max_hold_s=0.0)
 
         await manager.start()
 
@@ -258,7 +263,11 @@ class TestLane:
         handler_registry = MagicMock()
         handler_registry.get_handler = MagicMock(return_value=mock_handler)
 
-        lane = Lane(lane_id=0, handler_registry=handler_registry)
+        # max_hold_s=0.0: these events carry no commit_position (None, all
+        # tied at "+infinity"), so release order falls back to FIFO/insertion
+        # order (the buffer's stable tiebreak) -- force near-immediate
+        # release so the test's real-time sleep stays fast and reliable.
+        lane = Lane(lane_id=0, handler_registry=handler_registry, max_hold_s=0.0)
         await lane.start()
 
         try:
@@ -299,7 +308,7 @@ class TestLane:
         handler_registry = MagicMock()
         handler_registry.get_handler = MagicMock(return_value=mock_handler)
 
-        lane = Lane(lane_id=0, handler_registry=handler_registry)
+        lane = Lane(lane_id=0, handler_registry=handler_registry, max_hold_s=0.0)
         await lane.start()
 
         try:
@@ -356,7 +365,7 @@ class TestLane:
         handler_registry = MagicMock()
         handler_registry.get_handler = MagicMock(return_value=mock_handler)
 
-        lane = Lane(lane_id=0, handler_registry=handler_registry)
+        lane = Lane(lane_id=0, handler_registry=handler_registry, max_hold_s=0.0)
         await lane.start()
 
         try:
@@ -392,7 +401,7 @@ class TestLane:
         handler_registry = MagicMock()
         handler_registry.get_handler = MagicMock(return_value=mock_handler)
 
-        lane = Lane(lane_id=0, handler_registry=handler_registry)
+        lane = Lane(lane_id=0, handler_registry=handler_registry, max_hold_s=0.0)
         await lane.start()
 
         try:
@@ -434,7 +443,7 @@ class TestLane:
         handler_registry = MagicMock()
         handler_registry.get_handler = MagicMock(return_value=mock_handler)
 
-        lane = Lane(lane_id=0, handler_registry=handler_registry)
+        lane = Lane(lane_id=0, handler_registry=handler_registry, max_hold_s=0.0)
         await lane.start()
 
         try:
@@ -476,7 +485,7 @@ class TestLane:
         handler_registry = MagicMock()
         handler_registry.get_handler = MagicMock(return_value=mock_handler)
 
-        lane = Lane(lane_id=0, handler_registry=handler_registry)
+        lane = Lane(lane_id=0, handler_registry=handler_registry, max_hold_s=0.0)
         await lane.start()
 
         try:
@@ -497,5 +506,133 @@ class TestLane:
             assert lane.events_failed == 0
             assert lane.events_processed == 1
 
+        finally:
+            await lane.stop()
+
+
+@pytest.mark.asyncio
+class TestLaneReorderBuffer:
+    """
+    Integration-of-units: Lane wired with a ReorderBuffer (+ shared/fake
+    WatermarkTracker) releases buffered, out-of-order arrivals in ascending
+    commit_position order, and defers the checkpoint (ack) until each entry
+    is actually released -- never merely on enqueue/buffering.
+    """
+
+    @staticmethod
+    def _make_event(commit_position):
+        return EventEnvelope(
+            event_type="SentenceCreated",
+            aggregate_type=AggregateType.SENTENCE,
+            aggregate_id=str(uuid.uuid4()),
+            version=0,
+            data={"interview_id": "test-interview", "text": "Test"},
+            commit_position=commit_position,
+        )
+
+    async def test_out_of_order_arrivals_processed_in_commit_position_order(self):
+        """Events enqueued out of order (3, 1, 2) are handled in ascending
+        commit_position order (1, 2, 3), via the max_hold aging path (no
+        watermark tracker registered -> low_watermark() is always None)."""
+        processed = []
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock(
+            side_effect=lambda event, lane_id: processed.append(event.commit_position)
+        )
+        handler_registry = MagicMock()
+        handler_registry.get_handler = MagicMock(return_value=mock_handler)
+
+        acked = []
+
+        def make_cb(cp):
+            def cb():
+                acked.append(cp)
+
+            return cb
+
+        max_hold_s = 0.05
+        lane = Lane(lane_id=0, handler_registry=handler_registry, max_hold_s=max_hold_s)
+
+        # Enqueue out of commit_position order, BEFORE starting the lane, so
+        # all three are already queued when the processing loop begins --
+        # they land in the buffer together rather than racing the loop.
+        for cp in (3, 1, 2):
+            await lane.enqueue(self._make_event(cp), make_cb(cp))
+
+        await lane.start()
+        try:
+            # Not yet aged (or watermark-gated) -- nothing released.
+            assert processed == []
+            assert acked == []
+
+            # Wait past max_hold_s (generous slack for scheduling) so the
+            # aged-out flush releases everything, in ascending order.
+            await asyncio.sleep(max_hold_s + 0.2)
+
+            assert processed == [1, 2, 3]
+            assert acked == [1, 2, 3]
+        finally:
+            await lane.stop()
+
+    async def test_checkpoint_deferred_until_watermark_releases_entry(self):
+        """Deferred ack: a buffered event's checkpoint_callback must not fire
+        merely because it was enqueued -- only once it's actually released
+        (here, gated by the watermark rather than max_hold aging)."""
+        processed = []
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock(
+            side_effect=lambda event, lane_id: processed.append(event.commit_position)
+        )
+        handler_registry = MagicMock()
+        handler_registry.get_handler = MagicMock(return_value=mock_handler)
+
+        acked = []
+
+        def make_cb(cp):
+            def cb():
+                acked.append(cp)
+
+            return cb
+
+        class ManualWatermark:
+            """Minimal low_watermark()-duck-typed stub, manually controlled
+            by the test. WatermarkTracker's own per-subscription bookkeeping
+            is covered by test_reorder_buffer.py -- this isolates Lane's
+            wiring to "whatever object provides low_watermark()"."""
+
+            def __init__(self):
+                self.value = None
+
+            def low_watermark(self):
+                return self.value
+
+        watermark = ManualWatermark()
+        # max_hold_s intentionally large: only the watermark gate should be
+        # able to release the buffered entry within this test's run time.
+        lane = Lane(lane_id=0, handler_registry=handler_registry, watermark_tracker=watermark, max_hold_s=10.0)
+
+        await lane.enqueue(self._make_event(5), make_cb(5))
+        await lane.start()
+        try:
+            await asyncio.sleep(0.1)
+            # Buffered, watermark still None -- not releasable, not acked.
+            assert processed == []
+            assert acked == []
+
+            # Advance the watermark past the buffered entry's position, and
+            # enqueue a fresh (not-yet-releasable) event so the loop's
+            # blocked queue.get() wakes immediately and re-drains, instead
+            # of waiting on the bounded (<=1s) periodic re-check.
+            watermark.value = 5
+            await lane.enqueue(self._make_event(6), make_cb(6))
+
+            await asyncio.sleep(0.1)
+
+            # Only the newly-releasable entry (commit_position 5) fired --
+            # commit_position 6 is still buffered (watermark hasn't reached
+            # it) and its callback has NOT been invoked.
+            assert processed == [5]
+            assert acked == [5]
+            assert len(lane._buffer) == 1
         finally:
             await lane.stop()
