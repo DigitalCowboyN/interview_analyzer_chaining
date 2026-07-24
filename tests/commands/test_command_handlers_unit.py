@@ -392,14 +392,12 @@ class TestSentenceCommandHandlerUnit:
             assert "same as current text" in str(exc_info.value)
             assert not isinstance(exc_info.value, CommandExecutionError)
 
-    async def test_override_analysis_same_value_yields_command_validation_error(self):
-        """Parity with _handle_edit: the aggregate call inside
-        _handle_override_analysis is wrapped so a domain ValueError (e.g. a
-        same-value override) maps to CommandValidationError (-> 409), not
-        CommandExecutionError (-> 500). `override_analysis` has no
-        same-value guard today, so this test drives the wrap directly by
-        having the aggregate call raise ValueError — the same shape
-        `_handle_edit`'s real same-text check produces."""
+    async def test_override_analysis_valueerror_wraps_to_command_validation_error(self):
+        """Handler-wrap plumbing only: an aggregate-level ValueError surfaces as
+        CommandValidationError (parity with _handle_edit). NOTE: the Fragment
+        aggregate has no same-value override guard today, so this test drives the
+        wrap via a patched aggregate method — it is NOT evidence that same-value
+        overrides are rejected end-to-end."""
         sentence_id = str(uuid.uuid4())
         interview_id = str(uuid.uuid4())
 
