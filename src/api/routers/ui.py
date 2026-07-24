@@ -194,11 +194,27 @@ async def stream_events(
         raise HTTPException(status_code=422, detail="interview_id or project_id is required")
 
     hub, watcher = get_live_feed()
-    await watcher.ensure_started()
-    subscription = hub.subscribe(interview_id=interview_id, project_id=project_id)
 
     async def event_stream():
+        # All acquisition lives INSIDE the generator: an async generator
+        # that is never started executes no code on aclose(), so a client
+        # disconnect landing between handler return and the first chunk
+        # acquires nothing and therefore leaks nothing. (Acquiring in the
+        # handler had exactly that leak: cleanup lived only in this
+        # generator's finally, which never runs for an unstarted generator.)
+        subscription = None
         try:
+            # INVARIANT (ordering): subscribe -- synchronous, registers the
+            # subscriber immediately, no await -- must precede
+            # ensure_started. A racing last-disconnect then either sees this
+            # subscriber in its count check (and skips stop) or stops the
+            # watcher first, in which case ensure_started below restarts it
+            # (its liveness prune discards the stopped tasks). The reverse
+            # order leaves a window where the watcher is stopped after a
+            # no-op ensure_started but before our subscribe: a live
+            # connection fed by a dead watcher.
+            subscription = hub.subscribe(interview_id=interview_id, project_id=project_id)
+            await watcher.ensure_started()
             while True:
                 if await request.is_disconnected():
                     break
@@ -209,9 +225,16 @@ async def stream_events(
                     continue
                 yield format_sse_event(notification)
         finally:
-            subscription.close()
-            if hub.subscriber_count == 0:
-                await watcher.stop()
+            if subscription is not None:
+                subscription.close()
+                # INVARIANT (no await): nothing may suspend between close()
+                # (the count decrement) and the subscriber_count check, so
+                # the stop decision is always made on fresh state. Racing
+                # new connections serialize on the watcher's asyncio.Lock
+                # inside stop()/ensure_started(), and ensure_started's
+                # liveness prune restarts a watcher this stop tears down.
+                if hub.subscriber_count == 0:
+                    await watcher.stop()
 
     return StreamingResponse(
         event_stream(),

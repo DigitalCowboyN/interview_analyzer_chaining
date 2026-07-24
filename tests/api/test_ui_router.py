@@ -372,3 +372,97 @@ def test_stream_events_heartbeat_default_is_fifteen_seconds():
     from src.api.routers.ui import HEARTBEAT_SECONDS
 
     assert HEARTBEAT_SECONDS == 15.0
+
+
+def _bare_request():
+    """Minimal starlette Request for driving stream_events directly. The
+    generator-level tests below never let the route's loop touch it (either
+    the generator is never started, or is_disconnected is patched)."""
+    from starlette.requests import Request as StarletteRequest
+
+    return StarletteRequest(
+        {"type": "http", "method": "GET", "path": "/ui/streams/events", "headers": [], "query_string": b""}
+    )
+
+
+@pytest.mark.asyncio
+async def test_stream_events_generator_never_started_leaks_nothing_and_next_connect_works():
+    # A disconnect can land between handler return and the first chunk: the
+    # ASGI server then aclose()s the response generator WITHOUT ever starting
+    # it, and an unstarted async generator executes no code -- neither its
+    # body nor its finally. All acquisition therefore lives inside the
+    # generator: closing it unstarted must acquire nothing and leak nothing.
+    from src.api.routers.ui import stream_events
+
+    hub = NotificationHub()
+    watcher = make_watcher_stub()
+
+    with patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)):
+        response = await stream_events(_bare_request(), interview_id=IID, project_id=None)
+        await response.body_iterator.aclose()  # never started
+
+    assert hub.subscriber_count == 0  # nothing subscribed => nothing leaked
+    watcher.ensure_started.assert_not_awaited()
+    watcher.stop.assert_not_awaited()
+
+    # A subsequent connection on the same hub works end-to-end (count can
+    # still reach zero => lazy stop still functions).
+    seed_next_subscription(hub, Notification("transcript", interview_id=IID))
+    with (
+        patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)),
+        patch("starlette.requests.Request.is_disconnected", side_effect=[False, True]),
+    ):
+        response = await stream_events(_bare_request(), interview_id=IID, project_id=None)
+        chunks = [chunk async for chunk in response.body_iterator]
+
+    assert chunks and chunks[0].startswith("data: ")
+    assert json.loads(chunks[0][len("data: "):]) == {"surface": "transcript", "interview_id": IID}
+    assert hub.subscriber_count == 0
+    watcher.ensure_started.assert_awaited_once()
+    watcher.stop.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_stream_events_generator_aclosed_mid_stream_releases_subscription():
+    # aclose() after the first yield models the ASGI server cancelling the
+    # response mid-stream: GeneratorExit at the yield point must run the
+    # finally -- subscription released, watcher stopped at zero subscribers.
+    from src.api.routers.ui import stream_events
+
+    hub = NotificationHub()
+    seed_next_subscription(hub, Notification("transcript", interview_id=IID))
+    watcher = make_watcher_stub()
+
+    with (
+        patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)),
+        patch("starlette.requests.Request.is_disconnected", side_effect=[False]),
+    ):
+        response = await stream_events(_bare_request(), interview_id=IID, project_id=None)
+        generator = response.body_iterator
+        first = await generator.__anext__()
+        assert first.startswith("data: ")
+        assert hub.subscriber_count == 1
+        await generator.aclose()
+
+    assert hub.subscriber_count == 0
+    watcher.stop.assert_awaited_once()
+
+
+def test_stream_events_disconnect_with_remaining_subscriber_keeps_watcher(client):
+    hub = NotificationHub()
+    # A second, still-connected subscriber (subscribed before the seeding
+    # wrapper so it stays unseeded and untouched by the route).
+    lingering = hub.subscribe(interview_id="iv-other", project_id=None)
+    seed_next_subscription(hub, Notification("transcript", interview_id=IID))
+    watcher = make_watcher_stub()
+
+    with (
+        patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)),
+        patch("starlette.requests.Request.is_disconnected", side_effect=[False, True]),
+    ):
+        resp = client.get("/ui/streams/events", params={"interview_id": IID})
+
+    assert resp.status_code == 200
+    assert hub.subscriber_count == 1  # only the lingering subscriber remains
+    watcher.stop.assert_not_awaited()  # not the last subscriber => no stop
+    lingering.close()

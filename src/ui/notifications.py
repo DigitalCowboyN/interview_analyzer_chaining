@@ -204,15 +204,29 @@ class EsdbWatcher:
         """Idempotent: spawns one watch task per category stream on the first
         call. Concurrent callers are serialized by the lock so exactly one
         set of tasks is ever created, even if two SSE connections race to
-        start the watcher at once."""
+        start the watcher at once.
+
+        Liveness check, not just presence check: done tasks (e.g. left
+        behind by a stop() that was itself cancelled mid-await, or torn
+        down by a stop() that raced this call to the lock) are pruned
+        first, so a dead watcher restarts instead of no-oping forever
+        against zombie entries."""
         async with self._lock:
-            if self._tasks:
-                return
+            self._tasks = {name: task for name, task in self._tasks.items() if not task.done()}
             for stream_name in _WATCHED_STREAMS:
-                self._tasks[stream_name] = asyncio.create_task(self._watch(stream_name))
+                if stream_name not in self._tasks:
+                    self._tasks[stream_name] = asyncio.create_task(self._watch(stream_name))
 
     async def stop(self) -> None:
-        """Stop every watch task cleanly.
+        """Stop every watch task cleanly. Cancellation-safe by construction:
+        stop() runs in the SSE generator's `finally`, where a real client
+        disconnect can deliver CancelledError at any suspension point -- so
+        everything that matters (detaching state, stopping subscriptions,
+        cancelling tasks) happens synchronously BEFORE the first await. A
+        stop interrupted mid-await then leaves the watcher restartable
+        (dicts already cleared, tasks already cancelled; ensure_started's
+        liveness prune covers any residue) instead of bricked with stale,
+        dead tasks that make ensure_started no-op forever.
 
         Each task spends most of its life blocked inside
         `asyncio.to_thread(next, iterator, ...)`, parked on the esdbclient
@@ -226,20 +240,35 @@ class EsdbWatcher:
         (and the pending task cancellation get delivered) promptly.
         """
         async with self._lock:
-            for subscription in self._active_subscriptions.values():
-                subscription.stop()
-
             tasks = list(self._tasks.values())
+            subscriptions = list(self._active_subscriptions.values())
+            # Detach state before any await (see docstring): an interrupted
+            # stop must never leave stale entries for ensure_started to
+            # mistake for a live watcher.
+            self._tasks.clear()
+            self._active_subscriptions.clear()
+
+            for subscription in subscriptions:
+                # Per-item guard: one subscription raising from .stop() must
+                # not abort shutdown and leave the rest unstopped / the
+                # tasks below uncancelled.
+                try:
+                    subscription.stop()
+                except Exception:
+                    logger.warning("EsdbWatcher: error stopping a subscription during shutdown", exc_info=True)
+
             for task in tasks:
                 task.cancel()
             for task in tasks:
                 try:
                     await task
                 except asyncio.CancelledError:
-                    pass
-
-            self._tasks.clear()
-            self._active_subscriptions.clear()
+                    if not task.done():
+                        # Our own cancellation interrupted the wait (the
+                        # awaited task hasn't finished yet) -- propagate it.
+                        # State is already consistent, and the task will
+                        # still finish on the loop: it was cancelled above.
+                        raise
 
     async def _watch(self, stream_name: str) -> None:
         """One category stream's subscribe/consume/reconnect loop.

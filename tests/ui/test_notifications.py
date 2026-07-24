@@ -414,6 +414,91 @@ async def test_stop_cancels_tasks_and_stops_active_subscriptions():
 
 
 @pytest.mark.asyncio
+async def test_watcher_restartable_after_cancelled_stop():
+    # stop() runs in the SSE generator's finally, where a client disconnect
+    # can deliver CancelledError at stop()'s first suspension point. State
+    # must already be detached by then (synchronously), so a later
+    # ensure_started starts fresh tasks instead of no-oping forever against
+    # the dead ones (the "bricked watcher" failure mode).
+    hub = NotificationHub()
+    client = FakeEventStoreDBClient()
+    watcher = make_watcher(client, hub)
+
+    await watcher.ensure_started()
+    first_tasks = list(watcher._tasks.values())
+    await asyncio.sleep(0)  # one loop turn: watch tasks reach their blocking pull
+    assert len(client.subscribe_calls) == 3
+
+    stop_task = asyncio.create_task(watcher.stop())
+    # One more turn: stop() runs its synchronous section (detach state, stop
+    # subscriptions, cancel tasks) and parks at its first `await task`.
+    # sleep(0) is a bare yield, not a timed sleep.
+    await asyncio.sleep(0)
+    stop_task.cancel()
+    try:
+        await stop_task
+    except asyncio.CancelledError:
+        # Whether the cancellation propagates or the interrupted await
+        # resolves as the (already-cancelled) watch task finishing is a
+        # scheduler detail -- the invariants below hold either way, and
+        # they are what "not bricked" means.
+        pass
+
+    # The interrupted stop already detached state and cancelled the tasks
+    # (all synchronously, before its first await).
+    assert watcher._tasks == {}
+    assert watcher._active_subscriptions == {}
+    # Drain the cancelled watch tasks deterministically (pristine teardown).
+    await asyncio.gather(*first_tasks, return_exceptions=True)
+
+    # A fresh start works: three new subscriptions, three live tasks -- no
+    # zombie no-op against the dead ones.
+    await watcher.ensure_started()
+    await asyncio.sleep(0)  # let the fresh watch tasks reach their pull
+    assert len(client.subscribe_calls) == 6
+    assert sorted(watcher._tasks) == sorted(ALL_WATCHED_STREAMS)
+    assert all(not task.done() for task in watcher._tasks.values())
+    await watcher.stop()
+
+
+@pytest.mark.asyncio
+async def test_stop_survives_subscription_stop_raising():
+    # Hardening: one subscription raising from .stop() must not abort
+    # shutdown -- remaining subscriptions still stopped, tasks still
+    # cancelled, state still cleared.
+    hub = NotificationHub()
+    client = FakeEventStoreDBClient()
+    watcher = make_watcher(client, hub)
+
+    await watcher.ensure_started()
+    await asyncio.sleep(0)  # let watch tasks register their subscriptions
+    assert len(watcher._active_subscriptions) == 3
+
+    first_sub = watcher._active_subscriptions["$ce-Interview"]
+    original_stop = first_sub.stop
+    call_state = {"raised": False}
+
+    def raising_stop():
+        # Terminate the stream (so its worker thread unblocks and the watch
+        # task can actually finish -- keeping the test deterministic), then
+        # raise: models a gRPC teardown error surfacing from .stop().
+        original_stop()
+        call_state["raised"] = True
+        raise RuntimeError("gRPC teardown failed")
+
+    first_sub.stop = raising_stop
+
+    await watcher.stop()
+
+    assert call_state["raised"] is True
+    assert watcher._tasks == {}
+    assert watcher._active_subscriptions == {}
+    # The OTHER two subscriptions were still stopped despite the raise.
+    others = [s for s in client.handed_out if s is not first_sub]
+    assert others and all(s.stopped for s in others)
+
+
+@pytest.mark.asyncio
 async def test_get_live_feed_returns_same_singleton_pair_across_calls(monkeypatch):
     import src.ui.notifications as notifications_module
 
