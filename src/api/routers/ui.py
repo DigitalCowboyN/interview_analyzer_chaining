@@ -3,16 +3,33 @@ src/api/routers/ui.py
 
 The `/ui/*` read layer (M5.0 Task 1): backend contract for the Next.js
 frontend. Thin router — session → reader → shape; zero writes, no auth.
+
+M5.1 Task 4 adds the SSE live-feed route: param validation, subscribe to the
+module-level NotificationHub, and a small generator that formats queued
+Notifications as SSE frames (formatting itself lives in src/ui/notifications
+per that module's no-framework-coupling rule).
 """
 
-from fastapi import APIRouter, HTTPException, Query
+import asyncio
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 
 from src.events.project_events import person_id_for
 from src.resolution.candidates import normalize_name
 from src.ui import reader
+from src.ui.notifications import format_sse_event, get_live_feed
 from src.utils.neo4j_driver import Neo4jConnectionManager
 
 router = APIRouter(prefix="/ui", tags=["ui"])
+
+# Seconds of subscriber quiet before a `: keep-alive\n\n` comment is sent so
+# intermediate proxies/load balancers don't time out an idle connection.
+# Module constant with an injectable override: tests monkeypatch this name
+# (src.api.routers.ui.HEARTBEAT_SECONDS) to a small value to exercise the
+# heartbeat path without a real 15s wait.
+HEARTBEAT_SECONDS = 15.0
 
 
 async def _require_project(session, project_id: str) -> None:
@@ -156,3 +173,48 @@ async def derive_person_id(project_id: str, display_name: str = Query(..., min_l
     async with await Neo4jConnectionManager.get_session() as session:
         await _require_project(session, project_id)
     return {"person_id": person_id_for(project_id, normalize_name(display_name))}
+
+
+@router.get("/streams/events")
+async def stream_events(
+    request: Request,
+    interview_id: Optional[str] = Query(default=None),
+    project_id: Optional[str] = Query(default=None),
+):
+    """SSE live feed (M5.1): the browser subscribes by interview_id and/or
+    project_id (at least one required, else 422) and receives one
+    `data: {...}\\n\\n` frame per matching Notification, plus a
+    `: keep-alive\\n\\n` comment after HEARTBEAT_SECONDS of quiet.
+
+    Lazy lifecycle both directions: the shared EsdbWatcher is (idempotently)
+    started on this connection and stopped once the last subscriber
+    disconnects — see get_live_feed() / EsdbWatcher in src/ui/notifications.py.
+    """
+    if not interview_id and not project_id:
+        raise HTTPException(status_code=422, detail="interview_id or project_id is required")
+
+    hub, watcher = get_live_feed()
+    await watcher.ensure_started()
+    subscription = hub.subscribe(interview_id=interview_id, project_id=project_id)
+
+    async def event_stream():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    notification = await asyncio.wait_for(subscription.queue.get(), timeout=HEARTBEAT_SECONDS)
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+                    continue
+                yield format_sse_event(notification)
+        finally:
+            subscription.close()
+            if hub.subscriber_count == 0:
+                await watcher.stop()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

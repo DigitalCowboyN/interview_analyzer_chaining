@@ -9,14 +9,21 @@ project_id?}`. The browser must never learn about event types, stream
 names, or ESDB concepts — everything upstream of this module speaks
 core-domain, everything downstream speaks only surface tags.
 
-Task 4 (ESDB watcher) reads from this module and calls `hub.publish(...)`
-for each event it observes, via `scope_notifications`; the watcher itself
-does not live here yet — this module stays pure Python until then.
+Task 4 adds `EsdbWatcher`: it bridges ESDB catch-up subscriptions on the
+three notification-relevant category streams to the `NotificationHub`
+above, and `get_live_feed()`, a module-level lazy singleton pair the SSE
+route (src/api/routers/ui.py) uses for its lazy start/stop lifecycle.
 """
 
 import asyncio
-from dataclasses import dataclass
-from typing import List, Optional
+import json
+import logging
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from src.events.store import EventStoreClient, get_event_store_client
+
+logger = logging.getLogger(__name__)
 
 QUEUE_MAXSIZE = 64
 
@@ -47,8 +54,13 @@ def scope_notifications(stream_name: str, payload: dict) -> List[Notification]:
 
     if stream_name.startswith("Interview-"):
         # The interview id is the stream-name suffix itself (verified fact),
-        # so this notification never depends on payload contents.
+        # so this notification never depends on payload contents. Guard the
+        # degenerate bare "Interview-" case (empty suffix) the same way the
+        # sibling branches guard their required id -- a malformed stream name
+        # must never produce a Notification with interview_id="".
         interview_id = stream_name[len("Interview-") :]
+        if not interview_id:
+            return []
         notifications = [Notification("transcript", interview_id=interview_id)]
         project_id = payload.get("project_id")
         if project_id:
@@ -131,6 +143,180 @@ class NotificationHub:
             queue.put_nowait(notification)
 
 
-# --- Task 4 adds the ESDB watcher below this line (subscribes to $all,
-# translates events via scope_notifications, publishes to a module-level
-# NotificationHub instance). Nothing ESDB-related lives above it. ---
+def format_sse_event(notification: Notification) -> str:
+    """Render one Notification as an SSE `data:` frame containing only its
+    non-None fields — e.g. a "transcript" notification never carries a
+    stray `"project_id": null`. Pure formatting, no framework coupling; the
+    SSE route (src/api/routers/ui.py) is the only caller."""
+    fields = {key: value for key, value in asdict(notification).items() if value is not None}
+    return f"data: {json.dumps(fields)}\n\n"
+
+
+# ---------------------------------------------------------------------------
+# EsdbWatcher: bridges ESDB catch-up subscriptions to the NotificationHub.
+# ---------------------------------------------------------------------------
+
+# Category streams the watcher subscribes to; scope_notifications maps events
+# from each back to the surface tags subscribers care about.
+_WATCHED_STREAMS: Tuple[str, ...] = ("$ce-Interview", "$ce-Sentence", "$ce-Project")
+
+# Sentinel returned by asyncio.to_thread(next, iterator, _SUBSCRIPTION_ENDED)
+# when the underlying (blocking, sync) esdbclient iterator has nothing more
+# to give without blocking further -- mirrors
+# src/projections/subscription_manager.py's identical sentinel idiom.
+_SUBSCRIPTION_ENDED = object()
+
+
+class EsdbWatcher:
+    """Bridges three ESDB catch-up subscriptions ($ce-Interview, $ce-Sentence,
+    $ce-Project) to a NotificationHub. Lazy lifecycle by design: the SSE route
+    calls `ensure_started()` on first connect and `stop()` once the last
+    subscriber disconnects (`hub.subscriber_count == 0`) -- there is no
+    lifespan/startup coupling.
+
+    Mirrors the M4.7 sentinel-pull idiom from
+    `subscription_manager.py::_run_subscription`: sync esdbclient iterators
+    are consumed via `await asyncio.to_thread(next, iterator, sentinel)` so a
+    blocking network read never starves the event loop. Subscriptions are
+    catch-up (`from_end=True, resolve_links=True`), not persistent -- no
+    consumer groups, no acking.
+    """
+
+    def __init__(
+        self,
+        hub: NotificationHub,
+        event_store: Optional[EventStoreClient] = None,
+        backoff_seconds: Sequence[float] = (1, 2, 5, 10),
+    ):
+        self._hub = hub
+        self._event_store = event_store or get_event_store_client()
+        self._backoff_seconds: Tuple[float, ...] = tuple(backoff_seconds)
+        self._tasks: Dict[str, asyncio.Task] = {}
+        # Active esdbclient subscription object per stream name, for as long
+        # as that stream's outer loop iteration is connected. Held so stop()
+        # can call .stop() on it directly -- required to unblock a worker
+        # thread parked in asyncio.to_thread(next, ...); see stop()'s
+        # docstring (same rationale as SubscriptionManager.stop()).
+        self._active_subscriptions: Dict[str, Any] = {}
+        self._lock = asyncio.Lock()
+
+    async def ensure_started(self) -> None:
+        """Idempotent: spawns one watch task per category stream on the first
+        call. Concurrent callers are serialized by the lock so exactly one
+        set of tasks is ever created, even if two SSE connections race to
+        start the watcher at once."""
+        async with self._lock:
+            if self._tasks:
+                return
+            for stream_name in _WATCHED_STREAMS:
+                self._tasks[stream_name] = asyncio.create_task(self._watch(stream_name))
+
+    async def stop(self) -> None:
+        """Stop every watch task cleanly.
+
+        Each task spends most of its life blocked inside
+        `asyncio.to_thread(next, iterator, ...)`, parked on the esdbclient
+        subscription's blocking network read. Cancelling the asyncio.Task
+        alone does not unblock that worker thread -- the cancellation is
+        only delivered the next time the coroutine resumes on the event
+        loop, which won't happen until the blocking next() call itself
+        returns. So, mirroring SubscriptionManager.stop(), call `.stop()` on
+        each active esdbclient subscription object first: that cancels its
+        underlying gRPC stream, which makes the blocked next() call return
+        (and the pending task cancellation get delivered) promptly.
+        """
+        async with self._lock:
+            for subscription in self._active_subscriptions.values():
+                subscription.stop()
+
+            tasks = list(self._tasks.values())
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+            self._tasks.clear()
+            self._active_subscriptions.clear()
+
+    async def _watch(self, stream_name: str) -> None:
+        """One category stream's subscribe/consume/reconnect loop.
+
+        On any subscription exception: close the iterator (finally, below),
+        back off through `self._backoff_seconds` (repeating the last value
+        for subsequent failures), resubscribe from_end=True, and only once
+        that resubscribe succeeds, `hub.broadcast_resync()` -- clients then
+        refetch whatever they missed while this stream's watcher was down.
+        """
+        attempt = 0
+        needs_resync = False
+        while True:
+            try:
+                async with self._event_store.get_client() as client:
+                    subscription = client.subscribe_to_stream(stream_name, from_end=True, resolve_links=True)
+                    self._active_subscriptions[stream_name] = subscription
+
+                    if needs_resync:
+                        self._hub.broadcast_resync()
+                        needs_resync = False
+                    attempt = 0
+
+                    iterator = iter(subscription)
+                    while True:
+                        event = await asyncio.to_thread(next, iterator, _SUBSCRIPTION_ENDED)
+                        if event is _SUBSCRIPTION_ENDED:
+                            break
+                        self._handle_event(event)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.error("EsdbWatcher: subscription to '%s' failed", stream_name, exc_info=True)
+                needs_resync = True
+                delay = self._backoff_seconds[min(attempt, len(self._backoff_seconds) - 1)]
+                attempt += 1
+                await asyncio.sleep(delay)
+            finally:
+                stale_subscription = self._active_subscriptions.pop(stream_name, None)
+                if stale_subscription is not None:
+                    stale_subscription.stop()
+
+    def _handle_event(self, event: Any) -> None:
+        """Decode one resolved event and publish its mapped notifications.
+        Malformed `event.data` (unparseable JSON, or valid JSON that isn't
+        the dict-shaped payload scope_notifications expects, e.g. a bare
+        list or number) is logged at debug and skipped -- the loop keeps
+        running rather than killing the whole subscription over one bad
+        payload. Decoding and mapping are wrapped in the same try so a
+        shape surprise can't escape as an uncaught exception and get
+        mistaken for a subscription failure (which would trigger an
+        unwarranted backoff/resubscribe/resync)."""
+        try:
+            payload = json.loads(event.data)
+            # Use the RESOLVED event's stream name (link-resolved semantics,
+            # per resolve_links=True) -- see scope_notifications' docstring
+            # for why this is the mapping's only input besides the payload.
+            notifications = scope_notifications(event.stream_name, payload)
+        except Exception:
+            logger.debug("EsdbWatcher: skipping malformed event on stream '%s'", event.stream_name)
+            return
+
+        for notification in notifications:
+            self._hub.publish(notification)
+
+
+_hub: Optional[NotificationHub] = None
+_watcher: Optional[EsdbWatcher] = None
+
+
+def get_live_feed() -> Tuple[NotificationHub, EsdbWatcher]:
+    """Module-level lazy singleton pair: one NotificationHub and one
+    EsdbWatcher per process, created on first access. The SSE route's only
+    coupling point to this module's process-wide state."""
+    global _hub, _watcher
+    if _hub is None:
+        _hub = NotificationHub()
+    if _watcher is None:
+        _watcher = EsdbWatcher(_hub)
+    return _hub, _watcher
