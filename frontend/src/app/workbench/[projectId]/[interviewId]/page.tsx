@@ -3,8 +3,10 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useTranscript } from "@/hooks/useTranscript";
+import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { StateGate } from "@/components/StateGate";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { LiveIndicator } from "@/components/LiveIndicator";
 import { MetadataPanel } from "@/components/MetadataPanel";
 import { SegmentHeading } from "@/components/SegmentHeading";
 import { TranscriptLine } from "@/components/TranscriptLine";
@@ -17,6 +19,7 @@ export default function TranscriptPage() {
     interviewId: string;
   }>();
   const { data: transcript, isLoading, isError, error } = useTranscript(interviewId);
+  const liveStatus = useLiveInvalidation({ interviewId, projectId });
   const [selectedFragmentId, setSelectedFragmentId] = useState<string | null>(null);
   // Derive the selected line from the latest transcript data each render,
   // rather than caching the clicked line object — otherwise a refetch after
@@ -29,13 +32,16 @@ export default function TranscriptPage() {
   return (
     <div className="flex">
       <div className="flex-1 p-6">
-        <Breadcrumbs
-          items={[
-            { label: "Workbench", href: "/workbench" },
-            { label: projectId, href: `/workbench/${encodeURIComponent(projectId)}` },
-            { label: transcript?.title ?? interviewId },
-          ]}
-        />
+        <div className="flex items-center justify-between">
+          <Breadcrumbs
+            items={[
+              { label: "Workbench", href: "/workbench" },
+              { label: projectId, href: `/workbench/${encodeURIComponent(projectId)}` },
+              { label: transcript?.title ?? interviewId },
+            ]}
+          />
+          <LiveIndicator status={liveStatus} />
+        </div>
         <StateGate
           isLoading={isLoading}
           isError={isError}

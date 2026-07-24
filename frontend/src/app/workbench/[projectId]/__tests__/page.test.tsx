@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import ProjectInterviewsPage from "@/app/workbench/[projectId]/page";
 import { useInterviews } from "@/hooks/useInterviews";
 import { useParams } from "next/navigation";
@@ -16,6 +18,16 @@ function mockProjectId(projectId: string) {
   vi.mocked(useParams).mockReturnValue({ projectId });
 }
 
+// useLiveInvalidation (Task 5) reaches for the real useQueryClient, so page
+// renders need a provider — mirrors the sibling transcript page test.
+function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  }
+  return render(<ProjectInterviewsPage />, { wrapper: Wrapper });
+}
+
 describe("ProjectInterviewsPage (interviews)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -30,7 +42,7 @@ describe("ProjectInterviewsPage (interviews)", () => {
       error: null,
     } as never);
 
-    render(<ProjectInterviewsPage />);
+    renderPage();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
@@ -43,7 +55,7 @@ describe("ProjectInterviewsPage (interviews)", () => {
       error: null,
     } as never);
 
-    render(<ProjectInterviewsPage />);
+    renderPage();
     expect(screen.getByText("No interviews yet.")).toBeInTheDocument();
   });
 
@@ -56,7 +68,7 @@ describe("ProjectInterviewsPage (interviews)", () => {
       error: new Error("boom"),
     } as never);
 
-    render(<ProjectInterviewsPage />);
+    renderPage();
     expect(screen.getByRole("alert")).toHaveTextContent("boom");
   });
 
@@ -76,7 +88,7 @@ describe("ProjectInterviewsPage (interviews)", () => {
       error: null,
     } as never);
 
-    render(<ProjectInterviewsPage />);
+    renderPage();
     expect(
       screen.getByRole("link", { name: /Kickoff call/ }),
     ).toHaveAttribute("href", "/workbench/p1/i1");
@@ -91,7 +103,7 @@ describe("ProjectInterviewsPage (interviews)", () => {
       error: null,
     } as never);
 
-    render(<ProjectInterviewsPage />);
+    renderPage();
     expect(screen.getByRole("link", { name: "Workbench" })).toHaveAttribute(
       "href",
       "/workbench",
@@ -108,7 +120,7 @@ describe("ProjectInterviewsPage (interviews)", () => {
       error: null,
     } as never);
 
-    render(<ProjectInterviewsPage />);
+    renderPage();
     expect(useInterviews).toHaveBeenCalledWith("my project");
   });
 });
