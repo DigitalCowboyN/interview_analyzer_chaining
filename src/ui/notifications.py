@@ -307,9 +307,10 @@ class EsdbWatcher:
                 attempt += 1
                 await asyncio.sleep(delay)
             finally:
-                stale_subscription = self._active_subscriptions.pop(stream_name, None)
-                if stale_subscription is not None:
-                    stale_subscription.stop()
+                # Stale finallys must not evict a successor's live subscription.
+                if self._active_subscriptions.get(stream_name) is subscription:
+                    self._active_subscriptions.pop(stream_name, None)
+                    subscription.stop()
 
     def _handle_event(self, event: Any) -> None:
         """Decode one resolved event and publish its mapped notifications.
