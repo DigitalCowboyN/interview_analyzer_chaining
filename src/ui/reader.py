@@ -7,9 +7,25 @@ speaker-facing queries filter sp.merged_into IS NULL; persona reads filter
 n.lens = 'persona'. Zero writes.
 """
 
+import json
+import logging
 from typing import Any, Dict, List, Optional
 
+logger = logging.getLogger(__name__)
+
 PERSONA_LENS = "persona"
+
+
+def _parse_metadata_json(raw: Optional[str]) -> Dict[str, Any]:
+    """Parse the Interview's metadata_json property. Absent or malformed
+    JSON both return {} (log-and-empty for malformed) — never raises."""
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        logger.warning(f"Malformed interview metadata_json, returning {{}}: {exc}")
+        return {}
 
 
 async def project_exists(session, project_id: str) -> bool:
@@ -80,17 +96,26 @@ async def interview_rows(session, project_id: str) -> List[Dict[str, Any]]:
 
 
 async def interview_header_row(session, interview_id: str) -> Optional[Dict[str, Any]]:
-    """Interview title + graph-resident metadata (no ESDB aggregate reads here:
-    the Interview node carries no front-matter/metadata property today, so
-    this returns {} until a projection handler starts writing one)."""
+    """Interview title + graph-resident metadata (no ESDB aggregate reads here).
+
+    Metadata is stored as the JSON-string property `metadata_json`
+    (Neo4j can't store nested maps as node properties) written by
+    InterviewMetadataUpdatedHandler; Cypher can't parse JSON, so the
+    parse happens here in Python after the query returns.
+    """
     query = """
     MATCH (i:Interview {interview_id: $interview_id})
     RETURN i.interview_id AS interview_id, i.title AS title,
-           coalesce(i.metadata, {}) AS metadata
+           i.metadata_json AS metadata_json
     """
     result = await session.run(query, interview_id=interview_id)
     record = await result.single()
-    return dict(record) if record else None
+    if record is None:
+        return None
+    row = dict(record)
+    metadata_json = row.pop("metadata_json", None)
+    row["metadata"] = _parse_metadata_json(metadata_json)
+    return row
 
 
 async def transcript_line_rows(session, interview_id: str) -> List[Dict[str, Any]]:

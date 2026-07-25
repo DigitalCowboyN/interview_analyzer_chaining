@@ -3,6 +3,7 @@ import type { TranscriptLineData } from "@/hooks/useTranscript";
 import { useSentenceHistory } from "@/hooks/useSentenceHistory";
 import { StateGate } from "@/components/StateGate";
 import { PersonPicker } from "@/components/PersonPicker";
+import { NoticeText } from "@/components/NoticeText";
 import { queryKeys } from "@/hooks/queryKeys";
 import {
   useTextEditIntent,
@@ -11,7 +12,6 @@ import {
   useSegmentRemoveIntent,
   useLensItemOverrideIntent,
   usePersonUnlinkIntent,
-  type CorrectionNotice,
 } from "@/hooks/mutations";
 
 export interface LineDetailPanelProps {
@@ -19,17 +19,6 @@ export interface LineDetailPanelProps {
   interviewId: string;
   line: TranscriptLineData;
   onClose: () => void;
-}
-
-/** Inline notice for a correction's terminal non-settled state (timeout/conflict/network). */
-function CorrectionNoticeBanner({ notice }: { notice: CorrectionNotice | null }) {
-  if (!notice) return null;
-  const tone = notice.kind === "timeout" ? "text-neutral-500" : "text-red-600";
-  return (
-    <p role={notice.kind === "timeout" ? "status" : "alert"} className={`mt-1 text-xs ${tone}`}>
-      {notice.message}
-    </p>
-  );
 }
 
 /** Flow 1: edit-in-place for the line's text. */
@@ -60,7 +49,7 @@ function TextEditControl({
         >
           Edit text
         </button>
-        <CorrectionNoticeBanner notice={notice} />
+        <NoticeText notice={notice} />
       </div>
     );
   }
@@ -95,7 +84,7 @@ function TextEditControl({
           Cancel
         </button>
       </div>
-      <CorrectionNoticeBanner notice={notice} />
+      <NoticeText notice={notice} />
     </div>
   );
 }
@@ -130,7 +119,7 @@ function SpeakerRenameControl({
         >
           Rename speaker
         </button>
-        <CorrectionNoticeBanner notice={notice} />
+        <NoticeText notice={notice} />
       </div>
     );
   }
@@ -164,7 +153,7 @@ function SpeakerRenameControl({
           Cancel
         </button>
       </div>
-      <CorrectionNoticeBanner notice={notice} />
+      <NoticeText notice={notice} />
     </div>
   );
 }
@@ -201,7 +190,7 @@ function FragmentReattributeControl({
         >
           Reattribute to another speaker
         </button>
-        <CorrectionNoticeBanner notice={notice} />
+        <NoticeText notice={notice} />
       </div>
     );
   }
@@ -236,7 +225,7 @@ function FragmentReattributeControl({
           Cancel
         </button>
       </div>
-      <CorrectionNoticeBanner notice={notice} />
+      <NoticeText notice={notice} />
     </div>
   );
 }
@@ -277,7 +266,7 @@ function PersonLinkControl({
         >
           {isPending ? "Unlinking…" : "Unlink person"}
         </button>
-        <PersonNoticeBanner notice={notice} />
+        <NoticeText notice={notice} />
       </div>
     );
   }
@@ -304,16 +293,6 @@ function PersonLinkControl({
         Identify as person…
       </button>
     </div>
-  );
-}
-
-function PersonNoticeBanner({ notice }: { notice: CorrectionNotice | null }) {
-  if (!notice) return null;
-  const tone = notice.kind === "timeout" ? "text-neutral-500" : "text-red-600";
-  return (
-    <p role={notice.kind === "timeout" ? "status" : "alert"} className={`mt-1 text-xs ${tone}`}>
-      {notice.message}
-    </p>
   );
 }
 
@@ -344,7 +323,7 @@ function SegmentRemoveControl({
         >
           Remove segment
         </button>
-        <CorrectionNoticeBanner notice={notice} />
+        <NoticeText notice={notice} />
       </div>
     );
   }
@@ -382,7 +361,7 @@ function SegmentRemoveControl({
           Cancel
         </button>
       </div>
-      <CorrectionNoticeBanner notice={notice} />
+      <NoticeText notice={notice} />
     </div>
   );
 }
@@ -417,7 +396,7 @@ function LensItemOverrideControl({
         >
           Correct
         </button>
-        <CorrectionNoticeBanner notice={notice} />
+        <NoticeText notice={notice} />
       </div>
     );
   }
@@ -451,7 +430,7 @@ function LensItemOverrideControl({
           Cancel
         </button>
       </div>
-      <CorrectionNoticeBanner notice={notice} />
+      <NoticeText notice={notice} />
     </div>
   );
 }

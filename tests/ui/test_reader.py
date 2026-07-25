@@ -4,6 +4,8 @@ Fake-session pattern mirrors tests/ask/test_reader.py: FakeSession records
 every query + params in call order; rows list in, async iteration out.
 """
 
+import json
+
 import pytest
 
 from src.ui import reader
@@ -100,12 +102,13 @@ async def test_interview_rows_scopes_to_project_and_counts_fragments():
 @pytest.mark.asyncio
 async def test_interview_header_row_returns_title_and_metadata():
     session = FakeSession(
-        rows=[{"interview_id": IID, "title": "T", "metadata": {}}]
+        rows=[{"interview_id": IID, "title": "T", "metadata_json": None}]
     )
     row = await reader.interview_header_row(session, IID)
     assert row["interview_id"] == IID
     q = session.last_query
     assert "MATCH (i:Interview {interview_id: $interview_id})" in q
+    assert "metadata_json" in q
 
 
 @pytest.mark.asyncio
@@ -113,6 +116,36 @@ async def test_interview_header_row_none_when_missing():
     session = FakeSession(rows=[])
     row = await reader.interview_header_row(session, IID)
     assert row is None
+
+
+@pytest.mark.asyncio
+async def test_interview_header_row_parses_metadata_json():
+    session = FakeSession(
+        rows=[{
+            "interview_id": IID, "title": "T",
+            "metadata_json": json.dumps({"interviewer": "Alice", "location": "Remote"}, sort_keys=True),
+        }]
+    )
+    row = await reader.interview_header_row(session, IID)
+    assert row["metadata"] == {"interviewer": "Alice", "location": "Remote"}
+
+
+@pytest.mark.asyncio
+async def test_interview_header_row_absent_metadata_json_returns_empty_dict():
+    session = FakeSession(
+        rows=[{"interview_id": IID, "title": "T", "metadata_json": None}]
+    )
+    row = await reader.interview_header_row(session, IID)
+    assert row["metadata"] == {}
+
+
+@pytest.mark.asyncio
+async def test_interview_header_row_malformed_metadata_json_returns_empty_dict_no_raise():
+    session = FakeSession(
+        rows=[{"interview_id": IID, "title": "T", "metadata_json": "{not valid json"}]
+    )
+    row = await reader.interview_header_row(session, IID)
+    assert row["metadata"] == {}
 
 
 @pytest.mark.asyncio

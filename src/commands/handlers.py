@@ -376,13 +376,20 @@ class SentenceCommandHandler(CommandHandler):
             if sentence is None:
                 raise CommandValidationError(f"Sentence {command.sentence_id} not found", field="sentence_id")
 
-            # Execute command
-            sentence.override_analysis(
-                fields_overridden=command.fields_overridden,
-                note=command.note,
-                actor=command.actor,
-                correlation_id=command.correlation_id or generate_correlation_id(),
-            )
+            # Execute command. Mirrors _handle_edit's wrap: the aggregate may
+            # raise ValueError for domain validation failures (e.g. a no-op
+            # override) — re-raise as CommandValidationError so the router's
+            # existing 409 mapping applies instead of falling through to the
+            # generic 500 below.
+            try:
+                sentence.override_analysis(
+                    fields_overridden=command.fields_overridden,
+                    note=command.note,
+                    actor=command.actor,
+                    correlation_id=command.correlation_id or generate_correlation_id(),
+                )
+            except ValueError as e:
+                raise CommandValidationError(str(e), field="fields_overridden")
 
             # Persist events
             await repo.save(sentence)

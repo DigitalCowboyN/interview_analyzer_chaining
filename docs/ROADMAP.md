@@ -31,13 +31,14 @@
 | **M4.8** | ✅ Complete | `:Sentence` shim drop (alias flips, vector-index retarget, migration-CLI deletion) — closes the M4.x arc |
 | **M5.0** | ✅ Complete | UI scaffolding (Next.js): two-surface app shell — workbench + gallery |
 | **M4.9** | ✅ Complete | Projection ordering & recovery hardening (commit_position reorder buffer) — fixes a pre-existing cross-lane race surfaced by M5.1's live smoke |
-| **M5.1** | 🚧 In progress | Live workbench: real-time projection feed (SSE), dynamic transcript — paused at T6 pending M4.9; resumes rebased on it |
+| **M5.1** | ✅ Complete | Live workbench: real-time projection feed (SSE), dynamic transcript — transcript/list update live via a backend SSE bridge |
+| **M5.1b** | 📋 Planned | Gallery liveness — fast-follow SSE scopes on the M5.1 pipeline (personas/persons/worklist update live) |
 | **M5.2** | 📋 Planned | Edit observability: human-vs-machine event metrics, visualized in the gallery |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M5.1 (Live workbench — resume T6, rebased on M4.9)
-**Tests:** 1346 unit passing, 17 skipped (+146 frontend Vitest) | **Coverage:** 92.4% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Current Phase:** M5.1b (Gallery liveness — fast-follow SSE scopes)
+**Tests:** 1389 unit passing, 17 skipped (+185 frontend Vitest) | **Coverage:** 92.4% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
@@ -87,6 +88,55 @@ streams (every event already carries an Actor: human vs machine, per
 interview/extractor/lens) + endpoint, visualized in the gallery; a standing
 metrics projection only if replay-on-demand gets slow. Goal: feed ingestion
 improvements and eventually automated learning.
+
+---
+
+### M5.1: Live Workbench (real-time projection feed) ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-24-m51-live-workbench-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-24-m51-live-workbench.md`
+
+The workbench transcript and interview list update themselves as events
+project — a new line, a correction, or a linked speaker appears with no manual
+refresh. A backend SSE bridge watches the event store and pushes thin,
+surface-tagged notifications; the frontend invalidates the matching queries
+(debounced, with a trailing re-fetch to absorb projection lag). Chosen over
+WebSockets and over emitting from the projection service: the M4.7 delivery
+path stays untouched, and the browser knows only the HTTP/SSE contracts.
+
+- [x] Task 1 — intent-pattern hygiene rider (shared notice renderer, poll
+      `undefined` guards, URL encoding, `sentenceHistory` invalidation,
+      `_handle_override` parity)
+- [x] Task 2 — interview front-matter projection: `InterviewMetadataUpdated`
+      merges `metadata_diff` into a `metadata_json` property; the `/ui` reader
+      parses it (the metadata panel now has content, and updates live)
+- [x] Task 3 — `NotificationHub` + `scope_notifications` (event → surface-tag
+      translation; the browser never sees event types or stream names)
+- [x] Task 4 — `EsdbWatcher` (three ephemeral catch-up subscriptions) +
+      `GET /ui/streams/events` SSE route (heartbeat, resync-on-reconnect,
+      lazy lifecycle)
+- [x] Task 5 — `useLiveInvalidation` hook (debounce + trailing re-invalidate)
+      + `LiveIndicator`, wired into both workbench pages
+- [x] Task 6 — `make live-feed-smoke` (real ESDB event → SSE subscriber) +
+      `make ui-smoke` live-append money shot + README/ROADMAP
+
+**Transport note:** SSE is served through a Next.js App Router route handler,
+not the `/api/*` rewrite — the rewrite (and `next start`) BUFFER streaming
+responses, so an SSE stream never delivers its `200` to the browser and
+`EventSource.onopen` never fires. The route handler streams the body through;
+a `: connected` prelude flushes the head at connect time. (This transport bug,
+and the pre-existing projection race behind M4.9, were both caught by the live
+smokes — not by any unit test.)
+
+**Live acceptance:** `make ui-smoke` — with the transcript page open, a line
+appended server-side appears with NO user action; `make live-feed-smoke` — a
+real ESDB event reaches a live SSE subscriber. Both witnessed passing.
+
+**Completed:** 2026-07-25
+
+**Deferred:** gallery liveness (M5.1b — the same pipeline, more subscription
+scopes); the "intent-pattern hygiene" polish batch from the M5.0 final review
+(notice-renderer dedup, etc.); person-alias UI (no backend concept yet).
 
 ---
 

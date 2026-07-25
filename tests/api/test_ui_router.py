@@ -1,9 +1,22 @@
 """/ui/* router tests (M5.0 Task 1): 200 shapes, 404 legs, person-id equality.
+M5.1 Task 4 adds the SSE live-feed route tests below.
 
 Session-mocking idiom mirrors tests/api/test_queries_router.py: patch
 Neo4jConnectionManager.get_session and the reader functions the router calls.
+
+SSE route tests use a real NotificationHub (already unit-tested in
+tests/ui/test_notifications.py) with a stubbed EsdbWatcher (ensure_started /
+stop as AsyncMocks) injected via `src.api.routers.ui.get_live_feed`, plus a
+patched `Request.is_disconnected` so each test's StreamingResponse generator
+terminates deterministically -- starlette's TestClient (like httpx's
+ASGITransport) runs the whole ASGI app to completion before returning a
+Response, so an SSE generator that loops forever would hang the test; making
+`is_disconnected()` return True after a controlled number of iterations is
+what lets the generator actually finish and the response body be inspected.
 """
 
+import json
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -12,6 +25,7 @@ from fastapi.testclient import TestClient
 from src.events.project_events import person_id_for
 from src.main import app
 from src.resolution.candidates import normalize_name
+from src.ui.notifications import Notification, NotificationHub
 
 PID = "proj-1"
 IID = "iv-1"
@@ -267,3 +281,197 @@ def test_person_id_404_unknown_project(client):
     with patch_session(), _MultiPatch(patch_reader(project_exists=False)):
         resp = client.get(f"/ui/projects/{PID}/person-id", params={"display_name": "Alice"})
     assert resp.status_code == 404
+
+
+# --- GET /ui/streams/events (SSE live feed) ---
+
+
+def make_watcher_stub():
+    return SimpleNamespace(ensure_started=AsyncMock(), stop=AsyncMock())
+
+
+def seed_next_subscription(hub: NotificationHub, notification: Notification):
+    """Wrap hub.subscribe so the very next Subscription it creates already
+    has `notification` sitting in its queue before the route's generator
+    starts reading. This is what lets a single non-concurrent test call
+    (TestClient runs the whole app to completion before returning) observe a
+    real published notification without any timing dependency."""
+    original_subscribe = hub.subscribe
+
+    def seeded(*args, **kwargs):
+        subscription = original_subscribe(*args, **kwargs)
+        subscription.queue.put_nowait(notification)
+        return subscription
+
+    hub.subscribe = seeded
+
+
+def test_stream_events_422_when_both_params_missing(client):
+    resp = client.get("/ui/streams/events")
+    assert resp.status_code == 422
+
+
+def test_stream_events_first_notification_matches_contract_shape(client):
+    hub = NotificationHub()
+    seed_next_subscription(hub, Notification("transcript", interview_id=IID))
+    watcher = make_watcher_stub()
+
+    with (
+        patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)),
+        patch("starlette.requests.Request.is_disconnected", side_effect=[False, True]),
+    ):
+        resp = client.get("/ui/streams/events", params={"interview_id": IID})
+
+    assert resp.status_code == 200
+    assert resp.headers["cache-control"] == "no-cache"
+    assert resp.headers["x-accel-buffering"] == "no"
+    assert resp.headers["content-type"].startswith("text/event-stream")
+
+    frames = [frame for frame in resp.text.split("\n\n") if frame]
+    # The stream opens with a ": connected" prelude comment (flushes the
+    # response head at connect time so a buffering proxy can't delay
+    # EventSource.onopen); the first data frame follows it.
+    assert frames[0] == ": connected"
+    data_frames = [frame for frame in frames if frame.startswith("data: ")]
+    assert data_frames
+    payload = json.loads(data_frames[0][len("data: "):])
+    # Only non-None fields -- no stray "project_id": null.
+    assert payload == {"surface": "transcript", "interview_id": IID}
+    watcher.ensure_started.assert_awaited_once()
+
+
+def test_stream_events_disconnect_closes_subscription_and_stops_watcher_at_zero(client):
+    hub = NotificationHub()
+    seed_next_subscription(hub, Notification("transcript", interview_id=IID))
+    watcher = make_watcher_stub()
+
+    with (
+        patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)),
+        patch("starlette.requests.Request.is_disconnected", side_effect=[False, True]),
+    ):
+        resp = client.get("/ui/streams/events", params={"interview_id": IID})
+
+    assert resp.status_code == 200
+    assert hub.subscriber_count == 0
+    watcher.stop.assert_awaited_once()
+
+
+def test_stream_events_heartbeat_emitted_when_quiet(client):
+    hub = NotificationHub()  # no seeding -- queue stays empty, every wait times out
+    watcher = make_watcher_stub()
+
+    with (
+        patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)),
+        patch("src.api.routers.ui.HEARTBEAT_SECONDS", 0.01),
+        patch("starlette.requests.Request.is_disconnected", side_effect=[False, False, True]),
+    ):
+        resp = client.get("/ui/streams/events", params={"interview_id": IID})
+
+    assert resp.status_code == 200
+    assert resp.text.count(": keep-alive\n\n") == 2
+    assert hub.subscriber_count == 0
+    watcher.stop.assert_awaited_once()
+
+
+def test_stream_events_heartbeat_default_is_fifteen_seconds():
+    from src.api.routers.ui import HEARTBEAT_SECONDS
+
+    assert HEARTBEAT_SECONDS == 15.0
+
+
+def _bare_request():
+    """Minimal starlette Request for driving stream_events directly. The
+    generator-level tests below never let the route's loop touch it (either
+    the generator is never started, or is_disconnected is patched)."""
+    from starlette.requests import Request as StarletteRequest
+
+    return StarletteRequest(
+        {"type": "http", "method": "GET", "path": "/ui/streams/events", "headers": [], "query_string": b""}
+    )
+
+
+@pytest.mark.asyncio
+async def test_stream_events_generator_never_started_leaks_nothing_and_next_connect_works():
+    # A disconnect can land between handler return and the first chunk: the
+    # ASGI server then aclose()s the response generator WITHOUT ever starting
+    # it, and an unstarted async generator executes no code -- neither its
+    # body nor its finally. All acquisition therefore lives inside the
+    # generator: closing it unstarted must acquire nothing and leak nothing.
+    from src.api.routers.ui import stream_events
+
+    hub = NotificationHub()
+    watcher = make_watcher_stub()
+
+    with patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)):
+        response = await stream_events(_bare_request(), interview_id=IID, project_id=None)
+        await response.body_iterator.aclose()  # never started
+
+    assert hub.subscriber_count == 0  # nothing subscribed => nothing leaked
+    watcher.ensure_started.assert_not_awaited()
+    watcher.stop.assert_not_awaited()
+
+    # A subsequent connection on the same hub works end-to-end (count can
+    # still reach zero => lazy stop still functions).
+    seed_next_subscription(hub, Notification("transcript", interview_id=IID))
+    with (
+        patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)),
+        patch("starlette.requests.Request.is_disconnected", side_effect=[False, True]),
+    ):
+        response = await stream_events(_bare_request(), interview_id=IID, project_id=None)
+        chunks = [chunk async for chunk in response.body_iterator]
+
+    assert chunks and chunks[0] == ": connected\n\n"  # prelude first
+    data_chunks = [chunk for chunk in chunks if chunk.startswith("data: ")]
+    assert data_chunks
+    assert json.loads(data_chunks[0][len("data: "):]) == {"surface": "transcript", "interview_id": IID}
+    assert hub.subscriber_count == 0
+    watcher.ensure_started.assert_awaited_once()
+    watcher.stop.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_stream_events_generator_aclosed_mid_stream_releases_subscription():
+    # aclose() after the first yield models the ASGI server cancelling the
+    # response mid-stream: GeneratorExit at the yield point must run the
+    # finally -- subscription released, watcher stopped at zero subscribers.
+    from src.api.routers.ui import stream_events
+
+    hub = NotificationHub()
+    seed_next_subscription(hub, Notification("transcript", interview_id=IID))
+    watcher = make_watcher_stub()
+
+    with (
+        patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)),
+        patch("starlette.requests.Request.is_disconnected", side_effect=[False]),
+    ):
+        response = await stream_events(_bare_request(), interview_id=IID, project_id=None)
+        generator = response.body_iterator
+        # First yield is the ": connected" prelude -- enough to prove the
+        # generator started (subscribed) so aclose() must run the finally.
+        first = await generator.__anext__()
+        assert first == ": connected\n\n"
+        assert hub.subscriber_count == 1
+        await generator.aclose()
+
+    assert hub.subscriber_count == 0
+    watcher.stop.assert_awaited_once()
+
+
+def test_stream_events_disconnect_with_remaining_subscriber_keeps_watcher(client):
+    hub = NotificationHub()
+    # A second, still-connected subscriber (subscribed before the seeding
+    # wrapper so it stays unseeded and untouched by the route).
+    lingering = hub.subscribe(interview_id="iv-other", project_id=None)
+    seed_next_subscription(hub, Notification("transcript", interview_id=IID))
+    watcher = make_watcher_stub()
+
+    with (
+        patch("src.api.routers.ui.get_live_feed", return_value=(hub, watcher)),
+        patch("starlette.requests.Request.is_disconnected", side_effect=[False, True]),
+    ):
+        resp = client.get("/ui/streams/events", params={"interview_id": IID})
+
+    assert resp.status_code == 200
+    assert hub.subscriber_count == 1  # only the lingering subscriber remains
+    watcher.stop.assert_not_awaited()  # not the last subscriber => no stop
+    lingering.close()

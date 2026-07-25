@@ -189,6 +189,18 @@ request carries an `X-User-ID` header from a small dev identity switcher in
 the app header (localStorage-persisted, defaults to `"dev"`) — corrections
 are attributed to whichever identity is currently selected.
 
+**Live updates (M5.1):** the workbench transcript and interview list update
+themselves as events project — a new line, a correction, or a linked speaker
+appears without a manual refresh. A backend SSE endpoint
+(`GET /ui/streams/events`) watches the event store and pushes thin,
+surface-tagged notifications; the browser reacts by invalidating the matching
+queries (with a debounced trailing re-fetch to absorb projection lag). A
+subtle header dot ("Live updates on/off") shows the connection state. If SSE
+is unavailable the UI silently falls back to fetch-on-navigation — never a
+broken page. SSE is served through a Next.js route handler (not the `/api/*`
+rewrite, which buffers streaming responses); everything else stays same-origin
+through the rewrite.
+
 **Typegen workflow:** the frontend's API client is fully typed against the
 backend's OpenAPI schema (`frontend/openapi.json` + generated
 `frontend/src/api/schema.d.ts`). After any backend contract change:
@@ -206,7 +218,8 @@ types still match the backend.
 ```bash
 make ui-test    # cd frontend && npm run lint && npm run typecheck && npm test
 make ui-build   # cd frontend && npm run build (production build)
-make ui-smoke   # Playwright: seeded interview → transcript → text-edit settle
+make ui-smoke   # Playwright: transcript + text-edit settle, and a server-side
+                # line append appears LIVE (no user action) via the SSE feed
 ```
 
 `ui-smoke` is env-gated (`UI_SMOKE=1`) and NOT part of `ui-test` — it needs
