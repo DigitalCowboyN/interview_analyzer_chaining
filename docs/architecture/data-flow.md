@@ -1,243 +1,156 @@
 # Data Flow
 
-> **Last Updated:** 2026-01-18
+> **Last Updated:** 2026-07-25
 
-## Pipeline Processing Flow
+Analysis is organized as **layers** over a transcript. Each layer emits events;
+nothing rewrites the verbatim text. The projection service turns those events
+into the Neo4j read model. This doc traces the flow layer by layer.
 
-The core pipeline transforms raw text files into structured, multi-dimensional sentence analysis.
-
-```mermaid
-flowchart TD
-    subgraph Input["1. Input"]
-        file[fa:fa-file-text Text File<br/>data/input/*.txt]
-    end
-
-    subgraph Segmentation["2. Text Segmentation"]
-        read[Read File<br/>TextDataSource]
-        spacy[spaCy NLP<br/>en_core_web_sm]
-        sentences[Sentence List]
-
-        read --> spacy --> sentences
-    end
-
-    subgraph Mapping["3. Sentence Mapping"]
-        map_create[Create Sentence Map]
-        map_file[fa:fa-file-code Map File<br/>data/maps/*_map.jsonl]
-        event_interview[fa:fa-bolt InterviewCreated<br/>Event]
-        event_sentence[fa:fa-bolt SentenceCreated<br/>Events]
-
-        sentences --> map_create
-        map_create --> map_file
-        map_create --> event_interview
-        map_create --> event_sentence
-    end
-
-    subgraph Context["4. Context Building"]
-        context[ContextBuilder]
-        windows[Context Windows<br/>immediate, observer,<br/>broader, overall]
-
-        sentences --> context --> windows
-    end
-
-    subgraph Analysis["5. LLM Analysis"]
-        queue[Async Queue<br/>10 workers]
-        analyzer[SentenceAnalyzer]
-        llm[fa:fa-brain LLM API<br/>7 parallel calls]
-
-        windows --> queue --> analyzer --> llm
-    end
-
-    subgraph Classification["Analysis Dimensions"]
-        func[Function Type]
-        struct[Structure Type]
-        purpose[Purpose]
-        topic1[Topic Level 1]
-        topic3[Topic Level 3]
-        kw_overall[Overall Keywords]
-        kw_domain[Domain Keywords]
-
-        llm --> func & struct & purpose & topic1 & topic3 & kw_overall & kw_domain
-    end
-
-    subgraph Persistence["6. Event-First Persistence"]
-        consolidate[Consolidate Results]
-        event_analysis[fa:fa-bolt AnalysisGenerated<br/>Event]
-        jsonl[fa:fa-file-code Analysis File<br/>data/output/*_analysis.jsonl]
-
-        func & struct & purpose & topic1 & topic3 & kw_overall & kw_domain --> consolidate
-        consolidate --> event_analysis
-        consolidate --> jsonl
-    end
-
-    subgraph Projection["7. Event Projection"]
-        eventstore[(EventStoreDB)]
-        proj_service[Projection Service]
-        neo4j_proj[fa:fa-project-diagram Neo4j<br/>Projected View]
-
-        event_interview & event_sentence & event_analysis --> eventstore
-        eventstore --> proj_service --> neo4j_proj
-    end
-
-    file --> read
-```
-
-## Analysis Dimensions
-
-Each sentence is classified across 7 dimensions via parallel LLM calls:
-
-```mermaid
-flowchart LR
-    subgraph Input
-        sentence[Sentence + Context]
-    end
-
-    subgraph LLM["Parallel LLM Calls"]
-        call1[Function Type<br/>declarative, interrogative, etc.]
-        call2[Structure Type<br/>simple, compound, complex]
-        call3[Purpose<br/>statement, query, explanation]
-        call4[Topic Level 1<br/>high-level category]
-        call5[Topic Level 3<br/>specific subcategory]
-        call6[Overall Keywords<br/>general terms]
-        call7[Domain Keywords<br/>domain-specific terms]
-    end
-
-    subgraph Output
-        result[Consolidated<br/>Analysis Result]
-    end
-
-    sentence --> call1 & call2 & call3 & call4 & call5 & call6 & call7
-    call1 & call2 & call3 & call4 & call5 & call6 & call7 --> result
-```
-
-## Context Window Building
-
-The `ContextBuilder` creates different context windows around each sentence:
+## The pipeline, end to end
 
 ```mermaid
 flowchart TD
-    subgraph Document["Full Document"]
-        s1[Sentence 1]
-        s2[Sentence 2]
-        s3[Sentence 3]
-        target[**TARGET SENTENCE**]
-        s5[Sentence 5]
-        s6[Sentence 6]
-        s7[Sentence 7]
+    file[Transcript<br/>data/input/*.txt]
+
+    subgraph L1["Layer 1 — Ingestion &amp; structure"]
+        norm[Normalize + spaCy segmentation]
+        frags[Offset-grounded fragments<br/>+ map file data/maps/*.jsonl]
+        spk[Speaker genesis<br/>parsed or inferred]
+        stitch[Stitch utterances<br/>interruptions as overlay]
     end
 
-    subgraph Windows["Context Windows"]
-        immediate["Immediate Context<br/>±1 sentence"]
-        observer["Observer Context<br/>±3 sentences"]
-        broader["Broader Context<br/>±5 sentences"]
-        overall["Overall Context<br/>Full document summary"]
+    subgraph L2["Layer 2 — Enrichment"]
+        ext[Extractor registry<br/>one focused LLM call per dimension]
+        emb[Embeddings<br/>fragments + utterances]
     end
 
-    s3 & target & s5 --> immediate
-    s2 & s3 & target & s5 & s6 --> observer
-    s1 & s2 & s3 & target & s5 & s6 & s7 --> broader
-    Document --> overall
-```
-
-## Async Worker Architecture
-
-```mermaid
-sequenceDiagram
-    participant P as Pipeline
-    participant Q as Async Queue
-    participant W1 as Worker 1
-    participant W2 as Worker 2
-    participant Wn as Worker N
-    participant LLM as LLM API
-    participant R as Result Queue
-
-    P->>Q: Enqueue sentences (batch)
-
-    par Concurrent Processing
-        Q->>W1: Sentence 1
-        W1->>LLM: Analyze (7 calls)
-        LLM-->>W1: Results
-        W1->>R: Analysis 1
-
-        Q->>W2: Sentence 2
-        W2->>LLM: Analyze (7 calls)
-        LLM-->>W2: Results
-        W2->>R: Analysis 2
-
-        Q->>Wn: Sentence N
-        Wn->>LLM: Analyze (7 calls)
-        LLM-->>Wn: Results
-        Wn->>R: Analysis N
+    subgraph L3["Layer 3 — Lenses"]
+        lens[Generic lens engine<br/>meeting_minutes · persona]
     end
 
-    R->>P: Consolidated results
+    subgraph L4["Layer 4 — Segments"]
+        seg[Topic segments over utterances]
+    end
+
+    subgraph RES["Resolution (cross-interview)"]
+        person[Person identity + speaker links]
+        canon[Entity canonicalization]
+    end
+
+    es[(EventStoreDB<br/>source of truth)]
+    proj[Projection service<br/>sole Neo4j writer]
+    n4[(Neo4j read model)]
+
+    subgraph OUT["Consume"]
+        export[OKF export · Layer 5]
+        ask[Ask-the-corpus · GraphRAG]
+        ui[Live UI]
+    end
+
+    file --> norm --> frags --> spk --> stitch
+    stitch --> ext --> emb
+    emb --> lens --> seg
+    L1 & L2 & L3 & L4 & RES -->|events| es
+    es -->|commit-ordered replay| proj --> n4
+    n4 --> export & ask & ui
+    es -->|SSE notifications| ui
 ```
 
-## File Input/Output
+## Layer 1 — Ingestion & structure
 
-### Input Files
-- **Location:** `data/input/`
-- **Format:** Plain text (`.txt`)
-- **Content:** Interview transcripts, documents
+`python -m src.ingestion <file>` normalizes the transcript, segments it with
+spaCy into **offset-grounded fragments** (every fragment records its exact
+source span, written to a map file under `data/maps/`), and establishes
+speakers — parsed from labels when present, inferred with a confidence score
+when not. Interrupted utterances are stitched back together as a relationship
+overlay: the verbatim text is untouched, but "who interrupted whom" becomes
+queryable.
 
-### Output Files
+Events: `InterviewCreated`, `SpeakerCreated` / `SpeakerAttributed`,
+`SentenceCreated` (one per fragment), `UtteranceIdentified`,
+`InterruptionRecorded`, `StitchRemoved`.
 
-| File Type | Location | Format | Content |
-|-----------|----------|--------|---------|
-| Map Files | `data/maps/*_map.jsonl` | JSON Lines | `{sentence_id, sequence_order, sentence}` |
-| Analysis Files | `data/output/*_analysis.jsonl` | JSON Lines | Full analysis per sentence |
-| Log Files | `logs/pipeline.log` | Text | Processing logs |
+## Layer 2 — Enrichment
 
-### JSONL Analysis Format
+`--enrich` (or `python -m src.enrichment`) runs a **registry of focused
+extractors** — one schema-checked LLM call per dimension (function, structure,
+purpose, topics, keywords, entities), plus claims and embeddings — behind a
+provider failover chain (Anthropic Haiku → Claude Code → OpenAI). Each result
+carries a numeric confidence. Fragments and utterances get vector embeddings in
+per-model Neo4j indexes for semantic search.
 
-```json
-{
-  "sentence_id": 1,
-  "sequence_order": 1,
-  "sentence": "The product launch was successful.",
-  "filename": "interview_001.txt",
-  "function_type": "declarative",
-  "structure_type": "simple",
-  "purpose": "statement",
-  "topic_level_1": "Product",
-  "topic_level_3": "Product Launch",
-  "overall_keywords": ["product", "launch", "successful"],
-  "domain_keywords": ["product launch", "release"]
-}
-```
+Events: `AnalysisGenerated`, `EntitiesExtracted`, `EmbeddingGenerated` (per
+fragment); `ClaimExtracted`, `UtteranceEmbeddingGenerated` (per interview).
 
-## Error Handling Flow
+## Layer 3 — Lenses
+
+`python -m src.lens <interview_id> <lens>` applies a **lens** — a purpose-built
+reading of the interview. A single generic engine serves every lens; the lens
+itself is a YAML profile plus a prompts file (no code). `meeting_minutes`
+extracts objectives, decisions, action items, and follow-ups; `persona`
+extracts traits, goals, pain points, and notable quotes. Human overrides lock a
+lens item against future re-runs.
+
+Events: `LensApplied`, `LensExtractionGenerated`, `LensExtractionOverridden`.
+
+## Layer 4 — Segments
+
+Topic **segments** group the utterance sequence into episodes. Events:
+`SegmentIdentified`, `SegmentRemoved`.
+
+## Resolution (cross-interview identity)
+
+Speakers across interviews are linked to canonical **Persons**; entity surface
+forms are **canonicalized** (merge/split/alias). These are human-in-the-loop
+decisions surfaced in the review worklist and applied through the resolution
+API. Events (on the `Project` stream): `PersonIdentified`,
+`SpeakerLinkedToPerson`, `PersonLinkRemoved`, `EntityCanonicalized`,
+`EntityAliasAdded`, `EntityMergeConfirmed`, `EntitySplit`.
+
+## Layer 5 — Export & ask
+
+- **Export** (`python -m src.export <interview_id> <lens>`) writes an OKF bundle
+  — Markdown with YAML front matter, git-versionable, every lens item grounded
+  back to the verbatim transcript.
+- **Ask** (`python -m src.ask <project_id> "..."` or `POST /ask/{project_id}`)
+  answers questions with hybrid graph + vector retrieval and cited synthesis
+  (GraphRAG).
+
+## Projection & correctness
+
+Events are the source of truth; Neo4j is derived. The **projection service is
+the sole writer**. It replays each stream's events in **commit-position (causal)
+order** using a per-lane reorder buffer, so a dependent event never lands before
+its referent. An event whose referent isn't ready yet is **parked**
+(`StreamState.ANY`) rather than dropped, and can be redriven later
+(`python -m src.projections.redrive`).
 
 ```mermaid
 flowchart TD
-    subgraph Pipeline["Pipeline Operation"]
-        op[Operation Start]
-        emit[Emit Event to ESDB]
-        complete[Operation Complete]
-    end
+    op[Command / extractor] --> emit[Emit event to ESDB]
+    emit --> ok{Append ok?}
+    ok -->|No| abort[ABORT — raise]
+    ok -->|Yes| done[Command complete]
 
-    subgraph Errors["Error Handling"]
-        event_fail{Event Failed?}
-        abort[fa:fa-times-circle ABORT<br/>Raise Exception]
-    end
-
-    subgraph Projection["Projection Service"]
-        proj[Process Event]
-        neo4j_write[Write to Neo4j]
-        proj_fail{Write Failed?}
-        park[Park Event<br/>for Retry]
-    end
-
-    op --> emit --> event_fail
-    event_fail -->|Yes| abort
-    event_fail -->|No| complete
-
-    emit -.->|async| proj --> neo4j_write --> proj_fail
-    proj_fail -->|Yes| park
-    proj_fail -->|No| complete
+    emit -.->|async, commit-ordered| proj[Projection handler]
+    proj --> ready{Referent ready?}
+    ready -->|No| park[Park event · redrive later]
+    ready -->|Yes| write[Write to Neo4j]
 
     style abort fill:#f66,stroke:#333
     style park fill:#ff9,stroke:#333
-    style complete fill:#6f6,stroke:#333
+    style write fill:#6f6,stroke:#333
+    style done fill:#6f6,stroke:#333
 ```
 
-**Key Principle:** Events are the source of truth. Event failures abort the operation. Projection service is the sole writer to Neo4j and handles retries independently.
+**Principle:** event-append failures abort the command; projection failures are
+handled independently by the sole writer (park + redrive), never by losing data.
+
+## Live updates
+
+An in-process `EsdbWatcher` runs catch-up subscriptions on the category streams
+and pushes thin, surface-tagged notifications (`{surface, interview_id?,
+project_id?}`) to browsers over SSE (`GET /ui/streams/events`). The UI reacts by
+invalidating the matching read queries — the workbench and gallery stay current
+without a manual refresh. See [event-sourcing.md](./event-sourcing.md) for the
+watcher and ordering details.
