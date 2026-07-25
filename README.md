@@ -1,249 +1,279 @@
-# Enriched Sentence Analysis Pipeline & API
+# Interview Analyzer
 
-An event-sourced system for processing interview transcripts with AI-powered multi-dimensional sentence analysis.
+Turn interview transcripts into a queryable knowledge graph — speakers, claims,
+topics, and purpose-built "lens" views — with every fact grounded back to the
+exact words someone said, and every AI guess correctable by a human.
 
-> **Status:** M5.0 Complete (UI scaffolding — Next.js workbench + gallery, correction intents, manual speaker→person linking, Playwright smoke)
->
-> See [ROADMAP.md](docs/ROADMAP.md) for milestones, exact test/coverage stats, and [docs/architecture/](docs/architecture/) for detailed diagrams.
+The system is event-sourced: EventStoreDB holds the full history of what
+happened, and a projection service is the only thing that writes to the Neo4j
+read model. Nothing is ever silently overwritten; corrections are new events,
+not edits in place.
 
-## What It Does
+> **Status:** M5.1b complete — the Next.js workbench *and* gallery update live
+> off a server-sent-events feed. See [docs/ROADMAP.md](docs/ROADMAP.md) for the
+> full milestone history and current test/coverage numbers, and
+> [docs/architecture/](docs/architecture/) for the diagrams.
 
-1. **Ingests** interview transcripts (text files — labeled or raw unlabeled prose)
-2. **Segments** text into offset-grounded fragments using spaCy NLP (the map: every fragment ties back to exact source positions)
-3. **Attributes** speakers (parsed from labels, or inferred with confidence when absent — fully correctable)
-4. **Stitches** interrupted utterances via relationship overlay (verbatim text untouched; interruptions become queryable data)
-5. **Enriches** via a registry of focused extractors — one LLM call per dimension (function, structure, purpose, topics, keywords, entities, claims), each schema-enforced with numeric confidence, behind a provider failover chain (Anthropic Haiku → Claude Code → OpenAI)
-6. **Embeds** fragments and utterances into per-model Neo4j vector indexes for semantic search
-7. **Applies lenses** — purpose-built views like meeting minutes (objectives, decisions, action items, follow-ups) extracted by a fully generic engine; adding a lens is one YAML profile + one prompts file, zero code
-8. **Stores** everything as events in EventStoreDB (source of truth); the projection service is Neo4j's sole writer
-9. **Exports** OKF bundles — markdown files with YAML frontmatter, git-versionable and agent-consumable, grounding every lens item back to the verbatim transcript
-10. **Exposes** REST API for querying and user corrections (edits, speakers, stitches, lens items)
+## What it does
 
-**Run it:** `python -m src.ingestion <file> --enrich` (ingest + enrich in one shot), or `make ingest FILE=<path>`.
-Then apply a lens: `python -m src.lens <interview_id> meeting_minutes` (or `persona` — a second lens, same generic engine, zero per-lens code).
-Then export it: `python -m src.export <interview_id> meeting_minutes`.
-Then ask it a question: `python -m src.ask <project_id> "What did they decide about Acme Corp?"` (or `POST /ask/{project_id}`).
+You give it a transcript — a labeled interview, a raw wall of unlabeled prose,
+or something messy in between — and it works through several passes:
 
-Want sample content to try any of this against? See `data/samples/` (`MANIFEST.md` maps each transcript to the capability it exercises — mature labeled interviews, mixed/adversarial speaker labeling, and raw unlabeled transcripts).
+- **Ingests and maps.** The transcript is split into offset-grounded fragments
+  with spaCy. Every fragment records exactly where it came from in the source,
+  so nothing downstream is untraceable.
+- **Attributes speakers.** Labels are parsed when present; when they're absent,
+  speakers are inferred with a confidence score. Every attribution is a human
+  can override.
+- **Stitches interruptions.** Utterances split across an interruption are
+  reconnected as a relationship overlay — the verbatim text is never rewritten,
+  but "who interrupted whom" becomes queryable.
+- **Enriches.** A registry of focused extractors runs one LLM call per
+  dimension (function, structure, purpose, topics, keywords, entities, claims).
+  Each call is schema-checked and carries a numeric confidence, behind a
+  provider failover chain (Anthropic Haiku → Claude Code → OpenAI).
+- **Embeds.** Fragments and utterances get vector embeddings in per-model Neo4j
+  indexes for semantic search.
+- **Applies lenses.** A lens is a purpose-built reading of an interview —
+  *meeting minutes* (objectives, decisions, action items, follow-ups) or
+  *persona* (traits, goals, pain points, notable quotes). One generic engine
+  serves every lens; adding one is a YAML profile plus a prompts file, no code.
+- **Resolves identity.** Speakers across interviews get linked to canonical
+  Persons; entity surface forms get canonicalized. These are human-in-the-loop
+  decisions surfaced in a review worklist.
+- **Exports and answers.** Any lens can be exported as an OKF bundle —
+  Markdown with YAML front matter, git-versionable and grounded back to the
+  transcript. And you can ask the corpus a question and get a cited answer
+  (hybrid graph + vector retrieval, GraphRAG-style).
 
-There's also a Next.js UI in `frontend/` — see the [Frontend](#frontend-nextjs-ui) section below.
+Everything above is stored as events first. Neo4j is a projection of those
+events, rebuildable from scratch at any time.
 
-## Architecture
+## How it works
 
 ```
-Transcript Ingestion / Edit & Correction APIs
-    ↓
-Aggregates (Interview, Sentence)
-    └──→ EventStoreDB (events only) ← Source of Truth
-
-EventStoreDB
-    ↓
-Projection Service (12 lanes, sole Neo4j writer)
-    ↓
-Neo4j (read model: fragments, speakers, utterances, analysis)
+Ingestion / correction commands
+        │  (produce events)
+        ▼
+   Aggregates ── Interview · Sentence(=Fragment) · Project
+        │
+        ▼
+   EventStoreDB  ◀── source of truth (append-only history)
+        │  (catch-up subscriptions)
+        ▼
+   Projection service  ── the ONLY writer to Neo4j; replays events in
+        │                  commit-position order per lane (reorder buffer)
+        ▼
+      Neo4j  ── read model: fragments, speakers, utterances, claims,
+                lens items, persons, entities, segments, topics
 ```
 
-**Key Patterns:** Event Sourcing, CQRS, async/await throughout
+Two ideas do most of the work:
 
-> **Details:** [docs/architecture/](docs/architecture/) — system overview, data flow, event sourcing, database schema
+- **Event sourcing.** Commands validate against an aggregate and emit events;
+  the events are the record. The Neo4j graph is derived, so a bad projection is
+  a rebuild, not a data-loss incident.
+- **CQRS.** The write side (aggregates, commands, corrections) and the read side
+  (Neo4j queries, the UI's gallery) are separate. The UI mirrors this split: a
+  **workbench** for making changes, a **gallery** for reading them back.
 
-## Technology Stack
+The projection service processes events across parallel lanes but releases them
+to Neo4j in each stream's causal (commit-position) order, with a bounded
+reorder buffer and a redrive path for events whose referents aren't ready yet
+(see M4.9 in the roadmap). This is what makes the live UI trustworthy: what you
+see projected matches the order things actually happened.
+
+For the full picture — the layered "Mine" model (Layer 1 conversation
+structure, Layer 2 enrichment, Layer 3 lenses, Layer 4 segments, Layer 5
+export), the three aggregates and their events, and the Neo4j schema — see
+[docs/architecture/](docs/architecture/).
+
+## Technology
 
 | Component | Technology | Version |
 |-----------|-----------|---------|
 | Language | Python | 3.10 |
-| API | FastAPI + Uvicorn | 0.117.0+ |
-| Event Store | EventStoreDB | 23.10.1 |
-| Graph DB | Neo4j | 5.22.0 |
-| Task Queue | Celery + Redis | 5.5.3 / 7 |
-| NLP | spaCy | 3.8.11 |
-| LLM APIs | OpenAI, Anthropic, Gemini | Various |
+| API | FastAPI + Uvicorn | 0.117+ |
+| Event store | EventStoreDB | 23.10 |
+| Read model | Neo4j | 5.26 |
+| Background work | Celery + Redis | 5.5 / 7 |
+| NLP | spaCy | 3.8 |
+| LLM providers | Anthropic, OpenAI (+ Claude Code) | — |
+| UI | Next.js 15 + React + TanStack Query | — |
 
-## Quick Start
+## Quick start
 
-### Prerequisites
-
-- Docker & Docker Compose
-- Git
-
-### Setup
+You need Docker, Docker Compose, and Git.
 
 ```bash
-# Clone and enter directory
 git clone https://github.com/DigitalCowboyN/interview_analyzer_chaining
 cd interview_analyzer_chaining
 
-# Create .env with your API keys
-cat > .env << EOF
+# API keys and DB password
+cat > .env <<'EOF'
 OPENAI_API_KEY=your_key_here
+ANTHROPIC_API_KEY=your_key_here
 NEO4J_PASSWORD=your_password_here
 EOF
 
-# Build and start all services
 docker compose up -d
 ```
 
-The projection service creates its Neo4j schema (indexes/constraints) automatically at
-startup and fails fast if Neo4j is unreachable. To apply it standalone (e.g. before the
-service is up), run `python -m src.projections.ensure_schema`. `make deployed-smoke`
-proves the fully dockerized ingest → projection path end-to-end against real containers.
-
-**Upgrading an existing deployment:** graphs created before M4.8 still carry the
-`:Sentence` shim label. After deploying this version, run
-`python -m src.projections.migrate_shim_drop` once — it retargets the fragment
-vector indexes to `:Fragment` and strips the `:Sentence` label (idempotent).
-Fresh databases need nothing.
-
-### Access Points
+The projection service creates its own Neo4j schema (indexes and constraints) at
+startup and fails fast if Neo4j is unreachable. To apply the schema standalone,
+run `python -m src.projections.ensure_schema`. `make deployed-smoke` proves the
+whole dockerized ingest → projection path against real containers.
 
 | Service | URL |
 |---------|-----|
 | API | http://localhost:8000 |
-| API Docs (Swagger) | http://localhost:8000/docs |
-| Neo4j Browser | http://localhost:7474 |
+| API docs (Swagger) | http://localhost:8000/docs |
+| Neo4j browser | http://localhost:7474 |
 | EventStoreDB UI | http://localhost:2113 |
 
-### Run the Pipeline
+## Using it from the command line
+
+The pipeline is a handful of `python -m` entry points. A typical run:
 
 ```bash
-# Process files in data/input/
-docker compose run --rm app python src/main.py --run-pipeline
+# Ingest + enrich a transcript (Layer 1 + Layer 2) in one shot
+python -m src.ingestion data/input/interview.txt --enrich
+#   ...or the whole input directory at once:
+make ingest FILE=data/input/interview.txt
 
-# Or use Makefile
-make run-pipeline
+# Apply a lens (Layer 3) — meeting_minutes or persona, same engine
+python -m src.lens <interview_id> meeting_minutes
+
+# Export a lens as an OKF bundle (Layer 5)
+python -m src.export <interview_id> meeting_minutes
+
+# Ask the corpus a question (GraphRAG), CLI or API
+python -m src.ask <project_id> "What did they decide about Acme Corp?"
+#   ...or: POST /ask/{project_id}
 ```
 
-> **Detailed Setup:** [docs/onboarding/](docs/onboarding/) — prerequisites, configuration, troubleshooting
+Want something to try this on? `data/samples/` has transcripts covering the
+range — clean labeled interviews, adversarial/mixed labeling, and raw unlabeled
+prose. `data/samples/MANIFEST.md` maps each file to the capability it exercises.
 
-## Project Structure
+## The UI
 
-```
-src/
-├── agents/          # LLM interaction (OpenAI, Anthropic, Gemini)
-├── api/routers/     # FastAPI endpoints (files, analysis, edits)
-├── commands/        # CQRS command handlers
-├── events/          # Event sourcing (aggregates, store, repository)
-├── projections/     # Event-to-Neo4j projection service
-├── pipeline.py      # Core processing pipeline
-└── main.py          # FastAPI entry point
+A Next.js 15 app in `frontend/`, two surfaces mirroring the backend's CQRS
+split:
 
-docs/
-├── architecture/    # Mermaid diagrams (system, data flow, schema)
-├── onboarding/      # Getting started guides
-└── ROADMAP.md       # Project status and milestones
+- **Workbench** (write side): projects → interviews → transcript, with inline
+  corrections — text edits, speaker rename/reattribute, segment removal,
+  lens-item overrides, and manual speaker→person linking. Every change goes
+  through a correction endpoint as a command (fire → pending → bounded
+  confirm-poll → settled), never a direct state mutation.
+- **Gallery** (read side): persona and person cards, their core views, and an
+  actionable review worklist.
 
-tests/               # unit, integration, e2e (counts in ROADMAP.md)
-```
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/files/` | GET | List analysis files |
-| `/files/{filename}` | GET | Get analysis content |
-| `/analysis/` | POST | Trigger background analysis |
-| `/edits/sentences/{id}/{index}/edit` | POST | Edit sentence text |
-| `/edits/sentences/{id}/{index}/analysis/override` | POST | Override AI analysis |
-| `/lenses/{interview_id}/items/{item_id}/override` | POST | Correct a lens item (locks it) |
-| `/exports/{interview_id}/{lens_name}` | GET | Download an OKF bundle (zip) |
-| `/interviews/{interview_id}/lenses/{lens}/items` | GET | List a lens's items for an interview |
-| `/review/worklist` | GET | Low-confidence + unresolved-reference review queue |
-| `/speakers/rollup` | GET | Speaker rollup by display name, across interviews |
-| `/ask/{project_id}` | POST | Ask-the-corpus: hybrid retrieval + cited synthesis (GraphRAG) |
-
-> Full API documentation at http://localhost:8000/docs
-
-## Common Commands
-
-```bash
-make build          # Build Docker images
-make run            # Start all services
-make test           # Run test suite
-make run-pipeline   # Process input files
-make clean          # Stop and remove containers
-```
-
-## Frontend (Next.js UI)
-
-A Next.js 15 app in `frontend/` — two surfaces mirroring the backend's CQRS
-split: **workbench** (write side — projects → interviews → transcript, with
-inline correction affordances: text edit, speaker rename/reattribute, segment
-remove, lens-item override, manual speaker→person linking) and **gallery**
-(read side — persona/person cards and core views, an actionable review
-worklist). Every write goes through the existing correction endpoints as a
-command (fire → pending → bounded confirm-poll → settled), never a direct
-state mutation.
-
-**Dev quickstart:**
+**Live updates.** Both surfaces update themselves as events project — a new
+line, a correction, a linked speaker, a re-run lens — with no manual refresh. A
+backend SSE endpoint (`GET /ui/streams/events`) watches the event store and
+pushes thin, surface-tagged notifications; the browser reacts by invalidating
+the matching queries, with a debounced trailing re-fetch to absorb projection
+lag. A subtle header dot shows the connection state, and if SSE is unavailable
+the UI quietly falls back to fetch-on-navigation. (M5.1 brought the workbench
+live; M5.1b extended it to the gallery, including persona-lens content.)
 
 ```bash
 make ui-dev   # cd frontend && npm run dev — http://localhost:3000
 ```
 
 `next.config.ts` rewrites the frontend's same-origin `/api/*` calls to the
-FastAPI backend at `:8000` (no CORS) — start the backend separately
-(`make run` or `make run-api`) for the UI to have data to show.
+FastAPI backend at `:8000` (no CORS), so start the backend separately
+(`make run` or `make run-api`) for the UI to have data. The SSE stream is the
+one exception — it's served through a Next.js route handler, because the
+rewrite buffers streaming responses.
 
-**Identity:** there's no real auth yet (a future milestone). Every API
-request carries an `X-User-ID` header from a small dev identity switcher in
-the app header (localStorage-persisted, defaults to `"dev"`) — corrections
-are attributed to whichever identity is currently selected.
+**Identity.** There's no real auth yet. Every request carries an `X-User-ID`
+header from a small dev identity switcher in the app header (localStorage,
+defaults to `"dev"`), so corrections are attributed to whoever's selected.
 
-**Live updates (M5.1):** the workbench transcript and interview list update
-themselves as events project — a new line, a correction, or a linked speaker
-appears without a manual refresh. A backend SSE endpoint
-(`GET /ui/streams/events`) watches the event store and pushes thin,
-surface-tagged notifications; the browser reacts by invalidating the matching
-queries (with a debounced trailing re-fetch to absorb projection lag). A
-subtle header dot ("Live updates on/off") shows the connection state. If SSE
-is unavailable the UI silently falls back to fetch-on-navigation — never a
-broken page. SSE is served through a Next.js route handler (not the `/api/*`
-rewrite, which buffers streaming responses); everything else stays same-origin
-through the rewrite.
+**Types.** The API client is generated against the backend's OpenAPI schema.
+After any backend contract change, run `make ui-typegen`; `npm run
+typegen:check` (in `frontend/`) fails on drift.
 
-**Typegen workflow:** the frontend's API client is fully typed against the
-backend's OpenAPI schema (`frontend/openapi.json` + generated
-`frontend/src/api/schema.d.ts`). After any backend contract change:
+**Gates.**
 
 ```bash
-make ui-typegen          # regenerate both files (no running server needed)
+make ui-test    # lint + typecheck + vitest
+make ui-build   # production build
+make ui-smoke   # Playwright: corrections settle, and a server-side line append
+                # appears LIVE via the SSE feed (env-gated, needs the dev stack)
 ```
 
-`npm run typegen:check` (in `frontend/`) diffs a fresh regen against the
-committed files and fails on drift — run it if you're unsure the committed
-types still match the backend.
+## Project layout
 
-**Gates:**
+```
+src/
+├── ingestion/     # transcript → fragments, speaker genesis, stitching (Layer 1)
+├── enrichment/    # extractor registry, provider chain, claims/entities (Layer 2)
+├── lens/          # generic lens engine + profiles (Layer 3)
+├── resolution/    # persons, entity canonicalization (identity)
+├── export/        # OKF bundle export (Layer 5)
+├── ask/           # GraphRAG ask-the-corpus
+├── events/        # aggregates, event store, repository (event sourcing core)
+├── projections/   # event → Neo4j projection service (sole writer)
+├── commands/      # CQRS command handlers
+├── ui/            # SSE notification bridge for the live feed
+├── api/routers/   # FastAPI endpoints
+├── agents/        # LLM provider adapters
+└── main.py        # FastAPI app + batch ingest/enrich CLI
+
+frontend/          # Next.js UI (workbench + gallery)
+docs/
+├── architecture/  # system, data flow, event sourcing, schema
+├── onboarding/    # setup and dev-workflow guides
+├── archive/       # historical milestone notes (superseded)
+└── ROADMAP.md     # milestones, status, test/coverage stats
+tests/             # unit, integration, e2e (counts in ROADMAP.md)
+```
+
+## Selected API endpoints
+
+Full, always-current docs live at http://localhost:8000/docs. A few worth
+knowing:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/ui/streams/events` | GET | SSE live feed (surface-tagged notifications) |
+| `/interviews/{id}/lenses/{lens}/items` | GET | A lens's items for an interview |
+| `/lenses/{id}/items/{item_id}/override` | POST | Correct a lens item (locks it) |
+| `/resolution/{project_id}/persons/{person_id}/link` | POST | Link a speaker to a person |
+| `/exports/{interview_id}/{lens_name}` | GET | Download an OKF bundle |
+| `/review/worklist` | GET | Low-confidence + unresolved-reference review queue |
+| `/ask/{project_id}` | POST | Ask the corpus (cited GraphRAG synthesis) |
+| `/edits/sentences/{id}/{index}/edit` | POST | Edit fragment text |
+
+## Common commands
 
 ```bash
-make ui-test    # cd frontend && npm run lint && npm run typecheck && npm test
-make ui-build   # cd frontend && npm run build (production build)
-make ui-smoke   # Playwright: transcript + text-edit settle, and a server-side
-                # line append appears LIVE (no user action) via the SSE feed
+make run          # start all services (docker compose up -d)
+make run-api      # run the FastAPI app locally
+make ingest FILE=<path>   # ingest + enrich a transcript
+make test         # backend test suite
+make ui-dev       # frontend dev server
+make clean        # stop and remove containers
+make help         # everything else
 ```
-
-`ui-smoke` is env-gated (`UI_SMOKE=1`) and NOT part of `ui-test` — it needs
-the dockerized dev stack (`neo4j`, `eventstore`, `projection-service`) up
-since only that stack's projection consumer delivers events to Neo4j; it
-brings those containers up itself, starts the backend + frontend dev servers
-via Playwright's `webServer` config, seeds one interview through the real
-ingestion command path, and drives a full browser journey. On a machine
-that's never run Playwright before, first run the one-time browser install:
-`npx playwright install chromium` (from `frontend/`). See
-`frontend/e2e/smoke.spec.ts`'s header for the exact requirements.
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Project status, milestones, upgrade schedule |
-| [docs/architecture/](docs/architecture/) | System diagrams, data flow, database schema |
-| [docs/onboarding/](docs/onboarding/) | Setup guides, troubleshooting, dev workflow |
+| Document | What's in it |
+|----------|--------------|
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones, status, test/coverage stats |
+| [docs/architecture/](docs/architecture/) | System diagrams, data flow, event sourcing, schema |
+| [docs/onboarding/](docs/onboarding/) | Setup, configuration, troubleshooting, dev workflow |
 
 ## Contributing
 
-Contributions welcome. Please follow standard practices (issues, feature branches, tests, PRs). Code style enforced via `black` and `flake8`.
+Issues, feature branches, tests, PRs — the usual. Style is enforced with `black`
+and `flake8`; the frontend with ESLint. Run `make test` (and `make ui-test` for
+UI changes) before opening a PR.
 
 ## License
 
-MIT License. See `LICENSE` file.
+MIT. See [LICENSE](LICENSE).
