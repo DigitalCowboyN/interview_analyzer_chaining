@@ -1,19 +1,48 @@
 # Interview Analyzer
 
+![Python 3.10](https://img.shields.io/badge/python-3.10-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Status: active development](https://img.shields.io/badge/status-active%20development-orange)
+![Event-sourced](https://img.shields.io/badge/architecture-event--sourced-blueviolet)
+
 Turn interview transcripts into a queryable knowledge graph — speakers,
 utterances, entities, claims, topics, cross-interview personas, and
 purpose-built "lens" views — with every fact grounded back to the exact words
 someone said, and every AI guess correctable by a human.
 
-The system is event-sourced: EventStoreDB holds the full history of what
+**Who it's for:** anyone who works through interviews at volume and needs the
+output to be *trustworthy* — user researchers synthesizing across sessions,
+analysts pulling decisions and action items out of meetings, journalists or
+investigators tracing claims back to who said what. If a spreadsheet of
+AI-summarized quotes isn't good enough because you need to defend every line,
+this is built for that: nothing is inferred without a confidence score, nothing
+is stored without a link back to the source, and a human can correct anything
+the AI got wrong.
+
+<!-- SCREENSHOT: add a workbench/gallery screenshot here, e.g.
+     ![Workbench](docs/images/workbench.png) — see note in README audit. -->
+> 📸 *A UI screenshot goes here — the workbench (transcript + inline
+> corrections) and gallery (persona/person cards, review worklist). Not yet
+> captured; see [The UI](#the-ui) for what's on screen.*
+
+The system is **event-sourced**: EventStoreDB holds the full history of what
 happened, and a projection service is the only thing that writes to the Neo4j
 read model. Nothing is ever silently overwritten; corrections are new events,
 not edits in place.
 
-> **Status:** M5.1b complete — the Next.js workbench *and* gallery update live
-> off a server-sent-events feed. See [docs/ROADMAP.md](docs/ROADMAP.md) for the
-> full milestone history and current test/coverage numbers, and
-> [docs/architecture/](docs/architecture/) for the diagrams.
+## Status
+
+**Working today:** ingestion + speaker attribution, the full enrichment
+pipeline, two lenses (meeting minutes, persona), topic segments, cross-interview
+identity resolution, OKF export, ask-the-corpus (GraphRAG), and a live
+two-surface web UI (workbench + gallery) that updates without a refresh.
+
+**Not yet:** real authentication (there's a dev identity switcher instead), and
+a few UI affordances still on the roadmap.
+
+Actively developed. See [docs/ROADMAP.md](docs/ROADMAP.md) for the milestone
+history and current test/coverage numbers, and
+[docs/architecture/](docs/architecture/) for the diagrams.
 
 ## What it does
 
@@ -45,10 +74,11 @@ or something messy in between — and it works through several passes:
 - **Resolves identity.** Speakers across interviews get linked to canonical
   Persons; entity surface forms get canonicalized (merge / split / alias).
   These are human-in-the-loop decisions surfaced in a review worklist.
-- **Exports and answers.** Any lens can be exported as an OKF bundle —
-  Markdown with YAML front matter, git-versionable and grounded back to the
-  transcript. And you can ask the corpus a question and get a cited answer
-  (hybrid graph + vector retrieval, GraphRAG-style).
+- **Exports and answers.** Any lens can be exported as an **OKF bundle** (Open
+  Knowledge Format — a folder of Markdown files with YAML front matter,
+  git-versionable and grounded back to the transcript). And you can ask the
+  corpus a question and get a cited answer (hybrid graph + vector retrieval,
+  GraphRAG-style).
 
 Everything above is stored as events first. Neo4j is a projection of those
 events, rebuildable from scratch at any time.
@@ -107,6 +137,12 @@ export), the three aggregates and their events, and the Neo4j schema — see
 
 ## Quick start
 
+**Heads up before you start:** this is a multi-service system, not a
+single-binary demo. `docker compose up` brings up EventStoreDB, Neo4j, and Redis
+alongside the app, and the enrichment pipeline calls out to **paid LLM APIs** —
+you'll need both an OpenAI and an Anthropic key to run the full pipeline. It
+takes a few minutes and a bit of RAM, not two seconds.
+
 You need Docker, Docker Compose, and Git.
 
 ```bash
@@ -159,6 +195,52 @@ python -m src.ask <project_id> "What did they decide about Acme Corp?"
 Want something to try this on? `data/samples/` has transcripts covering the
 range — clean labeled interviews, adversarial/mixed labeling, and raw unlabeled
 prose. `data/samples/MANIFEST.md` maps each file to the capability it exercises.
+
+## What the output looks like
+
+Exporting the `meeting_minutes` lens writes a folder of grounded Markdown — one
+file per item, each linking back to who said it and where:
+
+```
+meeting_minutes_bundle/
+├── index.md              # overview + links to every item
+├── transcript.md         # the verbatim transcript, anchored per utterance
+├── speakers/
+│   └── alice-johnson.md
+├── decisions/
+│   └── go-with-acme-corp.md
+├── action-items/
+│   └── draft-the-doc.md
+└── objectives/
+    └── choose-a-vendor.md
+```
+
+A single decision file (`decisions/go-with-acme-corp.md`):
+
+```markdown
+---
+type: Decision
+title: Go with Acme Corp
+lens: meeting_minutes
+lens_version: 1
+confidence: 0.92
+model: claude-3-haiku
+provider: anthropic
+locked: false
+---
+
+Go with Acme Corp for the vendor contract.
+
+**DECIDED_BY:** [Alice Johnson](/speakers/alice-johnson.md)
+
+Grounded in:
+> We'll go with Acme Corp and I'll draft the doc by Friday. (/transcript.md#u-1)
+```
+
+The `confidence`, `model`, and `provider` tell you *how much to trust it*; the
+blockquote and `/transcript.md#u-1` anchor let you jump straight to the words it
+came from. `locked: true` would mean a human corrected this item, so re-running
+the lens leaves it alone.
 
 ## The UI
 
@@ -282,5 +364,4 @@ UI changes) before opening a PR.
 
 ## License
 
-Intended: MIT. Note — there is no `LICENSE` file in the repository yet; one
-should be added to make the license explicit and enforceable.
+MIT — see [LICENSE](LICENSE).
