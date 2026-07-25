@@ -1,186 +1,158 @@
 # System Overview
 
-> **Last Updated:** 2026-01-25
+> **Last Updated:** 2026-07-25
 
-## System Context
+## System context
 
-The Interview Analyzer is an event-sourced application that processes interview transcripts using AI and stores results in a graph database.
+The Interview Analyzer is an event-sourced application that turns interview
+transcripts into a queryable knowledge graph and serves it through a two-surface
+web UI. Humans correct what the AI produces; every correction is an event.
 
 ```mermaid
 C4Context
-    title System Context Diagram - Interview Analyzer
+    title System Context — Interview Analyzer
 
-    Person(user, "User", "Uploads transcripts, queries analysis results, makes corrections")
+    Person(analyst, "Analyst", "Ingests transcripts, reads analysis, corrects it")
 
-    System(analyzer, "Interview Analyzer", "Processes interview transcripts with AI, stores structured analysis in graph database")
+    System(analyzer, "Interview Analyzer", "Event-sourced transcript analysis: fragments, speakers, enrichment, lenses, resolution, export, ask")
 
-    System_Ext(openai, "OpenAI API", "GPT models for sentence classification")
-    System_Ext(anthropic, "Anthropic API", "Claude models (optional)")
-    System_Ext(gemini, "Google Gemini API", "Gemini models (optional)")
+    System_Ext(anthropic, "Anthropic API", "Claude models — primary extractor provider")
+    System_Ext(openai, "OpenAI API", "Fallback provider + embeddings")
 
-    Rel(user, analyzer, "Uploads files, queries results", "HTTP/REST")
-    Rel(analyzer, openai, "Classifies sentences", "HTTPS")
-    Rel(analyzer, anthropic, "Classifies sentences", "HTTPS")
-    Rel(analyzer, gemini, "Classifies sentences", "HTTPS")
+    Rel(analyst, analyzer, "Ingests, reads, corrects", "CLI / HTTP / Web UI")
+    Rel(analyzer, anthropic, "Focused extractor calls", "HTTPS")
+    Rel(analyzer, openai, "Fallback + embeddings", "HTTPS")
 ```
 
-## Container Diagram
+## Container diagram
 
 ```mermaid
 C4Container
-    title Container Diagram - Interview Analyzer Services
+    title Containers — Interview Analyzer
 
-    Person(user, "User", "Analyst or Developer")
+    Person(analyst, "Analyst")
 
-    Container_Boundary(app_boundary, "Interview Analyzer System") {
-        Container(api, "FastAPI Application", "Python, FastAPI", "REST API, pipeline orchestration, command handling")
-        Container(worker, "Celery Worker", "Python, Celery", "Background task processing")
-        Container(projection, "Projection Service", "Python", "Event consumer, Neo4j writer")
+    Container_Boundary(app, "Interview Analyzer") {
+        Container(ui, "Next.js UI", "Next.js 15 + React", "Workbench (write) + gallery (read); live via SSE")
+        Container(api, "FastAPI application", "Python, FastAPI", "Commands, corrections, queries, ask, SSE bridge")
+        Container(worker, "Celery worker", "Python, Celery", "Background/long-running work")
+        Container(projection, "Projection service", "Python", "Sole Neo4j writer; replays events in commit order")
 
-        ContainerDb(eventstore, "EventStoreDB", "EventStoreDB 23.10", "Event streams, source of truth")
-        ContainerDb(neo4j, "Neo4j", "Neo4j 5.22", "Graph database, read model")
-        ContainerDb(redis, "Redis", "Redis 7", "Message broker, task queue")
+        ContainerDb(eventstore, "EventStoreDB", "23.10", "Event streams — source of truth")
+        ContainerDb(neo4j, "Neo4j", "5.26", "Graph read model")
+        ContainerDb(redis, "Redis", "7", "Celery broker / results")
     }
 
-    System_Ext(llm, "LLM APIs", "OpenAI, Anthropic, Gemini")
+    System_Ext(llm, "LLM providers", "Anthropic, OpenAI")
 
-    Rel(user, api, "HTTP requests", "REST")
-    Rel(api, worker, "Queue tasks", "Redis")
-    Rel(api, eventstore, "Write events", "gRPC")
-    Rel(api, neo4j, "Direct write (temp)", "Bolt")
-    Rel(api, llm, "Classify sentences", "HTTPS")
+    Rel(analyst, ui, "Uses", "HTTPS")
+    Rel(ui, api, "Reads + corrections", "REST (same-origin rewrite)")
+    Rel(ui, api, "Live notifications", "SSE")
+    Rel(api, eventstore, "Append + read events", "gRPC")
+    Rel(api, neo4j, "Read queries", "Bolt")
+    Rel(api, llm, "Focused extractor calls", "HTTPS")
+    Rel(api, redis, "Enqueue work", "Redis")
 
-    Rel(eventstore, projection, "Subscribe", "gRPC")
-    Rel(projection, neo4j, "Project events", "Bolt")
-
-    Rel(worker, api, "Execute pipeline", "Internal")
+    Rel(eventstore, projection, "Category subscriptions", "gRPC")
+    Rel(projection, neo4j, "Project events (WRITE)", "Bolt")
+    Rel(worker, redis, "Consume", "Redis")
 ```
 
-## Service Descriptions
+> **Note:** the API reads Neo4j but never writes it. The projection service is
+> the only writer. (The M2.2 dual-write path was removed in M3.0.)
 
-### FastAPI Application (Port 8000)
+## Service descriptions
 
-**Responsibilities:**
-- REST API endpoints for file operations and analysis
-- Pipeline orchestration for transcript processing
-- Command handling for user edits
-- Event emission to EventStoreDB
+### FastAPI application (port 8000)
 
-**Key Endpoints:**
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Health check |
-| `/files/` | GET | List analysis files |
-| `/files/{filename}` | GET | Get analysis content |
-| `/analysis/` | POST | Trigger background analysis |
-| `/edits/sentences/{id}/{index}/edit` | POST | Edit sentence text |
-| `/edits/sentences/{id}/{index}/analysis/override` | POST | Override AI analysis |
+- Command handling and corrections (edits, speaker rename/reattribute, segment
+  removal, lens overrides, resolution merge/split/link/alias) — each emits
+  events to EventStoreDB.
+- Read queries against Neo4j (interviews, transcript, personas, persons,
+  worklist, lens items) — the `/ui/*` and query routers.
+- Ask-the-corpus (`/ask/{project_id}`) — GraphRAG hybrid retrieval + cited
+  synthesis.
+- The SSE live-feed bridge (`GET /ui/streams/events`): an in-process
+  `EsdbWatcher` runs catch-up subscriptions on the category streams and pushes
+  thin, surface-tagged notifications to browsers (see `src/ui/notifications.py`).
 
-### Celery Worker
+Routers live in `src/api/routers/`: `analysis`, `ask`, `edits`, `exports`,
+`files`, `lenses`, `queries`, `resolution`, `segments`, `speakers`, `ui`. Full,
+always-current API docs are at `/docs`.
 
-**Responsibilities:**
-- Execute long-running pipeline tasks
-- Process files asynchronously
-- Prevent API timeouts
+### Projection service
 
-**Configuration:**
-- Broker: Redis at `redis:6379`
-- Entry point: `celery -A src.celery_app worker`
+The **sole writer to Neo4j**. Entry point `python -m src.run_projection_service`.
 
-### Projection Service
+- Runs three category subscriptions — `$ce-Interview`, `$ce-Sentence`,
+  `$ce-Project` — each with an event allowlist (`src/projections/config.py`).
+- Processes events across parallel lanes but releases them to Neo4j in each
+  stream's **commit-position (causal) order** via a per-lane reorder buffer, with
+  a shared watermark and a bounded hold (M4.9). Events whose referents aren't
+  ready yet are parked (`StreamState.ANY`) and can be redriven
+  (`python -m src.projections.redrive`).
+- Creates its Neo4j schema (indexes/constraints) at startup and fails fast if
+  Neo4j is unreachable (`src/projections/ensure_schema.py`).
+- Handlers per node type live in `src/projections/handlers/`.
 
-**Responsibilities:**
-- Subscribe to EventStoreDB `$all` stream
-- Process events in order
-- Update Neo4j graph (create nodes, relationships)
-- Handle idempotency via event versioning
+### EventStoreDB (ports 2113, 1113)
 
-**Configuration:**
-- 12 parallel processing lanes
-- Checkpoint management for resume
-- Entry point: `python -m src.run_projection_service`
+Append-only source of truth. Streams per aggregate:
 
-### EventStoreDB (Ports 2113, 1113)
+- `Interview-{uuid}` — Interview aggregate (structure, enrichment, lenses, segments)
+- `Sentence-{uuid}` — Sentence/Fragment aggregate (per-fragment analysis)
+- `Project-{uuid}` — Project aggregate (persons, entity canonicalization)
 
-**Responsibilities:**
-- Store all domain events (source of truth)
-- Provide event streams for aggregates
-- Enable event replay and audit trail
-- Support persistent subscriptions
+Category streams (`$ce-Interview`, etc.) are what the projection and the SSE
+watcher subscribe to. The wire format is frozen: event names, the `Sentence`
+aggregate type, and stream names never change.
 
-**Event Streams:**
-- `Interview-{uuid}` - Interview aggregate events
-- `Sentence-{uuid}` - Sentence aggregate events
+### Neo4j (ports 7474, 7687)
 
-### Neo4j (Ports 7474, 7687)
+The CQRS read model — fragments, speakers, utterances, claims, entities, lens
+items, persons, segments, and their relationships (see
+[database-schema.md](./database-schema.md)). Rebuildable from the event log.
+Auth: `neo4j` / password from `.env`.
 
-**Responsibilities:**
-- Store sentence analysis as graph nodes
-- Maintain relationships (topics, keywords, etc.)
-- Enable complex graph queries
-- Serve as CQRS read model
+### Celery worker + Redis (port 6379)
 
-**Authentication:**
-- Username: `neo4j`
-- Password: From `.env` file
+Redis is the Celery broker/result backend; the worker handles background work.
+Entry point `celery -A src.celery_app worker`.
 
-### Redis (Port 6379)
-
-**Responsibilities:**
-- Message broker for Celery
-- Task result backend
-- Pub/sub for worker communication
-
-## Deployment View
+## Deployment view
 
 ```mermaid
 flowchart TB
-    subgraph Docker["Docker Compose Environment"]
-        subgraph AppServices["Application Services"]
-            api[fa:fa-server FastAPI<br/>Port 8000]
-            worker[fa:fa-cogs Celery Worker]
-            projection[fa:fa-stream Projection Service]
+    subgraph Docker["Docker Compose"]
+        subgraph App["Application"]
+            api[FastAPI · 8000]
+            worker[Celery worker]
+            projection[Projection service]
         end
-
-        subgraph DataStores["Data Stores"]
-            eventstore[fa:fa-database EventStoreDB<br/>Port 2113]
-            neo4j[fa:fa-project-diagram Neo4j<br/>Ports 7474, 7687]
-            neo4j_test[fa:fa-vial Neo4j Test<br/>Ports 7475, 7688]
-            redis[fa:fa-memory Redis<br/>Port 6379]
-        end
-
-        subgraph Volumes["Persistent Volumes"]
-            vol_neo4j[(neo4j_data)]
-            vol_redis[(redis_data)]
-            vol_es[(eventstore_data)]
+        subgraph Data["Data stores"]
+            eventstore[(EventStoreDB · 2113)]
+            neo4j[(Neo4j · 7474/7687)]
+            redis[(Redis · 6379)]
         end
     end
+    ui[Next.js UI · 3000]
+    llm[LLM providers]
 
-    subgraph External["External Services"]
-        openai[fa:fa-brain OpenAI API]
-        anthropic[fa:fa-robot Anthropic API]
-        gemini[fa:fa-google Google Gemini]
-    end
-
-    api --> redis
+    ui -->|REST + SSE| api
     api --> eventstore
-    api --> neo4j
-    api --> openai
-    api --> anthropic
-    api --> gemini
-
+    api -->|read| neo4j
+    api --> redis
+    api --> llm
     worker --> redis
-    worker --> api
-
-    projection --> eventstore
-    projection --> neo4j
-
-    neo4j --> vol_neo4j
-    redis --> vol_redis
-    eventstore --> vol_es
+    eventstore -->|subscriptions| projection
+    projection -->|write| neo4j
 ```
 
-## Environment Detection
+The frontend dev server proxies same-origin `/api/*` to the API; the SSE stream
+is served through a Next.js route handler instead of the proxy (the proxy
+buffers streaming responses).
+
+## Environment detection
 
 The system auto-detects its runtime environment for EventStoreDB connections:
 
@@ -203,9 +175,9 @@ flowchart TD
     Host --> HostConfig["esdb://localhost:2113?tls=false"]
 ```
 
-**Priority Order:**
+**Priority order:**
 1. Config file `event_sourcing.connection_string` (highest)
 2. `ESDB_CONNECTION_STRING` environment variable
-3. Auto-detected based on runtime environment (lowest)
+3. Auto-detected from the runtime environment (lowest)
 
-**Implementation:** See `src/events/store.py:get_event_store_client()` and `src/api/routers/edits.py:get_event_store()`
+**Implementation:** `src/events/store.py::get_event_store_client()`.
