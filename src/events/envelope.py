@@ -70,6 +70,11 @@ class EventEnvelope(BaseModel):
     project_id: Optional[str] = Field(None, description="Project/tenant ID if applicable")
     tags: List[str] = Field(default_factory=list, description="Free-form debugging labels")
 
+    # Read-side/transient (not serialized into stored event metadata; wire format is frozen)
+    commit_position: Optional[int] = Field(
+        default=None, description="ESDB global commit position; read-side/transient, None until delivered"
+    )
+
     model_config = ConfigDict(use_enum_values=True)
 
     @field_validator("occurred_at")

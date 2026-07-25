@@ -15,6 +15,12 @@ from typing import Dict, List, Optional
 from src.events.envelope import EventEnvelope
 
 from .config import LANE_COUNT, QUEUE_DEPTH_ALERT_THRESHOLD
+from .reorder_buffer import ReorderBuffer, WatermarkTracker
+
+# Default max time an event may sit buffered, ordered-but-not-yet-releasable,
+# before the lane gives up waiting on the watermark and releases it anyway
+# (bounds latency when a sibling subscription is idle/stalled).
+DEFAULT_MAX_HOLD_S = 0.25
 
 logger = logging.getLogger(__name__)
 
@@ -42,13 +48,30 @@ class Lane:
     to ensure ordering guarantees for events from the same interview.
     """
 
-    def __init__(self, lane_id: int, handler_registry):
+    def __init__(
+        self,
+        lane_id: int,
+        handler_registry,
+        watermark_tracker: Optional[WatermarkTracker] = None,
+        max_hold_s: float = DEFAULT_MAX_HOLD_S,
+        clock=None,
+    ):
         """
         Initialize a lane.
 
         Args:
             lane_id: Unique identifier for this lane
             handler_registry: Registry for looking up event handlers
+            watermark_tracker: Shared WatermarkTracker (see reorder_buffer.py)
+                used to gate ordered release. Defaults to a fresh, unshared
+                tracker (no subscriptions registered) so a lane can be used
+                standalone in tests -- in that case only `max_hold_s` aging
+                ever releases buffered events.
+            max_hold_s: Maximum time an event may sit buffered before being
+                released regardless of watermark (bounds latency). Injectable
+                for tests.
+            clock: zero-arg monotonic clock, forwarded to the ReorderBuffer.
+                Defaults to the asyncio event-loop clock.
         """
         self.lane_id = lane_id
         self.handler_registry = handler_registry
@@ -58,6 +81,11 @@ class Lane:
         self.events_processed = 0
         self.events_failed = 0
         self._task: Optional[asyncio.Task] = None
+
+        self.watermark_tracker = watermark_tracker if watermark_tracker is not None else WatermarkTracker()
+        self.max_hold_s = max_hold_s
+        self._clock = clock if clock is not None else (lambda: asyncio.get_running_loop().time())
+        self._buffer = ReorderBuffer(clock=self._clock)
 
     async def start(self):
         """Start the lane processing task."""
@@ -100,19 +128,60 @@ class Lane:
         await self.queue.put((event, checkpoint_callback))
 
     async def _process_loop(self):
-        """Main processing loop for this lane."""
+        """
+        Main processing loop for this lane.
+
+        Events pulled off the queue are NOT processed immediately -- they are
+        buffered in a ReorderBuffer keyed by `commit_position` and only
+        released (processed + acked), in ascending commit_position order,
+        once the shared watermark has passed them or they've aged past
+        `max_hold_s`. This reorders delivery-order arrivals from three
+        independent ESDB subscriptions back into causal (commit_position)
+        order within this lane, so dependent handlers reliably find their
+        referents. See reorder_buffer.py for the release algorithm.
+        """
         logger.info(f"Lane {self.lane_id} processing loop started")
 
         while self.is_running:
             try:
-                # Get next event from queue (with timeout to allow graceful shutdown)
+                # Wait for the next event, but never longer than it takes for
+                # the current buffer head to become max_hold-releasable (and
+                # never longer than 1s, so an idle queue still lets shutdown
+                # and periodic re-checks of the watermark happen promptly).
+                timeout = self._next_wait_timeout()
                 try:
-                    event, checkpoint_callback = await asyncio.wait_for(self.queue.get(), timeout=1.0)
+                    event, checkpoint_callback = await asyncio.wait_for(self.queue.get(), timeout=timeout)
+                    self._buffer.add(event.commit_position, event, checkpoint_callback)
                 except asyncio.TimeoutError:
-                    continue
+                    pass  # nothing new arrived; still drain below (max_hold flush)
 
-                # Process the event
-                await self._process_event(event, checkpoint_callback)
+                # Absorb the ENTIRE queue into the buffer synchronously before
+                # deciding what to release. This is load-bearing for ordering:
+                # the watermark guarantee ("W >= cp implies every event < cp has
+                # been routed") only means a lower-cp event is QUEUED, not yet
+                # BUFFERED -- and pop_ready is blind to the queue. Pulling one
+                # item per iteration and draining between pulls could therefore
+                # release a higher-cp head via the watermark while its lower-cp
+                # sibling still sits in the queue. Draining the queue with
+                # get_nowait() (no await) so absorption + low_watermark() +
+                # pop_ready all run in one synchronous block means nothing a
+                # subscription routes can interleave: everything routed is
+                # buffered at the release decision, restoring the invariant the
+                # watermark proof needs.
+                while True:
+                    try:
+                        event, checkpoint_callback = self.queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                    self._buffer.add(event.commit_position, event, checkpoint_callback)
+
+                # Drain: release + process everything now safe to release, in
+                # ascending commit_position order. Ack (checkpoint_callback)
+                # happens inside _process_event, per released entry -- a
+                # buffered-but-not-yet-released event is never acked.
+                watermark = self.watermark_tracker.low_watermark()
+                for ready_entry in self._buffer.pop_ready(watermark, self.max_hold_s):
+                    await self._process_event(ready_entry.event, ready_entry.checkpoint_callback)
 
             except asyncio.CancelledError:
                 logger.info(f"Lane {self.lane_id} processing loop cancelled")
@@ -123,6 +192,19 @@ class Lane:
                 await asyncio.sleep(1.0)
 
         logger.info(f"Lane {self.lane_id} processing loop stopped")
+
+    def _next_wait_timeout(self) -> float:
+        """
+        Bounded wait for the next queue item: no longer than 1s, and no
+        longer than the time remaining until the buffer's current head ages
+        into max_hold-releasability (so an aged head flushes promptly even
+        with no new arrivals).
+        """
+        deadline = self._buffer.next_deadline(self.max_hold_s)
+        if deadline is None:
+            return 1.0
+        remaining = deadline - self._clock()
+        return max(0.0, min(1.0, remaining))
 
     async def _process_event(self, event: EventEnvelope, checkpoint_callback):
         """
@@ -182,17 +264,38 @@ class LaneManager:
     in-order processing per interview while allowing parallelism.
     """
 
-    def __init__(self, handler_registry, lane_count: int = LANE_COUNT):
+    def __init__(
+        self,
+        handler_registry,
+        lane_count: int = LANE_COUNT,
+        max_hold_s: float = DEFAULT_MAX_HOLD_S,
+        watermark_tracker: Optional[WatermarkTracker] = None,
+    ):
         """
         Initialize the lane manager.
 
         Args:
             handler_registry: Registry for looking up event handlers
             lane_count: Number of lanes to create
+            max_hold_s: Max time a buffered event may wait before being
+                released regardless of watermark. Injectable for tests.
+            watermark_tracker: Shared WatermarkTracker passed to every lane
+                (and to SubscriptionManager, which records delivered
+                commit_positions into it). Defaults to a fresh tracker.
         """
         self.lane_count = lane_count
         self.handler_registry = handler_registry
-        self.lanes: List[Lane] = [Lane(lane_id=i, handler_registry=handler_registry) for i in range(lane_count)]
+        self.max_hold_s = max_hold_s
+        self.watermark_tracker = watermark_tracker if watermark_tracker is not None else WatermarkTracker()
+        self.lanes: List[Lane] = [
+            Lane(
+                lane_id=i,
+                handler_registry=handler_registry,
+                watermark_tracker=self.watermark_tracker,
+                max_hold_s=max_hold_s,
+            )
+            for i in range(lane_count)
+        ]
         logger.info(f"LaneManager initialized with {lane_count} lanes")
 
     async def start(self):

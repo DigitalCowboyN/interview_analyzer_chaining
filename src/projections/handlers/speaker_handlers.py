@@ -9,6 +9,15 @@ from .base_handler import BaseProjectionHandler
 logger = logging.getLogger(__name__)
 
 
+class ReferentNotReadyError(ValueError):
+    """Raised when a projection handler's referenced node isn't projected yet.
+
+    Subclasses ValueError so it's a transparent upgrade over the previous
+    bare-ValueError raise: existing call sites and base_handler's
+    ``except Exception`` retry/park logic keep working unchanged.
+    """
+
+
 def _raise_if_no_writes(summary, event_type: str, aggregate_id: str) -> None:
     """Raise when a MATCH-anchored write query touched nothing.
 
@@ -24,7 +33,7 @@ def _raise_if_no_writes(summary, event_type: str, aggregate_id: str) -> None:
         and counters.properties_set == 0
         and counters.relationships_created == 0
     ):
-        raise ValueError(
+        raise ReferentNotReadyError(
             f"{event_type} for {aggregate_id}: no writes applied "
             f"(referenced nodes not yet projected?)"
         )
@@ -47,7 +56,7 @@ class SpeakerCreatedHandler(BaseProjectionHandler):
             sp.merged_into = null
         MERGE (i)-[:HAS_PARTICIPANT]->(sp)
         """
-        await tx.run(
+        result = await tx.run(
             query,
             interview_id=event.aggregate_id,
             speaker_id=data["speaker_id"],
@@ -57,6 +66,7 @@ class SpeakerCreatedHandler(BaseProjectionHandler):
             confidence=data.get("confidence"),
             method=data.get("method"),
         )
+        _raise_if_no_writes(await result.consume(), "SpeakerCreated", event.aggregate_id)
         logger.info(f"Applied SpeakerCreated for speaker {data['speaker_id']}")
 
 

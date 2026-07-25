@@ -22,6 +22,11 @@ from src.projections.handlers.sentence_handlers import (
     SentenceCreatedHandler,
     SentenceEditedHandler,
 )
+from src.projections.handlers.speaker_handlers import (
+    ReferentNotReadyError,
+    SpeakerCreatedHandler,
+    _raise_if_no_writes,
+)
 
 
 @pytest.mark.asyncio
@@ -708,3 +713,257 @@ class TestProjectionHandlerDeduplication:
         # Should have run query and consumed result
         mock_tx.run.assert_called_once()
         mock_result.consume.assert_called_once()
+
+
+class TestReferentNotReadyErrorType:
+    """Pin the type contract: _raise_if_no_writes raises ReferentNotReadyError,
+    which IS-A ValueError so existing retry/park handling still engages."""
+
+    def test_raise_if_no_writes_raises_referent_not_ready_error(self):
+        summary = MagicMock()
+        summary.counters.nodes_created = 0
+        summary.counters.properties_set = 0
+        summary.counters.relationships_created = 0
+
+        with pytest.raises(ReferentNotReadyError):
+            _raise_if_no_writes(summary, "SomeEvent", "agg-123")
+
+    def test_referent_not_ready_error_is_a_value_error(self):
+        assert issubclass(ReferentNotReadyError, ValueError)
+
+    def test_raise_if_no_writes_does_not_raise_when_writes_occurred(self):
+        summary = MagicMock()
+        summary.counters.nodes_created = 0
+        summary.counters.properties_set = 1
+        summary.counters.relationships_created = 0
+
+        # Should not raise
+        _raise_if_no_writes(summary, "SomeEvent", "agg-123")
+
+
+@pytest.mark.asyncio
+class TestSpeakerCreatedReferentGuard:
+    """SpeakerCreated depends on a not-yet-projected Interview referent.
+    The MERGE/SET is unconditional, so _raise_if_no_writes (write-counter
+    based) correctly distinguishes 'Interview missing' (0 writes) from an
+    idempotent replay (SET always fires -> properties_set > 0)."""
+
+    async def test_speaker_created_raises_when_interview_missing(self):
+        handler = SpeakerCreatedHandler()
+
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.nodes_created = 0
+        mock_summary.counters.properties_set = 0
+        mock_summary.counters.relationships_created = 0
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        event = EventEnvelope(
+            event_type="SpeakerCreated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=str(uuid.uuid4()),
+            version=0,
+            data={
+                "speaker_id": str(uuid.uuid4()),
+                "handle": "SPEAKER_A",
+                "display_name": "Speaker A",
+                "provisional": True,
+            },
+        )
+
+        with pytest.raises(ReferentNotReadyError):
+            await handler.apply(mock_tx, event)
+
+    async def test_speaker_created_no_raise_when_interview_present(self):
+        handler = SpeakerCreatedHandler()
+
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.nodes_created = 1
+        mock_summary.counters.properties_set = 6
+        mock_summary.counters.relationships_created = 1
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        event = EventEnvelope(
+            event_type="SpeakerCreated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=str(uuid.uuid4()),
+            version=0,
+            data={
+                "speaker_id": str(uuid.uuid4()),
+                "handle": "SPEAKER_A",
+                "display_name": "Speaker A",
+                "provisional": True,
+            },
+        )
+
+        # Should not raise
+        await handler.apply(mock_tx, event)
+
+        mock_tx.run.assert_called_once()
+        mock_result.consume.assert_called_once()
+
+    async def test_speaker_created_no_raise_on_idempotent_replay(self):
+        """Idempotent replay: Interview present, Speaker already MERGEd
+        (nodes_created == 0) but the unconditional SET still fires
+        (properties_set > 0) -> must not raise."""
+        handler = SpeakerCreatedHandler()
+
+        mock_result = AsyncMock()
+        mock_summary = MagicMock()
+        mock_summary.counters.nodes_created = 0
+        mock_summary.counters.properties_set = 6
+        mock_summary.counters.relationships_created = 0
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        event = EventEnvelope(
+            event_type="SpeakerCreated",
+            aggregate_type=AggregateType.INTERVIEW,
+            aggregate_id=str(uuid.uuid4()),
+            version=1,
+            data={
+                "speaker_id": str(uuid.uuid4()),
+                "handle": "SPEAKER_A",
+                "display_name": "Speaker A",
+                "provisional": True,
+            },
+        )
+
+        # Should not raise
+        await handler.apply(mock_tx, event)
+
+
+@pytest.mark.asyncio
+class TestSentenceCreatedReferentGuard:
+    """SentenceCreated's SET is version-gated, so write counters alone
+    cannot distinguish 'Interview missing' from 'idempotent same-version
+    replay' (both yield all-zero counters). The handler must instead check
+    row presence from a RETURN that is unconditional on the version gate."""
+
+    async def test_sentence_created_raises_when_interview_missing(self):
+        handler = SentenceCreatedHandler()
+
+        mock_result = AsyncMock()
+        mock_result.single = AsyncMock(return_value=None)  # no row -> MATCH found nothing
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 0
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        event = EventEnvelope(
+            event_type="SentenceCreated",
+            aggregate_type=AggregateType.SENTENCE,
+            aggregate_id=str(uuid.uuid4()),
+            version=0,
+            data={
+                "interview_id": str(uuid.uuid4()),
+                "index": 0,
+                "text": "Orphaned sentence.",
+                "speaker": "Speaker A",
+            },
+        )
+
+        with pytest.raises(ReferentNotReadyError):
+            await handler.apply(mock_tx, event)
+
+    async def test_sentence_created_no_raise_when_interview_present(self):
+        handler = SentenceCreatedHandler()
+
+        mock_result = AsyncMock()
+        mock_result.single = AsyncMock(return_value={"interview_matched": "some-interview-id"})
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 5
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        event = EventEnvelope(
+            event_type="SentenceCreated",
+            aggregate_type=AggregateType.SENTENCE,
+            aggregate_id=str(uuid.uuid4()),
+            version=0,
+            data={
+                "interview_id": str(uuid.uuid4()),
+                "index": 0,
+                "text": "A sentence.",
+                "speaker": "Speaker A",
+            },
+        )
+
+        # Should not raise
+        await handler.apply(mock_tx, event)
+
+        query = mock_tx.run.call_args[0][0]
+        assert "RETURN" in query
+        assert "interview_matched" in query
+
+    async def test_sentence_created_no_raise_on_idempotent_same_version_replay(self):
+        """THE critical trap: Interview present (row returned) but the
+        version-gated SET does not fire because the same version was
+        already applied -> all write counters are 0. Must NOT raise."""
+        handler = SentenceCreatedHandler()
+
+        mock_result = AsyncMock()
+        mock_result.single = AsyncMock(return_value={"interview_matched": "some-interview-id"})
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 0
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        event = EventEnvelope(
+            event_type="SentenceCreated",
+            aggregate_type=AggregateType.SENTENCE,
+            aggregate_id=str(uuid.uuid4()),
+            version=1,
+            data={
+                "interview_id": str(uuid.uuid4()),
+                "index": 0,
+                "text": "Same version replay.",
+                "speaker": "Speaker A",
+            },
+        )
+
+        # Should not raise (this is the false-positive trap the guard must avoid)
+        await handler.apply(mock_tx, event)
+
+    async def test_sentence_created_no_raise_on_newer_version_reapply(self):
+        handler = SentenceCreatedHandler()
+
+        mock_result = AsyncMock()
+        mock_result.single = AsyncMock(return_value={"interview_matched": "some-interview-id"})
+        mock_summary = MagicMock()
+        mock_summary.counters.properties_set = 5
+        mock_result.consume = AsyncMock(return_value=mock_summary)
+
+        mock_tx = AsyncMock()
+        mock_tx.run = AsyncMock(return_value=mock_result)
+
+        event = EventEnvelope(
+            event_type="SentenceCreated",
+            aggregate_type=AggregateType.SENTENCE,
+            aggregate_id=str(uuid.uuid4()),
+            version=2,
+            data={
+                "interview_id": str(uuid.uuid4()),
+                "index": 0,
+                "text": "Newer version reapply.",
+                "speaker": "Speaker A",
+            },
+        )
+
+        # Should not raise
+        await handler.apply(mock_tx, event)

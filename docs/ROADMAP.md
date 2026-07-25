@@ -30,13 +30,14 @@
 | **M4.7** | ✅ Complete | Hardening & operational readiness (schema, deploy path, ask/resolution hardening, persona lens, content corpus) |
 | **M4.8** | ✅ Complete | `:Sentence` shim drop (alias flips, vector-index retarget, migration-CLI deletion) — closes the M4.x arc |
 | **M5.0** | ✅ Complete | UI scaffolding (Next.js): two-surface app shell — workbench + gallery |
-| **M5.1** | 📋 Planned | Live workbench: real-time projection feed (SSE/WebSocket), dynamic transcript |
+| **M4.9** | ✅ Complete | Projection ordering & recovery hardening (commit_position reorder buffer) — fixes a pre-existing cross-lane race surfaced by M5.1's live smoke |
+| **M5.1** | 🚧 In progress | Live workbench: real-time projection feed (SSE), dynamic transcript — paused at T6 pending M4.9; resumes rebased on it |
 | **M5.2** | 📋 Planned | Edit observability: human-vs-machine event metrics, visualized in the gallery |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M5.1 (Live workbench — real-time feed)
-**Tests:** 1304 unit passing, 17 skipped (+146 frontend Vitest) | **Coverage:** 92.41% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Current Phase:** M5.1 (Live workbench — resume T6, rebased on M4.9)
+**Tests:** 1346 unit passing, 17 skipped (+146 frontend Vitest) | **Coverage:** 92.4% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
@@ -86,6 +87,64 @@ streams (every event already carries an Actor: human vs machine, per
 interview/extractor/lens) + endpoint, visualized in the gallery; a standing
 metrics projection only if replay-on-demand gets slow. Goal: feed ingestion
 improvements and eventually automated learning.
+
+---
+
+### M4.9: Projection Ordering & Recovery Hardening ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-24-m49-projection-ordering-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-24-m49-projection-ordering.md`
+
+Out-of-sequence milestone (numbered 4.9, executed after M5.0): M5.1's live
+ui-smoke exposed that projecting a freshly-ingested interview was **flaky and
+lossy** — fragments orphaned, speakers null — at random. Root-caused (three
+adversarial analyses, `docs/superpowers/specs/proj-analysis-*` in the plan
+dir's sibling scratch) to a pre-existing cross-lane ordering race: an
+interview's events arrive via three independent ESDB subscriptions and were
+processed in ARRIVAL order, so dependent handlers ran before their referents
+projected. Confirmed reproducible on `main` (no M5.x code). Fixed by
+restoring commit-order processing per interview lane; the frozen wire format
+and the M4.7 delivery path (subscriptions, `ack_id` acks, `resolve_links`,
+`to_thread` pulls, checkpointing) are untouched.
+
+- [x] Task 1 (`af89190`): carry ESDB `commit_position` on delivered
+      envelopes — a read-side/transient field, never serialized into stored
+      metadata (wire format frozen)
+- [x] Task 2 (`ab19f14`): park events append-only (`StreamState.ANY`) —
+      stops the active data-loss where only the first park to each
+      `parked-<type>` stream ever succeeded (`NO_STREAM` default)
+- [x] Task 3 (`dc5e433`): raise `ReferentNotReadyError` on a missing
+      referent instead of silently no-op'ing — `SpeakerCreated` via the
+      write-count guard, `SentenceCreated` via a `CALL (i) {}` row-presence
+      signal (avoids false-raising on version-gated idempotent replay;
+      live-verified on Neo4j 5.26)
+- [x] Task 4 (`cb0371a`): the root fix — a shared `WatermarkTracker` +
+      per-interview-lane `ReorderBuffer` releasing events in
+      `commit_position` order (watermark-gated, `max_hold` flush for idle
+      subscriptions, deferred acks). commit-order == causal-order is verified,
+      so ordered release means handlers always find their referents
+- [x] Task 5 (`11c6665`): `python -m src.projections.redrive` CLI — replays
+      parked events through the real handler registry once referents land
+      (idempotent; reports still-parked without re-parking)
+- [x] Task 6: `make projection-smoke` (env-gated `PROJECTION_SMOKE=1`) seeds
+      5 interviews and asserts each projects every fragment with a non-null
+      speaker — the completeness the race used to break; ROADMAP + docs
+
+**Live acceptance:** `make projection-smoke` seeds 5 interviews cold and every
+one projects completely and reliably (before: intermittent orphans/null
+speakers). Unblocks M5.1 Task 6 (the workbench transcript now renders reliably
+once M5.1 rebases onto this).
+
+**Completed:** 2026-07-24
+
+**Deferred (from task + final reviews):** `speaker_handlers.py` `SpeakerMerged`
+pre-existing deprecated bare-`CALL {` form; `redrive.py`
+`KNOWN_AGGREGATE_TYPES` could derive from `SUBSCRIPTION_CONFIG`; **fast-park
+for `ReferentNotReadyError`** — a missing referent lives in the SAME
+(blocked) lane, so the current 5-attempt/~15s retry schedule before parking
+is futile on that path; after the reorder fix this only fires on the rare
+`max_hold` backstop, so parking after 1–2 quick attempts (instead of the full
+backoff) is a follow-up, not a merge blocker.
 
 ---
 

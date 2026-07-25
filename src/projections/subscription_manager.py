@@ -37,6 +37,7 @@ class SubscriptionManager:
         self,
         event_store: Optional[EventStoreClient] = None,
         lane_manager=None,
+        watermark_tracker=None,
     ):
         """
         Initialize the subscription manager.
@@ -44,9 +45,18 @@ class SubscriptionManager:
         Args:
             event_store: EventStore client (uses global if not provided)
             lane_manager: Lane manager for routing events
+            watermark_tracker: WatermarkTracker shared with the lane manager's
+                lanes, so this subscription's delivered commit_positions gate
+                ordered release there. If not provided, falls back to
+                `lane_manager.watermark_tracker` when present (the real
+                LaneManager owns and exposes one); otherwise None, in which
+                case watermark recording is skipped entirely.
         """
         self.event_store = event_store or get_event_store_client()
         self.lane_manager = lane_manager
+        self.watermark_tracker = (
+            watermark_tracker if watermark_tracker is not None else getattr(lane_manager, "watermark_tracker", None)
+        )
         self.subscriptions: Dict[str, asyncio.Task] = {}
         # Active esdbclient PersistentSubscription object per subscription
         # name, for as long as that subscription's outer loop iteration is
@@ -65,6 +75,8 @@ class SubscriptionManager:
         logger.info("Starting subscriptions...")
 
         for sub_name, config in SUBSCRIPTION_CONFIG.items():
+            if self.watermark_tracker is not None:
+                self.watermark_tracker.register(sub_name)
             task = asyncio.create_task(self._run_subscription(sub_name, config))
             self.subscriptions[sub_name] = task
             logger.info(
@@ -182,6 +194,14 @@ class SubscriptionManager:
                             # parked.
                             subscription.ack(event.ack_id)
                             continue
+
+                        # Record the watermark BEFORE routing, so the shared
+                        # tracker reflects this subscription's progress as
+                        # soon as possible (guard against commit_position
+                        # None -- defensive; delivered events should always
+                        # have one, but never gate on a missing value).
+                        if self.watermark_tracker is not None and envelope.commit_position is not None:
+                            self.watermark_tracker.record(sub_name, envelope.commit_position)
 
                         # Route to lane manager
                         if self.lane_manager:

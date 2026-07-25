@@ -338,6 +338,26 @@ deployed-smoke:
 
 # --- End Deployed-Path Smoke --- #
 
+# --- Projection-Ordering Smoke (M4.9) --- #
+# Proves the per-lane commit_position reorder buffer fixed the cross-lane
+# ordering race: seeds several interviews through the real command path and
+# asserts each projects EVERY fragment with a non-null speaker (the
+# completeness the race used to break intermittently). See
+# tests/integration/test_projection_ordering_smoke.py's header.
+# ESDB_CONNECTION_STRING is overridden for the same reason as deployed-smoke:
+# the committed .env points ESDB at the docker-internal "eventstore"
+# hostname, unresolvable from this host-run pytest process. Pyenv interpreter
+# pinned directly (NOT $(PYTHON)) — same rationale as deployed-smoke above.
+.PHONY: projection-smoke
+projection-smoke:
+	@echo "Building + starting neo4j, eventstore, projection-service (dev stack)..."
+	docker compose up -d --build neo4j eventstore projection-service
+	@echo "Waiting for services..."
+	docker compose ps
+	PROJECTION_SMOKE=1 ESDB_CONNECTION_STRING=esdb://localhost:2113?tls=false $$HOME/.pyenv/versions/3.10.7/bin/python -m pytest tests/integration/test_projection_ordering_smoke.py -q --no-cov
+
+# --- End Projection-Ordering Smoke --- #
+
 # --- Event Sourcing System Management --- #
 
 .PHONY: es-up

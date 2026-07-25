@@ -997,3 +997,187 @@ class TestRunSubscriptionAckBinding:
                 pass
 
         assert subscription.acked_ids == ["no-lane-ack-id"]
+
+
+class _CapturingWatermarkTracker:
+    """Fake WatermarkTracker double: captures register()/record() calls
+    (with subscription name + position/order) without any real gating
+    logic -- WatermarkTracker's own behavior is unit-tested in
+    test_reorder_buffer.py. This isolates SubscriptionManager's wiring:
+    does it register at startup, and record before routing?"""
+
+    def __init__(self):
+        self.registered = []
+        self.recorded = []  # list of (subscription_name, commit_position)
+
+    def register(self, subscription_name):
+        self.registered.append(subscription_name)
+
+    def record(self, subscription_name, commit_position):
+        self.recorded.append((subscription_name, commit_position))
+
+    def low_watermark(self):
+        return None
+
+
+class TestWatermarkRecording:
+    """
+    Regression coverage for M4.9 Task 4: SubscriptionManager must record
+    each delivered event's commit_position into the shared WatermarkTracker
+    BEFORE routing it to the lane manager (so the lane's reorder buffer can
+    safely gate release on the watermark), and must register itself with
+    the tracker at startup.
+    """
+
+    @pytest.mark.asyncio
+    @patch("src.projections.subscription_manager.get_event_store_client")
+    @patch(
+        "src.projections.subscription_manager.SUBSCRIPTION_CONFIG",
+        {
+            "interview": {"stream": "$ce-Interview", "group": "g-interview"},
+            "sentence": {"stream": "$ce-Sentence", "group": "g-sentence"},
+            "project": {"stream": "$ce-Project", "group": "g-project"},
+        },
+    )
+    async def test_start_registers_every_subscription_with_watermark_tracker(self, mock_get_client):
+        mock_get_client.return_value = MagicMock()
+        watermark_tracker = _CapturingWatermarkTracker()
+
+        manager = SubscriptionManager(watermark_tracker=watermark_tracker)
+        # Avoid actually spinning up _run_subscription tasks against a real
+        # connection -- only startup-time registration is under test here.
+        manager._run_subscription = AsyncMock()
+
+        await manager.start()
+        try:
+            assert set(watermark_tracker.registered) == {"interview", "sentence", "project"}
+        finally:
+            await manager.stop()
+
+    def test_watermark_tracker_defaults_to_lane_managers_tracker(self):
+        """When no explicit watermark_tracker is passed, SubscriptionManager
+        falls back to lane_manager.watermark_tracker (the shared instance a
+        real LaneManager owns), so both sides gate on the same tracker."""
+        fake_tracker = _CapturingWatermarkTracker()
+        lane_manager = MagicMock()
+        lane_manager.watermark_tracker = fake_tracker
+
+        manager = SubscriptionManager(event_store=MagicMock(), lane_manager=lane_manager)
+
+        assert manager.watermark_tracker is fake_tracker
+
+    @pytest.mark.asyncio
+    @patch("src.projections.subscription_manager.is_event_allowed", return_value=True)
+    async def test_records_watermark_before_routing(self, mock_is_allowed):
+        """The delivery path must call watermark_tracker.record(name, cp)
+        for a delivered event BEFORE calling lane_manager.route_event."""
+        mock_event_store = MagicMock()
+        mock_event_store._recorded_event_to_envelope.side_effect = lambda event: MagicMock(
+            event_id=event.id, event_type="TestEvent", commit_position=42
+        )
+
+        subscription = _BlockingQueueSubscription()
+        client = MagicMock()
+        client.read_subscription_to_stream.return_value = subscription
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=client)
+        async_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_event_store.get_client.return_value = async_cm
+
+        call_order = []
+
+        class _OrderTrackingLaneManager:
+            async def route_event(self, envelope, checkpoint_callback):
+                call_order.append(("route", envelope.event_id))
+
+        watermark_tracker = _CapturingWatermarkTracker()
+        original_record = watermark_tracker.record
+
+        def record_and_track(subscription_name, commit_position):
+            call_order.append(("record", subscription_name, commit_position))
+            original_record(subscription_name, commit_position)
+
+        watermark_tracker.record = record_and_track
+
+        manager = SubscriptionManager(
+            event_store=mock_event_store,
+            lane_manager=_OrderTrackingLaneManager(),
+            watermark_tracker=watermark_tracker,
+        )
+        manager._ensure_subscription_exists = AsyncMock()
+        manager.is_running = True
+
+        config = {"stream": "$ce-Test", "group": "test-group"}
+        task = asyncio.create_task(manager._run_subscription("test_sub", config))
+
+        await asyncio.sleep(0.05)
+        subscription.put(_FakeEvent("event-1"))
+
+        async def wait_for_route():
+            while not call_order:
+                await asyncio.sleep(0.05)
+
+        try:
+            await asyncio.wait_for(wait_for_route(), timeout=5.0)
+        finally:
+            manager.is_running = False
+            subscription.put(threading.Event())
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        assert watermark_tracker.recorded == [("test_sub", 42)]
+        assert call_order == [("record", "test_sub", 42), ("route", "event-1")]
+
+    @pytest.mark.asyncio
+    @patch("src.projections.subscription_manager.is_event_allowed", return_value=True)
+    async def test_does_not_record_when_commit_position_is_none(self, mock_is_allowed):
+        """Guard against a missing commit_position (defensive case) --
+        record() must not be called with None."""
+        mock_event_store = MagicMock()
+        mock_event_store._recorded_event_to_envelope.side_effect = lambda event: MagicMock(
+            event_id=event.id, event_type="TestEvent", commit_position=None
+        )
+
+        subscription = _BlockingQueueSubscription()
+        client = MagicMock()
+        client.read_subscription_to_stream.return_value = subscription
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=client)
+        async_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_event_store.get_client.return_value = async_cm
+
+        lane_manager = _RecordingLaneManager()
+        watermark_tracker = _CapturingWatermarkTracker()
+        manager = SubscriptionManager(
+            event_store=mock_event_store,
+            lane_manager=lane_manager,
+            watermark_tracker=watermark_tracker,
+        )
+        manager._ensure_subscription_exists = AsyncMock()
+        manager.is_running = True
+
+        config = {"stream": "$ce-Test", "group": "test-group"}
+        task = asyncio.create_task(manager._run_subscription("test_sub", config))
+
+        await asyncio.sleep(0.05)
+        subscription.put(_FakeEvent("event-1"))
+
+        async def wait_for_route():
+            while not lane_manager.routed:
+                await asyncio.sleep(0.05)
+
+        try:
+            await asyncio.wait_for(wait_for_route(), timeout=5.0)
+        finally:
+            manager.is_running = False
+            subscription.put(threading.Event())
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        assert watermark_tracker.recorded == []

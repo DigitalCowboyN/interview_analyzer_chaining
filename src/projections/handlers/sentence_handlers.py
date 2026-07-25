@@ -12,6 +12,7 @@ from src.events.envelope import EventEnvelope
 from src.utils.metrics import metrics_tracker
 
 from .base_handler import BaseProjectionHandler
+from .speaker_handlers import ReferentNotReadyError
 
 logger = logging.getLogger(__name__)
 
@@ -37,31 +38,43 @@ class SentenceCreatedHandler(BaseProjectionHandler):
         // Match the interview
         MATCH (i:Interview {interview_id: $interview_id})
 
-        // MERGE instead of CREATE for dual-write safety
-        // This allows both direct writes and projection writes to coexist
-        MERGE (s:Fragment {sentence_id: $sentence_id})
+        // Node write (MERGE) and the version-gated SET/link are scoped in a
+        // unit subquery so the WHERE below only filters what happens
+        // *inside* it. That keeps the outer RETURN unconditional on the
+        // version gate: an idempotent same-version replay (which performs
+        // zero writes here) must not look like "Interview not found".
+        CALL (i) {
+            // MERGE instead of CREATE for dual-write safety
+            // This allows both direct writes and projection writes to coexist
+            MERGE (s:Fragment {sentence_id: $sentence_id})
 
-        // Only update if event version is newer (or not set)
-        // This ensures projection service doesn't overwrite newer data
-        WITH s, i
-        WHERE s.event_version IS NULL OR s.event_version < $event_version
+            // Only update if event version is newer (or not set)
+            // This ensures projection service doesn't overwrite newer data
+            WITH s, i
+            WHERE s.event_version IS NULL OR s.event_version < $event_version
 
-        SET
-            s.aggregate_id = $aggregate_id,
-            s.text = $text,
-            s.sequence_order = $sequence_order,
-            s.speaker = $speaker,
-            s.start_ms = $start_ms,
-            s.end_ms = $end_ms,
-            s.status = $status,
-            s.is_edited = false,
-            s.created_at = datetime($created_at),
-            s.updated_at = datetime($updated_at),
-            s.event_version = $event_version,
-            s.source = $source
+            SET
+                s.aggregate_id = $aggregate_id,
+                s.text = $text,
+                s.sequence_order = $sequence_order,
+                s.speaker = $speaker,
+                s.start_ms = $start_ms,
+                s.end_ms = $end_ms,
+                s.status = $status,
+                s.is_edited = false,
+                s.created_at = datetime($created_at),
+                s.updated_at = datetime($updated_at),
+                s.event_version = $event_version,
+                s.source = $source
 
-        // Link to interview
-        MERGE (i)-[:HAS_SENTENCE]->(s)
+            // Link to interview
+            MERGE (i)-[:HAS_SENTENCE]->(s)
+        }
+
+        // Unconditional signal that the Interview referent was matched --
+        // present whenever the leading MATCH found a row, regardless of
+        // whether the version-gated write above actually fired.
+        RETURN i.interview_id AS interview_matched
         """
 
         result = await tx.run(
@@ -81,9 +94,21 @@ class SentenceCreatedHandler(BaseProjectionHandler):
             source="projection_service",  # Track that projection wrote this
         )
 
+        # Row presence tells us whether the Interview referent was matched at
+        # all (independent of the version-gated write, which will legitimately
+        # be a no-op on an idempotent replay). Zero rows means the leading
+        # MATCH found nothing -- the Interview isn't projected yet.
+        record = await result.single()
+        summary = await result.consume()
+
+        if record is None:
+            raise ReferentNotReadyError(
+                f"SentenceCreated for {event.aggregate_id}: Interview "
+                f"{data.get('interview_id')} not yet projected"
+            )
+
         # Track deduplication metrics
         # Check if properties were actually updated (WHERE clause passed)
-        summary = await result.consume()
         if summary.counters.properties_set > 0:
             # Properties were updated - either new node or version was newer
             logger.info(f"Applied SentenceCreated event (v{event.version}) for sentence {event.aggregate_id}")

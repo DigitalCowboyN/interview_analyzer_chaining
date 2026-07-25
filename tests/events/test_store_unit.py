@@ -42,6 +42,15 @@ def create_test_envelope(
     )
 
 
+class TestEventEnvelopeCommitPosition:
+    """Test EventEnvelope.commit_position (M4.9 Task 1: read-side/transient field)."""
+
+    def test_defaults_to_none_for_freshly_constructed_envelope(self):
+        """A producer-side envelope (not yet delivered by ESDB) has commit_position=None."""
+        envelope = create_test_envelope()
+        assert envelope.commit_position is None
+
+
 class TestEventStoreClientInit:
     """Test EventStoreClient initialization."""
 
@@ -350,6 +359,34 @@ class TestEventStoreClientAppendEvents:
             # -1 + 3 events = 2 (0-indexed)
             assert new_version == 2
 
+    async def test_append_events_metadata_excludes_commit_position(self):
+        """commit_position is read-side/transient and must NOT be written into the
+        ESDB metadata dict (wire format is frozen) (M4.9 Task 1)."""
+        client = EventStoreClient()
+        envelope = create_test_envelope()
+        # Populate commit_position so the test proves even a NON-None value
+        # does not leak into stored metadata (not just that a default None
+        # happens to be absent).
+        envelope.commit_position = 99999
+
+        with patch("src.events.store.EventStoreDBClient") as mock_esdb:
+            mock_instance = MagicMock()
+            mock_instance.append_to_stream.return_value = 12345
+            mock_esdb.return_value = mock_instance
+
+            await client.connect()
+            await client.append_events(
+                stream_name="Test-123",
+                events=[envelope],
+                expected_version=-1,
+            )
+
+            call_kwargs = mock_instance.append_to_stream.call_args.kwargs
+            new_event = call_kwargs["events"][0]
+            stored_metadata = json.loads(new_event.metadata.decode("utf-8"))
+
+            assert "commit_position" not in stored_metadata
+
 
 @pytest.mark.asyncio
 class TestEventStoreClientReadStream:
@@ -561,6 +598,36 @@ class TestRecordedEventToEnvelope:
         assert envelope.correlation_id == correlation_id
         assert envelope.source == "test_source"
         assert envelope.tags == ["tag1", "tag2"]
+
+    async def test_carries_commit_position_from_recorded_event(self):
+        """Test that the ESDB commit_position is carried onto the envelope (M4.9 Task 1)."""
+        client = EventStoreClient()
+        aggregate_id = str(uuid.uuid4())
+        event_id = str(uuid.uuid4())
+
+        mock_recorded = MagicMock()
+        mock_recorded.type = "TestEvent"
+        mock_recorded.commit_position = 12345
+        mock_recorded.data = json.dumps({"key": "value"}).encode("utf-8")
+        mock_recorded.metadata = json.dumps({
+            "event_id": event_id,
+            "aggregate_type": "Interview",
+            "aggregate_id": aggregate_id,
+            "version": 0,
+            "occurred_at": "2024-01-15T10:30:00+00:00",
+            "schema_version": "1.0.0",
+            "actor": None,
+            "correlation_id": None,
+            "causation_id": None,
+            "source": "test_source",
+            "trace_id": None,
+            "project_id": None,
+            "tags": [],
+        }).encode("utf-8")
+
+        envelope = client._recorded_event_to_envelope(mock_recorded)
+
+        assert envelope.commit_position == 12345
 
 
 @pytest.mark.asyncio
