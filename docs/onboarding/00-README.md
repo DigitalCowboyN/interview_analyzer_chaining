@@ -10,8 +10,10 @@ This project is a sophisticated event-sourced application for analyzing intervie
 - Event-sourced architecture with EventStoreDB
 - Neo4j graph database for projections
 - Celery workers for background processing
-- Real-time projection service
-- Comprehensive test suite (673 tests)
+- Real-time projection service (sole Neo4j writer) + live SSE UI feed
+- A layered "Mine" analysis pipeline (structure → enrichment → lenses →
+  segments → export/ask) and a two-surface Next.js UI
+- Comprehensive test suite (current counts in [../ROADMAP.md](../ROADMAP.md))
 
 ## Onboarding Path
 

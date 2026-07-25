@@ -1,9 +1,14 @@
 # Test Coverage Improvement Plan
 
-> **Created:** 2026-01-18
-> **Updated:** 2026-01-26
-> **Current Coverage:** 90.1% (1096 tests passing, 15 skipped) ✅ STRETCH GOAL MET
-> **Target Coverage:** 90%+ (stretch goal)
+> **Status: COMPLETED PLAN (historical).** Created 2026-01-18; its coverage
+> stretch goal was met and this plan is no longer active. The snapshot numbers
+> below (90.1%, 1096 tests) are from early 2026 — for **current** test and
+> coverage figures see [ROADMAP.md](ROADMAP.md). The **Testing Principles**
+> section below is kept as living reference — it still describes how tests
+> should be written in this project.
+>
+> **Original coverage snapshot:** 90.1% (1096 tests passing, 15 skipped) —
+> stretch goal met. **Target:** 90%+.
 
 ---
 

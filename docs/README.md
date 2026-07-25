@@ -1,51 +1,39 @@
 # Documentation
 
-> **Start here:** [ROADMAP.md](ROADMAP.md) - Project roadmap with status checklist
+> **Start here:** [ROADMAP.md](ROADMAP.md) — milestone status, test/coverage
+> numbers, and the plan of record.
 
----
+## Primary documents
 
-## Primary Documents
+| Document | Purpose |
+|----------|---------|
+| **[ROADMAP.md](ROADMAP.md)** | Canonical roadmap — milestones, status, current stats |
+| **[architecture/](architecture/)** | Current architecture: system overview, data flow, event sourcing, database schema |
+| **[onboarding/](onboarding/)** | Setup, configuration, dev workflow, troubleshooting |
 
-| Document | Purpose | Update When |
-|----------|---------|-------------|
-| **[ROADMAP.md](ROADMAP.md)** | Canonical project roadmap | Milestone status changes |
-| **[M2.8_MIGRATION_SUMMARY.md](M2.8_MIGRATION_SUMMARY.md)** | Current architecture overview | Architecture changes |
+## Architecture reference
 
----
-
-## Reference Documents
-
-### Architecture
-
-| Document | Description |
-|----------|-------------|
-| [M2.8_OVERWRITE_BEHAVIOR_ANALYSIS.md](M2.8_OVERWRITE_BEHAVIOR_ANALYSIS.md) | Event sourcing design decisions |
-| [M2.8_FINAL_SUMMARY.md](M2.8_FINAL_SUMMARY.md) | M2.8 production readiness checklist |
-| [ARCHITECTURAL_REVIEW_M2.2.md](ARCHITECTURAL_REVIEW_M2.2.md) | M2.2 architectural review |
-
-### Implementation Details
+The [architecture/](architecture/) folder is the current, maintained
+description of the system:
 
 | Document | Description |
 |----------|-------------|
-| [event-sourced-architecture-implementation.plan.md](event-sourced-architecture-implementation.plan.md) | M2.x milestone details |
-| [M2.2_DUAL_WRITE_INTEGRATION_PLAN.md](M2.2_DUAL_WRITE_INTEGRATION_PLAN.md) | Dual-write integration plan |
-| [M2.8_TEST_MIGRATION_COMPLETE_ANALYSIS.md](M2.8_TEST_MIGRATION_COMPLETE_ANALYSIS.md) | Test categorization and analysis |
+| [architecture/README.md](architecture/README.md) | Index + the system in one diagram + the layered "Mine" model |
+| [architecture/system-overview.md](architecture/system-overview.md) | System context, containers, request/projection paths |
+| [architecture/data-flow.md](architecture/data-flow.md) | The layered analysis pipeline, ingest → export/ask |
+| [architecture/event-sourcing.md](architecture/event-sourcing.md) | Aggregates, events, projection ordering, the SSE bridge |
+| [architecture/database-schema.md](architecture/database-schema.md) | Neo4j read-model nodes and relationships |
 
----
+## Archive
 
-## Other Documentation
+[archive/](archive/) holds historical milestone notes and session summaries
+(M2.x dual-write, Phase 2, test-migration analyses, etc.). They are **superseded
+and kept for reference only** — do not treat them as current. Where an archived
+doc described architecture (e.g. the M2.8 summaries), the current version lives
+in [architecture/](architecture/) and [ROADMAP.md](ROADMAP.md).
 
-| Location | Description |
-|----------|-------------|
-| [onboarding/](onboarding/) | Developer onboarding guides (setup, workflow, troubleshooting) |
-| [archive/](archive/) | Historical documents (superseded, for reference only) |
+## Current status
 
----
-
-## Quick Links
-
-- **Current Milestone:** M2.9 (User Edit API)
-- **Tests:** 691 passing, 84 skipped
-- **Coverage:** 72.2%
-
-See [ROADMAP.md](ROADMAP.md) for full status and checklist.
+See [ROADMAP.md](ROADMAP.md) for the authoritative, always-updated status
+(current milestone, test counts, coverage). It is the single source of truth for
+project state — this index intentionally does not duplicate those numbers.
