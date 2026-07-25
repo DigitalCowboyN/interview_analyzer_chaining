@@ -537,3 +537,61 @@ class TestVersionManagement:
         assert len(events) == 2
         assert events[0].version == 0
         assert events[1].version == 1
+
+
+def test_interview_stores_project_id_from_created_event():
+    iid = str(uuid.uuid4())
+    interview = Interview(iid)
+    interview.create(title="T", source="s", project_id="proj-42")
+    assert interview.project_id == "proj-42"
+
+
+def test_interview_project_id_defaults_to_none_without_project():
+    iid = str(uuid.uuid4())
+    interview = Interview(iid)
+    interview.create(title="T", source="s")
+    assert interview.project_id is None
+
+
+def test_apply_lens_stamps_project_id_onto_event():
+    iid = str(uuid.uuid4())
+    interview = Interview(iid)
+    interview.create(title="T", source="s", project_id="proj-42")
+    event = interview.apply_lens("persona", 1)
+    assert event.project_id == "proj-42"
+
+
+def test_record_lens_extraction_stamps_project_id_onto_event():
+    iid = str(uuid.uuid4())
+    interview = Interview(iid)
+    interview.create(title="T", source="s", project_id="proj-42")
+    interview.apply_lens("persona", 1)
+    event = interview.record_lens_extraction(
+        lens="persona", lens_version=1, node_type="Trait", item_id=str(uuid.uuid4()),
+        fields={"text": "Decisive"}, supporting_fragment_ids=[], speaker_links=[],
+        confidence=0.9, model="haiku", provider="anthropic",
+    )
+    assert event.project_id == "proj-42"
+
+
+def test_override_lens_extraction_stamps_project_id_onto_event():
+    iid = str(uuid.uuid4())
+    interview = Interview(iid)
+    interview.create(title="T", source="s", project_id="proj-42")
+    interview.apply_lens("persona", 1)
+    item_id = str(uuid.uuid4())
+    interview.record_lens_extraction(
+        lens="persona", lens_version=1, node_type="Trait", item_id=item_id,
+        fields={"text": "Decisive"}, supporting_fragment_ids=[], speaker_links=[],
+        confidence=0.9, model="haiku", provider="anthropic",
+    )
+    event = interview.override_lens_extraction(item_id, fields_overridden={"text": "Very decisive"})
+    assert event.project_id == "proj-42"
+
+
+def test_explicit_project_id_kwarg_wins_over_aggregate_value():
+    iid = str(uuid.uuid4())
+    interview = Interview(iid)
+    interview.create(title="T", source="s", project_id="proj-42")
+    event = interview.apply_lens("persona", 1, project_id="override-proj")
+    assert event.project_id == "override-proj"
