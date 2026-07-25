@@ -40,11 +40,12 @@ import asyncio
 import json
 import os
 import uuid as uuid_mod
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from starlette.requests import Request as StarletteRequest
 
+from src.enrichment.executor import SpecOutcome
 from src.ingestion.orchestrator import IngestionOrchestrator
 
 pytestmark = [
@@ -193,5 +194,93 @@ async def test_live_feed_delivers_transcript_notification_on_ingest(tmp_path, mo
                 transcript_notification = payload
 
         assert transcript_notification == {"surface": "transcript", "interview_id": fresh_interview_id}
+    finally:
+        await generator.aclose()
+
+
+@pytest.mark.asyncio
+async def test_live_feed_delivers_project_notifications_for_resolution_and_lens(
+    tmp_path, monkeypatch
+):
+    """Gallery liveness (M5.1b): a project-scoped SSE subscriber receives a
+    `project` notification for (a) a Project-stream resolution event and
+    (b) stamped Interview-stream persona-lens events. Leg (b) proves the
+    aggregate-stamp mechanism end-to-end: the persona lens run emits events
+    whose project_id lives only in ESDB metadata, and the watcher recovers it
+    there and routes them to the gallery.
+
+    Emits the resolution event through the Project aggregate + repository (the
+    same calls the resolution router makes) and runs the persona lens with a
+    mocked executor (LLM-free, mirroring test_layer3_lens_smoke.py) -- both
+    produce real, stamped ESDB events, which is exactly the path under test.
+    The stream is project-scoped (no interview_id), the gallery's own scope.
+    """
+    from src.api.routers.ui import stream_events
+    from src.events.aggregates import Project
+    from src.events.project_events import project_aggregate_id
+    from src.events.repository import get_project_repository
+    from src.lens.engine import LensEngine
+
+    project_id = f"live-gallery-smoke-{uuid_mod.uuid4()}"
+
+    monkeypatch.setattr("src.api.routers.ui.HEARTBEAT_SECONDS", HEARTBEAT_TEST_SECONDS)
+    monkeypatch.setattr(
+        "starlette.requests.Request.is_disconnected", AsyncMock(return_value=False)
+    )
+
+    # Ingest a labeled interview into this project (Layer 1) BEFORE opening the
+    # stream -- the persona lens re-run below is the event we watch for, not
+    # this ingest (the watcher is from_end and would miss it anyway).
+    input_file = tmp_path / "gallery_smoke.txt"
+    input_file.write_text(LABELED)
+    ingest = IngestionOrchestrator(project_id=project_id, map_dir=tmp_path / "maps")
+    ingest_result = await ingest.ingest_file(input_file)
+    interview_id = ingest_result.interview_id
+
+    response = await stream_events(_bare_request(), interview_id=None, project_id=project_id)
+    assert response.media_type == "text/event-stream"
+    generator = response.body_iterator
+
+    async def next_project_notification():
+        deadline = asyncio.get_running_loop().time() + NOTIFICATION_TIMEOUT_S
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                pytest.fail(
+                    f"No project notification for {project_id} within {NOTIFICATION_TIMEOUT_S}s."
+                )
+            chunk = await asyncio.wait_for(generator.__anext__(), timeout=remaining)
+            if chunk in (": keep-alive\n\n", ": connected\n\n"):
+                continue
+            assert chunk.startswith("data: ") and chunk.endswith("\n\n")
+            payload = json.loads(chunk[len("data: "):].strip())
+            if payload.get("surface") == "project" and payload.get("project_id") == project_id:
+                return payload
+
+    try:
+        first_chunk = await asyncio.wait_for(
+            generator.__anext__(), timeout=HEARTBEAT_TEST_SECONDS + 10
+        )
+        assert first_chunk == ": connected\n\n"
+        await asyncio.sleep(SUBSCRIPTION_SETTLE_S)
+
+        # --- Leg (a): a Project-stream resolution event -> project notification.
+        repo = get_project_repository()
+        project = Project(project_aggregate_id(project_id))
+        project.identify_person(project_id, str(uuid_mod.uuid4()), "Jane Doe")
+        await repo.save(project)
+        assert await next_project_notification() == {"surface": "project", "project_id": project_id}
+
+        # --- Leg (b): a persona-lens run -> stamped Interview-stream events ->
+        # project notification (mechanism proof; executor mocked, LLM-free).
+        executor = MagicMock()
+        executor.run_spec_on_text = AsyncMock(
+            side_effect=lambda spec, text, ctx=None: SpecOutcome(
+                data={spec.name: []}, provider="anthropic", model="haiku"
+            )
+        )
+        monkeypatch.setattr(LensEngine, "_build_executor", lambda self, lens: executor)
+        await LensEngine().apply(interview_id, "persona")
+        assert await next_project_notification() == {"surface": "project", "project_id": project_id}
     finally:
         await generator.aclose()
