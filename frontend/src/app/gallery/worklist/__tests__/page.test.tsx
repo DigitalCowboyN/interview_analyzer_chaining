@@ -4,10 +4,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import WorklistPage from "@/app/gallery/worklist/page";
 import { useWorklist } from "@/hooks/useWorklist";
+import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { useSearchParams } from "next/navigation";
 
 vi.mock("@/hooks/useWorklist", () => ({
   useWorklist: vi.fn(),
+}));
+
+// Mocked so the page test doesn't open a real EventSource; the real
+// LiveIndicator still renders off its status.
+vi.mock("@/hooks/useLiveInvalidation", () => ({
+  useLiveInvalidation: vi.fn(() => "idle"),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -166,5 +173,20 @@ describe("WorklistPage", () => {
     expect(screen.getByRole("link", { name: "Gallery" })).toHaveAttribute("href", "/gallery");
     expect(screen.getByText("proj1")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Worklist" })).toBeInTheDocument();
+  });
+
+  it("wires the live-updates indicator with the project scope", () => {
+    mockProjectParam("proj1");
+    vi.mocked(useLiveInvalidation).mockReturnValue("live");
+    vi.mocked(useWorklist).mockReturnValue({
+      data: EMPTY_DATA,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(screen.getByText(/Live updates/i)).toBeInTheDocument();
+    expect(useLiveInvalidation).toHaveBeenCalledWith({ projectId: "proj1" });
   });
 });

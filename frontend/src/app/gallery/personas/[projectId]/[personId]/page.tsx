@@ -2,24 +2,30 @@
 
 import { useParams } from "next/navigation";
 import { usePersonaDetail } from "@/hooks/usePersonaDetail";
+import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { StateGate } from "@/components/StateGate";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { LiveIndicator } from "@/components/LiveIndicator";
 import { PersonaCoreView } from "@/components/PersonaCoreView";
 
 /** Persona CORE view: dimension-grouped items with per-interview provenance. */
 export default function PersonaDetailPage() {
   const { projectId, personId } = useParams<{ projectId: string; personId: string }>();
   const { data: persona, isLoading, isError, error } = usePersonaDetail(projectId, personId);
+  const liveStatus = useLiveInvalidation({ projectId, personId });
 
   return (
     <div className="p-6">
-      <Breadcrumbs
-        items={[
-          { label: "Gallery", href: "/gallery" },
-          { label: projectId, href: `/gallery/personas/${encodeURIComponent(projectId)}` },
-          { label: persona?.display_name ?? personId },
-        ]}
-      />
+      <div className="flex items-center justify-between">
+        <Breadcrumbs
+          items={[
+            { label: "Gallery", href: "/gallery" },
+            { label: projectId, href: `/gallery/personas/${encodeURIComponent(projectId)}` },
+            { label: persona?.display_name ?? personId },
+          ]}
+        />
+        <LiveIndicator status={liveStatus} />
+      </div>
       <h1 className="text-lg font-semibold">{persona?.display_name ?? personId}</h1>
       <p className="mt-1 text-xs text-neutral-400">
         Persona profiles are currently seeded from per-person contributions.

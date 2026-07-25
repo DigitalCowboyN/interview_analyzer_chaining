@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import ProjectPersonasPage from "@/app/gallery/personas/[projectId]/page";
 import { usePersonaCards } from "@/hooks/usePersonaCards";
 import { useInterviews } from "@/hooks/useInterviews";
+import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { useParams } from "next/navigation";
 
 vi.mock("@/hooks/usePersonaCards", () => ({
@@ -11,6 +12,12 @@ vi.mock("@/hooks/usePersonaCards", () => ({
 
 vi.mock("@/hooks/useInterviews", () => ({
   useInterviews: vi.fn(),
+}));
+
+// Mocked so the page test doesn't open a real EventSource / need a
+// QueryClient provider; the real LiveIndicator still renders off its status.
+vi.mock("@/hooks/useLiveInvalidation", () => ({
+  useLiveInvalidation: vi.fn(() => "idle"),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -117,5 +124,21 @@ describe("ProjectPersonasPage (persona cards)", () => {
     expect(
       screen.getByText("Persona profiles are currently seeded from per-person contributions."),
     ).toBeInTheDocument();
+  });
+
+  it("wires the live-updates indicator with the project scope", () => {
+    mockProjectId("p1");
+    vi.mocked(useLiveInvalidation).mockReturnValue("live");
+    vi.mocked(useInterviews).mockReturnValue({ data: [] } as never);
+    vi.mocked(usePersonaCards).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<ProjectPersonasPage />);
+    expect(screen.getByText(/Live updates/i)).toBeInTheDocument();
+    expect(useLiveInvalidation).toHaveBeenCalledWith({ projectId: "p1" });
   });
 });
