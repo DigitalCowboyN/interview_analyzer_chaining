@@ -276,4 +276,5 @@ UI changes) before opening a PR.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Intended: MIT. Note — there is no `LICENSE` file in the repository yet; one
+should be added to make the license explicit and enforceable.
