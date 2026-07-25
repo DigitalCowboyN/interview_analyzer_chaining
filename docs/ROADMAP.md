@@ -6,7 +6,7 @@
 
 ## Quick Status
 
-**Last Updated:** 2026-07-17
+**Last Updated:** 2026-07-25
 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
@@ -32,19 +32,23 @@
 | **M5.0** | ✅ Complete | UI scaffolding (Next.js): two-surface app shell — workbench + gallery |
 | **M4.9** | ✅ Complete | Projection ordering & recovery hardening (commit_position reorder buffer) — fixes a pre-existing cross-lane race surfaced by M5.1's live smoke |
 | **M5.1** | ✅ Complete | Live workbench: real-time projection feed (SSE), dynamic transcript — transcript/list update live via a backend SSE bridge |
-| **M5.1b** | 📋 Planned | Gallery liveness — fast-follow SSE scopes on the M5.1 pipeline (personas/persons/worklist update live) |
+| **M5.1b** | ✅ Complete | Gallery liveness — persons/personas/worklist + persona-lens content update live, reusing the M5.1 pipeline plus an additive Interview-aggregate `project_id` stamp |
 | **M5.2** | 📋 Planned | Edit observability: human-vs-machine event metrics, visualized in the gallery |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
-**Current Phase:** M5.1b (Gallery liveness — fast-follow SSE scopes)
-**Tests:** 1389 unit passing, 17 skipped (+185 frontend Vitest) | **Coverage:** 92.4% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Current Phase:** M5.2 (Edit observability) — next
+**Tests:** 1403 unit passing, 17 skipped (+194 frontend Vitest) | **Coverage:** 92.4% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
 ## Milestone Checklist
 
-### Upcoming — the UI arc (mapped 2026-07-17, decisions by owner)
+### The UI arc (mapped 2026-07-17, decisions by owner)
+
+> **Status:** M4.8, M5.0, M5.1, and M5.1b are all shipped — see their milestone
+> sections below. M5.2 (edit observability) is the remaining item. The text
+> below is preserved as the original plan-of-record.
 
 The M5.x arc builds the user interface as **two distinct surfaces** mirroring
 the backend's CQRS split:
@@ -80,7 +84,14 @@ to browsers (SSE or WebSocket, per-interview subscription) instead of writing
 Neo4j. The transcript becomes the dynamic surface: line items appear and
 resequence live (by `sequence_order`) as enrichment/lens/resolution events
 process. Supersedes the old "WebSocket for real-time Neo4j updates" future
-item.
+item. (Delivered via SSE; an in-process `EsdbWatcher` bridges ESDB catch-up
+subscriptions to browsers, leaving the M4.7 projection delivery path untouched.)
+
+**M5.1b — Gallery liveness (fast-follow, shipped)**: the same SSE pipeline
+extended to the gallery (persons, personas, worklist, detail views). One
+additive backend change — the Interview aggregate stamps `project_id` onto lens
+events — lets persona-lens content reach the gallery via the existing `project`
+surface. See the M5.1b milestone section below.
 
 **M5.2 — Edit observability**: metrics over how much end users manipulate/
 change what the system produced. v1 = on-demand reader over ESDB category
@@ -137,6 +148,53 @@ real ESDB event reaches a live SSE subscriber. Both witnessed passing.
 **Deferred:** gallery liveness (M5.1b — the same pipeline, more subscription
 scopes); the "intent-pattern hygiene" polish batch from the M5.0 final review
 (notice-renderer dedup, etc.); person-alias UI (no backend concept yet).
+
+---
+
+### M5.1b: Gallery Liveness ✅ COMPLETE
+
+**Spec:** `docs/superpowers/specs/2026-07-25-m51b-gallery-liveness-design.md`
+**Plan:** `docs/superpowers/plans/2026-07-25-m51b-gallery-liveness.md`
+
+The fast-follow deferred from M5.1: the gallery surfaces (persons grid, person
+detail, personas grid, persona detail, worklist) now update live off the same
+SSE pipeline, with no manual refresh. Persons/worklist/persona-composition were
+free — `Project-*` events already carry `project_id` and already emit the
+`project` surface, so it was pure consumer-side wiring.
+
+Persona-lens *content* liveness needed one small, additive backend change. Lens
+events (`LensApplied` / `LensExtractionGenerated` / `LensExtractionOverridden`)
+are Interview-stream events, and the Interview aggregate didn't carry a
+`project_id` the SSE watcher could route on. The fix: the Interview aggregate
+now stamps `project_id` onto lens events (it's an existing optional
+envelope/metadata field — additive, the frozen wire format is untouched), the
+watcher decodes it best-effort from event metadata, and `scope_notifications`
+emits the existing `project` surface for Interview-stream events when a project
+is resolvable. Coarse by design — any Interview-stream event nudges the gallery;
+the debounce absorbs enrichment bursts.
+
+- [x] Task 1 — Interview aggregate carries + stamps `project_id` on lens events
+      (create-time and replay; `setdefault` so an explicit caller value wins)
+- [x] Task 2 — watcher decodes metadata `project_id` (best-effort, never
+      raises); `scope_notifications` adds the `project` surface for Interview-*
+- [x] Task 3 — frontend `keysForSurface` maps `project`/`resync` to the gallery
+      query keys, plus an optional `personId` scope (kept off the SSE URL)
+- [x] Task 4 — wire `useLiveInvalidation` + `LiveIndicator` into the five
+      gallery pages
+- [x] Task 5 — live smoke: a project-scoped subscriber gets `project`
+      notifications for a resolution event and a persona-lens run (the lens leg
+      proves the aggregate-stamp end-to-end)
+
+**Live acceptance:** `make live-feed-smoke` — a project-scoped SSE subscriber
+receives `project` notifications for both a `PersonIdentified` resolution event
+and a persona-lens run whose `project_id` lives only in ESDB metadata. Witnessed
+passing against a freshly-built projection-service stack.
+
+**Review:** final whole-branch review on Opus (Fable spend-capped) — zero
+Critical / zero Important; verified the frozen wire format holds and the
+live-smoke stamp proof has no spurious-pass path.
+
+**Completed:** 2026-07-25 (PR #14)
 
 ---
 

@@ -1,9 +1,14 @@
 # Archived Documentation
 
 **Status:** Historical reference
-**Last Updated:** 2026-01-18
+**Last Updated:** 2026-07-25
 
-This directory contains historical documentation that has been superseded by current documents. These are kept for reference but should not be used as authoritative sources.
+This directory contains historical documentation that has been superseded by
+current documents. These are kept for reference but should not be used as
+authoritative sources. In particular, the M2.x "architecture overview" and
+"migration summary" notes below describe a much earlier system (pre-Mine,
+pre-UI, dual-write era) — the current architecture lives in
+[../architecture/](../architecture/).
 
 ---
 
@@ -14,7 +19,7 @@ For up-to-date information, see:
 | Document | Purpose |
 |----------|---------|
 | **[../ROADMAP.md](../ROADMAP.md)** | Canonical project roadmap with status checklist |
-| **[../M2.8_MIGRATION_SUMMARY.md](../M2.8_MIGRATION_SUMMARY.md)** | Current architecture overview |
+| **[../architecture/](../architecture/)** | Current architecture (system, data flow, event sourcing, schema) |
 | **[../README.md](../README.md)** | Documentation index |
 
 ---

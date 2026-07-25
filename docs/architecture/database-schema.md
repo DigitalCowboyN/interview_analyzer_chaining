@@ -1,55 +1,74 @@
 # Database Schema
 
-> **Last Updated:** 2026-07-17
+> **Last Updated:** 2026-07-25
 
 ## Neo4j Graph Schema
 
-The Neo4j database serves as the read model in the CQRS architecture, storing projected views of events for efficient querying.
+The Neo4j database serves as the read model in the CQRS architecture, storing
+projected views of events for efficient querying. The diagrams below show the
+spine — Layer 1 structure plus the per-fragment analysis carried over from the
+earliest model. The full node catalog (enrichment, lenses, resolution,
+segments) is detailed in [Node Types](#node-types) and
+[Relationship Types](#relationship-types) below.
 
-### Entity Relationship Diagram
+### Entity Relationship Diagram (spine)
 
 ```mermaid
 erDiagram
-    SourceFile ||--o{ Sentence : contains
-    Sentence ||--o| FunctionType : has
-    Sentence ||--o| StructureType : has
-    Sentence ||--o| Purpose : has
-    Sentence }o--o{ Topic : has
-    Sentence }o--o{ Keyword : mentions
-    Sentence ||--o| Sentence : follows
+    SourceFile ||--o{ Fragment : contains
+    Interview ||--o{ Speaker : has_participant
+    Fragment ||--o| Speaker : spoken_by
+    Speaker ||--o{ Utterance : spoke
+    Fragment }o--o{ Utterance : part_of
+    Fragment ||--o| Fragment : follows
+    Fragment ||--o| FunctionType : has
+    Fragment ||--o| StructureType : has
+    Fragment ||--o| Purpose : has
+    Fragment }o--o{ Topic : has
+    Fragment }o--o{ Keyword : mentions
 
+    Interview {
+        string interview_id PK
+    }
     SourceFile {
         string filename PK
     }
-
-    Sentence {
+    Fragment {
         int sentence_id PK
         string filename FK
         string text
         int sequence_order
+        int start_char
+        int end_char
         int event_version
     }
-
+    Speaker {
+        string speaker_id PK
+        string handle
+        string display_name
+        boolean provisional
+    }
+    Utterance {
+        string utterance_id PK
+        string interview_id
+    }
     FunctionType {
         string name PK
     }
-
-    StructureType {
-        string name PK
-    }
-
-    Purpose {
-        string name PK
-    }
-
     Topic {
         string name PK
     }
-
     Keyword {
         string text PK
     }
 ```
+
+> Beyond this spine, the read model also holds `:Claim`, `:Entity`,
+> `:CanonicalEntity`, `:LensItem` (with dynamic sublabels like `:Decision`),
+> `:Person`, and `:Segment` — see the per-layer sections below. Note the
+> `:Fragment` node keeps the frozen `sentence_id` property and
+> `Sentence-{uuid}` stream, even though the `:Sentence` label was dropped in
+> M4.8.
 
 ### Graph Visualization
 
@@ -59,10 +78,10 @@ flowchart TD
         SF[fa:fa-file SourceFile<br/>filename: interview_001.txt]
     end
 
-    subgraph Sentences["Sentences"]
-        S1[fa:fa-comment Sentence 1<br/>id: 1, order: 1]
-        S2[fa:fa-comment Sentence 2<br/>id: 2, order: 2]
-        S3[fa:fa-comment Sentence 3<br/>id: 3, order: 3]
+    subgraph Fragments["Fragments"]
+        S1[fa:fa-comment Fragment 1<br/>id: 1, order: 1]
+        S2[fa:fa-comment Fragment 2<br/>id: 2, order: 2]
+        S3[fa:fa-comment Fragment 3<br/>id: 3, order: 3]
     end
 
     subgraph Analysis["Analysis Nodes"]
@@ -519,8 +538,8 @@ While Neo4j is the read model, EventStoreDB holds the authoritative event stream
 | Event | Stream | Description |
 |-------|--------|-------------|
 | `InterviewCreated` | `Interview-{id}` | New interview started |
-| `InterviewMetadataUpdated` | `Interview-{id}` | Metadata changed |
-| `InterviewStatusChanged` | `Interview-{id}` | Status transition |
+| `InterviewUpdated` | `Interview-{id}` | Metadata / title / language changed |
+| `StatusChanged` | `Interview-{id}` | Status transition |
 | `SentenceCreated` | `Sentence-{id}` | New sentence added |
 | `SentenceEdited` | `Sentence-{id}` | User edited text |
 | `AnalysisGenerated` | `Sentence-{id}` | AI analysis completed |
