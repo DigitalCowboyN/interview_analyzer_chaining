@@ -1,8 +1,9 @@
 # Interview Analyzer
 
-Turn interview transcripts into a queryable knowledge graph — speakers, claims,
-topics, and purpose-built "lens" views — with every fact grounded back to the
-exact words someone said, and every AI guess correctable by a human.
+Turn interview transcripts into a queryable knowledge graph — speakers,
+utterances, entities, claims, topics, cross-interview personas, and
+purpose-built "lens" views — with every fact grounded back to the exact words
+someone said, and every AI guess correctable by a human.
 
 The system is event-sourced: EventStoreDB holds the full history of what
 happened, and a projection service is the only thing that writes to the Neo4j
@@ -23,8 +24,8 @@ or something messy in between — and it works through several passes:
   with spaCy. Every fragment records exactly where it came from in the source,
   so nothing downstream is untraceable.
 - **Attributes speakers.** Labels are parsed when present; when they're absent,
-  speakers are inferred with a confidence score. Every attribution is a human
-  can override.
+  speakers are inferred with a confidence score. Every attribution can be
+  overridden by a human, and a human correction locks against later re-runs.
 - **Stitches interruptions.** Utterances split across an interruption are
   reconnected as a relationship overlay — the verbatim text is never rewritten,
   but "who interrupted whom" becomes queryable.
@@ -38,9 +39,12 @@ or something messy in between — and it works through several passes:
   *meeting minutes* (objectives, decisions, action items, follow-ups) or
   *persona* (traits, goals, pain points, notable quotes). One generic engine
   serves every lens; adding one is a YAML profile plus a prompts file, no code.
+  A human override on a lens item locks it against future re-runs.
+- **Segments by topic.** Utterances are grouped into topic episodes (Layer 4),
+  a pure overlay over the fragment sequence — correctable, never a rewrite.
 - **Resolves identity.** Speakers across interviews get linked to canonical
-  Persons; entity surface forms get canonicalized. These are human-in-the-loop
-  decisions surfaced in a review worklist.
+  Persons; entity surface forms get canonicalized (merge / split / alias).
+  These are human-in-the-loop decisions surfaced in a review worklist.
 - **Exports and answers.** Any lens can be exported as an OKF bundle —
   Markdown with YAML front matter, git-versionable and grounded back to the
   transcript. And you can ask the corpus a question and get a cited answer
@@ -243,8 +247,10 @@ knowing:
 | `/interviews/{id}/lenses/{lens}/items` | GET | A lens's items for an interview |
 | `/lenses/{id}/items/{item_id}/override` | POST | Correct a lens item (locks it) |
 | `/resolution/{project_id}/persons/{person_id}/link` | POST | Link a speaker to a person |
+| `/interviews/{id}/segments` | GET | Topic segments for an interview |
 | `/exports/{interview_id}/{lens_name}` | GET | Download an OKF bundle |
 | `/review/worklist` | GET | Low-confidence + unresolved-reference review queue |
+| `/speakers/rollup` | GET | Speaker rollup by display name, across interviews |
 | `/ask/{project_id}` | POST | Ask the corpus (cited GraphRAG synthesis) |
 | `/edits/sentences/{id}/{index}/edit` | POST | Edit fragment text |
 
