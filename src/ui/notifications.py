@@ -39,12 +39,19 @@ class Notification:
     project_id: Optional[str] = None
 
 
-def scope_notifications(stream_name: str, payload: dict) -> List[Notification]:
+def scope_notifications(
+    stream_name: str, payload: dict, *, event_project_id: Optional[str] = None
+) -> List[Notification]:
     """Map one core-domain stream event to zero or more surface notifications.
 
     Pure function: no I/O, no hub access. Returns [] when the stream isn't
     one we notify on, or when a required id is missing from the payload
     (log-and-skip for the missing-key case is the caller's job, not ours).
+
+    `event_project_id` carries a project_id resolved from the event's
+    metadata envelope (Interview-stream lens events stamp it there but not in
+    their data payload); it lets an Interview-* event reach the gallery via
+    the `project` surface without a per-event DB lookup.
     """
     if stream_name.startswith("Sentence-"):
         interview_id = payload.get("interview_id")
@@ -62,9 +69,14 @@ def scope_notifications(stream_name: str, payload: dict) -> List[Notification]:
         if not interview_id:
             return []
         notifications = [Notification("transcript", interview_id=interview_id)]
-        project_id = payload.get("project_id")
-        if project_id:
-            notifications.append(Notification("interviews", project_id=project_id))
+        payload_project_id = payload.get("project_id")
+        if payload_project_id:
+            notifications.append(Notification("interviews", project_id=payload_project_id))
+        # Coarse by design: any Interview-stream event with a resolvable
+        # project (payload OR metadata) nudges the gallery via `project`.
+        resolved_project_id = payload_project_id or event_project_id
+        if resolved_project_id:
+            notifications.append(Notification("project", project_id=resolved_project_id))
         return notifications
 
     if stream_name.startswith("Project-"):
@@ -330,22 +342,39 @@ class EsdbWatcher:
         the dict-shaped payload scope_notifications expects, e.g. a bare
         list or number) is logged at debug and skipped -- the loop keeps
         running rather than killing the whole subscription over one bad
-        payload. Decoding and mapping are wrapped in the same try so a
-        shape surprise can't escape as an uncaught exception and get
-        mistaken for a subscription failure (which would trigger an
-        unwarranted backoff/resubscribe/resync)."""
+        payload. Event metadata is decoded best-effort to recover a
+        `project_id` an Interview-stream lens event stamps in its envelope but
+        not its data payload -- a metadata surprise never aborts handling."""
         try:
             payload = json.loads(event.data)
+            event_project_id = self._project_id_from_metadata(event)
             # Use the RESOLVED event's stream name (link-resolved semantics,
             # per resolve_links=True) -- see scope_notifications' docstring
             # for why this is the mapping's only input besides the payload.
-            notifications = scope_notifications(event.stream_name, payload)
+            notifications = scope_notifications(
+                event.stream_name, payload, event_project_id=event_project_id
+            )
         except Exception:
             logger.debug("EsdbWatcher: skipping malformed event on stream '%s'", event.stream_name)
             return
 
         for notification in notifications:
             self._hub.publish(notification)
+
+    @staticmethod
+    def _project_id_from_metadata(event: Any) -> Optional[str]:
+        """Best-effort project_id from the event's metadata envelope. Returns
+        None on absent/empty/unparseable/non-dict metadata -- never raises."""
+        raw = getattr(event, "metadata", None)
+        if not raw:
+            return None
+        try:
+            meta = json.loads(raw)
+        except (ValueError, TypeError):
+            return None
+        if isinstance(meta, dict):
+            return meta.get("project_id")
+        return None
 
 
 _hub: Optional[NotificationHub] = None

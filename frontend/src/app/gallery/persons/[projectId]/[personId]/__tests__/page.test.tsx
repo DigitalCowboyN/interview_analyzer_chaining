@@ -2,10 +2,17 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import PersonDetailPage from "@/app/gallery/persons/[projectId]/[personId]/page";
 import { usePersonDetail } from "@/hooks/usePersonDetail";
+import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { useParams } from "next/navigation";
 
 vi.mock("@/hooks/usePersonDetail", () => ({
   usePersonDetail: vi.fn(),
+}));
+
+// Mocked so the page test doesn't open a real EventSource / need a
+// QueryClient provider; the real LiveIndicator still renders off its status.
+vi.mock("@/hooks/useLiveInvalidation", () => ({
+  useLiveInvalidation: vi.fn(() => "idle"),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -89,5 +96,20 @@ describe("PersonDetailPage (person core view)", () => {
 
     render(<PersonDetailPage />);
     expect(usePersonDetail).toHaveBeenCalledWith("p1", "person1");
+  });
+
+  it("wires the live-updates indicator with the project/person scope", () => {
+    mockParams("p1", "person1");
+    vi.mocked(useLiveInvalidation).mockReturnValue("live");
+    vi.mocked(usePersonDetail).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<PersonDetailPage />);
+    expect(screen.getByText(/Live updates/i)).toBeInTheDocument();
+    expect(useLiveInvalidation).toHaveBeenCalledWith({ projectId: "p1", personId: "person1" });
   });
 });

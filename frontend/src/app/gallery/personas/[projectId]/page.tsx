@@ -4,8 +4,10 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { usePersonaCards } from "@/hooks/usePersonaCards";
 import { useInterviews } from "@/hooks/useInterviews";
+import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { StateGate } from "@/components/StateGate";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { LiveIndicator } from "@/components/LiveIndicator";
 import { PersonaInterviewFilter } from "@/components/PersonaInterviewFilter";
 
 /**
@@ -18,16 +20,20 @@ export default function ProjectPersonasPage() {
   const { data: personas, isLoading, isError, error } = usePersonaCards(projectId);
   const { data: interviews } = useInterviews(projectId);
   const [selectedInterviewId, setSelectedInterviewId] = useState("");
+  const liveStatus = useLiveInvalidation({ projectId });
 
   return (
     <div className="p-6">
-      <Breadcrumbs
-        items={[
-          { label: "Gallery", href: "/gallery" },
-          { label: projectId },
-          { label: "Personas" },
-        ]}
-      />
+      <div className="flex items-center justify-between">
+        <Breadcrumbs
+          items={[
+            { label: "Gallery", href: "/gallery" },
+            { label: projectId },
+            { label: "Personas" },
+          ]}
+        />
+        <LiveIndicator status={liveStatus} />
+      </div>
       <h1 className="text-lg font-semibold">Personas</h1>
       <p className="mt-1 text-xs text-neutral-400">
         Persona profiles are currently seeded from per-person contributions.

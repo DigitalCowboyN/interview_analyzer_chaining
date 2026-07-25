@@ -3,8 +3,10 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useWorklist } from "@/hooks/useWorklist";
+import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { StateGate } from "@/components/StateGate";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { LiveIndicator } from "@/components/LiveIndicator";
 import { WorklistRows } from "@/components/WorklistRows";
 
 /**
@@ -17,6 +19,7 @@ function WorklistContent() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get("project") ?? "";
   const { data, isLoading, isError, error } = useWorklist(projectId);
+  const liveStatus = useLiveInvalidation({ projectId });
 
   const isEmpty =
     Boolean(data) &&
@@ -28,13 +31,16 @@ function WorklistContent() {
 
   return (
     <div className="p-6">
-      <Breadcrumbs
-        items={[
-          { label: "Gallery", href: "/gallery" },
-          ...(projectId ? [{ label: projectId }] : []),
-          { label: "Worklist" },
-        ]}
-      />
+      <div className="flex items-center justify-between">
+        <Breadcrumbs
+          items={[
+            { label: "Gallery", href: "/gallery" },
+            ...(projectId ? [{ label: projectId }] : []),
+            { label: "Worklist" },
+          ]}
+        />
+        <LiveIndicator status={liveStatus} />
+      </div>
       <h1 className="text-lg font-semibold">Worklist</h1>
 
       <div className="mt-4">

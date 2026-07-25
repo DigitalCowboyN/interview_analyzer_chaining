@@ -65,7 +65,35 @@ def test_interview_stream_with_project_id_adds_interviews_notification():
     assert result == [
         Notification("transcript", interview_id=IID),
         Notification("interviews", project_id=PID),
+        Notification("project", project_id=PID),
     ]
+
+
+def test_interview_stream_with_event_project_id_adds_project_notification():
+    result = scope_notifications(f"Interview-{IID}", {}, event_project_id=PID)
+    assert result == [
+        Notification("transcript", interview_id=IID),
+        Notification("project", project_id=PID),
+    ]
+
+
+def test_interview_stream_without_any_project_id_emits_only_transcript():
+    result = scope_notifications(f"Interview-{IID}", {})
+    assert result == [Notification("transcript", interview_id=IID)]
+
+
+def test_payload_project_id_takes_precedence_over_event_project_id():
+    result = scope_notifications(
+        f"Interview-{IID}", {"project_id": PID}, event_project_id="other-proj"
+    )
+    assert Notification("project", project_id=PID) in result
+    assert Notification("project", project_id="other-proj") not in result
+
+
+def test_project_stream_unaffected_by_event_project_id_kwarg():
+    # A Project-* event still maps to exactly one project notification.
+    result = scope_notifications(f"Project-{PID}", {"project_id": PID}, event_project_id="ignored")
+    assert result == [Notification("project", project_id=PID)]
 
 
 def test_project_stream_maps_to_project_notification():
@@ -204,11 +232,12 @@ async def test_full_queue_drops_oldest_without_raising():
 
 @dataclass
 class FakeRecordedEvent:
-    """Stands in for esdbclient.RecordedEvent: only the two fields the
-    watcher actually reads (the resolved stream name and raw data bytes)."""
+    """Stands in for esdbclient.RecordedEvent: the fields the watcher reads
+    -- resolved stream name, raw data bytes, and raw metadata bytes."""
 
     stream_name: str
     data: bytes
+    metadata: bytes = b"{}"
 
 
 class FakeSubscription:
@@ -300,6 +329,54 @@ async def test_watcher_publishes_notifications_from_subscribed_events():
     sentence_sub = FakeSubscription()
     sentence_sub.push_event(FakeRecordedEvent(f"Sentence-{IID}", json.dumps({"interview_id": IID}).encode()))
     client.queue_subscription(SENTENCE_STREAM, sentence_sub)
+
+    watcher = make_watcher(client, hub)
+    await watcher.ensure_started()
+    try:
+        notification = await asyncio.wait_for(sub.queue.get(), timeout=2.0)
+        assert notification == Notification("transcript", interview_id=IID)
+    finally:
+        await watcher.stop()
+
+
+@pytest.mark.asyncio
+async def test_watcher_emits_project_notification_from_lens_event_metadata():
+    hub = NotificationHub()
+    sub = hub.subscribe(interview_id=None, project_id=PID)
+
+    client = FakeEventStoreDBClient()
+    interview_sub = FakeSubscription()
+    # A lens event: project_id lives in metadata (envelope), NOT in data.
+    interview_sub.push_event(
+        FakeRecordedEvent(
+            f"Interview-{IID}",
+            json.dumps({"lens": "persona", "lens_version": 1}).encode(),
+            json.dumps({"project_id": PID}).encode(),
+        )
+    )
+    client.queue_subscription("$ce-Interview", interview_sub)
+
+    watcher = make_watcher(client, hub)
+    await watcher.ensure_started()
+    try:
+        notification = await asyncio.wait_for(sub.queue.get(), timeout=2.0)
+        assert notification == Notification("project", project_id=PID)
+    finally:
+        await watcher.stop()
+
+
+@pytest.mark.asyncio
+async def test_watcher_tolerates_malformed_metadata_on_interview_event():
+    # Bad metadata must not raise: the transcript notification still lands.
+    hub = NotificationHub()
+    sub = hub.subscribe(interview_id=IID, project_id=None)
+
+    client = FakeEventStoreDBClient()
+    interview_sub = FakeSubscription()
+    interview_sub.push_event(
+        FakeRecordedEvent(f"Interview-{IID}", json.dumps({}).encode(), b"not-json")
+    )
+    client.queue_subscription("$ce-Interview", interview_sub)
 
     watcher = make_watcher(client, hub)
     await watcher.ensure_started()

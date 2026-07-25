@@ -173,6 +173,7 @@ class Interview(AggregateRoot):
     def __init__(self, aggregate_id: str):
         """Initialize a new Interview aggregate."""
         super().__init__(aggregate_id)
+        self.project_id: Optional[str] = None
         self.title: Optional[str] = None
         self.source: Optional[str] = None
         self.language: Optional[str] = None
@@ -241,6 +242,7 @@ class Interview(AggregateRoot):
     def _apply_interview_created(self, event: EventEnvelope) -> None:
         """Apply InterviewCreated event."""
         data = event.data
+        self.project_id = event.project_id if event.project_id is not None else data.get("project_id")
         self.title = data.get("title")
         self.source = data.get("source")
         self.language = data.get("language")
@@ -704,6 +706,7 @@ class Interview(AggregateRoot):
 
         data = LensAppliedData(lens=lens, lens_version=lens_version)
 
+        envelope_kwargs.setdefault("project_id", self.project_id)
         return self._add_event(
             event_type="LensApplied",
             data=data.model_dump(),
@@ -755,6 +758,7 @@ class Interview(AggregateRoot):
             provider=provider,
         )
 
+        envelope_kwargs.setdefault("project_id", self.project_id)
         return self._add_event(
             event_type="LensExtractionGenerated",
             data=data.model_dump(),
@@ -776,6 +780,7 @@ class Interview(AggregateRoot):
             item_id=item_id, fields_overridden=fields_overridden, note=note
         )
 
+        envelope_kwargs.setdefault("project_id", self.project_id)
         return self._add_event(
             event_type="LensExtractionOverridden",
             data=data.model_dump(),
