@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 # SUBSCRIPTION_CONFIG / get_parked_stream_name callers).
 KNOWN_AGGREGATE_TYPES: List[str] = ["Interview", "Sentence", "Project"]
 
-_EMPTY_COUNTS: Dict[str, int] = {"redriven": 0, "still_parked": 0, "no_handler": 0}
+_EMPTY_COUNTS: Dict[str, int] = {"redriven": 0, "still_parked": 0, "no_handler": 0, "failed": 0}
 
 
 async def redrive_aggregate(
@@ -89,6 +89,15 @@ async def redrive_aggregate(
             logger.info(
                 f"Referent still not ready for parked event {event.event_id} "
                 f"(type={event.event_type}, aggregate={aggregate_type}): {e}"
+            )
+        except Exception as e:
+            # A single malformed/failing parked event must not abort the whole
+            # redrive run -- count it and continue.
+            counts["failed"] += 1
+            logger.error(
+                f"Redrive failed for parked event {event.event_id} "
+                f"(type={event.event_type}, aggregate={aggregate_type}): {e}",
+                exc_info=True,
             )
 
     return counts

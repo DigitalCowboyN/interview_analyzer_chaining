@@ -107,7 +107,7 @@ async def test_redrive_applies_event_whose_referent_now_exists():
 
     counts = await redrive_aggregate("Sentence", manager, registry)
 
-    assert counts == {"redriven": 1, "still_parked": 0, "no_handler": 0}
+    assert counts == {"redriven": 1, "still_parked": 0, "no_handler": 0, "failed": 0}
     assert handler.calls == 1
 
 
@@ -120,7 +120,28 @@ async def test_redrive_reports_still_parked_on_referent_not_ready_and_does_not_c
 
     counts = await redrive_aggregate("Sentence", manager, registry)
 
-    assert counts == {"redriven": 0, "still_parked": 1, "no_handler": 0}
+    assert counts == {"redriven": 0, "still_parked": 1, "no_handler": 0, "failed": 0}
+
+
+@pytest.mark.asyncio
+async def test_redrive_counts_unexpected_handler_error_as_failed_and_continues():
+    """A parked event whose handler raises a non-ReferentNotReadyError error
+    is counted as `failed` and does NOT abort the rest of the run (final
+    review Minor #4)."""
+    bad_event = _envelope(event_type="SpeakerAttributed", aggregate_type="Sentence")
+    good_event = _envelope(event_type="SpeakerReattributed", aggregate_type="Sentence")
+    manager = FakeParkedEventsManager({"Sentence": [_parked(bad_event), _parked(good_event)]})
+    registry = FakeRegistry(
+        {
+            "SpeakerAttributed": FakeHandler([RuntimeError("boom")]),
+            "SpeakerReattributed": FakeHandler(["ok"]),
+        }
+    )
+
+    counts = await redrive_aggregate("Sentence", manager, registry)
+
+    # The failing event is counted, and the following event still redrove.
+    assert counts == {"redriven": 1, "still_parked": 0, "no_handler": 0, "failed": 1}
 
 
 @pytest.mark.asyncio
@@ -131,7 +152,7 @@ async def test_redrive_reports_no_handler_when_none_registered():
 
     counts = await redrive_aggregate("Interview", manager, registry)
 
-    assert counts == {"redriven": 0, "still_parked": 0, "no_handler": 1}
+    assert counts == {"redriven": 0, "still_parked": 0, "no_handler": 1, "failed": 0}
 
 
 @pytest.mark.asyncio
@@ -147,8 +168,8 @@ async def test_redrive_is_idempotent_on_already_applied_event():
     first = await redrive_aggregate("Sentence", manager, registry)
     second = await redrive_aggregate("Sentence", manager, registry)
 
-    assert first == {"redriven": 1, "still_parked": 0, "no_handler": 0}
-    assert second == {"redriven": 1, "still_parked": 0, "no_handler": 0}
+    assert first == {"redriven": 1, "still_parked": 0, "no_handler": 0, "failed": 0}
+    assert second == {"redriven": 1, "still_parked": 0, "no_handler": 0, "failed": 0}
     assert handler.calls == 2
 
 
@@ -177,8 +198,8 @@ async def test_redrive_summarizes_across_aggregate_types_with_correct_json_shape
     assert summary["still_parked"] == 1
     assert summary["no_handler"] == 1
     assert summary["by_aggregate"] == {
-        "Sentence": {"redriven": 1, "still_parked": 1, "no_handler": 0},
-        "Interview": {"redriven": 0, "still_parked": 0, "no_handler": 1},
+        "Sentence": {"redriven": 1, "still_parked": 1, "no_handler": 0, "failed": 0},
+        "Interview": {"redriven": 0, "still_parked": 0, "no_handler": 1, "failed": 0},
     }
 
     # Must be dumpable as a single JSON line (seed_smoke.py / migrate_shim_drop.py convention).

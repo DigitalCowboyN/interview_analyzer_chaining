@@ -92,7 +92,7 @@ class ReorderBuffer:
         if clock is None:
             import asyncio
 
-            clock = lambda: asyncio.get_event_loop().time()  # noqa: E731
+            clock = lambda: asyncio.get_running_loop().time()  # noqa: E731
         self._clock = clock
         # Heap items: (sort_key, sequence, ReorderEntry). `commit_position is
         # None` sorts as +infinity (positioned events always order first);

@@ -84,7 +84,7 @@ class Lane:
 
         self.watermark_tracker = watermark_tracker if watermark_tracker is not None else WatermarkTracker()
         self.max_hold_s = max_hold_s
-        self._clock = clock if clock is not None else (lambda: asyncio.get_event_loop().time())
+        self._clock = clock if clock is not None else (lambda: asyncio.get_running_loop().time())
         self._buffer = ReorderBuffer(clock=self._clock)
 
     async def start(self):
@@ -154,6 +154,26 @@ class Lane:
                     self._buffer.add(event.commit_position, event, checkpoint_callback)
                 except asyncio.TimeoutError:
                     pass  # nothing new arrived; still drain below (max_hold flush)
+
+                # Absorb the ENTIRE queue into the buffer synchronously before
+                # deciding what to release. This is load-bearing for ordering:
+                # the watermark guarantee ("W >= cp implies every event < cp has
+                # been routed") only means a lower-cp event is QUEUED, not yet
+                # BUFFERED -- and pop_ready is blind to the queue. Pulling one
+                # item per iteration and draining between pulls could therefore
+                # release a higher-cp head via the watermark while its lower-cp
+                # sibling still sits in the queue. Draining the queue with
+                # get_nowait() (no await) so absorption + low_watermark() +
+                # pop_ready all run in one synchronous block means nothing a
+                # subscription routes can interleave: everything routed is
+                # buffered at the release decision, restoring the invariant the
+                # watermark proof needs.
+                while True:
+                    try:
+                        event, checkpoint_callback = self.queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                    self._buffer.add(event.commit_position, event, checkpoint_callback)
 
                 # Drain: release + process everything now safe to release, in
                 # ascending commit_position order. Ack (checkpoint_callback)

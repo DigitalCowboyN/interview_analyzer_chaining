@@ -636,3 +636,50 @@ class TestLaneReorderBuffer:
             assert len(lane._buffer) == 1
         finally:
             await lane.stop()
+
+    async def test_queue_backlog_does_not_release_higher_cp_before_lower(self):
+        """Regression (M4.9 final review): when several events are already in
+        the lane queue and the watermark is past all of them, the lane must
+        still process them in ascending commit_position order.
+
+        The bug: the loop absorbed ONE queue item per iteration, then drained
+        the buffer. With queue = [10, 5] (higher cp delivered first, the exact
+        cross-lane arrival this milestone reorders) and watermark >= 10, the
+        first iteration buffered only 10, then released it via the watermark
+        gate while 5 was still sitting unread in the queue -> processed [10, 5].
+        The fix absorbs the WHOLE queue (get_nowait, no await) before the
+        release decision, so nothing routed is left unbuffered at drain time.
+        """
+        processed = []
+        mock_handler = MagicMock()
+        mock_handler.handle_with_retry = AsyncMock(
+            side_effect=lambda event, lane_id: processed.append(event.commit_position)
+        )
+        handler_registry = MagicMock()
+        handler_registry.get_handler = MagicMock(return_value=mock_handler)
+
+        class ManualWatermark:
+            def low_watermark(self):
+                return 10  # already past BOTH events
+
+        # max_hold_s large so ONLY the watermark gate can release -- isolates
+        # the queue-absorption invariant from the aging path.
+        lane = Lane(
+            lane_id=0,
+            handler_registry=handler_registry,
+            watermark_tracker=ManualWatermark(),
+            max_hold_s=60.0,
+        )
+
+        # Arrival order: higher cp first (faster subscription), lower cp behind.
+        await lane.enqueue(self._make_event(10), lambda: None)
+        await lane.enqueue(self._make_event(5), lambda: None)
+
+        await lane.start()
+        try:
+            await asyncio.sleep(0.2)
+            assert processed == [5, 10], (
+                f"lane released out of commit_position order: {processed}"
+            )
+        finally:
+            await lane.stop()

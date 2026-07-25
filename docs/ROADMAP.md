@@ -37,7 +37,7 @@
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** M5.1 (Live workbench — resume T6, rebased on M4.9)
-**Tests:** 1304 unit passing, 17 skipped (+146 frontend Vitest) | **Coverage:** 92.41% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Tests:** 1346 unit passing, 17 skipped (+146 frontend Vitest) | **Coverage:** 92.4% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 
@@ -137,9 +137,14 @@ once M5.1 rebases onto this).
 
 **Completed:** 2026-07-24
 
-**Deferred (from task reviews):** `speaker_handlers.py` `SpeakerMerged`
+**Deferred (from task + final reviews):** `speaker_handlers.py` `SpeakerMerged`
 pre-existing deprecated bare-`CALL {` form; `redrive.py`
-`KNOWN_AGGREGATE_TYPES` could derive from `SUBSCRIPTION_CONFIG`.
+`KNOWN_AGGREGATE_TYPES` could derive from `SUBSCRIPTION_CONFIG`; **fast-park
+for `ReferentNotReadyError`** — a missing referent lives in the SAME
+(blocked) lane, so the current 5-attempt/~15s retry schedule before parking
+is futile on that path; after the reorder fix this only fires on the rare
+`max_hold` backstop, so parking after 1–2 quick attempts (instead of the full
+backoff) is a follow-up, not a merge blocker.
 
 ---
 
