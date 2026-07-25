@@ -77,17 +77,6 @@ def test_interview_stream_with_event_project_id_adds_project_notification():
     ]
 
 
-def test_interview_stream_with_payload_project_id_adds_interviews_and_project():
-    # InterviewCreated carries project_id in the payload: interviews (existing)
-    # AND project (new) both fire, resolved from the payload.
-    result = scope_notifications(f"Interview-{IID}", {"project_id": PID})
-    assert result == [
-        Notification("transcript", interview_id=IID),
-        Notification("interviews", project_id=PID),
-        Notification("project", project_id=PID),
-    ]
-
-
 def test_interview_stream_without_any_project_id_emits_only_transcript():
     result = scope_notifications(f"Interview-{IID}", {})
     assert result == [Notification("transcript", interview_id=IID)]

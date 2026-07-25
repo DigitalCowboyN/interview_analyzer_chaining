@@ -242,7 +242,7 @@ class Interview(AggregateRoot):
     def _apply_interview_created(self, event: EventEnvelope) -> None:
         """Apply InterviewCreated event."""
         data = event.data
-        self.project_id = event.project_id or data.get("project_id")
+        self.project_id = event.project_id if event.project_id is not None else data.get("project_id")
         self.title = data.get("title")
         self.source = data.get("source")
         self.language = data.get("language")
