@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/queryKeys";
@@ -165,6 +165,7 @@ export function useLiveInvalidation(
   const trailingMs = timing?.trailingMs ?? DEFAULT_TRAILING_MS;
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<LiveStatus>("idle");
+  const wasOfflineRef = useRef(false);
 
   useEffect(() => {
     if (!interviewId && !projectId) {
@@ -172,11 +173,28 @@ export function useLiveInvalidation(
       return;
     }
 
+    wasOfflineRef.current = false;
     const debouncer = createKeyDebouncer(queryClient, coalesceMs, trailingMs);
     const source = new EventSource(buildStreamUrl({ interviewId, projectId }));
 
-    source.onopen = () => setStatus("live");
-    source.onerror = () => setStatus("offline");
+    source.onopen = () => {
+      setStatus("live");
+      // Reconnect after a browser<->backend outage: notifications published
+      // during the gap are gone (the backend resubscribes from_end, no
+      // replay), so catch up by invalidating everything this hook watches —
+      // otherwise the badge reads "live" over stale data. First connect
+      // (never offline) skips this.
+      if (wasOfflineRef.current) {
+        wasOfflineRef.current = false;
+        for (const key of keysForSurface("resync", { interviewId, projectId })) {
+          debouncer.notify(key);
+        }
+      }
+    };
+    source.onerror = () => {
+      wasOfflineRef.current = true;
+      setStatus("offline");
+    };
     source.onmessage = (event: MessageEvent<string>) => {
       let parsed: StreamNotification;
       try {

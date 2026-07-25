@@ -282,6 +282,12 @@ class EsdbWatcher:
         attempt = 0
         needs_resync = False
         while True:
+            # Reset per iteration: if get_client()/subscribe below raises on
+            # the FIRST attempt (e.g. ESDB unreachable at watcher start),
+            # `subscription` must still be bound for the finally -- otherwise
+            # the finally raises UnboundLocalError and kills the watch task,
+            # defeating the backoff-reconnect this loop exists to provide.
+            subscription = None
             try:
                 async with self._event_store.get_client() as client:
                     subscription = client.subscribe_to_stream(stream_name, from_end=True, resolve_links=True)
@@ -296,6 +302,10 @@ class EsdbWatcher:
                     while True:
                         event = await asyncio.to_thread(next, iterator, _SUBSCRIPTION_ENDED)
                         if event is _SUBSCRIPTION_ENDED:
+                            # Clean end without exception: resubscribe from_end
+                            # will miss anything committed in the gap, so
+                            # signal a resync on the next successful connect.
+                            needs_resync = True
                             break
                         self._handle_event(event)
             except asyncio.CancelledError:
@@ -307,8 +317,10 @@ class EsdbWatcher:
                 attempt += 1
                 await asyncio.sleep(delay)
             finally:
-                # Stale finallys must not evict a successor's live subscription.
-                if self._active_subscriptions.get(stream_name) is subscription:
+                # Stale finallys must not evict a successor's live subscription;
+                # and `subscription` is None if the (re)subscribe above raised
+                # before binding it (first-connect failure) -- guard both.
+                if subscription is not None and self._active_subscriptions.get(stream_name) is subscription:
                     self._active_subscriptions.pop(stream_name, None)
                     subscription.stop()
 

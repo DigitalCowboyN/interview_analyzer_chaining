@@ -38,7 +38,7 @@
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
 **Current Phase:** M5.1b (Gallery liveness — fast-follow SSE scopes)
-**Tests:** 1348 unit passing, 17 skipped (+184 frontend Vitest) | **Coverage:** 92.4% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
+**Tests:** 1389 unit passing, 17 skipped (+185 frontend Vitest) | **Coverage:** 92.4% (unit). Legacy `src/io` + long-skipped suites deleted in M4.3.
 
 ---
 

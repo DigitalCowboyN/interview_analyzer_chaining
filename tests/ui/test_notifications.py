@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from src.events.store import EventStoreError
 from src.ui.notifications import (
     EsdbWatcher,
     Notification,
@@ -377,6 +378,52 @@ async def test_watcher_resubscribes_and_broadcasts_resync_after_subscription_err
         notification = await asyncio.wait_for(sub.queue.get(), timeout=2.0)
         assert notification == Notification("resync")
         assert client.subscribe_calls.count(SENTENCE_STREAM) == 2
+    finally:
+        await watcher.stop()
+
+
+@pytest.mark.asyncio
+async def test_watcher_survives_first_connect_failure_and_reconnects():
+    """Regression (M5.1 final review, Critical): if get_client() raises on the
+    FIRST attempt (ESDB unreachable at watcher start), the watch task must
+    back off and reconnect -- not die with UnboundLocalError in the finally
+    (which referenced the never-bound `subscription`). Proves the spec's
+    'ESDB unavailable at watcher start -> backoff reconnect' failure mode."""
+
+    class RaiseFirstThenYieldStore:
+        """get_client() raises on its first use per stream group, then yields
+        a healthy client (models ESDB down at start, up on retry)."""
+
+        def __init__(self, client):
+            self._client = client
+            self._raised = False
+
+        @asynccontextmanager
+        async def get_client(self):
+            if not self._raised:
+                self._raised = True
+                raise EventStoreError("ESDB unreachable at start")
+            yield self._client
+
+    hub = NotificationHub()
+    sub = hub.subscribe(interview_id=IID, project_id=None)
+
+    client = FakeEventStoreDBClient()
+    healthy_sub = FakeSubscription()  # left quiet after resubscribe
+    # Queue one healthy subscription per watched stream for the retry.
+    for stream in ALL_WATCHED_STREAMS:
+        client.queue_subscription(stream, FakeSubscription())
+    client.queue_subscription(SENTENCE_STREAM, healthy_sub)
+
+    watcher = EsdbWatcher(
+        hub, event_store=RaiseFirstThenYieldStore(client), backoff_seconds=(0, 0)
+    )
+    await watcher.ensure_started()
+    try:
+        # The watcher survived the first-connect failure and resubscribed:
+        # the resync it broadcasts on a successful reconnect reaches us.
+        notification = await asyncio.wait_for(sub.queue.get(), timeout=2.0)
+        assert notification == Notification("resync")
     finally:
         await watcher.stop()
 

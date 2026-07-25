@@ -157,14 +157,15 @@ async def test_live_feed_delivers_transcript_notification_on_ingest(tmp_path, mo
         # are `from_end=True` (only see events from the moment they connect
         # onward), so an ingest that runs first would produce events the
         # watcher can never see, and this test would then hang until
-        # NOTIFICATION_TIMEOUT_S. With nothing queued yet (we haven't
-        # ingested anything for this fresh interview_id), this first chunk
-        # is always the heartbeat -- which doubles as this test's proof that
-        # heartbeat framing parses.
+        # NOTIFICATION_TIMEOUT_S. The first chunk is always the ": connected"
+        # prelude (yielded immediately, before the heartbeat wait-loop, so a
+        # buffering proxy can't delay EventSource.onopen); heartbeat framing
+        # is exercised separately by the ": keep-alive" skip in the loop below
+        # (a heartbeat fires during the settle + notification wait).
         first_chunk = await asyncio.wait_for(
             generator.__anext__(), timeout=HEARTBEAT_TEST_SECONDS + 10
         )
-        assert first_chunk == ": keep-alive\n\n"
+        assert first_chunk == ": connected\n\n"
 
         await asyncio.sleep(SUBSCRIPTION_SETTLE_S)
 

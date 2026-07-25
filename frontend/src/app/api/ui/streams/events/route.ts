@@ -40,12 +40,18 @@ export async function GET(request: Request): Promise<Response> {
     // Abort the upstream fetch when the browser disconnects, so the backend
     // subscription closes and the watcher can reach its zero-subscriber stop.
     signal: request.signal,
-    // Stream the response body incrementally instead of buffering it.
+    // Opt out of Next's data cache (streaming itself comes from passing
+    // upstream.body through untouched, below).
     cache: "no-store",
   });
 
   if (!upstream.ok || upstream.body === null) {
-    return new Response(upstream.body, { status: upstream.status });
+    // Pass the backend error through, keeping its content-type so a 422's
+    // JSON `detail` is legible to anyone inspecting the response.
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: { "Content-Type": upstream.headers.get("content-type") ?? "application/json" },
+    });
   }
 
   return new Response(upstream.body, {
@@ -53,7 +59,6 @@ export async function GET(request: Request): Promise<Response> {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     },
   });

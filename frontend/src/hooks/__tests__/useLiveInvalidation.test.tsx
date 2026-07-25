@@ -184,6 +184,39 @@ describe("useLiveInvalidation", () => {
     expect(result.current).toBe("live");
   });
 
+  it("catches up (resync) on reconnect after going offline, but not on first connect", () => {
+    // M5.1 final review, Important #2: after a browser<->backend outage the
+    // browser's EventSource auto-reconnects; notifications published during
+    // the gap are gone, so onopen must invalidate every watched key — else
+    // the badge reads "live" over stale data. First connect must NOT.
+    const { client, Wrapper } = makeWrapper();
+    const spy = vi.spyOn(client, "invalidateQueries");
+    renderHook(() => useLiveInvalidation({ interviewId: "i1", projectId: "p1" }), {
+      wrapper: Wrapper,
+    });
+
+    act(() => {
+      latestSource().onopen?.();
+    });
+    expect(spy).not.toHaveBeenCalled(); // first connect: nothing missed
+
+    act(() => {
+      latestSource().onerror?.();
+    });
+    act(() => {
+      latestSource().onopen?.();
+    });
+
+    // Reconnect catch-up invalidates every key this hook watches.
+    for (const key of [
+      queryKeys.transcript("i1"),
+      queryKeys.interviews("p1"),
+      queryKeys.persons("p1"),
+    ]) {
+      expect(spy).toHaveBeenCalledWith({ queryKey: key, exact: true });
+    }
+  });
+
   it("closes the EventSource on unmount", () => {
     const { Wrapper } = makeWrapper();
     const { unmount } = renderHook(() => useLiveInvalidation({ interviewId: "i1" }), {
