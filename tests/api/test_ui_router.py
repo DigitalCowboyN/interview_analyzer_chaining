@@ -328,8 +328,13 @@ def test_stream_events_first_notification_matches_contract_shape(client):
     assert resp.headers["content-type"].startswith("text/event-stream")
 
     frames = [frame for frame in resp.text.split("\n\n") if frame]
-    assert frames[0].startswith("data: ")
-    payload = json.loads(frames[0][len("data: "):])
+    # The stream opens with a ": connected" prelude comment (flushes the
+    # response head at connect time so a buffering proxy can't delay
+    # EventSource.onopen); the first data frame follows it.
+    assert frames[0] == ": connected"
+    data_frames = [frame for frame in frames if frame.startswith("data: ")]
+    assert data_frames
+    payload = json.loads(data_frames[0][len("data: "):])
     # Only non-None fields -- no stray "project_id": null.
     assert payload == {"surface": "transcript", "interview_id": IID}
     watcher.ensure_started.assert_awaited_once()
@@ -415,8 +420,10 @@ async def test_stream_events_generator_never_started_leaks_nothing_and_next_conn
         response = await stream_events(_bare_request(), interview_id=IID, project_id=None)
         chunks = [chunk async for chunk in response.body_iterator]
 
-    assert chunks and chunks[0].startswith("data: ")
-    assert json.loads(chunks[0][len("data: "):]) == {"surface": "transcript", "interview_id": IID}
+    assert chunks and chunks[0] == ": connected\n\n"  # prelude first
+    data_chunks = [chunk for chunk in chunks if chunk.startswith("data: ")]
+    assert data_chunks
+    assert json.loads(data_chunks[0][len("data: "):]) == {"surface": "transcript", "interview_id": IID}
     assert hub.subscriber_count == 0
     watcher.ensure_started.assert_awaited_once()
     watcher.stop.assert_awaited_once()
@@ -439,8 +446,10 @@ async def test_stream_events_generator_aclosed_mid_stream_releases_subscription(
     ):
         response = await stream_events(_bare_request(), interview_id=IID, project_id=None)
         generator = response.body_iterator
+        # First yield is the ": connected" prelude -- enough to prove the
+        # generator started (subscribed) so aclose() must run the finally.
         first = await generator.__anext__()
-        assert first.startswith("data: ")
+        assert first == ": connected\n\n"
         assert hub.subscriber_count == 1
         await generator.aclose()
 
