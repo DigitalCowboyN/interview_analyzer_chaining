@@ -23,6 +23,7 @@ export type LiveStatus = "live" | "offline" | "idle";
 export interface LiveInvalidationScopes {
   interviewId?: string;
   projectId?: string;
+  personId?: string;
 }
 
 export interface LiveInvalidationTiming {
@@ -54,14 +55,17 @@ export function buildStreamUrl(scopes: LiveInvalidationScopes): string {
  *   transcript -> transcript(interviewId)
  *   interviews -> interviews(projectId)
  *   project    -> transcript(interviewId) IF an interviewId scope is present
- *                 (person links affect the open transcript), AND persons(projectId)
+ *                 (person links affect the open transcript), AND
+ *                 persons(projectId), personas(projectId), worklist(projectId);
+ *                 PLUS persona(projectId, personId) and person(projectId, personId)
+ *                 IF a personId scope is present (M5.1b gallery liveness)
  *   resync     -> every key this hook watches (union of the above, given the
  *                 hook's current scopes)
  * Pure function — exported for direct unit testing.
  */
 export function keysForSurface(surface: string, scopes: LiveInvalidationScopes): QueryKey[] {
   const keys: QueryKey[] = [];
-  const { interviewId, projectId } = scopes;
+  const { interviewId, projectId, personId } = scopes;
 
   switch (surface) {
     case "transcript":
@@ -72,13 +76,27 @@ export function keysForSurface(surface: string, scopes: LiveInvalidationScopes):
       break;
     case "project":
       if (interviewId) keys.push(queryKeys.transcript(interviewId));
-      if (projectId) keys.push(queryKeys.persons(projectId));
+      if (projectId) {
+        keys.push(queryKeys.persons(projectId));
+        keys.push(queryKeys.personas(projectId));
+        keys.push(queryKeys.worklist(projectId));
+        if (personId) {
+          keys.push(queryKeys.persona(projectId, personId));
+          keys.push(queryKeys.person(projectId, personId));
+        }
+      }
       break;
     case "resync":
       if (interviewId) keys.push(queryKeys.transcript(interviewId));
       if (projectId) {
         keys.push(queryKeys.interviews(projectId));
         keys.push(queryKeys.persons(projectId));
+        keys.push(queryKeys.personas(projectId));
+        keys.push(queryKeys.worklist(projectId));
+        if (personId) {
+          keys.push(queryKeys.persona(projectId, personId));
+          keys.push(queryKeys.person(projectId, personId));
+        }
       }
       break;
     default:
@@ -160,7 +178,7 @@ export function useLiveInvalidation(
   scopes: LiveInvalidationScopes,
   timing?: LiveInvalidationTiming,
 ): LiveStatus {
-  const { interviewId, projectId } = scopes;
+  const { interviewId, projectId, personId } = scopes;
   const coalesceMs = timing?.coalesceMs ?? DEFAULT_COALESCE_MS;
   const trailingMs = timing?.trailingMs ?? DEFAULT_TRAILING_MS;
   const queryClient = useQueryClient();
@@ -186,7 +204,7 @@ export function useLiveInvalidation(
       // (never offline) skips this.
       if (wasOfflineRef.current) {
         wasOfflineRef.current = false;
-        for (const key of keysForSurface("resync", { interviewId, projectId })) {
+        for (const key of keysForSurface("resync", { interviewId, projectId, personId })) {
           debouncer.notify(key);
         }
       }
@@ -202,7 +220,7 @@ export function useLiveInvalidation(
       } catch {
         return; // unparsable — ignore per contract
       }
-      for (const key of keysForSurface(parsed.surface, { interviewId, projectId })) {
+      for (const key of keysForSurface(parsed.surface, { interviewId, projectId, personId })) {
         debouncer.notify(key);
       }
     };
@@ -211,7 +229,7 @@ export function useLiveInvalidation(
       source.close();
       debouncer.dispose();
     };
-  }, [interviewId, projectId, coalesceMs, trailingMs, queryClient]);
+  }, [interviewId, projectId, personId, coalesceMs, trailingMs, queryClient]);
 
   return status;
 }
