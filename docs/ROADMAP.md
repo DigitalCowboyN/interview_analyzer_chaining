@@ -33,7 +33,8 @@
 | **M4.9** | ✅ Complete | Projection ordering & recovery hardening (commit_position reorder buffer) — fixes a pre-existing cross-lane race surfaced by M5.1's live smoke |
 | **M5.1** | ✅ Complete | Live workbench: real-time projection feed (SSE), dynamic transcript — transcript/list update live via a backend SSE bridge |
 | **M5.1b** | ✅ Complete | Gallery liveness — persons/personas/worklist + persona-lens content update live, reusing the M5.1 pipeline plus an additive Interview-aggregate `project_id` stamp |
-| **M5.2** | 📋 Planned | Edit observability: human-vs-machine event metrics, visualized in the gallery |
+| **M5.2** | 📋 Planned (spec'd) | Edit observability — a **standalone telemetry service** (not user-facing): stateless replay of the event log → an OKF telemetry domain measuring correction-metadata (where the AI is weak + how to improve corrections). Spec: `docs/superpowers/specs/2026-07-26-m52-edit-observability-design.md` |
+| **M5.3** | 📋 Planned | Standing telemetry service — checkpointed consumer + internal (non-user) dashboard + regression alerts, and the feedback loop toward automated learning (the live v2 of M5.2; reuses M5.2's reader/metrics/renderer) |
 | M3.2 | 📋 Partial | AI Agent Upgrade (structured outputs landed; openai 2.x SDK bump still pending) |
 | M3.3 | 📋 Planned | Infrastructure Upgrades |
 
@@ -93,12 +94,25 @@ additive backend change — the Interview aggregate stamps `project_id` onto len
 events — lets persona-lens content reach the gallery via the existing `project`
 surface. See the M5.1b milestone section below.
 
-**M5.2 — Edit observability**: metrics over how much end users manipulate/
-change what the system produced. v1 = on-demand reader over ESDB category
-streams (every event already carries an Actor: human vs machine, per
-interview/extractor/lens) + endpoint, visualized in the gallery; a standing
-metrics projection only if replay-on-demand gets slow. Goal: feed ingestion
-improvements and eventually automated learning.
+**M5.2 — Edit observability** (spec'd 2026-07-26; owner reframed from
+"visualized in the gallery" to a standalone telemetry service): measure how much
+humans change what the system produced, as telemetry **for the builder, not a
+user feature**. v1 = a stateless on-demand replay of the ESDB category streams
+(every event carries an Actor: human/system/ai) that emits an **OKF telemetry
+domain** — correction *metadata* only (the type of change, never the content),
+measuring (a) where the AI is weak (correction rate + calibration per
+extractor/lens/dimension) and (b) how to improve the human correction workflow
+(volume ranking, churn, recurring categorical patterns). No Neo4j dependency, no
+user-facing surface. Spec:
+`docs/superpowers/specs/2026-07-26-m52-edit-observability-design.md`.
+
+**M5.3 — Standing telemetry service** (v2 of M5.2): a checkpointed consumer that
+subscribes to the category streams, accumulates metrics into a store, and
+exposes an internal (non-user) query API / dashboard with regression alerts —
+plus the feedback loop that feeds prompt/model improvement and eventually
+automated learning. Built when on-demand replay gets too slow at corpus scale or
+continuous monitoring is wanted; reuses M5.2's reader/metrics/renderer unchanged
+(only the driver differs).
 
 ---
 
