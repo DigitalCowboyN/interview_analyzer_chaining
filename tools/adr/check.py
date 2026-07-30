@@ -13,6 +13,8 @@ from tools.adr.model import VALID_STATUS, Adr
 DECISION_MARKERS = ("decisions locked", "rejected alternative")
 ADR_REF = re.compile(r"\bADR[-\s]?\d{1,4}\b|docs/adr/\d{4}", re.IGNORECASE)
 
+RENDERERS = {"index.md": render_index, "log.md": render_log}
+
 
 @dataclass
 class Finding:
@@ -38,12 +40,25 @@ def check_structural(adrs: List[Adr]) -> List[Finding]:
                 findings.append(
                     Finding(f"{a.id:04d} supersedes {target:04d} but {target:04d}.superseded_by lacks it")
                 )
+    for a in adrs:
+        for target in a.superseded_by:
+            other = by_id.get(target)
+            if other is None:
+                findings.append(Finding(f"{a.id:04d} superseded_by unknown {target:04d}"))
+            elif a.id not in other.supersedes:
+                findings.append(
+                    Finding(f"{a.id:04d} superseded_by {target:04d} but {target:04d}.supersedes lacks it")
+                )
     return findings
 
 
 def check_generated_in_sync(adr_dir: str, adrs: List[Adr]) -> List[Finding]:
     findings: List[Finding] = []
-    for name, render in (("index.md", render_index), ("log.md", render_log)):
+    for name in sorted(RESERVED):
+        render = RENDERERS.get(name)
+        if render is None:
+            findings.append(Finding(f"{name} is reserved but has no renderer"))
+            continue
         path = os.path.join(adr_dir, name)
         want = render(adrs)
         have = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
