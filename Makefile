@@ -16,6 +16,16 @@ lint:
 	@echo "Linting code..."
 	$(PYTHON) -m flake8 $(MODULE_NAME) $(TEST_DIR)
 
+# ADR checks (non-blocking): validates docs/adr/ structure + spec-decision cross-refs
+.PHONY: adr-check
+adr-check:
+	@$(PYTHON) -m tools.adr check
+
+# Regenerate docs/adr/index.md + log.md from the ADR bundle
+.PHONY: adr-index
+adr-index:
+	@$(PYTHON) -m tools.adr index
+
 # Formatting
 .PHONY: format
 format:
