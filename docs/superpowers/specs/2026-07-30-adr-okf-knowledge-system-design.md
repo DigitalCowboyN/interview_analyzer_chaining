@@ -26,6 +26,8 @@ The system closes a loop: **read** past decisions when making new ones →
 **capture** new decisions as ADRs → **guard** the corpus's integrity and detect
 drift.
 
+> Captured as ADR-0015.
+
 ## What is already in place (why this is low-risk)
 
 - **The OKF v0.1 format exists.** `src/export/renderer.py` renders an OKF bundle
