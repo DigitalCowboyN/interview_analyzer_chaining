@@ -26,6 +26,12 @@ adr-check:
 adr-index:
 	@$(PYTHON) -m tools.adr index
 
+# Install the shared project git hooks (non-blocking ADR drift report on commit)
+.PHONY: hooks-install
+hooks-install:
+	@git config core.hooksPath .githooks
+	@echo "git hooks installed (core.hooksPath=.githooks)"
+
 # Formatting
 .PHONY: format
 format:

@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "python -m tools.adr context" } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Write", "hooks": [ { "type": "command", "command": "python -m tools.adr nudge" } ] }
+    ]
+  }
+}
