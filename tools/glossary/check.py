@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from typing import Dict, List
+
+from tools.glossary.reader import CodeTerm, code_dimensions, code_enums
+from tools.glossary.model import Term, load_glossary
+from tools.glossary.render import render_index
+
+
+@dataclass
+class Finding:
+    message: str
+
+
+def check_coverage(code: Dict[str, CodeTerm], terms: List[Term]) -> List[Finding]:
+    have = {t.term for t in terms}
+    findings: List[Finding] = []
+    for name in sorted(code):
+        if name not in have:
+            ct = code[name]
+            findings.append(Finding(f"code defines {ct.kind} {name} ({ct.source}) with no glossary term"))
+    return findings
+
+
+def check_enum_values(code: Dict[str, CodeTerm], terms: List[Term]) -> List[Finding]:
+    by_name = {t.term: t for t in terms}
+    findings: List[Finding] = []
+    for name, ct in code.items():
+        if ct.kind != "enum":
+            continue
+        gt = by_name.get(name)
+        if gt is None:
+            continue  # coverage handles missing
+        if set(gt.values) != set(ct.values):
+            missing = sorted(set(ct.values) - set(gt.values))
+            extra = sorted(set(gt.values) - set(ct.values))
+            findings.append(Finding(f"glossary term {name} values differ from code (missing: {missing}, extra: {extra})"))
+    return findings
+
+
+def check_stale_source(code: Dict[str, CodeTerm], terms: List[Term]) -> List[Finding]:
+    findings: List[Finding] = []
+    for t in terms:
+        if t.term not in code:
+            findings.append(Finding(f"glossary term {t.term}: no longer defined in code (source {t.source})"))
+    return findings
+
+
+def check_index_in_sync(index_path: str, terms: List[Term]) -> List[Finding]:
+    want = render_index(terms)
+    have = open(index_path, encoding="utf-8").read() if os.path.exists(index_path) else ""
+    if want != have:
+        return [Finding("docs/glossary/index.md out of sync — run make glossary-index")]
+    return []
+
+
+def run_all(root: str = ".") -> List[Finding]:
+    code = {**code_enums(root), **code_dimensions(root)}
+    terms = load_glossary(os.path.join(root, "docs/glossary"))
+    findings: List[Finding] = []
+    findings += check_coverage(code, terms)
+    findings += check_enum_values(code, terms)
+    findings += check_stale_source(code, terms)
+    findings += check_index_in_sync(os.path.join(root, "docs/glossary/index.md"), terms)
+    return findings
