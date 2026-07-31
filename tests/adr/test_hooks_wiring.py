@@ -7,8 +7,8 @@ def test_settings_registers_both_hooks():
     hooks = cfg.get("hooks", {})
     ups = json.dumps(hooks.get("UserPromptSubmit", []))
     ptu = json.dumps(hooks.get("PostToolUse", []))
-    assert "tools.adr context" in ups        # read side
-    assert "tools.adr nudge" in ptu           # capture side
+    assert "with-adr-py.sh context" in ups    # read side (via interpreter resolver)
+    assert "with-adr-py.sh nudge" in ptu       # capture side (via interpreter resolver)
 
 
 def test_precommit_hook_is_executable_and_nonblocking():

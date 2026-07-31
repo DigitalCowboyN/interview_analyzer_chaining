@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from typing import Callable, List, Optional
 
 from tools.adr.index import RESERVED, load_bundle, render_index, render_log
-from tools.adr.model import VALID_STATUS, Adr
+from tools.adr.model import VALID_STATUS, Adr, parse_adr, validate_frontmatter
+from src.ingestion.front_matter import parse_front_matter
 
 DECISION_MARKERS = ("decisions locked", "rejected alternative")
 ADR_REF = re.compile(r"\bADR[-\s]?\d{1,4}\b|docs/adr/\d{4}", re.IGNORECASE)
@@ -100,6 +101,24 @@ def check_staleness(adrs: List[Adr],
     return findings
 
 
+def check_parseable(adr_dir: str) -> List[Finding]:
+    findings: List[Finding] = []
+    for path in sorted(glob.glob(os.path.join(adr_dir, "*.md"))):
+        if os.path.basename(path) in RESERVED:
+            continue
+        text = open(path, encoding="utf-8").read()
+        try:
+            parse_adr(text, path=path)
+        except Exception as exc:
+            fm, _ = parse_front_matter(text)
+            if fm is None:
+                findings.append(Finding(f"{os.path.basename(path)}: unreadable front matter ({exc})"))
+            else:
+                problems = validate_frontmatter(fm) or [str(exc)]
+                findings.append(Finding(f"{os.path.basename(path)}: {'; '.join(problems)}"))
+    return findings
+
+
 def run_all(adr_dir: str, specs_dir: str) -> List[Finding]:
     adrs = load_bundle(adr_dir)
     findings: List[Finding] = []
@@ -107,4 +126,5 @@ def run_all(adr_dir: str, specs_dir: str) -> List[Finding]:
     findings += check_generated_in_sync(adr_dir, adrs)
     findings += check_specs_reference_adr(specs_dir)
     findings += check_staleness(adrs)
+    findings += check_parseable(adr_dir)
     return findings

@@ -65,3 +65,18 @@ def test_structural_flags_dangling_superseded_by():
     a = _adr(id=1, superseded_by=[9])     # ADR 9 does not exist
     msgs = " ".join(f.message for f in check_structural([a]))
     assert "superseded_by unknown 0009" in msgs
+
+def test_load_bundle_skips_malformed(tmp_path):
+    from tools.adr.index import load_bundle
+    (tmp_path / "0001-ok.md").write_text(
+        "---\ntype: ADR\nid: 1\ntitle: A\nstatus: accepted\ndate: 2026-07-04\n"
+        "supersedes: []\nsuperseded_by: []\ntags: []\nsource: docs/x.md\n---\nbody\n", encoding="utf-8")
+    (tmp_path / "0002-bad.md").write_text("---\ntype: ADR\ntitle: no id\n---\nbody\n", encoding="utf-8")
+    adrs = load_bundle(str(tmp_path))
+    assert [a.id for a in adrs] == [1]          # malformed skipped, no raise
+
+def test_check_parseable_flags_malformed(tmp_path):
+    from tools.adr.check import check_parseable
+    (tmp_path / "0002-bad.md").write_text("---\ntype: ADR\ntitle: no id\n---\nbody\n", encoding="utf-8")
+    msgs = " ".join(f.message for f in check_parseable(str(tmp_path)))
+    assert "0002-bad.md" in msgs

@@ -14,8 +14,11 @@ def load_bundle(adr_dir: str) -> List[Adr]:
     for path in sorted(glob.glob(os.path.join(adr_dir, "*.md"))):
         if os.path.basename(path) in RESERVED:
             continue
-        with open(path, encoding="utf-8") as fh:
-            adrs.append(parse_adr(fh.read(), path=path))
+        try:
+            with open(path, encoding="utf-8") as fh:
+                adrs.append(parse_adr(fh.read(), path=path))
+        except Exception:
+            continue  # malformed files are surfaced by check_parseable, not fatal here
     return sorted(adrs, key=lambda a: a.id)
 
 
