@@ -7,6 +7,8 @@ date: 2026-07-10
 supersedes: []
 superseded_by: []
 tags: [resolution, entity, person, schema-v2]
+governs:
+  - src/resolution/
 source: docs/superpowers/specs/2026-07-10-layer4-schema-v2-design.md
 ---
 ## Context

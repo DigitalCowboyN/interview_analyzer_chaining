@@ -7,6 +7,8 @@ date: 2026-07-04
 supersedes: []
 superseded_by: []
 tags: [event-sourcing, write-side]
+governs:
+  - src/persistence/
 source: docs/architecture/README.md
 ---
 ## Context
