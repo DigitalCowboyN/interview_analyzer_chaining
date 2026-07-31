@@ -16,9 +16,9 @@ class Term:
     kind: str
     source: Optional[str]
     values: List[str] = field(default_factory=list)
-    code_symbol: Optional[str] = None
     definition: str = ""
     path: Optional[str] = None
+    code_symbol: Optional[str] = None
 
 
 def parse_term(text: str, path: Optional[str] = None) -> Term:
