@@ -20,6 +20,8 @@ adjudication in v1); person linking is **auto within project + review**
 come from a **focused document-scope LLM extractor** (not derived from
 per-fragment topics).
 
+> Captured as ADR-0011, ADR-0012.
+
 ## The wire-format line (binds all three plans)
 
 Stored events are immutable history. Therefore, FROZEN FOREVER and documented

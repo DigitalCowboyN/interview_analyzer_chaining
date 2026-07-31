@@ -318,6 +318,8 @@ in the established unit/integration pattern.
 
 ## Rejected alternatives
 
+> Captured as ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010.
+
 - **Adopting `neo4j-graphrag-python`'s construction pipeline wholesale** — writes
   directly to Neo4j, bypassing event sourcing; loses edit protection, replay, and
   lens re-runs. Borrow retrievers/resolution utilities only.

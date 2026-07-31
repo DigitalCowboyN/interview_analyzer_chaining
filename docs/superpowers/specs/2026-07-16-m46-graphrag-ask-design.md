@@ -31,6 +31,8 @@ format, projection handlers remain the sole Neo4j writers.
   already knows how to write and test. Rejected alternatives recorded below.
 - **Sequential by design**: amended 2026-07-16 (M4.7 W3).
 
+> Captured as ADR-0014 (supersedes ADR-0008).
+
 ## Architecture & data flow
 
 ```

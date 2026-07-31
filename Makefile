@@ -16,6 +16,22 @@ lint:
 	@echo "Linting code..."
 	$(PYTHON) -m flake8 $(MODULE_NAME) $(TEST_DIR)
 
+# ADR checks (non-blocking): validates docs/adr/ structure + spec-decision cross-refs
+.PHONY: adr-check
+adr-check:
+	@$(PYTHON) -m tools.adr check
+
+# Regenerate docs/adr/index.md + log.md from the ADR bundle
+.PHONY: adr-index
+adr-index:
+	@$(PYTHON) -m tools.adr index
+
+# Install the shared project git hooks (non-blocking ADR drift report on commit)
+.PHONY: hooks-install
+hooks-install:
+	@git config core.hooksPath .githooks
+	@echo "git hooks installed (core.hooksPath=.githooks)"
+
 # Formatting
 .PHONY: format
 format:

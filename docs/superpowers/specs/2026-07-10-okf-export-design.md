@@ -22,6 +22,8 @@ surface is **CLI + API**; front-matter capture is **in scope** (full round-trip)
 **all three** query families ship; bundles include **everything enriched** (lens
 items + claims + entities + analysis dimensions).
 
+> Captured as ADR-0013.
+
 ## Architectural decision
 
 **Read-side exporter over Neo4j** (chosen over aggregate/ESDB rendering and over a

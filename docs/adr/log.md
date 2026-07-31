@@ -1,0 +1,17 @@
+# Decision Log
+
+- 2026-07-04 — **0001** EventStoreDB is the single source of truth · _accepted_
+- 2026-07-04 — **0002** CQRS write/read split · _accepted_
+- 2026-07-04 — **0003** The projection service is the sole writer to Neo4j · _accepted_
+- 2026-07-04 — **0004** Frozen wire format for event types and stream names · _accepted_
+- 2026-07-04 — **0005** Layered Mine architecture (ingestion → enrichment → lens → segment → export) · _accepted_
+- 2026-07-04 — **0006** Preserve, never rewrite (overlay-not-rewrite) · _accepted_
+- 2026-07-04 — **0007** Focused calls, not one-shot mega-calls · _accepted_
+- 2026-07-04 — **0008** Borrow neo4j-graphrag-python for resolution/retrieval, not its pipeline · _superseded_
+- 2026-07-05 — **0010** Provider strategy — config-selected chains, chat failover but pinned embeddings · _accepted_
+- 2026-07-09 — **0009** Lens engine — one generic event, one generic handler, zero per-lens code · _accepted_
+- 2026-07-10 — **0011** Deterministic-plus-review entity and person resolution, auto-link only within project · _accepted_
+- 2026-07-10 — **0012** Fragment dual-label rename, wire format stays frozen · _accepted_
+- 2026-07-10 — **0013** Read-side OKF exporter over Neo4j · _accepted_
+- 2026-07-16 — **0014** Hand-rolled hybrid retrieval instead of adopting neo4j-graphrag-python · _accepted_ (supersedes 0008)
+- 2026-07-30 — **0015** Adopt an OKF-conformant, non-blocking ADR corpus for architectural decisions · _accepted_
