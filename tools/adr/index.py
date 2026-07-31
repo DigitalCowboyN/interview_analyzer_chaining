@@ -6,7 +6,7 @@ from typing import List
 
 from tools.adr.model import Adr, parse_adr
 
-RESERVED = {"index.md", "log.md"}
+RESERVED = {"index.md", "log.md", "by-code.md"}
 
 
 def load_bundle(adr_dir: str) -> List[Adr]:
@@ -39,9 +39,23 @@ def render_log(adrs: List[Adr]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_by_code(adrs: List[Adr]) -> str:
+    mapping: dict = {}
+    for a in adrs:
+        for path in a.governs:
+            mapping.setdefault(path, []).append(a.id)
+    lines = ["# Code → ADR map", "", "| code path | governed by |", "| --- | --- |"]
+    for path in sorted(mapping):
+        ids = ", ".join(f"{i:04d}" for i in sorted(mapping[path]))
+        lines.append(f"| {path} | {ids} |")
+    return "\n".join(lines) + "\n"
+
+
 def write_generated(adr_dir: str) -> None:
     adrs = load_bundle(adr_dir)
     with open(os.path.join(adr_dir, "index.md"), "w", encoding="utf-8") as fh:
         fh.write(render_index(adrs))
     with open(os.path.join(adr_dir, "log.md"), "w", encoding="utf-8") as fh:
         fh.write(render_log(adrs))
+    with open(os.path.join(adr_dir, "by-code.md"), "w", encoding="utf-8") as fh:
+        fh.write(render_by_code(adrs))

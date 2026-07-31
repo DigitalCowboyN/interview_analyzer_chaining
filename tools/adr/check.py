@@ -7,14 +7,14 @@ import subprocess
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
-from tools.adr.index import RESERVED, load_bundle, render_index, render_log
+from tools.adr.index import RESERVED, load_bundle, render_by_code, render_index, render_log
 from tools.adr.model import VALID_STATUS, Adr, parse_adr, validate_frontmatter
 from src.ingestion.front_matter import parse_front_matter
 
 DECISION_MARKERS = ("decisions locked", "rejected alternative")
 ADR_REF = re.compile(r"\bADR[-\s]?\d{1,4}\b|docs/adr/\d{4}", re.IGNORECASE)
 
-RENDERERS = {"index.md": render_index, "log.md": render_log}
+RENDERERS = {"index.md": render_index, "log.md": render_log, "by-code.md": render_by_code}
 
 
 @dataclass
