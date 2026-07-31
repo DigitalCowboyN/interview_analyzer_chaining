@@ -32,6 +32,8 @@
 | eventstore-restart | internal | Restart EventStoreDB |
 | eventstore-up | internal | Start EventStoreDB |
 | format | everyday | Run black formatter |
+| glossary-check | everyday | Reconcile the glossary against code vocabulary (non-blocking) |
+| glossary-index | everyday | Regenerate docs/glossary/index.md |
 | help | everyday | Show the everyday commands |
 | hooks-install | everyday | Install the shared project git hooks |
 | ingest | everyday | Ingest + enrich a transcript (FILE=<path>) |
@@ -81,3 +83,4 @@
 | python -m tools.adr |  |
 | python -m tools.api |  |
 | python -m tools.cli |  |
+| python -m tools.glossary |  |
