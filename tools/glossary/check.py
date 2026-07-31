@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import Dict, List
 
-from tools.glossary.reader import CodeTerm, code_dimensions, code_enums
+from tools.glossary.reader import CodeTerm, code_dimensions, code_enums, code_literals
 from tools.glossary.model import Term, load_glossary
 from tools.glossary.render import render_index
 
@@ -25,18 +25,18 @@ def check_coverage(code: Dict[str, CodeTerm], terms: List[Term]) -> List[Finding
 
 
 def check_enum_values(code: Dict[str, CodeTerm], terms: List[Term]) -> List[Finding]:
-    by_name = {t.term: t for t in terms}
     findings: List[Finding] = []
-    for name, ct in code.items():
-        if ct.kind != "enum":
+    for t in terms:
+        key = getattr(t, "code_symbol", None) or (t.term if t.kind == "enum" else None)
+        if key is None:
             continue
-        gt = by_name.get(name)
-        if gt is None:
-            continue  # coverage handles missing
-        if set(gt.values) != set(ct.values):
-            missing = sorted(set(ct.values) - set(gt.values))
-            extra = sorted(set(gt.values) - set(ct.values))
-            findings.append(Finding(f"glossary term {name} values differ from code (missing: {missing}, extra: {extra})"))
+        ct = code.get(key)
+        if ct is None:
+            continue
+        if set(t.values) != set(ct.values):
+            missing = sorted(set(ct.values) - set(t.values))
+            extra = sorted(set(t.values) - set(ct.values))
+            findings.append(Finding(f"glossary term {t.term} values differ from code (missing: {missing}, extra: {extra})"))
     return findings
 
 
@@ -57,7 +57,7 @@ def check_index_in_sync(index_path: str, terms: List[Term]) -> List[Finding]:
 
 
 def run_all(root: str = ".") -> List[Finding]:
-    code = {**code_enums(root), **code_dimensions(root)}
+    code = {**code_enums(root), **code_dimensions(root), **code_literals(root)}
     terms = load_glossary(os.path.join(root, "docs/glossary"))
     findings: List[Finding] = []
     findings += check_coverage(code, terms)

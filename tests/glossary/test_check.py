@@ -30,3 +30,14 @@ def test_stale_source_flags_term_not_in_code():
     term = Term("GoneEnum", "enum", "src/x.py", [], "", "p")
     msgs = " ".join(f.message for f in check_stale_source({}, [term]))
     assert "GoneEnum" in msgs
+
+
+def test_enum_values_matches_code_symbol_literal():
+    from tools.glossary.reader import CodeTerm
+    from tools.glossary.model import Term
+    from tools.glossary.check import check_enum_values
+    code = {"Claim.kind": CodeTerm("Claim.kind", "literal", "src/m.py", ["assertion", "commitment", "request"])}
+    term = Term("claim-kind", "claim-kind", "src/m.py", ["assertion", "commitment"], "", "p")  # missing request
+    term.code_symbol = "Claim.kind"
+    msgs = " ".join(f.message for f in check_enum_values(code, [term]))
+    assert "claim-kind" in msgs and "request" in msgs
