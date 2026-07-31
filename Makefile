@@ -26,6 +26,15 @@ adr-check:
 adr-index:
 	@$(PYTHON) -m tools.adr index
 
+# CLI-surface catalog + reconciliation (non-blocking)
+.PHONY: cli-index
+cli-index: ## Regenerate docs/cli/index.md (the CLI catalog)
+	@$(PYTHON) -m tools.cli index
+
+.PHONY: cli-check
+cli-check: ## Reconcile docs against the real CLI surface (non-blocking)
+	@$(PYTHON) -m tools.cli check
+
 # Install the shared project git hooks (non-blocking ADR drift report on commit)
 .PHONY: hooks-install
 hooks-install:
