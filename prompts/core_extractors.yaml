@@ -4,6 +4,8 @@
 # labels like [S1]; prompts note this where context is used.
 
 function_type:
+  used_for: [classification]
+  audience: [enrichment]
   prompt: |
     Determine the function type of the sentence provided.
 
@@ -20,6 +22,8 @@ function_type:
     Provide your response explicitly formatted as JSON.
 
 structure_type:
+  used_for: [classification]
+  audience: [enrichment]
   prompt: |
     Classify the structure type of the given sentence.
 
@@ -36,6 +40,8 @@ structure_type:
     Provide your response explicitly formatted as JSON.
 
 purpose:
+  used_for: [classification]
+  audience: [enrichment]
   prompt: |
     Given the sentence and its surrounding context, identify the sentence's purpose
     from the perspective of an outside observer. Speaker labels like [S1] identify
@@ -78,6 +84,8 @@ purpose:
     Provide your response explicitly formatted as JSON.
 
 topic_level_1:
+  used_for: [classification]
+  audience: [enrichment]
   prompt: |
     Classify the topic of the given sentence based on its immediate surrounding
     context. Speaker labels like [S1] identify who is talking; the target sentence
@@ -111,6 +119,8 @@ topic_level_1:
     Provide your response explicitly formatted as JSON.
 
 topic_level_3:
+  used_for: [classification]
+  audience: [enrichment]
   prompt: |
     Classify the topic of the sentence considering a broader context. Speaker
     labels like [S1] identify who is talking; the target sentence is marked
@@ -144,6 +154,8 @@ topic_level_3:
     Provide your response explicitly formatted as JSON.
 
 overall_keywords:
+  used_for: [extraction]
+  audience: [enrichment]
   prompt: |
     Provide up to 6 keywords that best represent the main topics of conversation
     based on the surrounding context. Speaker labels like [S1] identify who is
@@ -160,6 +172,8 @@ overall_keywords:
     Provide your response explicitly formatted as JSON.
 
 domain_keywords:
+  used_for: [extraction]
+  audience: [enrichment]
   prompt: |
     Identify any domain-specific keywords present in the sentence from the provided
     domain-specific list below. Include up to 6 keywords found.
@@ -179,6 +193,8 @@ domain_keywords:
     Provide your response explicitly formatted as JSON.
 
 entity_mentions:
+  used_for: [extraction]
+  audience: [enrichment]
   prompt: |
     Identify entity mentions in the sentence: people, organizations, products,
     tools. For each entity report its exact character span WITHIN THE SENTENCE
@@ -194,6 +210,8 @@ entity_mentions:
     Provide your response explicitly formatted as JSON.
 
 claims:
+  used_for: [extraction]
+  audience: [enrichment]
   prompt: |
     The following is one speaker's complete utterance from a conversation.
     Extract the claims it makes. A claim is one of:
@@ -215,6 +233,8 @@ claims:
     Provide your response explicitly formatted as JSON.
 
 topic_segments:
+  used_for: [segmentation]
+  audience: [enrichment]
   prompt: |
     Segment the transcript below into topic episodes. Each transcript line is
     one fragment, prefixed with its fragment index in square brackets, then

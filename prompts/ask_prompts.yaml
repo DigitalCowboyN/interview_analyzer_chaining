@@ -1,4 +1,6 @@
 ask_synthesis:
+  used_for: [synthesis]
+  audience: [ask]
   prompt: |
     Answer the question using ONLY the context blocks below. Each block starts
     with its fragment id in square brackets. Cite the fragment ids of every

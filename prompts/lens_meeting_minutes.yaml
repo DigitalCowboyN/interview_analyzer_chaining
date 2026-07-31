@@ -1,4 +1,6 @@
 objectives:
+  used_for: [lens]
+  audience: [lens]
   prompt: |
     The full transcript of a meeting follows, speaker-labeled (labels like [S1]
     identify who is talking). Extract the meeting's OBJECTIVES — what the
@@ -17,6 +19,8 @@ objectives:
     Provide your response explicitly formatted as JSON.
 
 decisions:
+  used_for: [lens]
+  audience: [lens]
   prompt: |
     The following is one speaker's complete utterance from a meeting.
     Extract any DECISIONS it contains — a decision is a resolved choice or
@@ -37,6 +41,8 @@ decisions:
     Provide your response explicitly formatted as JSON.
 
 action_items:
+  used_for: [lens]
+  audience: [lens]
   prompt: |
     The following is one speaker's complete utterance from a meeting.
     Extract any ACTION ITEMS — concrete tasks someone is expected to do after
@@ -56,6 +62,8 @@ action_items:
     Provide your response explicitly formatted as JSON.
 
 followups:
+  used_for: [lens]
+  audience: [lens]
   prompt: |
     The following is one speaker's complete utterance from a meeting.
     Extract any FOLLOW-UPS — topics explicitly deferred to a later
