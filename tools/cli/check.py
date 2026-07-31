@@ -19,9 +19,15 @@ class Finding:
     message: str
 
 
-def check_docs_reference_real(commands: List[Command], doc_paths: List[str]) -> List[Finding]:
+def _module_resolves(root: str, dotted: str) -> bool:
+    # `python -m a.b.c` is valid if a/b/c.py, a/b/c/__main__.py, or the package exists.
+    base = os.path.join(root, *dotted.split("."))
+    return os.path.isfile(base + ".py") or os.path.isdir(base)
+
+
+def check_docs_reference_real(commands: List[Command], doc_paths: List[str],
+                              root: str = ".") -> List[Finding]:
     real_make = {c.name for c in commands if c.kind == "make"}
-    real_mod = {c.name.split()[-1] for c in commands if c.kind == "module"}
     findings: List[Finding] = []
     for dp in doc_paths:
         if not os.path.exists(dp):
@@ -32,8 +38,8 @@ def check_docs_reference_real(commands: List[Command], doc_paths: List[str]) -> 
             if m.group(1) not in real_make:
                 findings.append(Finding(f"{base} references `make {m.group(1)}` which is not a real target"))
         for m in _MODULE_MENTION.finditer(text):
-            if m.group(1) not in real_mod:
-                findings.append(Finding(f"{base} references `python -m {m.group(1)}` which is not a real entry point"))
+            if not _module_resolves(root, m.group(1)):
+                findings.append(Finding(f"{base} references `python -m {m.group(1)}` which does not resolve to a module"))
     return findings
 
 
@@ -54,7 +60,7 @@ def run_all(root: str = ".", docs=("CLAUDE.md", "README.md"),
             catalog: str = "docs/cli/index.md") -> List[Finding]:
     commands = parse_makefile(os.path.join(root, "Makefile")) + module_entrypoints(root)
     findings: List[Finding] = []
-    findings += check_docs_reference_real(commands, [os.path.join(root, d) for d in docs])
+    findings += check_docs_reference_real(commands, [os.path.join(root, d) for d in docs], root)
     findings += check_catalog_in_sync(os.path.join(root, catalog), commands)
     findings += check_undocumented(commands)
     return findings

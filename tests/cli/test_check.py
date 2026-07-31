@@ -13,10 +13,18 @@ CMDS = [
 def test_docs_reference_real_flags_only_backticked_missing(tmp_path):
     doc = tmp_path / "CLAUDE.md"
     doc.write_text("Run `make test` then `make gone`. Also make sure to `python -m src.gone`.\n", encoding="utf-8")
+    # root defaults to the repo root during pytest, so on-disk module resolution applies
     msgs = " ".join(f.message for f in check_docs_reference_real(CMDS, [str(doc)]))
     assert "make gone" in msgs                      # backticked, not real -> flagged
-    assert "src.gone" in msgs                        # not a real entry point
+    assert "src.gone" in msgs                        # does not resolve on disk -> flagged
     assert "make sure" not in msgs and "make test" not in msgs   # prose + real command not flagged
+
+def test_docs_reference_real_accepts_plain_module(tmp_path):
+    # a `python -m X` that resolves to a real module file (not a catalogued package) is fine
+    doc = tmp_path / "README.md"
+    doc.write_text("Run `python -m src.projections.ensure_schema` to set up the schema.\n", encoding="utf-8")
+    msgs = " ".join(f.message for f in check_docs_reference_real(CMDS, [str(doc)]))
+    assert "ensure_schema" not in msgs
 
 
 def test_catalog_in_sync(tmp_path):
