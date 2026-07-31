@@ -22,7 +22,7 @@ def _read_stdin_json() -> dict:
 
 def cmd_index(args) -> int:
     write_generated(args.adr_dir)
-    print(f"regenerated {args.adr_dir}/index.md and log.md")
+    print(f"regenerated {args.adr_dir}/index.md, log.md, by-code.md")
     return 0
 
 
@@ -64,6 +64,19 @@ def cmd_nudge(args) -> int:
     return 0
 
 
+def cmd_where(args) -> int:
+    from tools.adr.index import load_bundle
+    from tools.adr.check import _path_covered_by
+    adrs = load_bundle(args.adr_dir)
+    hits = [a for a in adrs if _path_covered_by(args.path, a.governs)]
+    if hits:
+        for a in hits:
+            print(f"ADR-{a.id:04d} {a.title}")
+    else:
+        print(f"no ADR governs {args.path}")
+    return 0
+
+
 def main(argv=None) -> int:
     # Shared options live on a parent parser so they are valid AFTER the
     # subcommand (e.g. `tools.adr check --adr-dir X --specs-dir Y`).
@@ -78,10 +91,11 @@ def main(argv=None) -> int:
     p_new = sub.add_parser("new", parents=[common]); p_new.add_argument("title")
     sub.add_parser("context", parents=[common])
     sub.add_parser("nudge", parents=[common])
+    p_where = sub.add_parser("where", parents=[common]); p_where.add_argument("path")
     args = parser.parse_args(argv)
     return {
         "index": cmd_index, "check": cmd_check, "new": cmd_new,
-        "context": cmd_context, "nudge": cmd_nudge,
+        "context": cmd_context, "nudge": cmd_nudge, "where": cmd_where,
     }[args.cmd](args)
 
 

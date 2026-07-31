@@ -7,6 +7,8 @@ date: 2026-07-04
 supersedes: []
 superseded_by: []
 tags: [event-sourcing, projection, neo4j]
+governs:
+  - src/projections/
 source: docs/architecture/README.md
 ---
 ## Context

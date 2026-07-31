@@ -7,6 +7,11 @@ date: 2026-07-04
 supersedes: []
 superseded_by: []
 tags: [mine, layers, architecture]
+governs:
+  - src/ingestion/
+  - src/enrichment/
+  - src/lens/
+  - src/export/
 source: docs/superpowers/specs/2026-07-04-mine-layers-design.md
 ---
 ## Context

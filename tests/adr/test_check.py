@@ -80,3 +80,44 @@ def test_check_parseable_flags_malformed(tmp_path):
     (tmp_path / "0002-bad.md").write_text("---\ntype: ADR\ntitle: no id\n---\nbody\n", encoding="utf-8")
     msgs = " ".join(f.message for f in check_parseable(str(tmp_path)))
     assert "0002-bad.md" in msgs
+
+
+from tools.adr.check import (
+    _path_covered_by, check_governs_resolve, check_code_markers_resolve,
+    check_governs_agreement, check_governs_staleness,
+)
+
+def test_path_covered_by():
+    assert _path_covered_by("src/x.py", ["src/x.py"])
+    assert _path_covered_by("src/pkg/x.py", ["src/pkg/"])   # parent-dir match
+    assert not _path_covered_by("src/other.py", ["src/pkg/"])
+
+def test_governs_resolve_flags_missing(tmp_path):
+    a = _adr(id=3, governs=["src/gone/"])
+    msgs = " ".join(f.message for f in check_governs_resolve([a], root=str(tmp_path)))
+    assert "0003 governs src/gone/ which does not exist" in msgs
+
+def test_code_markers_resolve_flags_dangling():
+    markers = {"src/x.py": ["ADR-0099"]}
+    msgs = " ".join(f.message for f in check_code_markers_resolve(markers, [1, 3]))
+    assert "src/x.py claims ADR-0099 which does not exist" in msgs
+
+def test_governs_agreement_both_directions():
+    a = _adr(id=3, governs=["src/projections/"])
+    # direction 1: ADR governs a path nothing marks -> finding
+    msgs1 = " ".join(f.message for f in check_governs_agreement([a], {}))
+    assert "0003 governs src/projections/ but nothing there is marked" in msgs1
+    # direction 2: marker claims ADR that doesn't govern the path -> finding
+    markers = {"src/other.py": ["ADR-0003"]}
+    msgs2 = " ".join(f.message for f in check_governs_agreement([a], markers))
+    assert "src/other.py is marked governed-by ADR-0003 but 0003 does not govern it" in msgs2
+    # satisfied: dir marker present and ADR governs that dir
+    markers_ok = {"src/projections/": ["ADR-0003"]}
+    assert check_governs_agreement([a], markers_ok) == []
+
+def test_governs_staleness_with_injected_ts():
+    a = _adr(id=3, governs=["src/projections/"], path="docs/adr/0003.md")
+    def fake_ts(p):
+        return 200 if p == "src/projections/" else 100   # governed code newer
+    msgs = " ".join(f.message for f in check_governs_staleness([a], ts_fn=fake_ts))
+    assert "0003: governed code src/projections/ changed after the ADR" in msgs

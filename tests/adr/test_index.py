@@ -38,3 +38,17 @@ def test_write_generated_is_idempotent(tmp_path):
     first = (tmp_path / "index.md").read_text()
     write_generated(str(tmp_path))
     assert (tmp_path / "index.md").read_text() == first
+
+def test_render_by_code_and_write(tmp_path):
+    from tools.adr.index import render_by_code, RESERVED
+    assert "by-code.md" in RESERVED
+    _write(tmp_path, "0003-p.md",
+           "---\ntype: ADR\nid: 3\ntitle: P\nstatus: accepted\ndate: 2026-07-04\n"
+           "governs:\n  - src/projections/\n---\nbody\n")
+    adrs = load_bundle(str(tmp_path))
+    table = render_by_code(adrs)
+    assert "| src/projections/ | 0003 |" in table
+    write_generated(str(tmp_path))
+    assert (tmp_path / "by-code.md").read_text() == table
+    # by-code.md is reserved -> load_bundle must not parse it as an ADR
+    assert [a.id for a in load_bundle(str(tmp_path))] == [3]

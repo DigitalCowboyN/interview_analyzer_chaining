@@ -6,4 +6,6 @@ This package provides the core event infrastructure including:
 - EventStoreDB integration
 - Repository patterns for aggregates
 - Event versioning and schema validation
+
+governed-by: ADR-0004
 """

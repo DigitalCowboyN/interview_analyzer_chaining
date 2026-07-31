@@ -7,6 +7,8 @@ date: 2026-07-04
 supersedes: []
 superseded_by: []
 tags: [event-sourcing, wire-format, compatibility]
+governs:
+  - src/events/
 source: docs/architecture/README.md
 ---
 ## Context

@@ -7,14 +7,15 @@ import subprocess
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
-from tools.adr.index import RESERVED, load_bundle, render_index, render_log
+from tools.adr.code_links import adr_ids_from_refs, scan_markers
+from tools.adr.index import RESERVED, load_bundle, render_by_code, render_index, render_log
 from tools.adr.model import VALID_STATUS, Adr, parse_adr, validate_frontmatter
 from src.ingestion.front_matter import parse_front_matter
 
 DECISION_MARKERS = ("decisions locked", "rejected alternative")
 ADR_REF = re.compile(r"\bADR[-\s]?\d{1,4}\b|docs/adr/\d{4}", re.IGNORECASE)
 
-RENDERERS = {"index.md": render_index, "log.md": render_log}
+RENDERERS = {"index.md": render_index, "log.md": render_log, "by-code.md": render_by_code}
 
 
 @dataclass
@@ -119,12 +120,82 @@ def check_parseable(adr_dir: str) -> List[Finding]:
     return findings
 
 
-def run_all(adr_dir: str, specs_dir: str) -> List[Finding]:
+def _path_covered_by(path: str, governs: List[str]) -> bool:
+    for g in governs:
+        if g == path:
+            return True
+        if g.endswith("/") and path.startswith(g):
+            return True
+    return False
+
+
+def check_governs_resolve(adrs: List[Adr], root: str = ".") -> List[Finding]:
+    findings: List[Finding] = []
+    for a in adrs:
+        for p in a.governs:
+            if not os.path.exists(os.path.join(root, p)):
+                findings.append(Finding(f"{a.id:04d} governs {p} which does not exist"))
+    return findings
+
+
+def check_code_markers_resolve(markers: dict, adr_ids: List[int]) -> List[Finding]:
+    findings: List[Finding] = []
+    known = set(adr_ids)
+    for path in sorted(markers):
+        for mid in adr_ids_from_refs(markers[path]):
+            if mid not in known:
+                findings.append(Finding(f"{path} claims ADR-{mid:04d} which does not exist"))
+    return findings
+
+
+def check_governs_agreement(adrs: List[Adr], markers: dict) -> List[Finding]:
+    findings: List[Finding] = []
+    by_id = {a.id: a for a in adrs}
+    for a in adrs:
+        for p in a.governs:
+            if a.id not in adr_ids_from_refs(markers.get(p, [])):
+                findings.append(
+                    Finding(f"{a.id:04d} governs {p} but nothing there is marked governed-by ADR-{a.id:04d}")
+                )
+    for path in sorted(markers):
+        for mid in adr_ids_from_refs(markers[path]):
+            a = by_id.get(mid)
+            if a is None:
+                continue  # dangling ref handled by check_code_markers_resolve
+            if not _path_covered_by(path, a.governs):
+                findings.append(
+                    Finding(f"{path} is marked governed-by ADR-{mid:04d} but {mid:04d} does not govern it")
+                )
+    return findings
+
+
+def check_governs_staleness(adrs: List[Adr],
+                            ts_fn: Callable[[str], Optional[int]] = git_committer_ts) -> List[Finding]:
+    findings: List[Finding] = []
+    for a in adrs:
+        if not a.path:
+            continue
+        adr_ts = ts_fn(a.path)
+        if adr_ts is None:
+            continue
+        for p in a.governs:
+            p_ts = ts_fn(p)
+            if p_ts is not None and p_ts > adr_ts:
+                findings.append(Finding(f"{a.id:04d}: governed code {p} changed after the ADR — revisit?"))
+    return findings
+
+
+def run_all(adr_dir: str, specs_dir: str, root: str = ".") -> List[Finding]:
     adrs = load_bundle(adr_dir)
+    markers = scan_markers(root)
     findings: List[Finding] = []
     findings += check_structural(adrs)
     findings += check_generated_in_sync(adr_dir, adrs)
     findings += check_specs_reference_adr(specs_dir)
     findings += check_staleness(adrs)
     findings += check_parseable(adr_dir)
+    findings += check_governs_resolve(adrs, root)
+    findings += check_code_markers_resolve(markers, [a.id for a in adrs])
+    findings += check_governs_agreement(adrs, markers)
+    findings += check_governs_staleness(adrs)
     return findings

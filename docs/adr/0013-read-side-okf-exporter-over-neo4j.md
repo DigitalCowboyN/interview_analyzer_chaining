@@ -7,6 +7,8 @@ date: 2026-07-10
 supersedes: []
 superseded_by: []
 tags: [okf, export, neo4j]
+governs:
+  - src/export/
 source: docs/superpowers/specs/2026-07-10-okf-export-design.md
 ---
 ## Context

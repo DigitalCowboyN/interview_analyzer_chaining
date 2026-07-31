@@ -7,6 +7,8 @@ date: 2026-07-09
 supersedes: []
 superseded_by: []
 tags: [lens, projection, extensibility]
+governs:
+  - src/lens/
 source: docs/superpowers/specs/2026-07-04-mine-layers-design.md
 ---
 ## Context
