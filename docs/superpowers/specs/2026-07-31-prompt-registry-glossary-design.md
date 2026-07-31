@@ -1,131 +1,178 @@
-# Prompt Registry (F) + Glossary Made Living & Extended (design)
+# Probabilistic-Components Registry (F) + Glossary Made Living & Extended (design)
 
-**Status:** approved by owner 2026-07-31 (brainstorm dialogue).
-**Program:** sub-project "F" of the *guarded knowledge graph over the codebase*,
-done together with a revision + extension of the glossary (A) it reconciles against.
-Follows A (glossary) and reuses the reader→render→check→CLI pattern.
+**Status:** approved by owner 2026-07-31 (brainstorm dialogue, two rounds).
+**Program:** sub-project "F" of the *guarded knowledge graph over the codebase*, done
+together with a revision + extension of the glossary (A) it reconciles against.
 
-## Goal
+## The reframe: prompts are probabilistic code components
 
-The prompts the product actually runs (`prompts/*.yaml`) enumerate the allowed values
-for the classification / extraction vocabularies. The glossary (A) is a human-readable
-**reference** that should track them. Today they have drifted (the glossary's
-`purpose`, `topic_level_1`, `topic_level_3` values are wrong). Make the prompt registry
-**catalogued and reconciled against the glossary**, and make the glossary a **living,
-correct** vocabulary:
+A prompt is **code** — versioned logic a component executes — so it is documented,
+linked, and guarded like code (the B/C/D machinery). But unlike the rest of the
+codebase it is **probabilistic**: an LLM runs it; output is non-deterministic. So it
+gets the same treatment as code **with a classification flag** distinguishing it.
 
-1. Correct and extend the glossary; frame it explicitly as a growing set.
-2. A `docs/prompts/` catalog + a guard that flags when the glossary is out of sync
-   with the registry (the operative source).
+This introduces a **determinism axis** to the whole graph: **deterministic code**
+(functions, routes, CLI — reconciled *exactly*) vs **probabilistic components**
+(prompts — reconciled, but understood to behave stochastically). v1 realises the axis
+by making the prompt domain carry `classification: probabilistic`; retrofitting a
+`deterministic` tag onto B/C/D is out of scope (future).
 
-## Canonicity (locked in brainstorm)
+## What each prompt carries (the facet model)
 
-- **The prompt registry is the operative source of truth** — it is what the product
-  runs. The glossary is a reference that follows it. When a registry-pinned value set
-  and the glossary disagree, the **fix path is registry → glossary** (update the
-  glossary). For **code-pinned** vocabularies (`Enum`s, the `claim` `Literal`) the code
-  is truth (checked by A's existing enum reconciliation, extended here).
-- **The domain is living.** The glossary grows in both *type* and *amount*; the model
-  and guards must not assume a closed universe. Adding a new vocabulary kind must not
-  require tooling changes.
+| Facet | Meaning | Source |
+|---|---|---|
+| `classification` | `probabilistic` (vs deterministic code) | intrinsic |
+| `used_for` | the capability: extraction / classification / segmentation / ingestion / synthesis / lens | **authored in the prompt YAML** |
+| `audience` | the consumer roles it is *enabled for* | **authored in the prompt YAML** (internal roles + external) |
+| `consumers` | the code that *actually* loads/runs it | **derived from code** |
+| `values` | enumerated closed set (if any) | the prompt → **reconciled to the glossary (A)** |
 
-## The vocabulary, by where truth lives (confirmed against code + prompts)
+### Audience taxonomy
+
+Audience is a set spanning two kinds, and it **grows** as a prompt is reused:
+
+- **Internal roles** (verifiable — map to code): `ingestion`, `enrichment`,
+  `lens`, `ask`, `api`, `agent`.
+- **External roles** (declared-only — not in this repo's code): `cli`, `skill`,
+  `coding-harness`, `other`.
+
+The prompt domain therefore sits at the **center** of the graph: a prompt links to the
+**code that runs it (B)**, the **API that exposes it (C)**, and the **CLI/harness that
+invokes it (D)**. `used_for` + `audience` are authored; `consumers` are derived; the
+guard reconciles the two.
+
+## Canonicity (locked)
+
+- **The prompt registry is the operative source of truth** for the value vocabularies;
+  the glossary follows. Value mismatch → fix path is **registry → glossary**. For
+  **code-pinned** vocabularies (`Enum`s, the `claim` `Literal`) the code is truth.
+- **The domain is living** — the glossary grows in type and amount; model + guards must
+  not assume a closed universe; adding a new vocabulary kind needs no tooling change.
+
+## The value vocabulary, by where truth lives (confirmed vs code + prompts)
 
 | Term(s) | Truth | Values |
 |---|---|---|
-| 7 `str,Enum` classes | **code** (A already) | from the enum |
-| `claim-kind` | **code** (`Literal` in `src/models/extractor_responses.py`) + prompt (agree) | assertion, commitment, request |
-| `function_type` / `structure_type` | **registry** (`core_extractors.yaml`) | 4 / 4 (grammatical) |
-| `purpose` | **registry** | 24 (Statement, Query, …) |
-| `topic_level_1` / `topic_level_3` | **registry** | 15 each |
-| `entity-type` | **registry** (prompt Format line; no code enum) | person, organization, product, tool, other |
-| `overall_keywords` / `domain_keywords` | — | open-ended (no closed set) |
+| 7 `str,Enum` classes | code (A already) | from the enum |
+| `claim-kind` | code (`Literal` in `extractor_responses.py`) + prompt (agree) | assertion, commitment, request |
+| `function_type` / `structure_type` | registry (`core_extractors.yaml`) | 4 / 4 |
+| `purpose` | registry | 24 |
+| `topic_level_1` / `topic_level_3` | registry | 15 each |
+| `entity-type` | registry (prompt Format line) | person, organization, product, tool, other |
+| `overall_keywords` / `domain_keywords` | — | open-ended |
 
-**Live source** = `core_extractors.yaml` (loaded by `src/enrichment/orchestrator.py`).
-`task_prompts.yaml` is the **legacy** predecessor (`core_extractors` says "Ported
-from task_prompts.yaml"); `domain_prompts.yaml` is unreferenced reference data.
+Live source = `core_extractors.yaml` (loaded by `src/enrichment/orchestrator.py`).
+`task_prompts.yaml` is legacy (ported → core_extractors); `domain_prompts.yaml` is
+unreferenced reference data.
 
 ## Part 1 — Glossary: living, corrected, extended
 
-- **`docs/glossary/README.md`** — states plainly: this is a *growing* reference,
-  expanding in type and amount; absence of a term means "not yet catalogued," not
-  "doesn't exist"; `kind` is free-form, new kinds welcome.
-- **Corrections** (registry → glossary): update `docs/glossary/purpose.md` (24 values),
-  `topic-level-1.md` + `topic-level-3.md` (their real 15-value sets, read from the
-  prompt). Their `kind` stays `dimension`.
-- **New terms:**
-  - `claim-kind` (`kind: claim-kind`, `source: src/models/extractor_responses.py`,
-    values assertion/commitment/request) — **code-pinned**.
-  - `entity-type` (`kind: entity-type`, `source: prompts/core_extractors.yaml`,
-    values person/organization/product/tool/other) — **registry-pinned**.
-- **`tools/glossary` extension:** add a small AST reader `code_literals(root)` that
-  finds `field: Literal[...]` closed sets (v1: the `claim` `kind`) and returns them as
-  `CodeTerm`s, so A's existing `check_enum_values` code-checks `claim-kind` exactly
-  like an enum. The prompt-pinned terms (dimensions, `entity-type`) remain authored and
-  are reconciled by F (Part 2), not by A's code checks.
+- **`docs/glossary/README.md`** — states plainly: a *growing* reference (type + amount);
+  absence ≠ nonexistence; `kind` is free-form.
+- **Corrections** (registry → glossary): `purpose` → 24; `topic_level_1` / `topic_level_3`
+  → their real 15 sets (read from the prompt). `kind` stays `dimension`.
+- **New terms:** `claim-kind` (`source: src/models/extractor_responses.py`, **code-pinned**)
+  and `entity-type` (`source: prompts/core_extractors.yaml`, **registry-pinned**).
+- **`tools/glossary` extension:** `code_literals(root)` — an AST reader for
+  `field: Literal[...]` closed sets (v1: the `claim` `kind`) returned as `CodeTerm`s, so
+  A's existing `check_enum_values` code-checks `claim-kind` like an enum.
 
-## Part 2 — F: the prompt-registry guard (`tools/prompts/`)
+## Part 2 — Probabilistic-components registry (`tools/prompts/`)
 
-- **Reader** — loads `prompts/*.yaml`; classifies each entry by the loading stage
-  (ingestion / enrichment / lens / ask / legacy) via a small static map of file→stage;
-  extracts an entry's enumerated value set when present, handling **both** shapes:
-  - `Options:` bullet lists (`function_type`, `structure_type`, `purpose`, `topic_*`);
-  - `"field": "a|b|c"` Format-line pipes (`claim` kind, `entity_type`).
-  Returns `PromptEntry(file, key, stage, values)`.
-- **Render** — `docs/prompts/index.md`: prompts grouped by stage (file · key), a map
-  for agents. Generated, never hand-edited.
-- **Check — `make prompt-check` (non-blocking):**
-  1. **registry↔glossary reconciliation** (headline) — for each prompt entry whose key
-     maps to a glossary term (via a small key→term map: `purpose`→purpose,
-     `entity_mentions`→entity-type, `claims`→claim-kind, …), compare the extracted
-     values to the glossary term's `values`. Mismatch → `glossary term X is out of sync
-     with the registry (prompts/…): missing …, extra … — update the glossary`.
-     (Bidirectional detection; the message names the glossary as the thing to fix.)
-  2. **orphan enumerated prompt** — an enumerated prompt entry mapping to no glossary
-     term → informational (a candidate to catalogue — the growth path).
-  3. **catalog-in-sync** — `docs/prompts/index.md` matches the live prompts.
-  4. **legacy/unused** (informational) — `task_prompts.yaml` present (legacy);
-     `domain_prompts.yaml` unreferenced.
-- **CLI / Makefile** — `python -m tools.prompts {index|check}`; `make prompt-index`,
-  `prompt-check` (self-documented per D's `##` convention).
+### Prompt metadata (authored in `prompts/*.yaml`)
 
-`PromptEntry` / `Finding` local to `tools/prompts`. Reads the glossary via
-`tools.glossary` (`load_glossary`).
+Add two keys to each prompt entry (a one-time backfill across the live files):
+
+```yaml
+function_type:
+  used_for: [classification]      # capability
+  audience: [enrichment]          # roles it is enabled for (internal + any external)
+  prompt: "Determine the function type…"
+```
+
+### Reader
+
+- Loads `prompts/*.yaml`; per entry yields `PromptEntry(file, key, used_for, audience,
+  values, consumers)`.
+- **values**: extracts the enumerated set when present, handling **both** shapes —
+  `Options:` bullet lists and `"field": "a|b|c"` Format-line pipes.
+- **consumers (derived)**: a `file → loading-module(s)` map built by scanning `src/` for
+  `"prompts/<file>"`; each module maps to an internal role via a small module-prefix→role
+  map (`src/enrichment`→enrichment, `src/ingestion`→ingestion, `src/ask`→ask,
+  `src/lens`→lens, `src/api`→api). A file with no loader → no consumers.
+
+### Catalog
+
+`docs/prompts/index.md` — generated, never hand-edited: each prompt as
+`classification · key · used_for · audience · consumers · values`, grouped by file/stage.
+The complete probabilistic-component map for agents.
+
+### The guard — `make prompt-check` (non-blocking, always exit 0)
+
+1. **values ↔ glossary** (registry → glossary) — enumerated prompt values vs the mapped
+   glossary term (`purpose`→purpose, `claims`→claim-kind, `entity_mentions`→entity-type,
+   …). Mismatch → `glossary term X out of sync with the registry — update the glossary`.
+2. **audience ↔ consumers** — for each declared **internal** audience role, a derived
+   consumer of that role must exist; declared-but-absent → `declares audience <role> but
+   no code consumes it`. A derived consumer role **not** in the declared audience →
+   `consumed by <role> but audience does not list it`. **External** roles (cli/skill/
+   harness) are surfaced, not reconciled (not in-repo).
+3. **orphan / unused** — a prompt with no derived consumers and no external audience →
+   `unused (no consumer)` (catches `task_prompts.yaml`, `domain_prompts.yaml`).
+4. **missing metadata** (informational) — a prompt with no `used_for` or `audience`.
+5. **catalog-in-sync.**
+
+### CLI / Makefile
+
+`python -m tools.prompts {index|check}`; `make prompt-index`, `prompt-check`
+(self-documented per D's `##` convention).
 
 ## Module design
 
 ```
 tools/prompts/
-  reader.py    # load prompts/*.yaml, stage map, value extraction (Options + Format-line)
+  reader.py    # load prompts/*.yaml; value extraction (2 shapes); consumer derivation (file->module->role)
   render.py    # render_catalog(entries) -> str
-  check.py     # reconcile-with-glossary, orphan, catalog-sync, legacy; run_all(root=".")
+  check.py     # values<->glossary, audience<->consumers, orphan, missing-metadata, catalog-sync; run_all(root=".")
   __main__.py  # index | check
-tools/glossary/
-  reader.py    # + code_literals(root) for Literal[...] closed sets (claim-kind)
-docs/glossary/
-  README.md, purpose.md, topic-level-1.md, topic-level-3.md (fixed), claim-kind.md, entity-type.md (new)
-docs/prompts/index.md          # generated catalog
-Makefile                        # + prompt-index, prompt-check
+tools/glossary/reader.py   # + code_literals(root) for Literal[...] (claim-kind)
+prompts/*.yaml             # + used_for + audience on each live entry (backfill)
+docs/glossary/             # README.md; purpose/topic-level-1/topic-level-3 fixed; claim-kind, entity-type new
+docs/prompts/index.md      # generated catalog
+Makefile                   # + prompt-index, prompt-check
 ```
+
+`PromptEntry` / `Finding` local to `tools/prompts`; reads the glossary via
+`tools.glossary.load_glossary`.
 
 ## Testing
 
 - **Glossary (Part 1)** — `code_literals` extracts a `Literal[...]` set from a synthetic
-  model; `check_enum_values` now flags a `claim-kind` mismatch; the fixed/new term files
+  model; `check_enum_values` flags a `claim-kind` mismatch; the fixed/new term files
   parse; `glossary-check` clean on the real repo after the fixes.
-- **F (Part 2)** — `reader` value extraction over both prompt shapes (a bulleted
-  `Options:` entry and a `"field": "a|b|c"` Format entry) + a no-enumeration entry;
-  stage classification; `render_catalog` shape; `check` reconciliation (a matching set →
-  no finding; a value the prompt has but the glossary lacks → finding naming the
-  glossary; an orphan enumerated prompt → informational; catalog out of sync). Assert
-  **no check raises**. Smoke: `make prompt-check` on the real repo is clean **after** the
-  Part-1 glossary fixes (proving the loop closes).
+- **F (Part 2)** —
+  - reader: value extraction over both shapes + a no-enumeration entry; `used_for`/
+    `audience` read from YAML; consumer derivation over a synthetic `src` tree + prompt
+    file (a file with a loader → that role; a file with none → no consumers).
+  - `render_catalog` shape.
+  - checks: values-reconcile (match → none; prompt-has/glossary-lacks → finding naming
+    the glossary); audience-reconcile (declared internal role with a consumer → none;
+    declared-but-absent → finding; consumed-but-undeclared → finding; external role →
+    not reconciled); orphan (no consumer → finding); catalog-sync. Assert **no check
+    raises**.
+  - Smoke: `make prompt-check` on the real repo is clean **after** the Part-1 glossary
+    fixes + the metadata backfill (values reconcile; each live prompt has a consumer +
+    `used_for`; task/domain flagged unused).
 
 ## Non-goals (this round)
 
-- **Lens / ask prompt value-reconciliation** — catalogued only (no closed value sets to
-  check against yet).
-- **Prompt versioning / provenance**, **governed-by ADR links**.
-- **Deleting the legacy `task_prompts.yaml`** — flagged, not removed (owner's call).
-- **Node labels / graph vocabulary** — the tracked graph-query sub-project.
-- **Blocking** on any finding.
+- **Retrofitting a `deterministic` classification onto B/C/D** — the axis is introduced
+  via the prompt domain only.
+- **Key-level consumer derivation** — consumers are derived per prompt *file* (the loader
+  loads the whole file); call-graph analysis to attribute individual keys is out of scope.
+- **External-audience verification** — cli/skill/harness are declared and surfaced, not
+  reconciled (not in this repo).
+- **Prompt versioning / provenance**, **governed-by ADR links**, **deleting legacy
+  `task_prompts.yaml`** (flagged, owner's call).
+- **Lens / ask value-reconciliation** (no closed value sets), **node/graph vocabulary**
+  (graph-query sub-project), **blocking**.
