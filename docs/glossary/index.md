@@ -2,6 +2,7 @@
 
 | term | kind | source |
 | --- | --- | --- |
+| claim-kind | claim-kind | src/models/extractor_responses.py |
 | domain_keywords | dimension | src/models/analysis_result.py |
 | function_type | dimension | src/models/analysis_result.py |
 | overall_keywords | dimension | src/models/analysis_result.py |
@@ -9,6 +10,7 @@
 | structure_type | dimension | src/models/analysis_result.py |
 | topic_level_1 | dimension | src/models/analysis_result.py |
 | topic_level_3 | dimension | src/models/analysis_result.py |
+| entity-type | entity-type | prompts/core_extractors.yaml |
 | ActorType | enum | src/events/envelope.py |
 | AggregateType | enum | src/events/envelope.py |
 | EditorType | enum | src/events/sentence_events.py |
