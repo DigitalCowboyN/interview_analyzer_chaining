@@ -41,3 +41,25 @@ def test_enum_values_matches_code_symbol_literal():
     term.code_symbol = "Claim.kind"
     msgs = " ".join(f.message for f in check_enum_values(code, [term]))
     assert "claim-kind" in msgs and "request" in msgs
+
+
+def test_coverage_ignores_literals():
+    from tools.glossary.reader import CodeTerm
+    from tools.glossary.check import check_coverage
+    # a plain Literal (ExtractorSpec.scope-like) is NOT passed to coverage -> no finding
+    code = {"ActorType": CodeTerm("ActorType", "enum", "src/e.py", ["HUMAN"])}
+    term = Term("ActorType", "enum", "src/e.py", ["HUMAN"], "", "p")
+    assert check_coverage(code, [term]) == []
+
+
+def test_stale_source_skips_registry_pinned_and_honors_code_symbol():
+    from tools.glossary.reader import CodeTerm
+    from tools.glossary.check import check_stale_source
+    lits = {"ClaimItem.kind": CodeTerm("ClaimItem.kind", "literal", "src/m.py", ["assertion"])}
+    ck = Term("claim-kind", "claim-kind", "src/m.py", ["assertion"], "", "p"); ck.code_symbol = "ClaimItem.kind"
+    et = Term("entity-type", "entity-type", "prompts/core_extractors.yaml", ["person"], "", "p")
+    # claim-kind's code_symbol resolves -> not stale; entity-type registry-pinned -> not stale
+    assert check_stale_source(lits, [ck, et]) == []
+    # a code_symbol that vanished -> stale
+    ck2 = Term("claim-kind", "claim-kind", "src/m.py", ["assertion"], "", "p"); ck2.code_symbol = "Gone.kind"
+    assert check_stale_source({}, [ck2])

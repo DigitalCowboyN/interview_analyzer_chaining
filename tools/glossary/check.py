@@ -43,8 +43,14 @@ def check_enum_values(code: Dict[str, CodeTerm], terms: List[Term]) -> List[Find
 def check_stale_source(code: Dict[str, CodeTerm], terms: List[Term]) -> List[Finding]:
     findings: List[Finding] = []
     for t in terms:
-        if t.term not in code:
-            findings.append(Finding(f"glossary term {t.term}: no longer defined in code (source {t.source})"))
+        symbol = getattr(t, "code_symbol", None)
+        if symbol:
+            if symbol not in code:
+                findings.append(Finding(f"glossary term {t.term}: code_symbol {symbol} no longer defined in code"))
+        elif t.kind in ("enum", "dimension"):
+            if t.term not in code:
+                findings.append(Finding(f"glossary term {t.term}: no longer defined in code (source {t.source})"))
+        # registry-pinned kinds (entity-type, etc.) are not code-backed -> skip
     return findings
 
 
@@ -57,11 +63,13 @@ def check_index_in_sync(index_path: str, terms: List[Term]) -> List[Finding]:
 
 
 def run_all(root: str = ".") -> List[Finding]:
-    code = {**code_enums(root), **code_dimensions(root), **code_literals(root)}
+    enums = code_enums(root)
+    dims = code_dimensions(root)
+    lits = code_literals(root)
     terms = load_glossary(os.path.join(root, "docs/glossary"))
     findings: List[Finding] = []
-    findings += check_coverage(code, terms)
-    findings += check_enum_values(code, terms)
-    findings += check_stale_source(code, terms)
+    findings += check_coverage({**enums, **dims}, terms)          # NOT lits
+    findings += check_enum_values({**enums, **dims, **lits}, terms)
+    findings += check_stale_source({**enums, **dims, **lits}, terms)
     findings += check_index_in_sync(os.path.join(root, "docs/glossary/index.md"), terms)
     return findings
