@@ -7,6 +7,8 @@
 | adr-check | everyday | Validate docs/adr (non-blocking) |
 | adr-index | everyday | Regenerate docs/adr generated files |
 | all | everyday | Lint, format, and test |
+| api-check | everyday | Reconcile the API surface + openapi.json freshness (non-blocking) |
+| api-index | everyday | Regenerate docs/api/index.md (the API catalog) |
 | build | everyday | Build Docker images |
 | clean | everyday | Remove __pycache__ and .pyc files |
 | clean-coverage | everyday | Remove coverage data |
@@ -77,4 +79,5 @@
 | python -m src.lens | Lens engine. |
 | python -m src.resolution | Resolution layer. |
 | python -m tools.adr |  |
+| python -m tools.api |  |
 | python -m tools.cli |  |
