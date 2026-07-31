@@ -44,6 +44,15 @@ api-index: ## Regenerate docs/api/index.md (the API catalog)
 api-check: ## Reconcile the API surface + openapi.json freshness (non-blocking)
 	@$(PYTHON) -m tools.api check
 
+# Glossary/taxonomy vocabulary catalog + reconciliation (non-blocking)
+.PHONY: glossary-index
+glossary-index: ## Regenerate docs/glossary/index.md
+	@$(PYTHON) -m tools.glossary index
+
+.PHONY: glossary-check
+glossary-check: ## Reconcile the glossary against code vocabulary (non-blocking)
+	@$(PYTHON) -m tools.glossary check
+
 # Install the shared project git hooks (non-blocking ADR drift report on commit)
 .PHONY: hooks-install
 hooks-install: ## Install the shared project git hooks
