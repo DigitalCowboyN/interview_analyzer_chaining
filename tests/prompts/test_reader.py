@@ -25,3 +25,12 @@ def test_load_prompt_entries_reads_metadata(tmp_path):
     e = next(x for x in entries if x.key == "function_type")
     assert e.used_for == ["classification"] and e.audience == ["enrichment"]
     assert e.values == ["declarative", "interrogative"] and e.consumers == ["enrichment"]
+
+def test_extract_values_ignores_instructional_bullets_without_options():
+    instructional = ("Group the fragments into utterances:\n"
+                     "  - Consecutive fragments from the same speaker\n"
+                     "  - If a speaker is interrupted\n"
+                     "  - A genuine topic change\n")
+    assert extract_values(instructional) == []          # no 'Options:' marker -> not values
+    opts = "Classify.\nOptions:\n  - declarative\n  - interrogative\n"
+    assert extract_values(opts) == ["declarative", "interrogative"]   # 'Options:' present -> extracted

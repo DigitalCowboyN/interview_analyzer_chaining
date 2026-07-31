@@ -29,9 +29,10 @@ def extract_values(text: str) -> List[str]:
     for m in _FMT.finditer(text):
         if "|" in m.group(1):
             return m.group(1).split("|")
-    bullets = re.findall(r'^\s*-\s*([A-Za-z][\w\- ]*?)\s*$', text, re.M)
-    if len(bullets) >= 2:
-        return [b.strip() for b in bullets]
+    if re.search(r"options:", text, re.IGNORECASE):
+        bullets = re.findall(r'^\s*-\s*([A-Za-z][\w\- ]*?)\s*$', text, re.M)
+        if bullets:
+            return [b.strip() for b in bullets]
     return []
 
 
