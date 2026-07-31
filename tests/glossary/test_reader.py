@@ -25,3 +25,15 @@ def test_code_dimensions_reads_annotated_fields(tmp_path):
     assert set(dims) == {"function_type", "purpose"}
     assert dims["function_type"].kind == "dimension"
     assert "Attributes" not in dims       # docstring not a field
+
+
+def test_code_literals_extracts_field_literals(tmp_path):
+    from tools.glossary.reader import code_literals
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "m.py").write_text(
+        "from typing import Literal\n"
+        "class Claim:\n    kind: Literal['assertion', 'commitment', 'request']\n", encoding="utf-8")
+    lits = code_literals(str(tmp_path))
+    assert "Claim.kind" in lits
+    assert lits["Claim.kind"].values == ["assertion", "commitment", "request"]
+    assert lits["Claim.kind"].source == "src/m.py"

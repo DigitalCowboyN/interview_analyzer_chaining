@@ -1,4 +1,6 @@
 traits:
+  used_for: [lens]
+  audience: [lens]
   prompt: |
     The full transcript of a conversation follows, speaker-labeled (labels like
     [S1] identify who is talking). Extract observable PERSONA TRAITS — durable
@@ -22,6 +24,8 @@ traits:
     Provide your response explicitly formatted as JSON.
 
 goals:
+  used_for: [lens]
+  audience: [lens]
   prompt: |
     The following is one speaker's complete utterance from a conversation.
     Extract any GOALS — what the speaker is trying to achieve, stated or
@@ -43,6 +47,8 @@ goals:
     Provide your response explicitly formatted as JSON.
 
 pain_points:
+  used_for: [lens]
+  audience: [lens]
   prompt: |
     The following is one speaker's complete utterance from a conversation.
     Extract any PAIN POINTS — frustrations, obstacles, or difficulties the
@@ -64,6 +70,8 @@ pain_points:
     Provide your response explicitly formatted as JSON.
 
 notable_quotes:
+  used_for: [lens]
+  audience: [lens]
   prompt: |
     The following is one speaker's complete utterance from a conversation.
     Extract any NOTABLE QUOTES — verbatim, self-contained, quotable statements

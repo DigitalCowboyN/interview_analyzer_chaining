@@ -53,6 +53,14 @@ glossary-index: ## Regenerate docs/glossary/index.md
 glossary-check: ## Reconcile the glossary against code vocabulary (non-blocking)
 	@$(PYTHON) -m tools.glossary check
 
+.PHONY: prompt-index
+prompt-index: ## Regenerate docs/prompts/index.md (probabilistic-components catalog)
+	@$(PYTHON) -m tools.prompts index
+
+.PHONY: prompt-check
+prompt-check: ## Reconcile the prompt registry vs glossary + code consumers (non-blocking)
+	@$(PYTHON) -m tools.prompts check
+
 # Install the shared project git hooks (non-blocking ADR drift report on commit)
 .PHONY: hooks-install
 hooks-install: ## Install the shared project git hooks

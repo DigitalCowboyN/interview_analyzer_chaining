@@ -45,6 +45,8 @@
 | projection-smoke | everyday | Prove the projection-ordering fix (M4.9) |
 | projection-status | internal | Show projection service status |
 | projection-up | internal | Start the projection service (docker) |
+| prompt-check | everyday | Reconcile the prompt registry vs glossary + code consumers (non-blocking) |
+| prompt-index | everyday | Regenerate docs/prompts/index.md (probabilistic-components catalog) |
 | run | everyday | Run application container (API) |
 | run-api | everyday | Run FastAPI server (local, dev) |
 | run-projection | everyday | Run the projection service (standalone) |
@@ -84,3 +86,4 @@
 | python -m tools.api |  |
 | python -m tools.cli |  |
 | python -m tools.glossary |  |
+| python -m tools.prompts |  |

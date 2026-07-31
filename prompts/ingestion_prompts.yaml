@@ -2,6 +2,8 @@
 # The transcript has NO speaker labels; speakers must be inferred from
 # conversational cues (questions vs answers, first-person content, verbal tics).
 speaker_window:
+  used_for: [ingestion]
+  audience: [ingestion]
   prompt: |
     You are analyzing a raw conversation transcript that has NO speaker labels.
     The fragments below are numbered and appear in as-spoken order. Multiple people
@@ -31,6 +33,8 @@ speaker_window:
 # detect interruptions. The fragment sequence is never modified; this only
 # proposes grouping and interruption relationships.
 stitch_window:
+  used_for: [ingestion]
+  audience: [ingestion]
   prompt: |
     You are analyzing a conversation transcript. Each numbered fragment below is
     prefixed with its speaker handle. People sometimes interrupt each other, so a
