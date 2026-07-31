@@ -35,6 +35,15 @@ cli-index: ## Regenerate docs/cli/index.md (the CLI catalog)
 cli-check: ## Reconcile docs against the real CLI surface (non-blocking)
 	@$(PYTHON) -m tools.cli check
 
+# API-surface catalog + openapi.json freshness (non-blocking; imports the app)
+.PHONY: api-index
+api-index: ## Regenerate docs/api/index.md (the API catalog)
+	@$(PYTHON) -m tools.api index
+
+.PHONY: api-check
+api-check: ## Reconcile the API surface + openapi.json freshness (non-blocking)
+	@$(PYTHON) -m tools.api check
+
 # Install the shared project git hooks (non-blocking ADR drift report on commit)
 .PHONY: hooks-install
 hooks-install: ## Install the shared project git hooks
