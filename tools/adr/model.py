@@ -18,6 +18,7 @@ class Adr:
     supersedes: List[int] = field(default_factory=list)
     superseded_by: List[int] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
+    governs: List[str] = field(default_factory=list)
     source: Optional[str] = None
     path: Optional[str] = None
     body: str = ""
@@ -50,6 +51,7 @@ def parse_adr(text: str, path: Optional[str] = None) -> Adr:
         supersedes=_int_list(fm.get("supersedes")),
         superseded_by=_int_list(fm.get("superseded_by")),
         tags=list(fm.get("tags") or []),
+        governs=[str(p) for p in (fm.get("governs") or [])],
         source=fm.get("source"),
         path=path,
         body=text[offset:],
