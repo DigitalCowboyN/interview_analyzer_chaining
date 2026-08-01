@@ -78,7 +78,8 @@ def check_output_contract(entries: List[QueryEntry], root: str = ".") -> List[Fi
                 continue
             for node in ast.walk(fn):
                 var = field = None
-                if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name):
+                if (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name)
+                        and isinstance(node.ctx, ast.Load)):
                     key = node.slice
                     if isinstance(key, ast.Constant) and isinstance(key.value, str):
                         var, field = node.value.id, key.value
