@@ -22,7 +22,10 @@ def sanitize_fulltext_query(text: str) -> str:
 
 async def ensure_fulltext_index(session) -> None:
     """Lazy, idempotent DDL (vector-index idiom); await population so a
-    freshly created index is queryable in the same process."""
+    freshly created index is queryable in the same process.
+
+    graphq: purpose=ask scope=task audience=[ask]
+    """
     await session.run(
         f"CREATE FULLTEXT INDEX {FULLTEXT_INDEX} IF NOT EXISTS "
         "FOR (f:Fragment) ON EACH [f.text]"
@@ -31,6 +34,10 @@ async def ensure_fulltext_index(session) -> None:
 
 
 async def project_exists(session, project_id: str) -> bool:
+    """Whether a project exists.
+
+    graphq: purpose=ask scope=task audience=[api, ask, agents]
+    """
     query = "MATCH (p:Project {project_id: $project_id}) RETURN count(p) AS found"
     result = await session.run(query, project_id=project_id)
     record = await result.single()
@@ -38,7 +45,10 @@ async def project_exists(session, project_id: str) -> bool:
 
 
 async def name_rows(session, project_id: str) -> List[Dict[str, Any]]:
-    """Live canonical-entity names/surfaces and person names (query analysis)."""
+    """Live canonical-entity names/surfaces and person names (query analysis).
+
+    graphq: purpose=ask scope=domain-broad audience=[ask, agents]
+    """
     query = """
     MATCH (c:CanonicalEntity {project_id: $project_id})
     WHERE c.merged_into IS NULL
@@ -57,6 +67,10 @@ async def name_rows(session, project_id: str) -> List[Dict[str, Any]]:
 async def vector_fragment_rows(
     session, project_id: str, index_name: str, vector: List[float], k: int
 ) -> List[Dict[str, Any]]:
+    """Vector-similarity fragment hits, project-scoped.
+
+    graphq: purpose=ask scope=domain-broad audience=[ask, agents]
+    """
     query = """
     CALL db.index.vector.queryNodes($index_name, $fetch_k, $vector)
     YIELD node, score
@@ -76,7 +90,10 @@ async def vector_fragment_rows(
 async def vector_utterance_rows(
     session, project_id: str, index_name: str, vector: List[float], k: int
 ) -> List[Dict[str, Any]]:
-    """Utterance hits expand to member fragments, inheriting the hit's score."""
+    """Utterance hits expand to member fragments, inheriting the hit's score.
+
+    graphq: purpose=ask scope=domain-broad audience=[ask, agents]
+    """
     query = """
     CALL db.index.vector.queryNodes($index_name, $fetch_k, $vector)
     YIELD node, score
@@ -96,6 +113,10 @@ async def vector_utterance_rows(
 async def fulltext_rows(
     session, project_id: str, query_text: str, k: int
 ) -> List[Dict[str, Any]]:
+    """Full-text fragment hits, project-scoped.
+
+    graphq: purpose=ask scope=domain-broad audience=[ask, agents]
+    """
     query = f"""
     CALL db.index.fulltext.queryNodes('{FULLTEXT_INDEX}', $query_text, {{limit: $fetch_k}})
     YIELD node, score
@@ -115,7 +136,10 @@ async def fulltext_rows(
 async def graph_anchor_rows(
     session, project_id: str, canonical_ids: List[str], person_ids: List[str]
 ) -> List[Dict[str, Any]]:
-    """One row per (anchor, fragment) hit — duplicates are the ranking signal."""
+    """One row per (anchor, fragment) hit — duplicates are the ranking signal.
+
+    graphq: purpose=ask scope=domain-broad audience=[ask, agents]
+    """
     query = """
     MATCH (c:CanonicalEntity)<-[:ALIAS_OF {project_id: $project_id}]-(:Entity)
           <-[:MENTIONS]-(f:Fragment)<-[:HAS_SENTENCE]-(:Interview)
@@ -137,7 +161,10 @@ async def graph_anchor_rows(
 
 
 async def context_rows(session, fragment_ids: List[str]) -> List[Dict[str, Any]]:
-    """Everything the context blocks need, one row per fragment."""
+    """Everything the context blocks need, one row per fragment.
+
+    graphq: purpose=ask scope=domain-broad audience=[ask, agents]
+    """
     query = """
     UNWIND $fragment_ids AS fid
     MATCH (f:Fragment {sentence_id: fid})<-[:HAS_SENTENCE]-(i:Interview)

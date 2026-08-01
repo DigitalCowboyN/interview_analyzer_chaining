@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List
 
@@ -96,6 +97,54 @@ def code_literals(root: str = ".", subdirs=("src",)) -> Dict[str, CodeTerm]:
                                 if vals:
                                     out[f"{node.name}.{b.target.id}"] = CodeTerm(
                                         f"{node.name}.{b.target.id}", "literal", rel, vals)
+    return out
+
+
+_GV_LABEL = re.compile(r"[(\[]\s*\w*:([A-Z][A-Za-z]+)")
+_GV_REL = re.compile(r"\[\s*\w*:([A-Z_]{3,})")
+_GV_PROP = re.compile(r"\b\w+\.(\w+)\s*=|SET\s+\w+\.(\w+)|REQUIRE\s+\w+\.(\w+)|\{\s*(\w+)\s*:")
+
+
+def graph_vocabulary(root: str = ".", subdir: str = "src/projections") -> Dict[str, CodeTerm]:
+    out: Dict[str, CodeTerm] = {}
+    start = os.path.join(root, subdir)
+    if not os.path.isdir(start):
+        return out
+    kw = re.compile(r"\b(MATCH|MERGE|CREATE|SET|RETURN|CALL|WHERE|REMOVE|REQUIRE)\b")
+    for dirpath, _dirs, files in os.walk(start):
+        for fn in files:
+            if not fn.endswith(".py"):
+                continue
+            full = os.path.join(dirpath, fn)
+            rel = os.path.relpath(full, root).replace(os.sep, "/")
+            try:
+                tree = ast.parse(open(full, encoding="utf-8", errors="ignore").read())
+            except Exception:
+                continue
+            cypher = "\n".join(
+                n.value for n in ast.walk(tree)
+                if isinstance(n, ast.Constant) and isinstance(n.value, str) and kw.search(n.value)
+            )
+            for m in _GV_LABEL.finditer(cypher):
+                name = m.group(1)
+                if name.isupper():
+                    continue  # a rel type caught in a rel pattern, not a label
+                out.setdefault(name, CodeTerm(name, "graph-label", rel, []))
+            for m in _GV_REL.finditer(cypher):
+                out.setdefault(m.group(1), CodeTerm(m.group(1), "rel-type", rel, []))
+            for m in _GV_PROP.finditer(cypher):
+                p = next((g for g in m.groups() if g), None)
+                if p and not p[0].isupper():
+                    out.setdefault(p, CodeTerm(p, "graph-property", rel, []))
+            # rel types built dynamically: passed as UPPER_SNAKE string args to _link* helpers
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    fname = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", "")
+                    if "link" in fname.lower():
+                        for a in node.args:
+                            if (isinstance(a, ast.Constant) and isinstance(a.value, str)
+                                    and re.match(r"^[A-Z][A-Z_]{2,}$", a.value)):
+                                out.setdefault(a.value, CodeTerm(a.value, "rel-type", rel, []))
     return out
 
 

@@ -4,7 +4,9 @@ import os
 from dataclasses import dataclass
 from typing import Dict, List
 
-from tools.glossary.reader import CodeTerm, code_dimensions, code_enums, code_literals
+from tools.glossary.reader import (
+    CodeTerm, code_dimensions, code_enums, code_literals, graph_vocabulary,
+)
 from tools.glossary.model import Term, load_glossary
 from tools.glossary.render import render_index
 
@@ -47,7 +49,7 @@ def check_stale_source(code: Dict[str, CodeTerm], terms: List[Term]) -> List[Fin
         if symbol:
             if symbol not in code:
                 findings.append(Finding(f"glossary term {t.term}: code_symbol {symbol} no longer defined in code"))
-        elif t.kind in ("enum", "dimension"):
+        elif t.kind in ("enum", "dimension", "graph-label", "rel-type", "graph-property"):
             if t.term not in code:
                 findings.append(Finding(f"glossary term {t.term}: no longer defined in code (source {t.source})"))
         # registry-pinned kinds (entity-type, etc.) are not code-backed -> skip
@@ -66,10 +68,11 @@ def run_all(root: str = ".") -> List[Finding]:
     enums = code_enums(root)
     dims = code_dimensions(root)
     lits = code_literals(root)
+    gv = graph_vocabulary(root)
     terms = load_glossary(os.path.join(root, "docs/glossary"))
     findings: List[Finding] = []
-    findings += check_coverage({**enums, **dims}, terms)          # NOT lits
+    findings += check_coverage({**enums, **dims, **gv}, terms)    # NOT lits
     findings += check_enum_values({**enums, **dims, **lits}, terms)
-    findings += check_stale_source({**enums, **dims, **lits}, terms)
+    findings += check_stale_source({**enums, **dims, **lits, **gv}, terms)
     findings += check_index_in_sync(os.path.join(root, "docs/glossary/index.md"), terms)
     return findings

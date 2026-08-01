@@ -29,6 +29,10 @@ def _parse_metadata_json(raw: Optional[str]) -> Dict[str, Any]:
 
 
 async def project_exists(session, project_id: str) -> bool:
+    """Whether a project exists.
+
+    graphq: purpose=ui scope=task audience=[api, ask]
+    """
     query = "MATCH (p:Project {project_id: $project_id}) RETURN count(p) AS found"
     result = await session.run(query, project_id=project_id)
     record = await result.single()
@@ -36,6 +40,10 @@ async def project_exists(session, project_id: str) -> bool:
 
 
 async def interview_exists(session, interview_id: str) -> bool:
+    """Whether an interview exists.
+
+    graphq: purpose=ui scope=task audience=[ui]
+    """
     query = "MATCH (i:Interview {interview_id: $interview_id}) RETURN count(i) AS found"
     result = await session.run(query, interview_id=interview_id)
     record = await result.single()
@@ -43,6 +51,10 @@ async def interview_exists(session, interview_id: str) -> bool:
 
 
 async def person_exists(session, project_id: str, person_id: str) -> bool:
+    """Whether a person exists among a project's (unmerged) speakers.
+
+    graphq: purpose=ui scope=task audience=[api]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
           (:Interview)-[:HAS_SENTENCE]->(:Fragment)-[:SPOKEN_BY]->
@@ -56,6 +68,10 @@ async def person_exists(session, project_id: str, person_id: str) -> bool:
 
 
 async def persona_exists(session, project_id: str, person_id: str) -> bool:
+    """Whether a person has any persona-lens items in a project.
+
+    graphq: purpose=ui scope=task audience=[api]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
           (:Interview)-[:HAS_SENTENCE]->(f:Fragment)
@@ -71,7 +87,10 @@ async def persona_exists(session, project_id: str, person_id: str) -> bool:
 
 
 async def project_rows(session) -> List[Dict[str, Any]]:
-    """Every project with its interview count (nav landing)."""
+    """Every project with its interview count (nav landing).
+
+    graphq: purpose=ui scope=domain-broad audience=[api]
+    """
     query = """
     MATCH (p:Project)
     OPTIONAL MATCH (p)-[:CONTAINS_INTERVIEW]->(i:Interview)
@@ -83,7 +102,10 @@ async def project_rows(session) -> List[Dict[str, Any]]:
 
 
 async def interview_rows(session, project_id: str) -> List[Dict[str, Any]]:
-    """Project's interviews with fragment counts."""
+    """Project's interviews with fragment counts.
+
+    graphq: purpose=ui scope=domain-broad audience=[api]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->(i:Interview)
     OPTIONAL MATCH (i)-[:HAS_SENTENCE]->(f:Fragment)
@@ -102,6 +124,8 @@ async def interview_header_row(session, interview_id: str) -> Optional[Dict[str,
     (Neo4j can't store nested maps as node properties) written by
     InterviewMetadataUpdatedHandler; Cypher can't parse JSON, so the
     parse happens here in Python after the query returns.
+
+    graphq: purpose=ui scope=task audience=[api]
     """
     query = """
     MATCH (i:Interview {interview_id: $interview_id})
@@ -120,7 +144,10 @@ async def interview_header_row(session, interview_id: str) -> Optional[Dict[str,
 
 async def transcript_line_rows(session, interview_id: str) -> List[Dict[str, Any]]:
     """One row per fragment, ordered, with every line-detail relation carried
-    and null-stripped via the export-reader idiom."""
+    and null-stripped via the export-reader idiom.
+
+    graphq: purpose=ui scope=domain-broad audience=[api]
+    """
     query = """
     MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(f:Fragment)
     OPTIONAL MATCH (f)-[:SPOKEN_BY]->(sp:Speaker)
@@ -153,7 +180,10 @@ async def transcript_line_rows(session, interview_id: str) -> List[Dict[str, Any
 
 async def persona_card_rows(session, project_id: str) -> List[Dict[str, Any]]:
     """Persona-profile cards: one row per person with persona lens items,
-    dimension counts + a representative quote + the interviews they appear in."""
+    dimension counts + a representative quote + the interviews they appear in.
+
+    graphq: purpose=ui scope=domain-broad audience=[api]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->(i:Interview)
           -[:HAS_SENTENCE]->(f:Fragment)
@@ -181,7 +211,10 @@ async def persona_card_rows(session, project_id: str) -> List[Dict[str, Any]]:
 
 
 async def persona_detail_rows(session, project_id: str, person_id: str) -> List[Dict[str, Any]]:
-    """Persona core view: per-interview provenance for every dimension item."""
+    """Persona core view: per-interview provenance for every dimension item.
+
+    graphq: purpose=ui scope=domain-broad audience=[api]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->(i:Interview)
           -[:HAS_SENTENCE]->(f:Fragment)
@@ -200,7 +233,10 @@ async def persona_detail_rows(session, project_id: str, person_id: str) -> List[
 
 async def person_display_name_row(session, project_id: str, person_id: str) -> Optional[Dict[str, Any]]:
     """Person's display_name, project-scoped — shared by the persona and
-    person core views (both need this one fact beyond their detail rows)."""
+    person core views (both need this one fact beyond their detail rows).
+
+    graphq: purpose=ui scope=task audience=[api]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
           (:Interview)-[:HAS_SENTENCE]->(:Fragment)-[:SPOKEN_BY]->
@@ -215,7 +251,10 @@ async def person_display_name_row(session, project_id: str, person_id: str) -> O
 
 
 async def person_card_rows(session, project_id: str) -> List[Dict[str, Any]]:
-    """Person cards: identity facts (speaker + interview counts)."""
+    """Person cards: identity facts (speaker + interview counts).
+
+    graphq: purpose=ui scope=domain-broad audience=[api]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->(i:Interview)
           -[:HAS_SENTENCE]->(:Fragment)-[:SPOKEN_BY]->(sp:Speaker)
@@ -231,7 +270,10 @@ async def person_card_rows(session, project_id: str) -> List[Dict[str, Any]]:
 
 
 async def person_detail_rows(session, project_id: str, person_id: str) -> List[Dict[str, Any]]:
-    """Person core view: linked speakers per interview."""
+    """Person core view: linked speakers per interview.
+
+    graphq: purpose=ui scope=domain-broad audience=[api]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->(i:Interview)
           -[:HAS_SENTENCE]->(:Fragment)-[:SPOKEN_BY]->(sp:Speaker)
@@ -247,7 +289,10 @@ async def person_detail_rows(session, project_id: str, person_id: str) -> List[D
 
 async def person_contributes_to_persona(session, project_id: str, person_id: str) -> bool:
     """Whether this person has any persona-lens items (loose link source
-    for the person core view's `contributes_to_persona` flag)."""
+    for the person core view's `contributes_to_persona` flag).
+
+    graphq: purpose=ui scope=task audience=[api]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->
           (:Interview)-[:HAS_SENTENCE]->(f:Fragment)

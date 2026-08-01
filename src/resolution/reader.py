@@ -8,7 +8,10 @@ from typing import Any, Dict, List
 
 
 async def entity_surface_rows(session, project_id: str) -> List[Dict[str, Any]]:
-    """Distinct entity surfaces mentioned anywhere in the project, with counts."""
+    """Distinct entity surfaces mentioned anywhere in the project, with counts.
+
+    graphq: purpose=resolution scope=domain-broad audience=[resolution]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->(:Interview)
           -[:HAS_SENTENCE]->(:Fragment)-[m:MENTIONS]->(e:Entity)
@@ -20,7 +23,10 @@ async def entity_surface_rows(session, project_id: str) -> List[Dict[str, Any]]:
 
 
 async def speaker_rows(session, project_id: str) -> List[Dict[str, Any]]:
-    """Live (unmerged) speakers across the project's interviews."""
+    """Live (unmerged) speakers across the project's interviews.
+
+    graphq: purpose=resolution scope=domain-broad audience=[export, resolution]
+    """
     query = """
     MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->(i:Interview)
           -[:HAS_PARTICIPANT]->(sp:Speaker)

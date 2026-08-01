@@ -34,6 +34,8 @@
 | format | everyday | Run black formatter |
 | glossary-check | everyday | Reconcile the glossary against code vocabulary (non-blocking) |
 | glossary-index | everyday | Regenerate docs/glossary/index.md |
+| graphq-check | everyday | Reconcile graph queries vs schema + consumers (non-blocking) |
+| graphq-index | everyday | Regenerate docs/graph-queries/index.md (graph-query registry) |
 | help | everyday | Show the everyday commands |
 | hooks-install | everyday | Install the shared project git hooks |
 | ingest | everyday | Ingest + enrich a transcript (FILE=<path>) |
@@ -86,4 +88,5 @@
 | python -m tools.api |  |
 | python -m tools.cli |  |
 | python -m tools.glossary |  |
+| python -m tools.graphq |  |
 | python -m tools.prompts |  |
