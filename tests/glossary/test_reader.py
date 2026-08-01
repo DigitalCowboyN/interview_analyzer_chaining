@@ -43,10 +43,27 @@ def test_graph_vocabulary_extracts_labels_rels_props(tmp_path):
     from tools.glossary.reader import graph_vocabulary
     p = tmp_path / "src" / "projections"; p.mkdir(parents=True)
     (p / "h.py").write_text(
-        'q = "MERGE (c:Claim {claim_id: $id}) SET c.confidence = 0.9 "\n'
-        '    "MERGE (s:Speaker)-[:MADE_BY]->(c)"\n', encoding="utf-8")
+        'q = ("MERGE (c:Claim {claim_id: $id}) SET c.confidence = 0.9 "\n'
+        '    "MERGE (s:Speaker)-[:MADE_BY]->(c)")\n', encoding="utf-8")
     gv = graph_vocabulary(str(tmp_path))
     assert gv["Claim"].kind == "graph-label" and gv["Speaker"].kind == "graph-label"
     assert gv["MADE_BY"].kind == "rel-type"
     assert "claim_id" in gv and gv["claim_id"].kind == "graph-property"
     assert "confidence" in gv
+
+
+def test_graph_vocabulary_ignores_python_attributes(tmp_path):
+    from tools.glossary.reader import graph_vocabulary
+    p = tmp_path / "src" / "projections"; p.mkdir(parents=True)
+    (p / "h.py").write_text(
+        "class H:\n"
+        "    def __init__(self):\n"
+        "        self._buffer = []\n"          # python attr, NOT a graph prop
+        "        self.handler_registry = {}\n"
+        "    def run(self, session):\n"
+        "        return session.run('MERGE (c:Claim {claim_id: $id}) SET c.confidence = 0.9')\n",
+        encoding="utf-8")
+    gv = graph_vocabulary(str(tmp_path))
+    assert "claim_id" in gv and "confidence" in gv          # from the Cypher string
+    assert "_buffer" not in gv and "handler_registry" not in gv   # python attrs excluded
+    assert gv["Claim"].kind == "graph-label"

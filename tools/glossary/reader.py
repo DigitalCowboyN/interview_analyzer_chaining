@@ -110,21 +110,29 @@ def graph_vocabulary(root: str = ".", subdir: str = "src/projections") -> Dict[s
     start = os.path.join(root, subdir)
     if not os.path.isdir(start):
         return out
+    kw = re.compile(r"\b(MATCH|MERGE|CREATE|SET|RETURN|CALL|WHERE|REMOVE|REQUIRE)\b")
     for dirpath, _dirs, files in os.walk(start):
         for fn in files:
             if not fn.endswith(".py"):
                 continue
             full = os.path.join(dirpath, fn)
-            text = open(full, encoding="utf-8", errors="ignore").read()
             rel = os.path.relpath(full, root).replace(os.sep, "/")
-            for m in _GV_LABEL.finditer(text):
+            try:
+                tree = ast.parse(open(full, encoding="utf-8", errors="ignore").read())
+            except Exception:
+                continue
+            cypher = "\n".join(
+                n.value for n in ast.walk(tree)
+                if isinstance(n, ast.Constant) and isinstance(n.value, str) and kw.search(n.value)
+            )
+            for m in _GV_LABEL.finditer(cypher):
                 name = m.group(1)
                 if name.isupper():
                     continue  # a rel type caught in a rel pattern, not a label
                 out.setdefault(name, CodeTerm(name, "graph-label", rel, []))
-            for m in _GV_REL.finditer(text):
+            for m in _GV_REL.finditer(cypher):
                 out.setdefault(m.group(1), CodeTerm(m.group(1), "rel-type", rel, []))
-            for m in _GV_PROP.finditer(text):
+            for m in _GV_PROP.finditer(cypher):
                 p = next((g for g in m.groups() if g), None)
                 if p and not p[0].isupper():
                     out.setdefault(p, CodeTerm(p, "graph-property", rel, []))
