@@ -38,7 +38,10 @@ async def _load_interview(interview_id: str) -> Tuple[InterviewRepository, Inter
 
 @router.get("/interviews/{interview_id}/segments")
 async def list_segments(interview_id: str):
-    """Topic segments with their fragment ranges, in transcript order."""
+    """Topic segments with their fragment ranges, in transcript order.
+
+    graphq: purpose=ui scope=task audience=[api]
+    """
     async with await Neo4jConnectionManager.get_session() as session:
         exists = await session.run(
             "MATCH (i:Interview {interview_id: $interview_id}) RETURN count(i) AS found",

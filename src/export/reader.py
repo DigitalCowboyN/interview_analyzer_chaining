@@ -8,6 +8,10 @@ from typing import Any, Dict, List, Optional
 
 
 async def transcript_rows(session, interview_id: str) -> List[Dict[str, Any]]:
+    """Full transcript: fragments with speaker + utterance links, in order.
+
+    graphq: purpose=export scope=domain-broad audience=[export]
+    """
     query = """
     MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)
     OPTIONAL MATCH (s)-[:SPOKEN_BY]->(sp:Speaker)
@@ -22,7 +26,10 @@ async def transcript_rows(session, interview_id: str) -> List[Dict[str, Any]]:
 
 
 async def segment_rows(session, interview_id: str) -> List[Dict[str, Any]]:
-    """Topic segments with their fragment ranges (Layer 4 overlay)."""
+    """Topic segments with their fragment ranges (Layer 4 overlay).
+
+    graphq: purpose=export scope=domain-broad audience=[api, export]
+    """
     query = """
     MATCH (seg:Segment {interview_id: $interview_id})-[:CONTAINS]->(f:Fragment)
     RETURN seg.segment_id AS segment_id, seg.topic AS topic,
@@ -35,6 +42,10 @@ async def segment_rows(session, interview_id: str) -> List[Dict[str, Any]]:
 
 
 async def speaker_rows(session, interview_id: str) -> List[Dict[str, Any]]:
+    """Interview's live (unmerged) speakers.
+
+    graphq: purpose=export scope=domain-broad audience=[export, resolution]
+    """
     query = """
     MATCH (i:Interview {interview_id: $interview_id})-[:HAS_PARTICIPANT]->(sp:Speaker)
     WHERE sp.merged_into IS NULL
@@ -55,6 +66,10 @@ async def lens_item_rows(
     limit: Optional[int] = None,
     offset: int = 0,
 ) -> List[Dict[str, Any]]:
+    """Lens items for an interview/lens, with speaker links and supporting fragments.
+
+    graphq: purpose=export scope=domain-broad audience=[api, export]
+    """
     query = """
     MATCH (n:LensItem {interview_id: $interview_id, lens: $lens})
     WHERE ($node_type IS NULL OR n.node_type = $node_type)
@@ -88,6 +103,10 @@ async def lens_item_rows(
 
 
 async def claim_rows(session, interview_id: str) -> List[Dict[str, Any]]:
+    """Claims extracted for an interview, with speaker and supporting fragments.
+
+    graphq: purpose=export scope=domain-broad audience=[export]
+    """
     query = """
     MATCH (c:Claim {interview_id: $interview_id})
     OPTIONAL MATCH (c)-[:MADE_BY]->(sp:Speaker)
@@ -104,6 +123,10 @@ async def claim_rows(session, interview_id: str) -> List[Dict[str, Any]]:
 
 
 async def entity_rows(session, interview_id: str) -> List[Dict[str, Any]]:
+    """Entity mentions for an interview, resolved to canonical entities where linked.
+
+    graphq: purpose=export scope=domain-broad audience=[export]
+    """
     query = """
     MATCH (proj:Project)-[:CONTAINS_INTERVIEW]->
           (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)-[m:MENTIONS]->(e:Entity)
@@ -120,7 +143,10 @@ async def entity_rows(session, interview_id: str) -> List[Dict[str, Any]]:
 
 
 async def person_rows(session, interview_id: str) -> List[Dict[str, Any]]:
-    """Persons identified for this interview's speakers."""
+    """Persons identified for this interview's speakers.
+
+    graphq: purpose=export scope=domain-broad audience=[export]
+    """
     query = """
     MATCH (:Interview {interview_id: $interview_id})-[:HAS_PARTICIPANT]->
           (sp:Speaker)-[:IDENTIFIED_AS]->(p:Person)
@@ -140,6 +166,10 @@ async def worklist_rows(
     limit: int = 50,
     offset: int = 0,
 ) -> Dict[str, List[Dict[str, Any]]]:
+    """Low-confidence lens items and claims (optionally project-scoped), for the review worklist.
+
+    graphq: purpose=export scope=domain-broad audience=[api]
+    """
     lens_item_query = """
     MATCH (n:LensItem)
     WHERE ($project_id IS NULL OR EXISTS {
@@ -201,6 +231,10 @@ async def speaker_rollup_rows(
     offset: int = 0,
     scan_cap: int = 5000,
 ) -> List[Dict[str, Any]]:
+    """Speaker-grouped rollup of lens items and claims, linked to Person where resolved.
+
+    graphq: purpose=export scope=domain-broad audience=[api]
+    """
     # bounded scan: grouping/pagination happen in Python; raise scan_cap for very large projects
     items_query = """
     MATCH (n:LensItem)-[r]->(sp:Speaker)
@@ -253,6 +287,10 @@ async def speaker_rollup_rows(
 
 
 async def analysis_rows(session, interview_id: str) -> List[Dict[str, Any]]:
+    """Latest per-fragment analysis: function/structure/purpose/topics/keywords.
+
+    graphq: purpose=export scope=domain-broad audience=[export]
+    """
     query = """
     MATCH (i:Interview {interview_id: $interview_id})-[:HAS_SENTENCE]->(s:Fragment)
     OPTIONAL MATCH (s)-[:SPOKEN_BY]->(sp:Speaker)
