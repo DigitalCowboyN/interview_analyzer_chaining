@@ -61,6 +61,15 @@ prompt-index: ## Regenerate docs/prompts/index.md (probabilistic-components cata
 prompt-check: ## Reconcile the prompt registry vs glossary + code consumers (non-blocking)
 	@$(PYTHON) -m tools.prompts check
 
+# Graph-query registry: schema-drift + output-contract reconciliation (non-blocking)
+.PHONY: graphq-index
+graphq-index: ## Regenerate docs/graph-queries/index.md (graph-query registry)
+	@$(PYTHON) -m tools.graphq index
+
+.PHONY: graphq-check
+graphq-check: ## Reconcile graph queries vs schema + consumers (non-blocking)
+	@$(PYTHON) -m tools.graphq check
+
 # Install the shared project git hooks (non-blocking ADR drift report on commit)
 .PHONY: hooks-install
 hooks-install: ## Install the shared project git hooks
