@@ -37,3 +37,16 @@ def test_code_literals_extracts_field_literals(tmp_path):
     assert "Claim.kind" in lits
     assert lits["Claim.kind"].values == ["assertion", "commitment", "request"]
     assert lits["Claim.kind"].source == "src/m.py"
+
+
+def test_graph_vocabulary_extracts_labels_rels_props(tmp_path):
+    from tools.glossary.reader import graph_vocabulary
+    p = tmp_path / "src" / "projections"; p.mkdir(parents=True)
+    (p / "h.py").write_text(
+        'q = "MERGE (c:Claim {claim_id: $id}) SET c.confidence = 0.9 "\n'
+        '    "MERGE (s:Speaker)-[:MADE_BY]->(c)"\n', encoding="utf-8")
+    gv = graph_vocabulary(str(tmp_path))
+    assert gv["Claim"].kind == "graph-label" and gv["Speaker"].kind == "graph-label"
+    assert gv["MADE_BY"].kind == "rel-type"
+    assert "claim_id" in gv and gv["claim_id"].kind == "graph-property"
+    assert "confidence" in gv

@@ -63,3 +63,18 @@ def test_stale_source_skips_registry_pinned_and_honors_code_symbol():
     # a code_symbol that vanished -> stale
     ck2 = Term("claim-kind", "claim-kind", "src/m.py", ["assertion"], "", "p"); ck2.code_symbol = "Gone.kind"
     assert check_stale_source({}, [ck2])
+
+
+def test_coverage_and_stale_cover_graph_kinds():
+    from tools.glossary.reader import CodeTerm
+    from tools.glossary.model import Term
+    from tools.glossary.check import check_coverage, check_stale_source
+    code = {"Claim": CodeTerm("Claim", "graph-label", "src/projections/h.py", [])}
+    # code defines a graph-label with no glossary term -> coverage finding
+    assert check_coverage(code, [])
+    # a graph-label glossary term not in code -> stale
+    t = Term("GoneLabel", "graph-label", "src/projections/h.py", [], "", "p")
+    assert check_stale_source({}, [t])
+    # covered -> no findings
+    ct = Term("Claim", "graph-label", "src/projections/h.py", [], "", "p")
+    assert check_coverage(code, [ct]) == [] and check_stale_source(code, [ct]) == []
