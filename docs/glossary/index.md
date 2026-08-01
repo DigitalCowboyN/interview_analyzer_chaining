@@ -106,6 +106,9 @@
 | INTERRUPTS | rel-type | src/projections/handlers/utterance_handlers.py |
 | MADE_BY | rel-type | src/projections/handlers/claim_handlers.py |
 | MENTIONS | rel-type | src/projections/handlers/entity_handlers.py |
+| MENTIONS_DOMAIN_KEYWORD | rel-type | src/projections/handlers/sentence_handlers.py |
+| MENTIONS_OVERALL_KEYWORD | rel-type | src/projections/handlers/sentence_handlers.py |
+| MENTIONS_TOPIC | rel-type | src/projections/handlers/sentence_handlers.py |
 | PART_OF_UTTERANCE | rel-type | src/projections/handlers/utterance_handlers.py |
 | SPOKE | rel-type | src/projections/handlers/speaker_handlers.py |
 | SPOKEN_BY | rel-type | src/projections/handlers/speaker_handlers.py |

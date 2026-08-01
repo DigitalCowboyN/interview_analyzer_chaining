@@ -136,6 +136,15 @@ def graph_vocabulary(root: str = ".", subdir: str = "src/projections") -> Dict[s
                 p = next((g for g in m.groups() if g), None)
                 if p and not p[0].isupper():
                     out.setdefault(p, CodeTerm(p, "graph-property", rel, []))
+            # rel types built dynamically: passed as UPPER_SNAKE string args to _link* helpers
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    fname = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", "")
+                    if "link" in fname.lower():
+                        for a in node.args:
+                            if (isinstance(a, ast.Constant) and isinstance(a.value, str)
+                                    and re.match(r"^[A-Z][A-Z_]{2,}$", a.value)):
+                                out.setdefault(a.value, CodeTerm(a.value, "rel-type", rel, []))
     return out
 
 
