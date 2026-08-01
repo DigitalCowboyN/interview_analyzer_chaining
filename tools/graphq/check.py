@@ -1,6 +1,7 @@
 # tools/graphq/check.py
 from __future__ import annotations
 
+import ast
 import glob
 import os
 import re
@@ -32,22 +33,63 @@ def check_schema_drift(entries: List[QueryEntry], vocab: Dict) -> List[Finding]:
 
 def check_output_contract(entries: List[QueryEntry], root: str = ".") -> List[Finding]:
     findings: List[Finding] = []
-    src = {os.path.relpath(f, root).replace(os.sep, "/"): open(f, encoding="utf-8", errors="ignore").read()
-           for f in glob.glob(os.path.join(root, "src", "**", "*.py"), recursive=True)}
-    for e in entries:
-        if not e.returns:
+    by_name = {e.name: e for e in entries}
+
+    def _query_of_call(node):
+        if isinstance(node, ast.Call):
+            fname = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", "")
+            return by_name.get(fname)
+        return None
+
+    def _query_in(expr):
+        for n in ast.walk(expr):
+            q = _query_of_call(n)
+            if q:
+                return q
+        return None
+
+    for f in glob.glob(os.path.join(root, "src", "**", "*.py"), recursive=True):
+        rel = os.path.relpath(f, root).replace(os.sep, "/")
+        if rel.endswith("reader.py"):
             continue
-        returned = set(e.returns)
-        call = re.compile(rf"\b{re.escape(e.name)}\s*\(")
-        access = re.compile(r"""(?:\[["']|\.get\(["'])(\w+)["']""")
-        for rel, text in src.items():
-            if rel.endswith("reader.py") or not call.search(text):
+        try:
+            tree = ast.parse(open(f, encoding="utf-8", errors="ignore").read())
+        except Exception:
+            continue
+        for fn in ast.walk(tree):
+            if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            for m in access.finditer(text):
-                fld = m.group(1)
-                # only flag fields that look like query outputs (appear in some query's returns)
-                if fld not in returned and any(fld in x.returns for x in entries):
-                    findings.append(Finding(f"{rel} reads field '{fld}' not returned by {e.bundle}:{e.name}"))
+            var_query = {}  # varname -> QueryEntry
+            for node in ast.walk(fn):
+                if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                    q = _query_in(node.value)
+                    if q:
+                        var_query[node.targets[0].id] = q
+                if isinstance(node, ast.For) and isinstance(node.target, ast.Name):
+                    q = _query_in(node.iter)
+                    if q:
+                        var_query[node.target.id] = q
+            # one hop: `for row in <var-bound-to-a-query>`
+            for node in ast.walk(fn):
+                if (isinstance(node, ast.For) and isinstance(node.target, ast.Name)
+                        and isinstance(node.iter, ast.Name) and node.iter.id in var_query):
+                    var_query.setdefault(node.target.id, var_query[node.iter.id])
+            if not var_query:
+                continue
+            for node in ast.walk(fn):
+                var = field = None
+                if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name):
+                    key = node.slice
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                        var, field = node.value.id, key.value
+                elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                      and node.func.attr == "get" and isinstance(node.func.value, ast.Name)
+                      and node.args and isinstance(node.args[0], ast.Constant)
+                      and isinstance(node.args[0].value, str)):
+                    var, field = node.func.value.id, node.args[0].value
+                if var in var_query and field and field not in var_query[var].returns:
+                    q = var_query[var]
+                    findings.append(Finding(f"{rel} reads field '{field}' not returned by {q.bundle}:{q.name}"))
     return findings
 
 
