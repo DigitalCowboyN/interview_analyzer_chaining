@@ -14,6 +14,8 @@
 | clean-coverage | everyday | Remove coverage data |
 | cli-check | everyday | Reconcile docs against the real CLI surface (non-blocking) |
 | cli-index | everyday | Regenerate docs/cli/index.md (the CLI catalog) |
+| code-check | everyday | Reconcile the code map vs the import graph (non-blocking) |
+| code-index | everyday | Regenerate docs/code/index.md + pipeline.md (code map) |
 | coverage | internal | Coverage report (terminal) |
 | coverage-html | internal | Coverage report (HTML) |
 | coverage-xml | internal | Coverage report (XML, for CI) |
@@ -87,6 +89,7 @@
 | python -m tools.adr |  |
 | python -m tools.api |  |
 | python -m tools.cli |  |
+| python -m tools.code |  |
 | python -m tools.glossary |  |
 | python -m tools.graphq |  |
 | python -m tools.prompts |  |
