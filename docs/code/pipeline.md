@@ -3,7 +3,6 @@
 ```mermaid
 graph LR
     agents --> utils
-    agents.agent_factory --> config
     agents.agent_factory --> utils
     api --> ask
     api --> commands
@@ -19,7 +18,6 @@ graph LR
     ask --> projections
     ask --> utils
     ask.engine --> agents
-    ask.engine --> config
     ask.engine --> enrichment
     ask.engine --> projections
     ask.engine --> utils
@@ -31,14 +29,12 @@ graph LR
     enrichment.executor --> agents
     enrichment.executor --> utils
     enrichment.orchestrator --> agents
-    enrichment.orchestrator --> config
     enrichment.orchestrator --> events
     enrichment.orchestrator --> utils
     events --> utils
     export --> events
     export --> lens
     export --> utils
-    export.bundler --> config
     export.bundler --> events
     export.bundler --> lens
     export.bundler --> utils
@@ -63,7 +59,6 @@ graph LR
     lens --> events
     lens --> utils
     lens.engine --> agents
-    lens.engine --> config
     lens.engine --> enrichment
     lens.engine --> events
     lens.engine --> utils
@@ -75,7 +70,6 @@ graph LR
     resolution --> enrichment
     resolution --> events
     resolution --> utils
-    resolution.engine --> config
     resolution.engine --> enrichment
     resolution.engine --> events
     resolution.engine --> utils

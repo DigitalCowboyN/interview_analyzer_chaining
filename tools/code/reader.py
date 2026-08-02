@@ -92,7 +92,7 @@ def load_units(root: str = ".", code_dir: str = "docs/code") -> List[CodeUnit]:
     for path in sorted(glob.glob(os.path.join(root, code_dir, "*.md"))):
         if os.path.basename(path) in ("index.md", "pipeline.md"):
             continue
-        text = open(path, encoding="utf-8").read()
+        text = open(path, encoding="utf-8", errors="ignore").read()
         fm, offset = parse_front_matter(text)
         if not fm or "unit" not in fm:
             continue
@@ -109,6 +109,7 @@ def load_units(root: str = ".", code_dir: str = "docs/code") -> List[CodeUnit]:
 def dep_edges_for_module(unit: str, root: str) -> List[str]:
     if "." not in unit:
         return []
+    valid = set(packages(root))  # only edges to documented packages (mirrors dep_edges)
     deps = set()
     for f in _files_of(unit, root):
         try:
@@ -117,6 +118,6 @@ def dep_edges_for_module(unit: str, root: str) -> List[str]:
             continue
         pkg = unit.split(".")[0]
         for m in _IMPORT.finditer(t):
-            if m.group(1) != pkg:
+            if m.group(1) != pkg and m.group(1) in valid:
                 deps.add(m.group(1))
     return sorted(deps)

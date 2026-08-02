@@ -27,7 +27,7 @@ def check_map_in_sync(index_path: str, pipeline_path: str, units: List[CodeUnit]
     findings: List[Finding] = []
     for path, render in ((index_path, render_index), (pipeline_path, render_pipeline)):
         want = render(units)
-        have = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+        have = open(path, encoding="utf-8", errors="ignore").read() if os.path.exists(path) else ""
         if want != have:
             findings.append(Finding(f"code: {os.path.basename(path)} out of sync — run make code-index (new dependency?)"))
     return findings
