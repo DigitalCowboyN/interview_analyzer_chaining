@@ -70,6 +70,14 @@ graphq-index: ## Regenerate docs/graph-queries/index.md (graph-query registry)
 graphq-check: ## Reconcile graph queries vs schema + consumers (non-blocking)
 	@$(PYTHON) -m tools.graphq check
 
+.PHONY: code-index
+code-index: ## Regenerate docs/code/index.md + pipeline.md (code map)
+	@$(PYTHON) -m tools.code index
+
+.PHONY: code-check
+code-check: ## Reconcile the code map vs the import graph (non-blocking)
+	@$(PYTHON) -m tools.code check
+
 # Install the shared project git hooks (non-blocking ADR drift report on commit)
 .PHONY: hooks-install
 hooks-install: ## Install the shared project git hooks
