@@ -9,6 +9,11 @@ from typing import List
 from src.ingestion.front_matter import parse_front_matter
 from tools.code.reader import KEY_MODULES, load_units, packages
 
+# The capability category axis — an open, ordered set. product/operations are
+# populated; strategic/supporting are reserved (recognized by the guard, skipped by
+# the renderer until a node uses them). Adding a value = one edit here.
+CATEGORIES = ["product", "operations", "strategic", "supporting"]
+
 
 @dataclass
 class Capability:
@@ -19,6 +24,7 @@ class Capability:
     implemented_by: List[str]
     statement: str
     path: str
+    category: str = ""   # product | operations | … (primaries; children inherit)
 
 
 def load_capabilities(root: str = ".", cap_dir: str = "docs/capabilities") -> List[Capability]:
@@ -41,6 +47,7 @@ def load_capabilities(root: str = ".", cap_dir: str = "docs/capabilities") -> Li
             implemented_by=list(fm.get("implemented_by") or []),
             statement=text[offset:].strip(),
             path=path,
+            category=str(fm.get("category", "")),
         ))
     return caps
 
