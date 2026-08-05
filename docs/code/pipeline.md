@@ -73,6 +73,16 @@ graph LR
     resolution.engine --> enrichment
     resolution.engine --> events
     resolution.engine --> utils
+    tools.adr --> ingestion
+    tools.api
+    tools.capability --> ingestion
+    tools.capability --> tools.code
+    tools.cli
+    tools.code --> ingestion
+    tools.glossary --> ingestion
+    tools.graphq --> tools.glossary
+    tools.knowledge
+    tools.prompts --> tools.glossary
     ui --> events
     ui.reader
     utils

@@ -56,3 +56,17 @@ See `pipeline.md` for the dependency graph.
 | ask.reader | Neo4j |  |
 | ui | ESDB, HTTP, Neo4j | events |
 | ui.reader | ESDB, Neo4j |  |
+
+## tooling
+
+| unit | io | depends_on |
+| --- | --- | --- |
+| tools.adr | files | ingestion |
+| tools.api | LLM, files |  |
+| tools.capability | files | ingestion, tools.code |
+| tools.cli | files |  |
+| tools.code | ESDB, HTTP, LLM, Neo4j, files | ingestion |
+| tools.glossary | files | ingestion |
+| tools.graphq | files | tools.glossary |
+| tools.knowledge | files |  |
+| tools.prompts | files | tools.glossary |
