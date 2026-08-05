@@ -18,7 +18,12 @@ KEY_MODULES = [
     "resolution.engine", "agents.agent_factory",
 ]
 
-_IMPORT = re.compile(r"(?:from|import)\s+src\.(\w+)")
+_IMPORT = re.compile(r"(?:from|import)\s+(src|tools)\.(\w+)")
+
+
+def _dep_slug(match) -> str:
+    tree, name = match.group(1), match.group(2)
+    return name if tree == "src" else f"tools.{name}"
 
 
 @dataclass
@@ -33,18 +38,21 @@ class CodeUnit:
 
 
 def packages(root: str = ".") -> List[str]:
-    src = os.path.join(root, "src")
     out = []
-    if os.path.isdir(src):
-        for name in sorted(os.listdir(src)):
-            p = os.path.join(src, name)
-            if os.path.isdir(p) and name != "__pycache__":
-                out.append(name)
+    for tree, prefix in (("src", ""), ("tools", "tools.")):
+        base = os.path.join(root, tree)
+        if os.path.isdir(base):
+            for name in sorted(os.listdir(base)):
+                if os.path.isdir(os.path.join(base, name)) and name != "__pycache__":
+                    out.append(f"{prefix}{name}")
     return out
 
 
 def _files_of(unit: str, root: str) -> List[str]:
-    # package -> all its .py; dotted module -> that one file
+    # tools package -> all its .py; src package -> all its .py; src dotted module -> that one file
+    if unit.startswith("tools."):
+        pkg = unit.split(".", 1)[1]
+        return glob.glob(os.path.join(root, "tools", pkg, "**", "*.py"), recursive=True)
     if "." in unit:
         return [os.path.join(root, "src", *unit.split(".")) + ".py"]
     return glob.glob(os.path.join(root, "src", unit, "**", "*.py"), recursive=True)
@@ -60,7 +68,7 @@ def dep_edges(root: str = ".") -> Dict[str, List[str]]:
             except Exception:
                 continue
             for m in _IMPORT.finditer(text):
-                dep = m.group(1)
+                dep = _dep_slug(m)
                 if dep != pkg and dep in edges:
                     edges[pkg].add(dep)
     return {p: sorted(s) for p, s in edges.items()}
@@ -107,17 +115,18 @@ def load_units(root: str = ".", code_dir: str = "docs/code") -> List[CodeUnit]:
 
 
 def dep_edges_for_module(unit: str, root: str) -> List[str]:
-    if "." not in unit:
+    if "." not in unit or unit.startswith("tools."):
         return []
-    valid = set(packages(root))  # only edges to documented packages (mirrors dep_edges)
+    valid = set(packages(root))
+    parent = unit.split(".")[0]
     deps = set()
     for f in _files_of(unit, root):
         try:
             t = open(f, encoding="utf-8", errors="ignore").read()
         except Exception:
             continue
-        pkg = unit.split(".")[0]
         for m in _IMPORT.finditer(t):
-            if m.group(1) != pkg and m.group(1) in valid:
-                deps.add(m.group(1))
+            dep = _dep_slug(m)
+            if dep != parent and dep in valid:
+                deps.add(dep)
     return sorted(deps)
