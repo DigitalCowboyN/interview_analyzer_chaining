@@ -617,3 +617,19 @@ git commit -m "docs(adr): ADR-0016 — adopt knowledge cascade + spec/plan hones
 - [ ] `docs/index.md` renders as a table on GitHub; every domain links to a real `index.md`.
 - [ ] Live hooks: an architectural prompt yields the ADR pointer (not the table); a Write to a `specs/` or `plans/` path yields the honesty-check reminder; a Write elsewhere is silent.
 - [ ] `scripts/with-adr-py.sh` is gone and nothing references it.
+
+## Knowledge-graph check
+
+Reviewed against `docs/index.md` on 2026-08-05.
+
+| domain | touched? | consulted / reconciled | notes |
+| --- | --- | --- | --- |
+| adr | yes | captured as ADR-0016 (`source:` = the spec) | extends ADR-0015's disclosure model; no supersede |
+| cli | yes | added `make knowledge-check` → ran `cli-index`; `cli-check` clean | new make target enters the CLI catalog |
+| code | no | — | `tools/knowledge/` lives under `tools/`, not a `src/` package |
+| glossary | no | — | no new domain vocabulary pinned to code enums |
+| api | no | — | no HTTP surface change |
+| prompts | no | — | no LLM prompt added or changed |
+| graph-queries | no | — | no Neo4j read-query change |
+
+**Verdict:** reconciled — every touched domain consulted; ADR-0016 + cli catalog regenerated.
