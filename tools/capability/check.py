@@ -5,10 +5,10 @@ import os
 from dataclasses import dataclass
 from typing import List
 
-from tools.capability.reader import code_nodes, load_capabilities, real_code_units
+from tools.capability.reader import CATEGORIES, code_nodes, load_capabilities, real_code_units
 from tools.capability.render import render_index
 
-_MANDATORY_ROLES = ("pipeline-layer", "surface")
+_MANDATORY_ROLES = ("pipeline-layer", "surface", "tooling")
 _VALID_KINDS = ("primary", "child", "variant")
 
 
@@ -34,7 +34,7 @@ def check_coverage(caps, nodes) -> List[Finding]:
     findings: List[Finding] = []
     for n in nodes:
         if n.role not in _MANDATORY_ROLES:
-            continue  # infrastructure/model/agent/tooling — advisory, never flagged
+            continue  # infrastructure/model/agent — advisory, never flagged
         parent_pkg = n.unit.split(".")[0]
         if n.unit not in claimed and parent_pkg not in claimed:
             findings.append(Finding(
@@ -48,8 +48,11 @@ def check_classification(caps) -> List[Finding]:
     for c in caps:
         if c.kind not in _VALID_KINDS:
             findings.append(Finding(f"capability: {c.slug} has no/invalid kind"))
-        if c.kind == "primary" and c.tier not in ("core", "enabling"):
-            findings.append(Finding(f"capability: primary {c.slug} has no tier"))
+        if c.kind == "primary":
+            if c.tier not in ("core", "enabling"):
+                findings.append(Finding(f"capability: primary {c.slug} has no tier"))
+            if c.category not in CATEGORIES:
+                findings.append(Finding(f"capability: primary {c.slug} has no/invalid category"))
         if c.kind in ("child", "variant"):
             if not c.parent:
                 findings.append(Finding(f"capability: {c.kind} {c.slug} has no parent"))

@@ -34,3 +34,15 @@ def test_code_nodes_carry_roles():
     nodes = code_nodes(".")
     roles = {n.unit: n.role for n in nodes}
     assert roles.get("api") == "surface" and roles.get("lens") == "pipeline-layer"
+
+
+def test_load_parses_category(tmp_path):
+    import os
+    from tools.capability.reader import load_capabilities, CATEGORIES
+    cap = tmp_path / "docs/capabilities/x.md"
+    os.makedirs(os.path.dirname(cap), exist_ok=True)
+    open(cap, "w").write("---\ntype: Capability\nkind: primary\ntier: core\n"
+                         "category: operations\nimplemented_by: [tools.code]\n---\nDoes a thing.\n")
+    c = load_capabilities(str(tmp_path))[0]
+    assert c.category == "operations"
+    assert CATEGORIES[:2] == ["product", "operations"]  # product/operations populated; then reserved

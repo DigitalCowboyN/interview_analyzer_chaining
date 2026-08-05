@@ -19,3 +19,4 @@
 | 0015 | Adopt an OKF-conformant, non-blocking ADR corpus for architectural decisions | accepted |
 | 0016 | Adopt knowledge cascade and spec/plan honesty check | accepted |
 | 0017 | Adopt a capabilities domain linked to the code map | accepted |
+| 0018 | Adopt the capability category axis and operations capabilities | accepted |

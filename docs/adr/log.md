@@ -17,3 +17,4 @@
 - 2026-07-30 — **0015** Adopt an OKF-conformant, non-blocking ADR corpus for architectural decisions · _accepted_
 - 2026-08-05 — **0016** Adopt knowledge cascade and spec/plan honesty check · _accepted_
 - 2026-08-05 — **0017** Adopt a capabilities domain linked to the code map · _accepted_
+- 2026-08-05 — **0018** Adopt the capability category axis and operations capabilities · _accepted_
