@@ -17,3 +17,4 @@
 | 0013 | Read-side OKF exporter over Neo4j | accepted |
 | 0014 | Hand-rolled hybrid retrieval instead of adopting neo4j-graphrag-python | accepted |
 | 0015 | Adopt an OKF-conformant, non-blocking ADR corpus for architectural decisions | accepted |
+| 0016 | Adopt knowledge cascade and spec/plan honesty check | accepted |

@@ -78,6 +78,10 @@ code-index: ## Regenerate docs/code/index.md + pipeline.md (code map)
 code-check: ## Reconcile the code map vs the import graph (non-blocking)
 	@$(PYTHON) -m tools.code check
 
+.PHONY: knowledge-check
+knowledge-check: ## Reconcile specs/plans + cascade root vs the knowledge domains (non-blocking)
+	@$(PYTHON) -m tools.knowledge check
+
 # Install the shared project git hooks (non-blocking ADR drift report on commit)
 .PHONY: hooks-install
 hooks-install: ## Install the shared project git hooks

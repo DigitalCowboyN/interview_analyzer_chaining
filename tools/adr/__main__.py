@@ -44,14 +44,15 @@ def cmd_new(args) -> int:
 
 
 def cmd_context(args) -> int:
-    # UserPromptSubmit hook: stdout is injected as context. Quiet unless architectural.
+    # UserPromptSubmit hook: a PROVISIONAL, lean before-signal. Emits a pointer (not
+    # the full ADR table) only on architectural prompts. Retire once the cascade
+    # reliably gets ADRs consulted without it (see the 2026-08-05 knowledge-cascade
+    # spec's retirement criterion).
     prompt = _read_stdin_json().get("prompt", "")
     if is_architectural(prompt):
-        try:
-            print(open(f"{args.adr_dir}/index.md", encoding="utf-8").read())
-            print("(Before locking a decision, consult these ADRs; supersede rather than silently override.)")
-        except FileNotFoundError:
-            pass
+        print("Locking an architectural decision? Consult docs/adr/index.md before "
+              "you do (and docs/index.md for the wider knowledge map). "
+              "Supersede rather than silently override.")
     return 0
 
 

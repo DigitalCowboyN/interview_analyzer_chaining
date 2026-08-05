@@ -41,6 +41,7 @@
 | help | everyday | Show the everyday commands |
 | hooks-install | everyday | Install the shared project git hooks |
 | ingest | everyday | Ingest + enrich a transcript (FILE=<path>) |
+| knowledge-check | everyday | Reconcile specs/plans + cascade root vs the knowledge domains (non-blocking) |
 | lint | everyday | Run flake8 linter |
 | live-feed-smoke | everyday | Prove the SSE live-feed bridge delivers a real ESDB event |
 | projection-down | internal | Stop the projection service |
@@ -92,4 +93,5 @@
 | python -m tools.code |  |
 | python -m tools.glossary |  |
 | python -m tools.graphq |  |
+| python -m tools.knowledge |  |
 | python -m tools.prompts |  |
