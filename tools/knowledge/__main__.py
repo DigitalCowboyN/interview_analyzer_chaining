@@ -29,7 +29,8 @@ def cmd_check(args) -> int:
 
 def cmd_nudge(args) -> int:
     # PostToolUse(Write) hook: honesty-check reminder when a spec/plan lands.
-    path = _read_stdin_json().get("tool_input", {}).get("file_path", "").replace("\\", "/")
+    # `or {}` guards a JSON `null` tool_input (the {} default only covers a missing key).
+    path = (_read_stdin_json().get("tool_input") or {}).get("file_path", "").replace("\\", "/")
     if any(d in path for d in _SPEC_PLAN_DIRS):
         print("This spec/plan likely touches the knowledge graph. Review it against "
               "docs/index.md: for each domain it affects, consult the bundle and run "

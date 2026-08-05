@@ -31,3 +31,10 @@ def test_nudge_silent_on_other_path():
     proc = _run(["nudge"], stdin=json.dumps({"tool_input": {"file_path": "src/api/main.py"}}))
     assert proc.returncode == 0
     assert proc.stdout.strip() == ""
+
+
+def test_nudge_survives_null_tool_input():
+    # a JSON null tool_input must not raise (non-blocking hook invariant)
+    proc = _run(["nudge"], stdin=json.dumps({"tool_input": None}))
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == ""
