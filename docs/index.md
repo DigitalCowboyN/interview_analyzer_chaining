@@ -9,6 +9,7 @@ surface it covers. All checks are non-blocking (visibility, not gates).
 | [adr/](adr/index.md) | architectural decisions (what & why) — consult before locking one | `make adr-check` |
 | [glossary/](glossary/index.md) | canonical vocabulary (nodes, lenses, dimensions, graph labels) pinned to code enums | `make glossary-check` |
 | [code/](code/index.md) | package/module map: roles, derived deps + I/O, Mermaid pipeline | `make code-check` |
+| [capabilities/](capabilities/index.md) | what the system can do (value-framed), linked to the code map | `make capability-check` |
 | [api/](api/index.md) | HTTP surface vs. committed `openapi.json` | `make api-check` |
 | [cli/](cli/index.md) | command surface (CLI + make targets) | `make cli-check` |
 | [prompts/](prompts/index.md) | probabilistic components — the LLM prompts the agents use | `make prompt-check` |

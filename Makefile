@@ -82,6 +82,14 @@ code-check: ## Reconcile the code map vs the import graph (non-blocking)
 knowledge-check: ## Reconcile specs/plans + cascade root vs the knowledge domains (non-blocking)
 	@$(PYTHON) -m tools.knowledge check
 
+.PHONY: capability-index
+capability-index: ## Regenerate docs/capabilities/index.md (the capability catalogue)
+	@$(PYTHON) -m tools.capability index
+
+.PHONY: capability-check
+capability-check: ## Reconcile capabilities vs the code map + coverage (non-blocking)
+	@$(PYTHON) -m tools.capability check
+
 # Install the shared project git hooks (non-blocking ADR drift report on commit)
 .PHONY: hooks-install
 hooks-install: ## Install the shared project git hooks
