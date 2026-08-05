@@ -2,13 +2,14 @@
 from types import SimpleNamespace as NS
 from tools.capability.reader import Capability
 from tools.capability.check import (
-    Finding, check_links, check_coverage, check_classification, check_index_sync, run_all,
+    CATEGORIES, Finding, check_links, check_coverage, check_classification, check_index_sync,
+    run_all,
 )
 from tools.capability.render import render_index
 
 
-def _cap(slug, kind="primary", tier="core", parent="", impl=None):
-    return Capability(slug, kind, tier, parent, impl or [], f"{slug} does a thing.", "p")
+def _cap(slug, kind="primary", tier="core", parent="", impl=None, category="operations"):
+    return Capability(slug, kind, tier, parent, impl or [], f"{slug} does a thing.", "p", category)
 
 
 def test_links_flag_unknown_unit():
@@ -50,3 +51,16 @@ def test_index_sync_flags_stale(tmp_path):
 
 def test_run_all_returns_list_never_raises(tmp_path):
     assert isinstance(run_all(str(tmp_path)), list)
+
+
+def test_classification_flags_primary_missing_category():
+    caps = [Capability("p", "primary", "core", "", [], "x", "path", "")]  # category ""
+    msgs = " ".join(f.message for f in check_classification(caps))
+    assert "category" in msgs
+
+
+def test_coverage_now_flags_unclaimed_tooling():
+    nodes = [NS(unit="tools.adr", role="tooling"), NS(unit="utils", role="infrastructure")]
+    caps = [_cap("x", impl=["tools.code"])]
+    msgs = " ".join(f.message for f in check_coverage(caps, nodes))
+    assert "tools.adr" in msgs and "utils" not in msgs  # tooling mandatory; infra still advisory
