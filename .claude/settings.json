@@ -1,10 +1,10 @@
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "bash scripts/with-adr-py.sh context" } ] }
+      { "hooks": [ { "type": "command", "command": "bash scripts/with-project-py.sh tools.adr context" } ] }
     ],
     "PostToolUse": [
-      { "matcher": "Write", "hooks": [ { "type": "command", "command": "bash scripts/with-adr-py.sh nudge" } ] }
+      { "matcher": "Write", "hooks": [ { "type": "command", "command": "bash scripts/with-project-py.sh tools.knowledge nudge" } ] }
     ]
   }
 }

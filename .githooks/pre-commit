@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 # Non-blocking ADR drift report. Never fails the commit.
-bash scripts/with-adr-py.sh check || true
+bash scripts/with-project-py.sh tools.adr check || true
 exit 0
