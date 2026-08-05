@@ -10,6 +10,8 @@
 | api-check | everyday | Reconcile the API surface + openapi.json freshness (non-blocking) |
 | api-index | everyday | Regenerate docs/api/index.md (the API catalog) |
 | build | everyday | Build Docker images |
+| capability-check | everyday | Reconcile capabilities vs the code map + coverage (non-blocking) |
+| capability-index | everyday | Regenerate docs/capabilities/index.md (the capability catalogue) |
 | clean | everyday | Remove __pycache__ and .pyc files |
 | clean-coverage | everyday | Remove coverage data |
 | cli-check | everyday | Reconcile docs against the real CLI surface (non-blocking) |
@@ -89,6 +91,7 @@
 | python -m src.resolution | Resolution layer. |
 | python -m tools.adr |  |
 | python -m tools.api |  |
+| python -m tools.capability |  |
 | python -m tools.cli |  |
 | python -m tools.code |  |
 | python -m tools.glossary |  |
