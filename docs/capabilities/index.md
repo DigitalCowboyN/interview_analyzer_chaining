@@ -6,6 +6,11 @@ What the system can do, linked to the code map (`../code/`).
 
 ### core
 
+#### access-analysis-output-files
+List and retrieve an interview's completed analysis output — by file and by individual sentence — the flat-file files router an analyst or downstream tool reads directly from the output directory.
+
+- **implemented_by:** api
+
 #### ask-the-corpus
 Answer an analyst's free-form question over the whole corpus with hybrid graph + vector retrieval and one grounded, cited answer.
 
@@ -53,11 +58,6 @@ Turn raw transcript files into structured, speaker-attributed, stitched utteranc
 - parse-fragments — Read a transcript file and emit one `SentenceCreated` event per offset-grounded fragment, plus the map file used later for verbatim grounding. (ingestion.orchestrator)
 - segment-conversation — Normalize the raw transcript and segment it into sentence-level units via spaCy, before fragment and speaker events are emitted. (ingestion)
 - stitch-utterances — Merge utterances split across interruptions back into one continuous statement, without touching the verbatim fragment text. (ingestion.stitcher, agents)
-
-#### manage-transcript-files
-List and retrieve an interview's completed analysis output — by file and by individual sentence — the flat-file files router an analyst or downstream tool reads directly from the output directory.
-
-- **implemented_by:** api
 
 #### resolve-entities-and-people
 Link speakers to canonical Persons across interviews and canonicalize entity surface forms — cross-interview identity for the analyst view.
