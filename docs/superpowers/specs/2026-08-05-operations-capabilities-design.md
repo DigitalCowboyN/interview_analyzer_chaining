@@ -29,14 +29,34 @@ Two principles the owner locked, carried into this domain:
 
 ## The `category` axis
 
-New authored frontmatter key on **primaries**: `category: product | operations`
-(children/variants inherit their primary's category, exactly like `tier`).
-
-- The 11 existing primaries are stamped `category: product`.
-- The operations tree and file-management are added.
+New authored frontmatter key on **primaries**: `category: <value>` (children/variants
+inherit their primary's category, exactly like `tier`).
 
 `category` (not `class` — a Python reserved word; not `realm` — non-standard) is the
 industry axis term and a valid dataclass field name.
+
+**The axis is an OPEN, ordered set — not a fixed pair.** Industry capability maps use
+categories such as *strategic, customer-facing/product, operational, supporting/
+enabling*. We define the recognized set as an extensible constant:
+
+```
+CATEGORIES = ["product", "operations", "strategic", "supporting"]
+```
+
+- **product** — what the app does for analysts (the 11 existing primaries + file
+  management). *Populated this round.*
+- **operations** — what the repo does to stay correct and advanceable (the
+  knowledge-graph program). *Populated this round.*
+- **strategic** — direction-setting capabilities. *Reserved; none yet.*
+- **supporting** — support tools / systems that enable the above (e.g. dev
+  infrastructure, ops systems we may build later). *Reserved; none yet — but the axis
+  must accept a `category: supporting` node the day we make one, with no code change.*
+
+The reader stores `category` as a free string; the **guard validates it against
+`CATEGORIES`** (adding a value = one edit to the list); the **renderer groups by
+`CATEGORIES` order, skipping empty categories** (exactly as it already skips empty
+tiers). So `strategic`/`supporting` cost nothing until used, and adding them later is a
+one-line change — do not hardcode a two-value assumption anywhere.
 
 ## Nodes added
 
@@ -81,13 +101,15 @@ drift-guarded as the product map). Infrastructure/model units remain advisory.
 
 - **`reader.py`** — `Capability` gains a `category: str` field; `load_capabilities`
   reads the `category:` key (default `""`).
-- **`render.py`** — `render_index` groups **by category → tier → primary → children**
-  (a `## product` / `## operations` top level, then `### core`/`### enabling`, then
-  primaries). Deterministic.
-- **`check.py`** — `check_classification` additionally requires a **primary** to carry
-  `category in {product, operations}`. `check_coverage` adds `tooling` to
-  `_MANDATORY_ROLES`. `check_links` unchanged (the code registry already includes
-  `tools.*` from Round A). Non-blocking throughout.
+- **`render.py`** — `render_index` groups **by category → tier → primary → children**,
+  iterating the `CATEGORIES` order and **skipping empty categories** (so `strategic`/
+  `supporting` simply don't render until populated). A `## product` / `## operations`
+  top level, then `### core`/`### enabling`, then primaries. Deterministic.
+- **`check.py`** — `CATEGORIES` constant lives here (the single source of truth reader/
+  render/check share). `check_classification` additionally requires a **primary** to
+  carry `category in CATEGORIES`. `check_coverage` adds `tooling` to `_MANDATORY_ROLES`.
+  `check_links` unchanged (the code registry already includes `tools.*` from Round A).
+  Non-blocking throughout.
 - **Backfill** — stamp `category: product` on the 11 existing primaries; author the 10
   new nodes (1 operations primary + 9 operations children + 1 file-management primary).
   Regenerate `docs/capabilities/index.md`.
@@ -105,8 +127,10 @@ mandatory; infra/model advisory), **classification** (kind; primary has `tier` *
 ## Testing
 
 - **Unit** — `load_capabilities` parses `category`; `render_index` produces a
-  `## product` and `## operations` section, operations before/after product
-  deterministically; `check_classification` flags a primary missing `category`;
+  `## product` then `## operations` section in `CATEGORIES` order and **omits an empty
+  category** (a `strategic`/`supporting` section must NOT appear when unpopulated);
+  `check_classification` flags a primary missing `category` **and one whose `category`
+  is not in `CATEGORIES`**;
   `check_coverage` now flags an unclaimed `tooling` unit (and still not an unclaimed
   infra unit); `check_links` resolves a `tools.*` slug. Assert no check raises.
 - **Smoke** — `make capability-index` writes the catalogue with both categories;
@@ -115,10 +139,12 @@ mandatory; infra/model advisory), **classification** (kind; primary has `tier` *
 
 ## Capture as ADR
 
-Capture **ADR-0018**: adopt the `category: product | operations` axis and the
-operations capabilities. `source:` = this spec. Refines ADR-0017 (the capabilities
-domain) rather than superseding it — it adds a classification axis and the operations
-tree.
+Capture **ADR-0018**: adopt the `category` axis — an **open, ordered set**
+(`product, operations, strategic, supporting`; `product`/`operations` populated,
+`strategic`/`supporting` reserved) — and the operations capabilities. `source:` = this
+spec. Refines ADR-0017 (the capabilities domain) rather than superseding it — it adds a
+classification axis and the operations tree. Record the reserved values so the decision
+to leave the axis extensible is durable, not just implied by a constant.
 
 ## Non-goals (this round)
 
