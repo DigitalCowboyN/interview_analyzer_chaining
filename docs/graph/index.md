@@ -9,14 +9,14 @@
 | depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 51 |
 | governs | governed_by | ADR → CodeUnit | authored | — | 24 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
-| fulfilled_by | fulfills | UseCase → Capability | authored | — | 2 |
+| fulfilled_by | fulfills | UseCase → Capability | authored | — | 52 |
 
 ## Nodes
 
 - ADR: 20
 - Capability: 52
 - CodeUnit: 41
-- UseCase: 3
+- UseCase: 20
 
 ## Meta-schema
 

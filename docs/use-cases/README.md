@@ -34,7 +34,7 @@ use-case) is the derived inverse, read backward in the graph.
 ---
 type: UseCase
 form: user-story | feature | requirement | use-case
-category: product | operations | support     # reuses the capability axis (open set)
+category: product | operations | supporting   # reuses the capability axis (open set)
 actor: <who wants it — person, operator, or external system>
 acceptance_criteria:                          # list of strings; may be omitted / empty
   - "Given …, when …, then …"                 # Given/When/Then or a rule sentence
