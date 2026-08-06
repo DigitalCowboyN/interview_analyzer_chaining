@@ -30,8 +30,9 @@ NODE_DOMAINS = {
     "Capability": "capabilities",
     "ADR": "adr",
     "UseCase": "use-cases",
+    "Test": "tests",
     # reserved: GlossaryTerm→glossary, Prompt→prompts, GraphQuery→graph-queries,
-    # Spec→spec, Test→test
+    # Spec→spec
 }
 
 # The extensible edge registry. Adding an authored edge on existing node types is a
@@ -56,4 +57,8 @@ EDGES: List[EdgeType] = [
     EdgeType("fulfilled_by", "fulfills", "UseCase", "Capability", "authored",
              field="fulfilled_by", resolve="id",
              description="A use-case's intent is reached toward by a capability's implementation."),
+    EdgeType("verifies", "verified_by", "Test", "CodeUnit|UseCase|Capability", "derived",
+             field="verifies_edges", resolve="id",
+             properties=[PropSpec("test_type", enum=["unit", "integration", "e2e"])],
+             description="A test proves a code unit works, or an acceptance test proves an intent."),
 ]

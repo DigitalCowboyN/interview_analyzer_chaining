@@ -43,7 +43,8 @@ def render_catalog(edges: List[Edge], node_ids: Dict[str, Set[str]]) -> str:
     lines.append("```mermaid")
     lines.append("graph LR")
     for et in EDGES:
-        lines.append(f"    {et.from_type} -->|{et.name}| {et.to_type}")
+        for tt in et.to_type.split("|"):
+            lines.append(f"    {et.from_type} -->|{et.name}| {tt}")
     lines.append("```")
 
     return "\n".join(lines).rstrip() + "\n"

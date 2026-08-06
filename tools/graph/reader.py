@@ -10,6 +10,7 @@ from tools.capability.reader import load_capabilities
 from tools.code.reader import dep_edges, load_units
 from tools.adr.index import load_bundle
 from tools.usecase.reader import load_use_cases
+from tools.testmap.reader import load_tests, verifies_edges
 
 
 @dataclass
@@ -30,6 +31,7 @@ _ADAPTERS = {
     "CodeUnit": (load_units, "unit"),
     "ADR": (lambda root: load_bundle(os.path.join(root, "docs/adr")), "id"),
     "UseCase": (load_use_cases, "slug"),
+    "Test": (load_tests, "slug"),
 }
 
 
@@ -76,7 +78,12 @@ def _derived_deps(edge: EdgeType, root: str) -> List[Edge]:
             for u, deps in dep_edges(root).items() for d in deps]
 
 
-_DERIVED = {"dep_edges": _derived_deps}                # add a handler for a new derived edge
+def _derived_verifies(edge: EdgeType, root: str) -> List[Edge]:
+    return [Edge(edge.name, src, dst, {"test_type": tt})
+            for src, dst, tt in verifies_edges(root)]
+
+
+_DERIVED = {"dep_edges": _derived_deps, "verifies_edges": _derived_verifies}
 
 
 def harvest(root: str = ".", edges: List[EdgeType] = EDGES) -> List[Edge]:

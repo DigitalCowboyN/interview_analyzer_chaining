@@ -5,7 +5,8 @@ def test_registry_well_formed():
     names = {e.name for e in EDGES}
     assert {"implements", "child_of", "depends_on", "governs", "supersedes"} <= names
     for e in EDGES:
-        assert e.from_type in NODE_DOMAINS and e.to_type in NODE_DOMAINS
+        assert e.from_type in NODE_DOMAINS
+        assert all(t in NODE_DOMAINS for t in e.to_type.split("|"))
         assert e.source in ("authored", "derived")
 
 
