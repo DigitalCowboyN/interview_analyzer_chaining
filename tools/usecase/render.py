@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from tools.capability.reader import CATEGORIES
+from tools.usecase.coverage import NOT_COVERED
 from tools.usecase.reader import FORMS, UseCase
 
 
@@ -28,7 +29,7 @@ def render_index(use_cases: List[UseCase], coverage: Dict[str, str]) -> str:
             lines.append(f"### {form}")
             lines.append("")
             for u in form_ucs:
-                state = coverage.get(u.slug, "NOT_COVERED")
+                state = coverage.get(u.slug, NOT_COVERED)
                 lines.append(f"#### {u.slug} — {state}")
                 lines.append(u.statement)
                 lines.append("")
