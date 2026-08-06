@@ -4,17 +4,19 @@
 
 | edge | inverse | from → to | source | properties | count |
 | --- | --- | --- | --- | --- | --- |
-| implements | implemented_by | Capability → CodeUnit | authored | — | 89 |
-| child_of | parent_of | Capability → Capability | authored | — | 37 |
-| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 48 |
+| implements | implemented_by | Capability → CodeUnit | authored | — | 90 |
+| child_of | parent_of | Capability → Capability | authored | — | 38 |
+| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 51 |
 | governs | governed_by | ADR → CodeUnit | authored | — | 24 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
+| fulfilled_by | fulfills | UseCase → Capability | authored | — | 52 |
 
 ## Nodes
 
-- ADR: 20
-- Capability: 51
-- CodeUnit: 40
+- ADR: 21
+- Capability: 52
+- CodeUnit: 41
+- UseCase: 20
 
 ## Meta-schema
 
@@ -25,4 +27,5 @@ graph LR
     CodeUnit -->|depends_on| CodeUnit
     ADR -->|governs| CodeUnit
     ADR -->|supersedes| ADR
+    UseCase -->|fulfilled_by| Capability
 ```

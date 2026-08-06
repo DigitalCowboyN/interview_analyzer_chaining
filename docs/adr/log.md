@@ -20,3 +20,4 @@
 - 2026-08-05 — **0018** Adopt the capability category axis and operations capabilities · _accepted_
 - 2026-08-06 — **0019** Capabilities are durable intent; implementation is a derived, replaceable link · _accepted_
 - 2026-08-06 — **0020** Adopt an OKF-extension typed-edge graph model · _accepted_
+- 2026-08-06 — **0021** Use-cases domain as the graph source layer · _accepted_

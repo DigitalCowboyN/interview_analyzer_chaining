@@ -79,6 +79,8 @@
 | ui-smoke | everyday | Playwright smoke: seeded interview to transcript text-edit settle |
 | ui-test | everyday | Frontend gates: lint + typecheck + vitest |
 | ui-typegen | everyday | Regenerate OpenAPI types from the backend app object |
+| usecase-check | everyday | Reconcile use-cases vs forms/categories/criteria + coverage (non-blocking) |
+| usecase-index | everyday | Regenerate docs/use-cases/index.md (the use-case corpus + derived coverage) |
 | wait-eventstore | internal | Wait for EventStoreDB to be healthy |
 | wait-neo4j-test | internal | Wait for the Neo4j test DB to be healthy |
 
@@ -102,3 +104,4 @@
 | python -m tools.graphq |  |
 | python -m tools.knowledge |  |
 | python -m tools.prompts |  |
+| python -m tools.usecase |  |

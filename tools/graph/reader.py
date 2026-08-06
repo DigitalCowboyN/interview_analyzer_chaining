@@ -9,6 +9,7 @@ from tools.graph.registry import EDGES, NODE_DOMAINS, EdgeType
 from tools.capability.reader import load_capabilities
 from tools.code.reader import dep_edges, load_units
 from tools.adr.index import load_bundle
+from tools.usecase.reader import load_use_cases
 
 
 @dataclass
@@ -28,6 +29,7 @@ _ADAPTERS = {
     "Capability": (load_capabilities, "slug"),
     "CodeUnit": (load_units, "unit"),
     "ADR": (lambda root: load_bundle(os.path.join(root, "docs/adr")), "id"),
+    "UseCase": (load_use_cases, "slug"),
 }
 
 

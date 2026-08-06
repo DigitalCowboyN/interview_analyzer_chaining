@@ -19,6 +19,7 @@ DOMAINS: List[Tuple[str, str]] = [
     ("graph", "graph"),
     ("graph-queries", "graphq"),
     ("prompts", "prompt"),
+    ("use-cases", "usecase"),
 ]
 
 ADOPTION_DATE = "2026-08-05"          # specs/plans dated >= this must carry the addendum

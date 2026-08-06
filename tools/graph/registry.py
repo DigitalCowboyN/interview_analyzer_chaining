@@ -29,8 +29,9 @@ NODE_DOMAINS = {
     "CodeUnit": "code",
     "Capability": "capabilities",
     "ADR": "adr",
+    "UseCase": "use-cases",
     # reserved: GlossaryTerm→glossary, Prompt→prompts, GraphQuery→graph-queries,
-    # Spec→spec, Test→test, UseCase→usecase
+    # Spec→spec, Test→test
 }
 
 # The extensible edge registry. Adding an authored edge on existing node types is a
@@ -52,4 +53,7 @@ EDGES: List[EdgeType] = [
     EdgeType("supersedes", "superseded_by", "ADR", "ADR", "authored",
              field="supersedes", resolve="id",
              description="A decision replaces an earlier one."),
+    EdgeType("fulfilled_by", "fulfills", "UseCase", "Capability", "authored",
+             field="fulfilled_by", resolve="id",
+             description="A use-case's intent is reached toward by a capability's implementation."),
 ]
