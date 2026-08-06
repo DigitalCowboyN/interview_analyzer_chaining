@@ -18,3 +18,4 @@
 - 2026-08-05 — **0016** Adopt knowledge cascade and spec/plan honesty check · _accepted_
 - 2026-08-05 — **0017** Adopt a capabilities domain linked to the code map · _accepted_
 - 2026-08-05 — **0018** Adopt the capability category axis and operations capabilities · _accepted_
+- 2026-08-06 — **0019** Capabilities are durable intent; implementation is a derived, replaceable link · _accepted_

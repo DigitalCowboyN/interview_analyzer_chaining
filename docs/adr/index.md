@@ -20,3 +20,4 @@
 | 0016 | Adopt knowledge cascade and spec/plan honesty check | accepted |
 | 0017 | Adopt a capabilities domain linked to the code map | accepted |
 | 0018 | Adopt the capability category axis and operations capabilities | accepted |
+| 0019 | Capabilities are durable intent; implementation is a derived, replaceable link | accepted |
