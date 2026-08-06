@@ -50,6 +50,11 @@ Apply a purpose-built reading of an interview (meeting minutes, persona, …) vi
 - per-lens-extractors _(variant)_ — Per-lens extractor calls — `meeting_minutes`' objectives/decisions/action items, `persona`'s traits/goals/quotes — configured entirely by profile, no lens-specific code path. (lens.engine, agents)
 - run-lens-engine — Drive any lens profile (YAML + prompts) through one generic engine: run extractors, resolve speaker references, and emit the lens events. (lens.engine)
 
+#### import-transcripts
+Let an analyst bring source transcripts into the system to be analysed.
+
+- **implemented_by:** —
+
 #### ingest-transcripts
 Turn raw transcript files into structured, speaker-attributed, stitched utterances the rest of the system analyses.
 
