@@ -5,6 +5,8 @@ order through the real handler registry against real Neo4j (there is no live
 subscription consumer in the test environment). Requires `make test-infra-up`.
 """
 
+# verifies: use-cases:surface-the-signal
+
 import uuid as uuid_mod
 
 import pytest

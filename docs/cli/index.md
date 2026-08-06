@@ -74,6 +74,8 @@
 | test-projections | internal | Run projection tests |
 | test-rebuild | everyday | Run projection rebuild test (validates event sourcing) |
 | test-unit | everyday | Run unit tests only (no integration markers) |
+| testmap-check | everyday | Reconcile tests vs code/intent + verification coverage (non-blocking) |
+| testmap-index | everyday | Regenerate docs/tests/index.md (test suite nodes + verification rollup) |
 | ui-build | everyday | Production build of the frontend |
 | ui-dev | everyday | Run the frontend dev server |
 | ui-smoke | everyday | Playwright smoke: seeded interview to transcript text-edit settle |
@@ -104,4 +106,5 @@
 | python -m tools.graphq |  |
 | python -m tools.knowledge |  |
 | python -m tools.prompts |  |
+| python -m tools.testmap |  |
 | python -m tools.usecase |  |

@@ -67,8 +67,9 @@ See `pipeline.md` for the dependency graph.
 | tools.cli | files |  |
 | tools.code | ESDB, HTTP, LLM, Neo4j, files | ingestion |
 | tools.glossary | files | ingestion |
-| tools.graph | files | tools.adr, tools.capability, tools.code, tools.usecase |
+| tools.graph | files | tools.adr, tools.capability, tools.code, tools.testmap, tools.usecase |
 | tools.graphq | files | tools.glossary |
 | tools.knowledge | files |  |
 | tools.prompts | files | tools.glossary |
+| tools.testmap | files | tools.capability, tools.usecase |
 | tools.usecase | files | ingestion, tools.capability |
