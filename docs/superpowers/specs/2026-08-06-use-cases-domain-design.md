@@ -174,8 +174,10 @@ render, the guard runs clean-or-advisory, coverage derives, `graph-check` stays 
 `neighbors` traverses `fulfilled_by`.
 
 **Phase 2 — full corpus derivation (same round, reviewed before merge).** Diligently
-derive the full use-case corpus by working **backward from the capability tree to the
-real human problem** — then draw `fulfilled_by` back to the capabilities.
+**reconstruct the originating intents** — the use-cases that, had someone written them
+down first, would have *led to* this system. This is retrospective derivation: work
+**backward from the capability tree to the real human problem** that motivated it, then
+draw `fulfilled_by` back to the capabilities that reach toward it.
 
 > **The anti-restatement rule (design guidance, enforced in review).** A use-case must
 > reach *past* the capability to the human problem. "The system extracts fragments" →
@@ -184,6 +186,17 @@ real human problem** — then draw `fulfilled_by` back to the capabilities.
 > matters" is a **use-case**. Every derived use-case's `statement` must name an actor and
 > a benefit that would make sense to someone who has never seen the code. Operations and
 > support use-cases follow the same rule with operator/maintainer actors.
+
+> **The trajectory test (how we know derivation is honest, not restatement).** A correctly
+> derived corpus **overshoots the current build**. If every use-case maps 1:1 onto an
+> existing capability, the derivation has merely mirrored the code — restatement at corpus
+> scale. Following a real user-problem honestly points *past* what is built today to where
+> the system's direction is clearly heading (e.g. deriving an import/onboarding use-case,
+> or a "revisit and correct a past extraction" use-case, that no capability yet fulfills).
+> **These uncovered and partially-covered use-cases are the expected, desired output** —
+> the `NOT_COVERED` / `PARTIALLY_COVERED` states are the domain doing its job (surfacing
+> where intent outruns implementation), not defects to be pruned. A corpus with **zero**
+> uncovered intents is a red flag in review that we restated rather than derived.
 
 The corpus is authored, `fulfilled_by` links drawn, coverage reviewed (expect genuine
 `NOT_COVERED` / `PARTIALLY_COVERED` results — those are the point, not defects), and the
