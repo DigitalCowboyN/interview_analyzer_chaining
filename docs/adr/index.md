@@ -21,3 +21,4 @@
 | 0017 | Adopt a capabilities domain linked to the code map | accepted |
 | 0018 | Adopt the capability category axis and operations capabilities | accepted |
 | 0019 | Capabilities are durable intent; implementation is a derived, replaceable link | accepted |
+| 0020 | Adopt an OKF-extension typed-edge graph model | accepted |
