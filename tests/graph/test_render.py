@@ -11,6 +11,7 @@ def test_catalog_lists_edge_types_and_counts():
     out = render_catalog(EDGES, NODES)
     assert "implements" in out and "depends_on" in out
     assert "```mermaid" in out            # the meta-schema diagram
+    assert "properties" in out            # edge-property capacity is visible
 
 
 def test_graph_has_per_edge_type_sections():

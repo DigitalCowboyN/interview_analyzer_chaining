@@ -19,12 +19,16 @@ def render_catalog(edges: List[Edge], node_ids: Dict[str, Set[str]]) -> str:
     for e in edges:
         counts[e.type] = counts.get(e.type, 0) + 1
 
-    lines = ["# Graph", "", "| edge | inverse | from → to | source | count |",
-             "| --- | --- | --- | --- | --- |"]
+    lines = ["# Graph", "",
+             "> Counts are live — regenerate with `make graph-index` after adding nodes or edges.",
+             "",
+             "| edge | inverse | from → to | source | properties | count |",
+             "| --- | --- | --- | --- | --- | --- |"]
     for et in EDGES:
+        props = ", ".join(p.name for p in et.properties) or "—"
         lines.append(
             f"| {et.name} | {et.inverse} | {et.from_type} → {et.to_type} | "
-            f"{et.source} | {counts.get(et.name, 0)} |"
+            f"{et.source} | {props} | {counts.get(et.name, 0)} |"
         )
     lines.append("")
 
