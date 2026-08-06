@@ -14,6 +14,7 @@ surface it covers. All checks are non-blocking (visibility, not gates).
 | [cli/](cli/index.md) | command surface (CLI + make targets) | `make cli-check` |
 | [prompts/](prompts/index.md) | probabilistic components — the LLM prompts the agents use | `make prompt-check` |
 | [graph-queries/](graph-queries/index.md) | Neo4j read-query registry (schema + output contract) | `make graphq-check` |
+| [graph/](graph/index.md) | cross-domain edge graph (typed links between all domains) | `make graph-check` |
 
 **Writing a spec or plan?** Record a `## Knowledge-graph check` addendum — the
 per-domain review of what it touched and what you reconciled (`make knowledge-check`
