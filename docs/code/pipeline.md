@@ -80,6 +80,9 @@ graph LR
     tools.cli
     tools.code --> ingestion
     tools.glossary --> ingestion
+    tools.graph --> tools.adr
+    tools.graph --> tools.capability
+    tools.graph --> tools.code
     tools.graphq --> tools.glossary
     tools.knowledge
     tools.prompts --> tools.glossary

@@ -16,6 +16,7 @@ DOMAINS: List[Tuple[str, str]] = [
     ("code", "code"),
     ("capabilities", "capability"),
     ("glossary", "glossary"),
+    ("graph", "graph"),
     ("graph-queries", "graphq"),
     ("prompts", "prompt"),
 ]

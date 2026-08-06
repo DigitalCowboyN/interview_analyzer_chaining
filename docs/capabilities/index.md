@@ -114,6 +114,7 @@ Keep the codebase's own knowledge correct and discoverable: catalog each facet (
 - catalog-the-prompt-registry — Catalog every LLM prompt template — its classification, audience, and consumers — and guard it against the glossary vocabulary it draws on. (tools.prompts)
 - disclose-knowledge-and-check-specs — Nudge a spec or plan to reconcile against the domains it touches, then hold it honest — non-blocking check that a "Knowledge-graph check" addendum is present and each touched domain was consulted. (tools.knowledge)
 - govern-architectural-decisions — Capture and guard the durable architectural decision record — schema, id uniqueness, bidirectional supersede edges, and specs that lock a decision without one — non-blocking drift detection over the ADR corpus. (tools.adr)
+- link-the-domains — Assemble every domain's typed links into one cross-domain graph — traverse and guard it. (tools.graph)
 - maintain-the-glossary — Maintain the shared vocabulary — dimensions, enums, entity/claim kinds, graph labels — scaffolded from code and guarded against drift. (tools.glossary)
 - map-capabilities — Catalog what the system can do — link each capability to the code that implements it — and guard classification, code coverage, and index freshness. (tools.capability)
 - map-the-code — Classify every package/module by role and derive its dependencies + I/O into a pipeline map. (tools.code)

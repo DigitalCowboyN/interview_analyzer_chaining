@@ -38,8 +38,11 @@
 | format | everyday | Run black formatter |
 | glossary-check | everyday | Reconcile the glossary against code vocabulary (non-blocking) |
 | glossary-index | everyday | Regenerate docs/glossary/index.md |
+| graph-check | everyday | Reconcile the edge graph vs its sources (non-blocking) |
+| graph-index | everyday | Regenerate docs/graph/index.md + graph.md (cross-domain edge graph) |
 | graphq-check | everyday | Reconcile graph queries vs schema + consumers (non-blocking) |
 | graphq-index | everyday | Regenerate docs/graph-queries/index.md (graph-query registry) |
+| health | everyday | Run every domain check + the cross-domain graph check (full sweep) |
 | help | everyday | Show the everyday commands |
 | hooks-install | everyday | Install the shared project git hooks |
 | ingest | everyday | Ingest + enrich a transcript (FILE=<path>) |
@@ -95,6 +98,7 @@
 | python -m tools.cli |  |
 | python -m tools.code |  |
 | python -m tools.glossary |  |
+| python -m tools.graph |  |
 | python -m tools.graphq |  |
 | python -m tools.knowledge |  |
 | python -m tools.prompts |  |

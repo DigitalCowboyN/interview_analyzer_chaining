@@ -78,6 +78,19 @@ code-index: ## Regenerate docs/code/index.md + pipeline.md (code map)
 code-check: ## Reconcile the code map vs the import graph (non-blocking)
 	@$(PYTHON) -m tools.code check
 
+# Cross-domain edge graph: typed links between nodes across all domains (non-blocking)
+.PHONY: graph-index
+graph-index: ## Regenerate docs/graph/index.md + graph.md (cross-domain edge graph)
+	@$(PYTHON) -m tools.graph index
+
+.PHONY: graph-check
+graph-check: ## Reconcile the edge graph vs its sources (non-blocking)
+	@$(PYTHON) -m tools.graph check
+
+.PHONY: health
+health: ## Run every domain check + the cross-domain graph check (full sweep)
+	@for d in adr cli api glossary prompts graphq code capability knowledge graph; do $(PYTHON) -m tools.$$d check || true; done
+
 .PHONY: knowledge-check
 knowledge-check: ## Reconcile specs/plans + cascade root vs the knowledge domains (non-blocking)
 	@$(PYTHON) -m tools.knowledge check
