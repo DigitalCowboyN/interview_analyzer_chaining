@@ -93,15 +93,20 @@ Result: a list of `Edge(type, from="<domain>:<id>", to="<domain>:<id>", props={}
 
 ## Generated artifacts
 
-- **`docs/graph/index.md`** — the **edge catalog**: every registered edge type (name,
-  inverse, from→to, source, properties) with its **live instance count**, plus the
-  node-type inventory and totals. The "what edges exist, and how connected are we" map.
-- **`docs/graph/capability-code.md`** — the **capability→code Mermaid** deferred from the
-  capabilities rounds: capabilities linked to the CodeUnits that implement them (now that
-  the code map spans `src` *and* `tools`, this shows product *and* operations).
+- **`docs/graph/index.md`** — the **edge catalog** (every registered edge type: name,
+  inverse, from→to, source, properties, **live instance count**; the node-type inventory;
+  totals) **plus a meta-schema diagram**: a small Mermaid of *node types ↔ edge types*
+  (`Capability --implements--> CodeUnit`, `ADR --governs--> CodeUnit`, …) — the shape of
+  the whole graph at a glance.
+- **`docs/graph/graph.md`** — the **full cross-domain instance graph**. A single 90-node/
+  ~300-edge Mermaid is an unreadable hairball GitHub may not render, so "full" is rendered
+  **digestibly**: one Mermaid section **per edge type** (all `implements` edges, all
+  `depends_on`, all `governs`, …), each clustered by domain. Every edge instance appears;
+  together the sections ARE the complete graph. The capability→code view (deferred from
+  the capabilities rounds) is simply the `implements` section.
 
-(A full cross-domain Mermaid and the derived-`implements`-into-the-code-map surfacing are
-possible follow-ons; this round proves the model with the catalog + the one flagship map.)
+The **`neighbors` CLI** (below) is the targeted entry point for "what connects to X";
+these files are the whole picture.
 
 ## The guard — `make graph-check` (non-blocking, exit 0)
 
@@ -112,9 +117,26 @@ possible follow-ons; this round proves the model with the catalog + the one flag
   `resolve` the harvester can't handle → finding.
 - **index-sync** — committed `docs/graph/*.md` match a fresh render.
 
-All non-blocking, `return 0`. It **complements** the per-domain checks (each domain still
-guards its own links); the graph guard adds only the cross-domain view + endpoint
-integrity — it does **not** replace them this round.
+All non-blocking, `return 0`.
+
+**Complement, not replace — with distinct roles (reasoned, not just asserted).** Per-domain
+checks stay: when you work inside a domain they are the right tool — fast, scoped,
+authoritative for that domain's own links. The graph guard's *unique* value is the case
+no per-domain check covers: **cross-domain breakage from a single-domain edit** — you
+rename a `CodeUnit` in a *code* commit, `code-check` passes (it doesn't know about
+capabilities), yet a capability's `implements` and an ADR's `governs` now dangle. Only a
+whole-graph sweep catches that regardless of what you touched. So:
+
+- **`make graph-check`** — the aggregate cross-domain integrity sweep; **wired into
+  `.githooks/pre-commit`** (non-blocking, alongside the existing `adr-check`) so every
+  commit gets the whole-graph health signal.
+- **`make health`** — a new target running every domain's `*-check` + `graph-check`: the
+  full sweep for CI / on demand.
+- Per-domain `make <domain>-check` — unchanged; for focused work.
+
+The overlap (both the capability check and the graph check validate capability→code
+endpoints) is deliberate defense-in-depth; the graph check is the only one that sees the
+whole graph.
 
 ## CLI
 
@@ -129,11 +151,14 @@ it, the ADRs that govern it, the code that depends on it).
   domain/enumerator/id map). The single extensible source of truth.
 - `reader.py` — `harvest(root) -> list[Edge]` (registry-driven); `nodes(root)` (all
   addressable nodes); `Edge` dataclass.
-- `render.py` — `render_catalog(edges, nodes)`, `render_capability_code(edges)` (Mermaid).
+- `render.py` — `render_catalog(edges, nodes)` (+ the meta-schema diagram),
+  `render_graph(edges)` (the full instance graph, per-edge-type Mermaid sections). Pure.
 - `check.py` — `Finding`; `check_endpoints`, `check_registry`, `check_index_sync`,
   `run_all(root=".")`. Non-blocking.
-- `__main__.py` — `index | check | neighbors`.
-- **Makefile** — `graph-index`, `graph-check`.
+- `__main__.py` — `index | check | neighbors <domain:id>`.
+- **Makefile** — `graph-index`, `graph-check`, and **`health`** (runs every `*-check` +
+  `graph-check`).
+- **`.githooks/pre-commit`** — add `graph-check` (non-blocking) alongside `adr-check`.
 - **Cascade + registry** — add `("graph", "graph")` to `tools/knowledge`'s `DOMAINS` and a
   row to `docs/index.md`.
 
@@ -156,9 +181,11 @@ added to a fixture registry harvests + renders without code change.
   EdgeType to a fixture registry** harvests with no code change (the extensibility test);
   `render_catalog` groups by edge type; `neighbors` returns inbound+outbound. Assert no
   check raises.
-- **Smoke** — `make graph-index` writes the catalog + capability→code Mermaid over the
-  real repo; `make graph-check` clean; `make knowledge-check` + `make cli-check` clean
-  (cascade row + registry entry added; `graph-*` targets catalogued).
+- **Smoke** — `make graph-index` writes `index.md` (catalog + meta-schema) + `graph.md`
+  (full per-edge-type instance graph) over the real repo; `make graph-check` clean;
+  `.githooks/pre-commit` runs `graph-check` non-blocking; `make health` runs the full
+  sweep; `make knowledge-check` + `make cli-check` clean (cascade row + registry entry
+  added; `graph-*`/`health` targets catalogued).
 
 ## Non-goals (this round)
 
@@ -187,9 +214,9 @@ Reviewed against `docs/index.md` on 2026-08-06.
 | --- | --- | --- | --- |
 | graph | yes | the new meta-domain | — |
 | code / capabilities / adr | yes (read-only) | edges harvested from their existing frontmatter/derivations; no change to them | reuse `tools.code`, `tools.adr.code_links` |
-| cli | yes | new `graph-*` targets → `cli-index` in the plan; `cli-check` clean | — |
+| cli | yes | new `graph-*` + `health` targets → `cli-index` in the plan; `cli-check` clean | — |
 | adr | yes | ADR-0020 | — |
-| knowledge | yes | cascade row + `DOMAINS` entry for `graph` | — |
+| knowledge | yes | cascade row + `DOMAINS` entry for `graph`; `graph-check` added to `.githooks/pre-commit` | — |
 | glossary / api / prompts / graph-queries | no | — | their edges are reserved registry entries for later |
 
 **Verdict:** reconciled — graph (subject) + code/capabilities/adr (read-only) consulted;
