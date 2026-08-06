@@ -27,7 +27,7 @@ def render_catalog(edges: List[Edge], node_ids: Dict[str, Set[str]]) -> str:
     for et in EDGES:
         props = ", ".join(p.name for p in et.properties) or "—"
         lines.append(
-            f"| {et.name} | {et.inverse} | {et.from_type} → {et.to_type} | "
+            f"| {et.name} | {et.inverse} | {et.from_type} → {et.to_type.replace('|', chr(92) + '|')} | "
             f"{et.source} | {props} | {counts.get(et.name, 0)} |"
         )
     lines.append("")
@@ -43,7 +43,8 @@ def render_catalog(edges: List[Edge], node_ids: Dict[str, Set[str]]) -> str:
     lines.append("```mermaid")
     lines.append("graph LR")
     for et in EDGES:
-        lines.append(f"    {et.from_type} -->|{et.name}| {et.to_type}")
+        for tt in et.to_type.split("|"):
+            lines.append(f"    {et.from_type} -->|{et.name}| {tt}")
     lines.append("```")
 
     return "\n".join(lines).rstrip() + "\n"

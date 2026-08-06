@@ -118,4 +118,5 @@ Keep the codebase's own knowledge correct and discoverable: catalog each facet (
 - maintain-the-glossary — Maintain the shared vocabulary — dimensions, enums, entity/claim kinds, graph labels — scaffolded from code and guarded against drift. (tools.glossary)
 - map-capabilities — Catalog what the system can do — link each capability to the code that implements it — and guard classification, code coverage, and index freshness. (tools.capability)
 - map-the-code — Classify every package/module by role and derive its dependencies + I/O into a pipeline map. (tools.code)
+- map-the-tests — Map the test suite as graph nodes and derive what each test verifies, so coverage gains a verification dimension distinct from implementation. (tools.testmap)
 - map-use-cases — Record the user-centered intents the system serves and derive how far current capabilities cover them. (tools.usecase)

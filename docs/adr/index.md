@@ -23,3 +23,4 @@
 | 0019 | Capabilities are durable intent; implementation is a derived, replaceable link | accepted |
 | 0020 | Adopt an OKF-extension typed-edge graph model | accepted |
 | 0021 | Use-cases domain as the graph source layer | accepted |
+| 0022 | Tests domain with an orthogonal verification axis | accepted |

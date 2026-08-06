@@ -42,10 +42,11 @@ def check_registry(
             findings.append(
                 Finding(f"graph: edge type {et.name} from_type {et.from_type} is not a known node type")
             )
-        if et.to_type not in node_domains:
-            findings.append(
-                Finding(f"graph: edge type {et.name} to_type {et.to_type} is not a known node type")
-            )
+        for tt in et.to_type.split("|"):
+            if tt not in node_domains:
+                findings.append(
+                    Finding(f"graph: edge type {et.name} to_type {tt} is not a known node type")
+                )
         if et.source == "authored" and not et.field:
             findings.append(
                 Finding(f"graph: authored edge type {et.name} has no field")

@@ -1,0 +1,284 @@
+# Tests
+
+The test suite as a graph node set, and what it verifies (`../code/`, `../capabilities/`, `../use-cases/`). Verification is derived, orthogonal to implementation coverage.
+
+## unit
+
+- `adr.test_check` (14) → tools.adr  ·  verifies: —
+- `adr.test_cli` (2) → tools.adr  ·  verifies: —
+- `adr.test_code_links` (2) → tools.adr  ·  verifies: —
+- `adr.test_context` (2) → tools.adr  ·  verifies: —
+- `adr.test_hooks_wiring` (2) → tools.adr  ·  verifies: —
+- `adr.test_index` (4) → tools.adr  ·  verifies: —
+- `adr.test_intent` (2) → tools.adr  ·  verifies: —
+- `adr.test_model` (4) → tools.adr  ·  verifies: —
+- `adr.test_scaffold` (2) → tools.adr  ·  verifies: —
+- `agents.test_agent_factory` (15) → agents  ·  verifies: —
+- `agents.test_anthropic_agent` (18) → agents  ·  verifies: —
+- `agents.test_claude_code_agent` (9) → agents  ·  verifies: —
+- `agents.test_failover_agent` (12) → agents  ·  verifies: —
+- `agents.test_openai_agent` (24) → agents  ·  verifies: —
+- `agents.test_structured_outputs` (5) → agents  ·  verifies: —
+- `api.test_analysis_rewire` (3) → api  ·  verifies: —
+- `api.test_ask_router` (5) → api  ·  verifies: —
+- `api.test_edit_api_unit` (23) → api  ·  verifies: —
+- `api.test_exports_router` (2) → api  ·  verifies: —
+- `api.test_files_api` (18) → api  ·  verifies: —
+- `api.test_files_api_core` (12) → api  ·  verifies: —
+- `api.test_files_api_edge_cases` (11) → api  ·  verifies: —
+- `api.test_lenses_router` (3) → api  ·  verifies: —
+- `api.test_main` (1) → api  ·  verifies: —
+- `api.test_queries_router` (4) → api  ·  verifies: —
+- `api.test_resolution_router` (18) → api  ·  verifies: —
+- `api.test_segments_router` (9) → api  ·  verifies: —
+- `api.test_speakers_router` (11) → api  ·  verifies: —
+- `api.test_ui_router` (24) → api  ·  verifies: —
+- `api_surface.test_check` (4) → —  ·  verifies: —
+- `api_surface.test_cli` (1) → —  ·  verifies: —
+- `api_surface.test_reader` (3) → —  ·  verifies: —
+- `api_surface.test_render` (1) → —  ·  verifies: —
+- `ask.test_cli` (4) → ask  ·  verifies: —
+- `ask.test_context` (7) → ask  ·  verifies: —
+- `ask.test_engine` (12) → ask  ·  verifies: —
+- `ask.test_fusion` (5) → ask  ·  verifies: —
+- `ask.test_reader` (11) → ask  ·  verifies: —
+- `capability.test_check` (8) → tools.capability  ·  verifies: —
+- `capability.test_cli` (2) → tools.capability  ·  verifies: —
+- `capability.test_reader` (5) → tools.capability  ·  verifies: —
+- `capability.test_render` (3) → tools.capability  ·  verifies: —
+- `cli.test_check` (4) → tools.cli  ·  verifies: —
+- `cli.test_cli` (2) → tools.cli  ·  verifies: —
+- `cli.test_reader` (2) → tools.cli  ·  verifies: —
+- `cli.test_render` (2) → tools.cli  ·  verifies: —
+- `code.test_check` (5) → tools.code  ·  verifies: —
+- `code.test_cli` (1) → tools.code  ·  verifies: —
+- `code.test_reader` (3) → tools.code  ·  verifies: —
+- `code.test_reader_tools` (4) → tools.code  ·  verifies: —
+- `code.test_render` (2) → tools.code  ·  verifies: —
+- `commands.test_command_handlers` (3) → commands  ·  verifies: —
+- `commands.test_command_handlers_unit` (22) → commands  ·  verifies: —
+- `enrichment.test_embedder` (7) → enrichment  ·  verifies: —
+- `enrichment.test_executor` (11) → enrichment  ·  verifies: —
+- `enrichment.test_final_review_fixes` (7) → enrichment  ·  verifies: —
+- `enrichment.test_graph_context` (5) → enrichment  ·  verifies: —
+- `enrichment.test_orchestrator` (4) → enrichment  ·  verifies: —
+- `enrichment.test_orchestrator_document_pass` (8) → enrichment  ·  verifies: —
+- `enrichment.test_parity` (2) → enrichment  ·  verifies: —
+- `enrichment.test_registry` (6) → enrichment  ·  verifies: —
+- `enrichment.test_segment_extractor_decl` (3) → enrichment  ·  verifies: —
+- `enrichment.test_segment_validation` (4) → enrichment  ·  verifies: —
+- `enrichment.test_syntax_check` (6) → enrichment  ·  verifies: —
+- `events.test_aggregates_unit` (37) → events  ·  verifies: —
+- `events.test_analysis_payload_v2` (4) → events  ·  verifies: —
+- `events.test_core_plumbing_validation` (20) → events  ·  verifies: —
+- `events.test_embedding_events` (4) → events  ·  verifies: —
+- `events.test_entity_claim_events` (6) → events  ·  verifies: —
+- `events.test_interview_speaker_events` (8) → events  ·  verifies: —
+- `events.test_interview_stitch_events` (7) → events  ·  verifies: —
+- `events.test_lens_events` (7) → events  ·  verifies: —
+- `events.test_project_aggregate` (16) → events  ·  verifies: —
+- `events.test_project_events` (9) → events  ·  verifies: —
+- `events.test_project_repository` (4) → events  ·  verifies: —
+- `events.test_repository_unit` (27) → events  ·  verifies: —
+- `events.test_segment_events` (6) → events  ·  verifies: —
+- `events.test_sentence_speaker_events` (9) → events  ·  verifies: —
+- `events.test_shim_dropped` (3) → events  ·  verifies: —
+- `events.test_store_unit` (42) → events  ·  verifies: —
+- `export.test_bundler` (10) → export  ·  verifies: —
+- `export.test_reader` (12) → export  ·  verifies: —
+- `export.test_renderer` (28) → export  ·  verifies: —
+- `glossary.test_check` (7) → tools.glossary  ·  verifies: —
+- `glossary.test_cli` (2) → tools.glossary  ·  verifies: —
+- `glossary.test_model` (2) → tools.glossary  ·  verifies: —
+- `glossary.test_reader` (6) → tools.glossary  ·  verifies: —
+- `glossary.test_render` (1) → tools.glossary  ·  verifies: —
+- `graph.test_check` (4) → tools.graph  ·  verifies: —
+- `graph.test_cli` (3) → tools.graph  ·  verifies: —
+- `graph.test_reader` (5) → tools.graph  ·  verifies: —
+- `graph.test_registry` (2) → tools.graph  ·  verifies: —
+- `graph.test_render` (2) → tools.graph  ·  verifies: —
+- `graph.test_usecase_edge` (2) → tools.graph  ·  verifies: —
+- `graph.test_verifies_edge` (2) → tools.graph  ·  verifies: —
+- `graphq.test_check` (3) → tools.graphq  ·  verifies: —
+- `graphq.test_cli` (1) → tools.graphq  ·  verifies: —
+- `graphq.test_reader` (3) → tools.graphq  ·  verifies: —
+- `graphq.test_render` (1) → tools.graphq  ·  verifies: —
+- `ingestion.test_format_detector` (4) → ingestion  ·  verifies: —
+- `ingestion.test_front_matter` (7) → ingestion  ·  verifies: —
+- `ingestion.test_front_matter_seeding` (5) → ingestion  ·  verifies: —
+- `ingestion.test_golden_transcript` (1) → ingestion  ·  verifies: —
+- `ingestion.test_models` (3) → ingestion  ·  verifies: —
+- `ingestion.test_normalizer` (6) → ingestion  ·  verifies: —
+- `ingestion.test_orchestrator` (2) → ingestion  ·  verifies: —
+- `ingestion.test_sample_corpus` (8) → ingestion  ·  verifies: —
+- `ingestion.test_speaker_inference` (7) → ingestion  ·  verifies: —
+- `ingestion.test_stitcher` (8) → ingestion  ·  verifies: —
+- `knowledge.test_check` (6) → tools.knowledge  ·  verifies: —
+- `knowledge.test_cli` (5) → tools.knowledge  ·  verifies: —
+- `lens.test_engine` (4) → lens  ·  verifies: —
+- `lens.test_lens_models` (11) → lens  ·  verifies: —
+- `models.test_extractor_responses` (5) → models  ·  verifies: —
+- `models.test_ingestion_responses` (6) → models  ·  verifies: —
+- `persistence.test_graph_persistence` (10) → persistence  ·  verifies: —
+- `projections.test_bootstrap_unit` (12) → projections  ·  verifies: —
+- `projections.test_config_unit` (2) → projections  ·  verifies: —
+- `projections.test_embedding_handlers` (5) → projections  ·  verifies: —
+- `projections.test_entity_claim_handlers` (7) → projections  ·  verifies: —
+- `projections.test_health_unit` (33) → projections  ·  verifies: —
+- `projections.test_lane_manager_unit` (22) → projections  ·  verifies: —
+- `projections.test_lens_handlers` (6) → projections  ·  verifies: —
+- `projections.test_metrics_unit` (35) → projections  ·  verifies: —
+- `projections.test_migrate_shim_drop` (6) → projections  ·  verifies: —
+- `projections.test_parked_events_unit` (22) → projections  ·  verifies: —
+- `projections.test_projection_handlers_unit` (31) → projections  ·  verifies: —
+- `projections.test_projection_service_unit` (26) → projections  ·  verifies: —
+- `projections.test_redrive` (8) → projections  ·  verifies: —
+- `projections.test_registry_unit` (16) → projections  ·  verifies: —
+- `projections.test_reorder_buffer` (13) → projections  ·  verifies: —
+- `projections.test_resolution_handlers` (13) → projections  ·  verifies: —
+- `projections.test_run_projection_service_unit` (17) → projections  ·  verifies: —
+- `projections.test_schema` (4) → projections  ·  verifies: —
+- `projections.test_segment_handlers` (5) → projections  ·  verifies: —
+- `projections.test_speaker_handlers` (8) → projections  ·  verifies: —
+- `projections.test_subscription_manager_unit` (40) → projections  ·  verifies: —
+- `projections.test_utterance_handlers` (6) → projections  ·  verifies: —
+- `prompts.test_check` (3) → tools.prompts  ·  verifies: —
+- `prompts.test_cli` (1) → tools.prompts  ·  verifies: —
+- `prompts.test_reader` (4) → tools.prompts  ·  verifies: —
+- `prompts.test_render` (1) → tools.prompts  ·  verifies: —
+- `resolution.test_candidates` (12) → resolution  ·  verifies: —
+- `resolution.test_engine` (7) → resolution  ·  verifies: —
+- `resolution.test_reader` (2) → resolution  ·  verifies: —
+- `resolution.test_suggestions` (10) → resolution  ·  verifies: —
+- `test_anthropic_agent_response` (10) → —  ·  verifies: —
+- `test_celery_app` (15) → —  ·  verifies: —
+- `test_config` (25) → —  ·  verifies: —
+- `test_openai_agent_response` (10) → —  ·  verifies: —
+- `test_prompts` (15) → —  ·  verifies: —
+- `test_tasks` (2) → —  ·  verifies: —
+- `testmap.test_check` (4) → tools.testmap  ·  verifies: —
+- `testmap.test_cli` (2) → tools.testmap  ·  verifies: —
+- `testmap.test_reader` (2) → tools.testmap  ·  verifies: —
+- `testmap.test_render` (2) → tools.testmap  ·  verifies: —
+- `testmap.test_verification` (3) → tools.testmap  ·  verifies: —
+- `ui.test_notifications` (31) → ui  ·  verifies: —
+- `ui.test_reader` (18) → ui  ·  verifies: —
+- `usecase.test_check` (5) → tools.usecase  ·  verifies: —
+- `usecase.test_cli` (2) → tools.usecase  ·  verifies: —
+- `usecase.test_coverage` (2) → tools.usecase  ·  verifies: —
+- `usecase.test_reader` (3) → tools.usecase  ·  verifies: —
+- `usecase.test_render` (2) → tools.usecase  ·  verifies: —
+- `utils.test_environment_unit` (65) → utils  ·  verifies: —
+- `utils.test_helpers` (46) → utils  ·  verifies: —
+- `utils.test_logging` (1) → utils  ·  verifies: —
+- `utils.test_metrics_performance` (8) → utils  ·  verifies: —
+- `utils.test_metrics_tracker_comprehensive` (21) → utils  ·  verifies: —
+- `utils.test_neo4j_driver` (10) → utils  ·  verifies: —
+- `utils.test_path_helpers` (4) → utils  ·  verifies: —
+- `utils.test_text_processing` (7) → utils  ·  verifies: —
+
+## integration
+
+- `integration.test_anthropic_api_messages` (4) → —  ·  verifies: —
+- `integration.test_api_calls` (3) → —  ·  verifies: —
+- `integration.test_idempotency` (6) → —  ·  verifies: —
+- `integration.test_migrate_shim_drop_live` (1) → —  ·  verifies: —
+- `integration.test_multi_provider_api_live` (5) → —  ·  verifies: —
+- `integration.test_neo4j_connection_reliability` (15) → —  ·  verifies: —
+- `integration.test_neo4j_data_integrity` (8) → —  ·  verifies: —
+- `integration.test_openai_api_responses` (2) → —  ·  verifies: —
+- `integration.test_projection_replay` (3) → —  ·  verifies: —
+- `integration.test_prompt_validation_live` (15) → —  ·  verifies: —
+
+## e2e
+
+- `integration.test_ask_smoke` (1) → —  ·  verifies: —
+- `integration.test_deployed_projection_smoke` (1) → —  ·  verifies: —
+- `integration.test_e2e_user_edits` (3) → —  ·  verifies: use-cases:correct-what-the-system-got-wrong
+- `integration.test_end_to_end_smoke` (1) → —  ·  verifies: use-cases:surface-the-signal
+- `integration.test_layer1_projection_smoke` (1) → —  ·  verifies: —
+- `integration.test_layer2_enrichment_smoke` (1) → —  ·  verifies: —
+- `integration.test_layer3_lens_smoke` (2) → —  ·  verifies: —
+- `integration.test_layer4_resolution_smoke` (1) → —  ·  verifies: —
+- `integration.test_layer5_export_smoke` (1) → —  ·  verifies: —
+- `integration.test_live_feed_smoke` (2) → —  ·  verifies: —
+- `integration.test_projection_ordering_smoke` (1) → —  ·  verifies: —
+
+## Verification rollup
+
+Use-cases:
+- catalog-every-live-surface: PARTIALLY_VERIFIED
+- collaborate-with-my-team-on-a-corpus: UNVERIFIED
+- correct-what-the-system-got-wrong: VERIFIED
+- diagnose-a-stalled-analysis: UNVERIFIED
+- export-my-analysis-to-take-elsewhere: PARTIALLY_VERIFIED
+- get-a-grounded-answer-from-my-corpus: PARTIALLY_VERIFIED
+- govern-decisions-and-hold-specs-honest: VERIFIED
+- keep-the-codebase-legible: UNVERIFIED
+- keep-the-workbench-live: PARTIALLY_VERIFIED
+- know-who-said-what-across-interviews: PARTIALLY_VERIFIED
+- navigate-the-transcript-by-meaning: PARTIALLY_VERIFIED
+- notify-me-when-my-analysis-is-ready: UNVERIFIED
+- onboard-my-transcripts: UNVERIFIED
+- read-analysis-output-without-the-ui: VERIFIED
+- revisit-a-past-extraction: UNVERIFIED
+- structure-the-raw-transcript: PARTIALLY_VERIFIED
+- surface-the-signal: VERIFIED
+- survive-a-provider-outage: VERIFIED
+- tailor-the-reading-to-the-audience: PARTIALLY_VERIFIED
+- trust-the-event-record: VERIFIED
+
+Capabilities:
+- access-analysis-output-files: VERIFIED
+- ask-the-corpus: PARTIALLY_VERIFIED
+- assemble-bundle: UNVERIFIED
+- canonicalize-entities: UNVERIFIED
+- catalog-the-api-surface: UNVERIFIED
+- catalog-the-cli-surface: VERIFIED
+- catalog-the-graph-queries: VERIFIED
+- catalog-the-prompt-registry: VERIFIED
+- chat-failover: VERIFIED
+- cited-synthesis: UNVERIFIED
+- classify-dimensions: PARTIALLY_VERIFIED
+- correct-resolution: VERIFIED
+- correct-the-analysis: VERIFIED
+- disclose-knowledge-and-check-specs: VERIFIED
+- edit-text: VERIFIED
+- enrich-fragments: PARTIALLY_VERIFIED
+- export-a-portable-bundle: PARTIALLY_VERIFIED
+- extract-claims: PARTIALLY_VERIFIED
+- extract-insights-via-lenses: PARTIALLY_VERIFIED
+- gallery-read: UNVERIFIED
+- govern-architectural-decisions: VERIFIED
+- hybrid-retrieval: UNVERIFIED
+- import-transcripts: UNVERIFIED
+- infer-speakers: PARTIALLY_VERIFIED
+- ingest-transcripts: PARTIALLY_VERIFIED
+- link-the-domains: VERIFIED
+- live-notifications: VERIFIED
+- maintain-a-guarded-knowledge-graph: UNVERIFIED
+- maintain-event-source-of-truth: VERIFIED
+- maintain-the-glossary: VERIFIED
+- map-capabilities: VERIFIED
+- map-the-code: VERIFIED
+- map-the-tests: VERIFIED
+- map-use-cases: VERIFIED
+- merge-split-link-alias: UNVERIFIED
+- override-lens-items: VERIFIED
+- parse-fragments: UNVERIFIED
+- per-lens-extractors: PARTIALLY_VERIFIED
+- pinned-embeddings: VERIFIED
+- project-events-to-graph: VERIFIED
+- provider-strategy-and-focused-calls: VERIFIED
+- remove-segments: VERIFIED
+- rename-reattribute-speakers: VERIFIED
+- render-bundle: UNVERIFIED
+- resolve-entities-and-people: PARTIALLY_VERIFIED
+- resolve-persons: UNVERIFIED
+- run-lens-engine: UNVERIFIED
+- run-read-queries: VERIFIED
+- segment-conversation: VERIFIED
+- serve-workbench-and-gallery: PARTIALLY_VERIFIED
+- stitch-utterances: PARTIALLY_VERIFIED
+- tag-topics-keywords: PARTIALLY_VERIFIED
+- workbench-write: VERIFIED

@@ -11,6 +11,8 @@ Note: Projection service updates to Neo4j are tested separately.
 This focuses on the command/event flow.
 """
 
+# verifies: use-cases:correct-what-the-system-got-wrong
+
 import uuid
 
 import pytest

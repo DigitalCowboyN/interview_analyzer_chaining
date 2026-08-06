@@ -16,6 +16,7 @@ surface it covers. All checks are non-blocking (visibility, not gates).
 | [graph-queries/](graph-queries/index.md) | Neo4j read-query registry (schema + output contract) | `make graphq-check` |
 | [graph/](graph/index.md) | cross-domain edge graph (typed links between all domains) | `make graph-check` |
 | [use-cases/](use-cases/README.md) | user-centered intents (requirements/stories/features) with derived coverage over capabilities | `make usecase-check` |
+| [tests/](tests/README.md) | the test suite as nodes + what it verifies (derived verification axis) | `make testmap-check` |
 
 **Writing a spec or plan?** Record a `## Knowledge-graph check` addendum — the
 per-domain review of what it touched and what you reconciled (`make knowledge-check`
