@@ -59,6 +59,7 @@ graph LR
     n_capabilities_maintain_the_glossary["capabilities:maintain-the-glossary"] --> n_code_tools_glossary["code:tools.glossary"]
     n_capabilities_map_capabilities["capabilities:map-capabilities"] --> n_code_tools_capability["code:tools.capability"]
     n_capabilities_map_the_code["capabilities:map-the-code"] --> n_code_tools_code["code:tools.code"]
+    n_capabilities_map_use_cases["capabilities:map-use-cases"] --> n_code_tools_usecase["code:tools.usecase"]
     n_capabilities_merge_split_link_alias["capabilities:merge-split-link-alias"] --> n_code_resolution_engine["code:resolution.engine"]
     n_capabilities_override_lens_items["capabilities:override-lens-items"] --> n_code_api["code:api"]
     n_capabilities_override_lens_items["capabilities:override-lens-items"] --> n_code_commands["code:commands"]
@@ -119,6 +120,7 @@ graph LR
     n_capabilities_maintain_the_glossary["capabilities:maintain-the-glossary"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
     n_capabilities_map_capabilities["capabilities:map-capabilities"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
     n_capabilities_map_the_code["capabilities:map-the-code"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
+    n_capabilities_map_use_cases["capabilities:map-use-cases"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
     n_capabilities_merge_split_link_alias["capabilities:merge-split-link-alias"] --> n_capabilities_resolve_entities_and_people["capabilities:resolve-entities-and-people"]
     n_capabilities_override_lens_items["capabilities:override-lens-items"] --> n_capabilities_correct_the_analysis["capabilities:correct-the-analysis"]
     n_capabilities_parse_fragments["capabilities:parse-fragments"] --> n_capabilities_ingest_transcripts["capabilities:ingest-transcripts"]
@@ -185,8 +187,11 @@ graph LR
     n_code_tools_graph["code:tools.graph"] --> n_code_tools_adr["code:tools.adr"]
     n_code_tools_graph["code:tools.graph"] --> n_code_tools_capability["code:tools.capability"]
     n_code_tools_graph["code:tools.graph"] --> n_code_tools_code["code:tools.code"]
+    n_code_tools_graph["code:tools.graph"] --> n_code_tools_usecase["code:tools.usecase"]
     n_code_tools_graphq["code:tools.graphq"] --> n_code_tools_glossary["code:tools.glossary"]
     n_code_tools_prompts["code:tools.prompts"] --> n_code_tools_glossary["code:tools.glossary"]
+    n_code_tools_usecase["code:tools.usecase"] --> n_code_ingestion["code:ingestion"]
+    n_code_tools_usecase["code:tools.usecase"] --> n_code_tools_capability["code:tools.capability"]
     n_code_ui["code:ui"] --> n_code_events["code:events"]
 ```
 
@@ -225,4 +230,12 @@ graph LR
 ```mermaid
 graph LR
     n_adr_14["adr:14"] --> n_adr_8["adr:8"]
+```
+
+## fulfilled_by
+
+```mermaid
+graph LR
+    n_use_cases_onboard_my_transcripts["use-cases:onboard-my-transcripts"] --> n_capabilities_import_transcripts["capabilities:import-transcripts"]
+    n_use_cases_surface_the_signal["use-cases:surface-the-signal"] --> n_capabilities_extract_insights_via_lenses["capabilities:extract-insights-via-lenses"]
 ```

@@ -83,9 +83,12 @@ graph LR
     tools.graph --> tools.adr
     tools.graph --> tools.capability
     tools.graph --> tools.code
+    tools.graph --> tools.usecase
     tools.graphq --> tools.glossary
     tools.knowledge
     tools.prompts --> tools.glossary
+    tools.usecase --> ingestion
+    tools.usecase --> tools.capability
     ui --> events
     ui.reader
     utils

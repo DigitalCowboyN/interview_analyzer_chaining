@@ -89,7 +89,7 @@ graph-check: ## Reconcile the edge graph vs its sources (non-blocking)
 
 .PHONY: health
 health: ## Run every domain check + the cross-domain graph check (full sweep)
-	@for d in adr cli api glossary prompts graphq code capability knowledge graph; do $(PYTHON) -m tools.$$d check || true; done
+	@for d in adr cli api glossary prompts graphq code capability knowledge graph usecase; do $(PYTHON) -m tools.$$d check || true; done
 
 .PHONY: knowledge-check
 knowledge-check: ## Reconcile specs/plans + cascade root vs the knowledge domains (non-blocking)
@@ -102,6 +102,14 @@ capability-index: ## Regenerate docs/capabilities/index.md (the capability catal
 .PHONY: capability-check
 capability-check: ## Reconcile capabilities vs the code map + coverage (non-blocking)
 	@$(PYTHON) -m tools.capability check
+
+.PHONY: usecase-index
+usecase-index: ## Regenerate docs/use-cases/index.md (the use-case corpus + derived coverage)
+	@$(PYTHON) -m tools.usecase index
+
+.PHONY: usecase-check
+usecase-check: ## Reconcile use-cases vs forms/categories/criteria + coverage (non-blocking)
+	@$(PYTHON) -m tools.usecase check
 
 # Install the shared project git hooks (non-blocking ADR drift report on commit)
 .PHONY: hooks-install
