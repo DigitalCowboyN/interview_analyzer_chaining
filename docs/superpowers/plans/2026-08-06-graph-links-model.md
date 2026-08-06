@@ -395,14 +395,28 @@ def test_graph_in_knowledge_registry():
 
 ---
 
-### Task 6: Generate the graph artifacts + reconcile
+### Task 6: Self-register the graph domain + generate artifacts + reconcile
 
-**Files:** Create `docs/graph/index.md`, `docs/graph/graph.md`; regenerate `docs/cli/index.md`
+**Files:** Create `docs/code/tools.graph.md`, one operations capability child under `docs/capabilities/`, `docs/graph/index.md`, `docs/graph/graph.md`; regenerate `docs/code/index.md`+`pipeline.md`, `docs/capabilities/index.md`, `docs/cli/index.md`
 
-- [ ] **Step 1: Generate** — `~/.pyenv/shims/python -m tools.graph index` (writes both files).
-- [ ] **Step 2: Reconcile** — `~/.pyenv/shims/python -m tools.graph check` → `graph-check: clean` (index in sync; endpoints resolve — if a dangling endpoint appears, it's a real cross-domain drift: fix the offending frontmatter, don't mask it). `make cli-index` (catalog the new `graph-*`/`health` targets) → `~/.pyenv/shims/python -m tools.cli check` clean. `~/.pyenv/shims/python -m tools.knowledge check` clean.
-- [ ] **Step 3: Verify** — `docs/graph/index.md` has the edge catalog + meta-schema; `docs/graph/graph.md` has a `## implements` (the capability→code view) + `## depends_on` + `## governs` + `## supersedes` + `## child_of` section. Re-run `graph index` → `git status --short docs/graph/` shows no diff (idempotent).
-- [ ] **Step 4: Commit** — `git add docs/graph/ docs/cli/ && git commit -m "docs(graph): generate cross-domain edge catalog + full instance graph; catalog graph-* targets"`
+**Why this step exists (found during Task 4):** creating `tools/graph/` makes it a new tool package. Round A's code map now flags `tools.graph` as an uncovered package; once it has a code node, Round B's tooling-coverage flags it as unclaimed by any operations capability; and `graph-check` flags the `code:tools.graph` `depends_on` endpoints as dangling. The graph domain must **self-register** across code + capabilities — dogfooding the very graph it introduces.
+
+- [ ] **Step 1: Register `tools.graph` in the code map** — author `docs/code/tools.graph.md`:
+  ```markdown
+  ---
+  type: CodeUnit
+  unit: tools.graph
+  role: tooling
+  key_modules: [registry, reader, render, check]
+  ---
+  The cross-domain graph layer: an extensible edge registry + a registry-driven harvester that assembles every domain's typed links into one traversable graph, rendered and guarded.
+  ```
+  Then `~/.pyenv/shims/python -m tools.code index`; `~/.pyenv/shims/python -m tools.code check` → clean (`tools.graph` covered; `pipeline.md` now shows `tools.graph → tools.adr/capability/code`).
+- [ ] **Step 2: Claim it with an operations capability** — author one child under the `maintain-a-guarded-knowledge-graph` primary (mirroring the other operations children — `kind: child`, `parent: maintain-a-guarded-knowledge-graph`, no tier/category), e.g. `docs/capabilities/link-the-domains.md` with `implemented_by: [tools.graph]` and a terse value statement ("Assemble every domain's typed links into one cross-domain graph — traverse and guard it."). Then `~/.pyenv/shims/python -m tools.capability index`; `~/.pyenv/shims/python -m tools.capability check` → clean (`tools.graph` now claimed).
+- [ ] **Step 3: Generate the graph artifacts** — `~/.pyenv/shims/python -m tools.graph index` (writes `docs/graph/index.md` + `graph.md`). Note: Steps 1–2 also add a new `implements` edge (`link-the-domains → tools.graph`) and `depends_on` edges from `tools.graph` — that's expected; they now resolve.
+- [ ] **Step 4: Reconcile everything clean** — `~/.pyenv/shims/python -m tools.graph check` → `graph-check: clean` (the `code:tools.graph` endpoints now resolve; index in sync). `make cli-index` (catalog `graph-*`/`health`) → `tools.cli check` clean. `tools.knowledge check` clean. Re-run `tools.code check` + `tools.capability check` → both still clean.
+- [ ] **Step 5: Verify idempotent** — `docs/graph/index.md` has the catalog + meta-schema; `docs/graph/graph.md` has `## implements` (incl. `link-the-domains → tools.graph`) + `## depends_on` + `## governs` + `## supersedes` + `## child_of`. Re-run all three `index` commands → `git status --short docs/` shows no diff.
+- [ ] **Step 6: Commit** — `git add docs/code/ docs/capabilities/ docs/graph/ docs/cli/ && git commit -m "docs(graph): self-register tools.graph (code node + operations capability) + generate graph artifacts + catalog targets"`
 
 ---
 
@@ -419,6 +433,7 @@ def test_graph_in_knowledge_registry():
 
 - [ ] `~/.pyenv/shims/python -m pytest tests/graph/ tests/knowledge/ -p no:cacheprovider -q -o addopts=""` — all green.
 - [ ] `make graph-check` — clean; `make graph-index` then `git status` — `docs/graph/*` regenerate identically.
+- [ ] `make code-check` + `make capability-check` — clean (`tools.graph` self-registered: a code node + an operations capability claim).
 - [ ] `make knowledge-check` + `make cli-check` — clean; `make adr-check` — clean apart from 3 known.
 - [ ] `make health` — runs all domain checks + graph-check, exits 0.
 - [ ] `.githooks/pre-commit` includes a non-blocking `tools.graph check`.
