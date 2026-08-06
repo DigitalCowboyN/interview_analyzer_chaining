@@ -27,7 +27,7 @@ def render_catalog(edges: List[Edge], node_ids: Dict[str, Set[str]]) -> str:
     for et in EDGES:
         props = ", ".join(p.name for p in et.properties) or "—"
         lines.append(
-            f"| {et.name} | {et.inverse} | {et.from_type} → {et.to_type} | "
+            f"| {et.name} | {et.inverse} | {et.from_type} → {et.to_type.replace('|', chr(92) + '|')} | "
             f"{et.source} | {props} | {counts.get(et.name, 0)} |"
         )
     lines.append("")

@@ -12,7 +12,7 @@ from tools.capability.reader import real_code_units
 TEST_TYPES = ["unit", "integration", "e2e"]
 
 _VERIFIES = re.compile(r"^#\s*verifies:\s*(\S+)", re.MULTILINE)
-_TESTFN = re.compile(r"^\s*def test_", re.MULTILINE)
+_TESTFN = re.compile(r"^\s*(?:async\s+)?def test_", re.MULTILINE)
 _E2E = re.compile(r"(test_e2e_|test_end_to_end_|_smoke)")
 
 _TESTS_ADDR = "tests"  # this domain's node-address prefix
