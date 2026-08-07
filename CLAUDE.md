@@ -24,11 +24,13 @@ lens, export, api, ui). `frontend/` — the Next.js UI.
 `docs/superpowers/{specs,plans}/` — design specs and implementation plans.
 
 ## Knowledge map
-This repo keeps guarded knowledge domains under `docs/` — see
-[`docs/index.md`](docs/index.md) for the map. Each has a non-blocking
-`make <domain>-check`. When you change a surface one covers, consult its bundle and
-run its check. When you write a spec/plan, record a `## Knowledge-graph check`
-addendum (`make knowledge-check` flags a new one that skipped it).
+This repo keeps a guarded knowledge graph over its own codebase — domains under `docs/`
+that trace **use-case → capability → code → test** (plus adr/glossary/api/cli/prompts/
+graph-queries and the cross-domain `graph/`). See [`docs/index.md`](docs/index.md) for the
+map and the model. Each domain has a non-blocking `make <domain>-check`. When you change a
+surface one covers, consult its bundle and run its check. When you write a spec/plan,
+record a `## Knowledge-graph check` addendum (`make knowledge-check` flags a new one that
+skipped it).
 
 ## Architecture Decision Records (policy)
 - **Before locking any architectural decision, consult `docs/adr/index.md`.**

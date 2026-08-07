@@ -7,6 +7,7 @@
 
 | Document | Purpose |
 |----------|---------|
+| **[index.md](index.md)** | The guarded knowledge graph — self-documenting domains (decisions, capabilities, use-cases, code, tests) reconciled against the code, with the traceability spine |
 | **[ROADMAP.md](ROADMAP.md)** | Canonical roadmap — milestones, status, current stats |
 | **[architecture/](architecture/)** | Current architecture: system overview, data flow, event sourcing, database schema |
 | **[onboarding/](onboarding/)** | Setup, configuration, dev workflow, troubleshooting |
