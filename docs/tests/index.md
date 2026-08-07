@@ -33,10 +33,10 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `api.test_segments_router` (9) → api  ·  verifies: —
 - `api.test_speakers_router` (11) → api  ·  verifies: —
 - `api.test_ui_router` (24) → api  ·  verifies: —
-- `api_surface.test_check` (4) → —  ·  verifies: —
-- `api_surface.test_cli` (1) → —  ·  verifies: —
-- `api_surface.test_reader` (3) → —  ·  verifies: —
-- `api_surface.test_render` (1) → —  ·  verifies: —
+- `api_surface.test_check` (4) → tools.api  ·  verifies: —
+- `api_surface.test_cli` (1) → tools.api  ·  verifies: —
+- `api_surface.test_reader` (3) → tools.api  ·  verifies: —
+- `api_surface.test_render` (1) → tools.api  ·  verifies: —
 - `ask.test_cli` (4) → ask  ·  verifies: —
 - `ask.test_context` (7) → ask  ·  verifies: —
 - `ask.test_engine` (12) → ask  ·  verifies: —
@@ -44,7 +44,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `ask.test_reader` (11) → ask  ·  verifies: —
 - `capability.test_check` (8) → tools.capability  ·  verifies: —
 - `capability.test_cli` (2) → tools.capability  ·  verifies: —
-- `capability.test_reader` (5) → tools.capability  ·  verifies: —
+- `capability.test_reader` (6) → tools.capability  ·  verifies: —
 - `capability.test_render` (3) → tools.capability  ·  verifies: —
 - `cli.test_check` (4) → tools.cli  ·  verifies: —
 - `cli.test_cli` (2) → tools.cli  ·  verifies: —
@@ -113,7 +113,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `ingestion.test_sample_corpus` (8) → ingestion  ·  verifies: —
 - `ingestion.test_speaker_inference` (7) → ingestion  ·  verifies: —
 - `ingestion.test_stitcher` (8) → ingestion  ·  verifies: —
-- `knowledge.test_check` (6) → tools.knowledge  ·  verifies: —
+- `knowledge.test_check` (10) → tools.knowledge  ·  verifies: —
 - `knowledge.test_cli` (5) → tools.knowledge  ·  verifies: —
 - `lens.test_engine` (4) → lens  ·  verifies: —
 - `lens.test_lens_models` (11) → lens  ·  verifies: —
@@ -158,7 +158,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `test_tasks` (2) → —  ·  verifies: —
 - `testmap.test_check` (4) → tools.testmap  ·  verifies: —
 - `testmap.test_cli` (2) → tools.testmap  ·  verifies: —
-- `testmap.test_reader` (2) → tools.testmap  ·  verifies: —
+- `testmap.test_reader` (3) → tools.testmap  ·  verifies: —
 - `testmap.test_render` (2) → tools.testmap  ·  verifies: —
 - `testmap.test_verification` (3) → tools.testmap  ·  verifies: —
 - `ui.test_notifications` (31) → ui  ·  verifies: —
@@ -207,7 +207,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 ## Verification rollup
 
 Use-cases:
-- catalog-every-live-surface: PARTIALLY_VERIFIED
+- catalog-every-live-surface: VERIFIED
 - collaborate-with-my-team-on-a-corpus: UNVERIFIED
 - correct-what-the-system-got-wrong: VERIFIED
 - diagnose-a-stalled-analysis: UNVERIFIED
@@ -233,7 +233,7 @@ Capabilities:
 - ask-the-corpus: PARTIALLY_VERIFIED
 - assemble-bundle: UNVERIFIED
 - canonicalize-entities: UNVERIFIED
-- catalog-the-api-surface: UNVERIFIED
+- catalog-the-api-surface: VERIFIED
 - catalog-the-cli-surface: VERIFIED
 - catalog-the-graph-queries: VERIFIED
 - catalog-the-prompt-registry: VERIFIED
@@ -244,6 +244,7 @@ Capabilities:
 - correct-the-analysis: VERIFIED
 - disclose-knowledge-and-check-specs: VERIFIED
 - edit-text: VERIFIED
+- embed-fragments: VERIFIED
 - enrich-fragments: PARTIALLY_VERIFIED
 - export-a-portable-bundle: PARTIALLY_VERIFIED
 - extract-claims: PARTIALLY_VERIFIED
