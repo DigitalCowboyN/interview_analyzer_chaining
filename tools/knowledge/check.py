@@ -4,7 +4,7 @@ import glob
 import os
 import re
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from tools.capability.reader import CATEGORIES, category_defined, load_capabilities
 from tools.usecase.reader import load_use_cases
@@ -79,7 +79,7 @@ def check_category_axis(root: str = ".") -> List[Finding]:
     not a reserved placeholder. Complements the per-domain 'unknown category' checks
     (which flag values not in the axis at all)."""
     try:
-        used: dict = {}
+        used: Dict[str, int] = {}
         for node in (*load_capabilities(root), *load_use_cases(root)):
             if node.category:
                 used[node.category] = used.get(node.category, 0) + 1

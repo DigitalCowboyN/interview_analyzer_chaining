@@ -59,6 +59,17 @@ def test_flags_used_but_reserved_category(tmp_path):
     assert any("strategic" in f.message and "in use" in f.message for f in findings)
 
 
+def test_flags_reserved_category_used_by_a_use_case(tmp_path):
+    # exercises the use-case half of the cross-domain read (not just capabilities)
+    d = tmp_path / "docs" / "use-cases"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "u.md").write_text(
+        "---\ntype: UseCase\nform: user-story\ncategory: strategic\nactor: a\n---\nu.\n",
+        encoding="utf-8")
+    findings = check_category_axis(str(tmp_path))
+    assert any("strategic" in f.message for f in findings)
+
+
 def test_clean_when_used_categories_are_defined(tmp_path):
     _cap(tmp_path, "x", "product")            # defined
     _cap(tmp_path, "y", "supporting")         # defined
