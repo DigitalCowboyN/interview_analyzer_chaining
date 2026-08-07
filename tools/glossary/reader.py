@@ -153,5 +153,5 @@ def _name_of(n):
 
 
 def _literal_elts(sl):
-    node = sl.value if isinstance(sl, ast.Index) else sl  # py<3.9 compat
+    node = sl.value if isinstance(sl, getattr(ast, "Index", ())) else sl  # ast.Index gone in 3.12
     return node.elts if isinstance(node, ast.Tuple) else [node]

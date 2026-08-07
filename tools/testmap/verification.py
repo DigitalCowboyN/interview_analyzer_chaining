@@ -1,3 +1,10 @@
+"""Derived verification axis — is a node PROVEN by tests, orthogonal to whether it is implemented.
+
+States `UNVERIFIED | PARTIALLY_VERIFIED | VERIFIED`, computed from the `verifies` edges
+(test→code by convention, test→intent by authored marker) and rolled up transitively
+through capabilities. Pure — callers supply the loaded reader objects.
+"""
+
 from __future__ import annotations
 
 from typing import Dict, List, Set
@@ -12,6 +19,7 @@ VERIFIED = "VERIFIED"
 
 
 def verified_units(tests: List[Test]) -> Set[str]:
+    """Code-unit slugs that at least one test verifies (the derived test→code targets)."""
     return {t.target for t in tests if t.target}
 
 
@@ -35,6 +43,9 @@ def _capability_state(cap: Capability, vunits: Set[str], direct: Set[str]) -> st
 
 
 def verify_capabilities(caps: List[Capability], tests: List[Test]) -> Dict[str, str]:
+    """Derived verification state per capability: VERIFIED when every `implemented_by`
+    unit is tested (or a direct marker names it), PARTIALLY when some are, else UNVERIFIED.
+    """
     vunits, direct = verified_units(tests), _direct(tests)
     return {c.slug: _capability_state(c, vunits, direct) for c in caps}
 
@@ -42,8 +53,12 @@ def verify_capabilities(caps: List[Capability], tests: List[Test]) -> Dict[str, 
 def verify_use_cases(
     use_cases: List[UseCase], caps: List[Capability], tests: List[Test]
 ) -> Dict[str, str]:
-    vunits, direct = verified_units(tests), _direct(tests)
-    cap_state = {c.slug: _capability_state(c, vunits, direct) for c in caps}
+    """Derived verification state per use-case: VERIFIED via a direct `use-cases:<slug>`
+    marker or when every fulfilling capability is VERIFIED; PARTIALLY when some are; else
+    UNVERIFIED. Rolls up the capability states, so a direct marker on a fulfilling
+    capability propagates automatically."""
+    direct = _direct(tests)
+    cap_state = verify_capabilities(caps, tests)
     known = {c.slug for c in caps}
     out: Dict[str, str] = {}
     for uc in use_cases:

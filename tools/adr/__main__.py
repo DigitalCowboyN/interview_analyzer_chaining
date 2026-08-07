@@ -56,15 +56,6 @@ def cmd_context(args) -> int:
     return 0
 
 
-def cmd_nudge(args) -> int:
-    # PostToolUse(Write) hook: remind to capture decisions when a spec lands.
-    path = _read_stdin_json().get("tool_input", {}).get("file_path", "")
-    if "docs/superpowers/specs/" in path.replace("\\", "/"):
-        print("This spec may lock decisions — capture them as ADR(s) "
-              "(`python -m tools.adr new \"<title>\"`) and set `source:` to this spec.")
-    return 0
-
-
 def cmd_where(args) -> int:
     from tools.adr.index import load_bundle
     from tools.adr.check import _path_covered_by
@@ -91,12 +82,11 @@ def main(argv=None) -> int:
     sub.add_parser("check", parents=[common])
     p_new = sub.add_parser("new", parents=[common]); p_new.add_argument("title")
     sub.add_parser("context", parents=[common])
-    sub.add_parser("nudge", parents=[common])
     p_where = sub.add_parser("where", parents=[common]); p_where.add_argument("path")
     args = parser.parse_args(argv)
     return {
         "index": cmd_index, "check": cmd_check, "new": cmd_new,
-        "context": cmd_context, "nudge": cmd_nudge, "where": cmd_where,
+        "context": cmd_context, "where": cmd_where,
     }[args.cmd](args)
 
 

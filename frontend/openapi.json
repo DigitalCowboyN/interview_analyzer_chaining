@@ -832,7 +832,7 @@
           "segments"
         ],
         "summary": "List Segments",
-        "description": "Topic segments with their fragment ranges, in transcript order.",
+        "description": "Topic segments with their fragment ranges, in transcript order.\n\ngraphq: purpose=ui scope=task audience=[api]",
         "operationId": "list_segments_interviews__interview_id__segments_get",
         "parameters": [
           {
@@ -2019,6 +2019,70 @@
               "type": "string",
               "minLength": 1,
               "title": "Display Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/streams/events": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "Stream Events",
+        "description": "SSE live feed (M5.1): the browser subscribes by interview_id and/or\nproject_id (at least one required, else 422) and receives one\n`data: {...}\\n\\n` frame per matching Notification, plus a\n`: keep-alive\\n\\n` comment after HEARTBEAT_SECONDS of quiet.\n\nLazy lifecycle both directions: the shared EsdbWatcher is (idempotently)\nstarted on this connection and stopped once the last subscriber\ndisconnects \u2014 see get_live_feed() / EsdbWatcher in src/ui/notifications.py.",
+        "operationId": "stream_events_ui_streams_events_get",
+        "parameters": [
+          {
+            "name": "interview_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Interview Id"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
             }
           }
         ],

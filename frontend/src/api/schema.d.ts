@@ -334,6 +334,8 @@ export interface paths {
         /**
          * List Segments
          * @description Topic segments with their fragment ranges, in transcript order.
+         *
+         *     graphq: purpose=ui scope=task audience=[api]
          */
         get: operations["list_segments_interviews__interview_id__segments_get"];
         put?: never;
@@ -678,6 +680,33 @@ export interface paths {
          *     frontend must never derive ids itself (loose-coupling requirement).
          */
         get: operations["derive_person_id_ui_projects__project_id__person_id_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ui/streams/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Events
+         * @description SSE live feed (M5.1): the browser subscribes by interview_id and/or
+         *     project_id (at least one required, else 422) and receives one
+         *     `data: {...}\n\n` frame per matching Notification, plus a
+         *     `: keep-alive\n\n` comment after HEARTBEAT_SECONDS of quiet.
+         *
+         *     Lazy lifecycle both directions: the shared EsdbWatcher is (idempotently)
+         *     started on this connection and stopped once the last subscriber
+         *     disconnects — see get_live_feed() / EsdbWatcher in src/ui/notifications.py.
+         */
+        get: operations["stream_events_ui_streams_events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2102,6 +2131,38 @@ export interface operations {
             path: {
                 project_id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_events_ui_streams_events_get: {
+        parameters: {
+            query?: {
+                interview_id?: string | null;
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
