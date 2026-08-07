@@ -352,9 +352,18 @@ make help         # everything else
 
 | Document | What's in it |
 |----------|--------------|
+| [docs/index.md](docs/index.md) | **The guarded knowledge graph** — how this repo documents itself and stays honest |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones, status, test/coverage stats |
 | [docs/architecture/](docs/architecture/) | System diagrams, data flow, event sourcing, schema |
 | [docs/onboarding/](docs/onboarding/) | Setup, configuration, troubleshooting, dev workflow |
+
+**The guarded knowledge graph.** Beyond prose docs, the repo keeps a graph *over its own
+codebase*: small Markdown domains that catalog the system's decisions, vocabulary, code
+map, capabilities, use-cases, and tests — each reconciling itself against the real code via
+a non-blocking `make <domain>-check`, so documentation drift is surfaced instead of
+rotting. The domains form a traceability spine — **use-case → capability → code → test** —
+with derived implementation *and* verification coverage. Start at
+[docs/index.md](docs/index.md).
 
 ## Contributing
 
