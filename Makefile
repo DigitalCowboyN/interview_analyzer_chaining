@@ -1,8 +1,11 @@
 # Makefile
 
 # Variables
-# Python detection: Allow override, else prefer 'python' (pyenv), fallback to 'python3'
-PYTHON ?= $(shell command -v python 2>/dev/null || command -v python3 2>/dev/null)
+# Python detection: allow override, else resolve the pyenv-pinned interpreter (see
+# .python-version) even when shims aren't on PATH, then fall back to python/python3.
+# The generic fallbacks may pick a system python WITHOUT the project deps (pyyaml,
+# pytest) — run inside the project's pyenv env, or set PYTHON=/path/to/python.
+PYTHON ?= $(shell pyenv which python 2>/dev/null || command -v python 2>/dev/null || command -v python3 2>/dev/null)
 MODULE_NAME = src
 TEST_DIR = tests
 
