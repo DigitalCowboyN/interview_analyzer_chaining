@@ -50,7 +50,7 @@ corpus and drift from both it and the code.
 type: Capability
 kind: primary | child | variant
 tier: core | enabling            # primaries carry tier; children/variants inherit
-category: product | operations   # primaries carry category (industry axis; strategic/supporting reserved)
+category: product | operations | supporting   # industry axis; definitions live in tools/capability/reader.py (strategic reserved)
 parent: <primary-slug>           # children/variants only
 implemented_by: [<code-unit slugs from ../code/>]   # may be [] — legitimate
 ---
@@ -66,9 +66,12 @@ The slug is the filename. `implemented_by` targets are CodeUnit slugs from the
 - **`implements` is the inverse of `implemented_by`, derived** — read the edges backward,
   never authored as markers in code (`src/`/`tools/` stay untouched). Surfacing that
   inverse is the job of the forthcoming graph-links work.
-- **Categories** follow industry and are an open set. `product` and `operations` are
-  populated; `strategic` (direction-setting) and `supporting` are reserved — add a value
-  only when a concrete capability forces it.
+- **Categories** follow industry and are an **open, defined set** — each value's meaning
+  lives in `tools/capability/reader.py` (`CATEGORIES`), and `make knowledge-check` flags a
+  value used before it's defined. Current axis: **product** (the thing customers use),
+  **operations** (running the system — CI, infra, the knowledge graph), **supporting**
+  (customer-facing but around the product — self-help, notifications, output access).
+  `strategic` (direction-setting) is reserved — define it on first use.
 - **Capability ↔ use-case is indirect and many-to-many** — a use-case may inform several
   capabilities; a capability may fulfill several (or none, for operational/support
   ones). They are **not** linked here (that is a later round, and even then loosely).
