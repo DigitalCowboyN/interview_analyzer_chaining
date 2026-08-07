@@ -6,6 +6,9 @@ import re
 from dataclasses import dataclass
 from typing import List, Tuple
 
+from tools.capability.reader import CATEGORIES, category_defined, load_capabilities
+from tools.usecase.reader import load_use_cases
+
 # Single source of truth for the knowledge-graph domains: (docs slug, make-name).
 # Each has docs/<slug>/index.md and a `make <make-name>-check`. Add a row here (and
 # to docs/index.md) when a new domain ships (e.g. capabilities).
@@ -71,10 +74,31 @@ def check_cascade_covers_domains(root: str = ".", domains=DOMAINS) -> List[Findi
     return findings
 
 
+def check_category_axis(root: str = ".") -> List[Finding]:
+    """Cross-domain: every category USED by a capability or use-case must be DEFINED,
+    not a reserved placeholder. Complements the per-domain 'unknown category' checks
+    (which flag values not in the axis at all)."""
+    try:
+        used: dict = {}
+        for node in (*load_capabilities(root), *load_use_cases(root)):
+            if node.category:
+                used[node.category] = used.get(node.category, 0) + 1
+    except Exception as exc:  # non-blocking: a guard must never raise out
+        return [Finding(f"knowledge: category-axis check failed: {exc}")]
+    findings: List[Finding] = []
+    for cat, n in sorted(used.items()):
+        if cat in CATEGORIES and not category_defined(cat):
+            findings.append(Finding(
+                f"knowledge: category '{cat}' is in use ({n} node(s)) but has no "
+                f"definition in tools/capability/reader.py — define it before use"))
+    return findings
+
+
 def run_all(root: str = ".") -> List[Finding]:
     specs = os.path.join(root, "docs/superpowers/specs")
     plans = os.path.join(root, "docs/superpowers/plans")
     findings: List[Finding] = []
     findings += check_cascade_covers_domains(root)
+    findings += check_category_axis(root)
     findings += check_addendum_present(specs, plans)
     return findings

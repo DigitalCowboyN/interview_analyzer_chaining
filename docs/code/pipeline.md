@@ -86,7 +86,8 @@ graph LR
     tools.graph --> tools.testmap
     tools.graph --> tools.usecase
     tools.graphq --> tools.glossary
-    tools.knowledge
+    tools.knowledge --> tools.capability
+    tools.knowledge --> tools.usecase
     tools.prompts --> tools.glossary
     tools.testmap --> tools.capability
     tools.testmap --> tools.usecase
