@@ -1,5 +1,12 @@
 import os
-from tools.capability.reader import Capability, load_capabilities, real_code_units, code_nodes
+from tools.capability.reader import (
+    Capability,
+    load_capabilities,
+    real_code_units,
+    code_nodes,
+    CATEGORIES,
+    category_defined,
+)
 
 
 def _write(p, text):
@@ -37,12 +44,21 @@ def test_code_nodes_carry_roles():
 
 
 def test_load_parses_category(tmp_path):
-    import os
-    from tools.capability.reader import load_capabilities, CATEGORIES
     cap = tmp_path / "docs/capabilities/x.md"
     os.makedirs(os.path.dirname(cap), exist_ok=True)
     open(cap, "w").write("---\ntype: Capability\nkind: primary\ntier: core\n"
                          "category: operations\nimplemented_by: [tools.code]\n---\nDoes a thing.\n")
     c = load_capabilities(str(tmp_path))[0]
     assert c.category == "operations"
-    assert CATEGORIES[:2] == ["product", "operations"]  # product/operations populated; then reserved
+    assert list(CATEGORIES)[:2] == ["product", "operations"]  # product/operations populated; then reserved
+
+
+def test_categories_is_defined_axis():
+    # membership + iteration still behave like the old list
+    assert "product" in CATEGORIES and "nonsense" not in CATEGORIES
+    assert list(CATEGORIES)[:2] == ["product", "operations"]  # order preserved for render
+    # product/operations/supporting are defined; strategic is reserved ("")
+    assert category_defined("product") and category_defined("operations")
+    assert category_defined("supporting")
+    assert not category_defined("strategic")   # reserved
+    assert not category_defined("unknown")     # not in the axis

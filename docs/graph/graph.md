@@ -192,6 +192,8 @@ graph LR
     n_code_tools_graph["code:tools.graph"] --> n_code_tools_testmap["code:tools.testmap"]
     n_code_tools_graph["code:tools.graph"] --> n_code_tools_usecase["code:tools.usecase"]
     n_code_tools_graphq["code:tools.graphq"] --> n_code_tools_glossary["code:tools.glossary"]
+    n_code_tools_knowledge["code:tools.knowledge"] --> n_code_tools_capability["code:tools.capability"]
+    n_code_tools_knowledge["code:tools.knowledge"] --> n_code_tools_usecase["code:tools.usecase"]
     n_code_tools_prompts["code:tools.prompts"] --> n_code_tools_glossary["code:tools.glossary"]
     n_code_tools_testmap["code:tools.testmap"] --> n_code_tools_capability["code:tools.capability"]
     n_code_tools_testmap["code:tools.testmap"] --> n_code_tools_usecase["code:tools.usecase"]

@@ -9,10 +9,24 @@ from typing import List
 from src.ingestion.front_matter import parse_front_matter
 from tools.code.reader import KEY_MODULES, load_units, packages
 
-# The capability category axis — an open, ordered set. product/operations are
-# populated; strategic/supporting are reserved (recognized by the guard, skipped by
-# the renderer until a node uses them). Adding a value = one edit here.
-CATEGORIES = ["product", "operations", "strategic", "supporting"]
+# The capability category axis — an open, ordered set carrying each value's definition.
+# A non-empty definition = defined & in use; "" = reserved (declared; define on first use).
+# Adding/promoting a value = one edit here; knowledge-check flags a used-but-undefined value.
+# Kept dict-shaped so `x in CATEGORIES` / `for c in CATEGORIES` behave as before (keys).
+CATEGORIES = {
+    "product": "the product itself — the capability a customer directly uses",
+    "operations": "running and maintaining the system — CI, infra, projections, the guarded knowledge graph",
+    "supporting": (
+        "customer-facing but around the product, not the product itself — "
+        "self-help, notifications, getting output out"
+    ),
+    "strategic": "",  # reserved: direction-setting; define on first use
+}
+
+
+def category_defined(name: str) -> bool:
+    """True when `name` is a category with a real definition (not reserved / unknown)."""
+    return bool(CATEGORIES.get(name))
 
 
 @dataclass

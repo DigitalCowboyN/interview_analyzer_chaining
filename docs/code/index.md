@@ -69,7 +69,7 @@ See `pipeline.md` for the dependency graph.
 | tools.glossary | files | ingestion |
 | tools.graph | files | tools.adr, tools.capability, tools.code, tools.testmap, tools.usecase |
 | tools.graphq | files | tools.glossary |
-| tools.knowledge | files |  |
+| tools.knowledge | files | tools.capability, tools.usecase |
 | tools.prompts | files | tools.glossary |
 | tools.testmap | files | tools.capability, tools.usecase |
 | tools.usecase | files | ingestion, tools.capability |
