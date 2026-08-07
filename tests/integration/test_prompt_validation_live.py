@@ -17,6 +17,7 @@ Requirements:
 Usage:
     pytest tests/integration/test_prompt_validation_live.py -xvs
 """
+# verifies: code:agents
 
 import os
 from pathlib import Path

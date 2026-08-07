@@ -4,6 +4,7 @@ Integration tests for Neo4j connection reliability and environment-aware configu
 These tests verify that the enhanced connection management system works correctly
 across different environments and handles various failure scenarios gracefully.
 """
+# verifies: code:persistence
 
 import asyncio
 import os

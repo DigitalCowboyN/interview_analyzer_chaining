@@ -17,6 +17,7 @@ Requirements:
 Usage:
     pytest tests/integration/test_anthropic_api_messages.py -xvs
 """
+# verifies: code:agents
 
 import json
 import os

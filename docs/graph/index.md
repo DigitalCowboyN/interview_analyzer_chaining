@@ -10,7 +10,7 @@
 | governs | governed_by | ADR → CodeUnit | authored | — | 24 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 52 |
-| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 168 |
+| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 190 |
 
 ## Nodes
 

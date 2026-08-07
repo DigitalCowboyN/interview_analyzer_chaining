@@ -150,11 +150,11 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `resolution.test_engine` (7) → resolution  ·  verifies: —
 - `resolution.test_reader` (2) → resolution  ·  verifies: —
 - `resolution.test_suggestions` (10) → resolution  ·  verifies: —
-- `test_anthropic_agent_response` (10) → —  ·  verifies: —
+- `test_anthropic_agent_response` (10) → —  ·  verifies: code:agents
 - `test_celery_app` (15) → —  ·  verifies: —
 - `test_config` (25) → —  ·  verifies: —
-- `test_openai_agent_response` (10) → —  ·  verifies: —
-- `test_prompts` (15) → —  ·  verifies: —
+- `test_openai_agent_response` (10) → —  ·  verifies: code:agents
+- `test_prompts` (15) → —  ·  verifies: code:tools.prompts
 - `test_tasks` (2) → —  ·  verifies: —
 - `testmap.test_check` (4) → tools.testmap  ·  verifies: —
 - `testmap.test_cli` (2) → tools.testmap  ·  verifies: —
@@ -179,30 +179,30 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 
 ## integration
 
-- `integration.test_anthropic_api_messages` (4) → —  ·  verifies: —
-- `integration.test_api_calls` (3) → —  ·  verifies: —
-- `integration.test_idempotency` (6) → —  ·  verifies: —
-- `integration.test_migrate_shim_drop_live` (1) → —  ·  verifies: —
-- `integration.test_multi_provider_api_live` (5) → —  ·  verifies: —
-- `integration.test_neo4j_connection_reliability` (15) → —  ·  verifies: —
-- `integration.test_neo4j_data_integrity` (8) → —  ·  verifies: —
-- `integration.test_openai_api_responses` (2) → —  ·  verifies: —
-- `integration.test_projection_replay` (3) → —  ·  verifies: —
-- `integration.test_prompt_validation_live` (15) → —  ·  verifies: —
+- `integration.test_anthropic_api_messages` (4) → —  ·  verifies: code:agents
+- `integration.test_api_calls` (3) → —  ·  verifies: code:agents
+- `integration.test_idempotency` (6) → —  ·  verifies: code:projections
+- `integration.test_migrate_shim_drop_live` (1) → —  ·  verifies: code:projections
+- `integration.test_multi_provider_api_live` (5) → —  ·  verifies: code:agents
+- `integration.test_neo4j_connection_reliability` (15) → —  ·  verifies: code:persistence
+- `integration.test_neo4j_data_integrity` (8) → —  ·  verifies: code:projections
+- `integration.test_openai_api_responses` (2) → —  ·  verifies: code:agents
+- `integration.test_projection_replay` (3) → —  ·  verifies: code:projections
+- `integration.test_prompt_validation_live` (15) → —  ·  verifies: code:agents
 
 ## e2e
 
-- `integration.test_ask_smoke` (1) → —  ·  verifies: —
-- `integration.test_deployed_projection_smoke` (1) → —  ·  verifies: —
+- `integration.test_ask_smoke` (1) → —  ·  verifies: use-cases:get-a-grounded-answer-from-my-corpus
+- `integration.test_deployed_projection_smoke` (1) → —  ·  verifies: code:projections
 - `integration.test_e2e_user_edits` (3) → —  ·  verifies: use-cases:correct-what-the-system-got-wrong
 - `integration.test_end_to_end_smoke` (1) → —  ·  verifies: use-cases:surface-the-signal
-- `integration.test_layer1_projection_smoke` (1) → —  ·  verifies: —
-- `integration.test_layer2_enrichment_smoke` (1) → —  ·  verifies: —
-- `integration.test_layer3_lens_smoke` (2) → —  ·  verifies: —
-- `integration.test_layer4_resolution_smoke` (1) → —  ·  verifies: —
-- `integration.test_layer5_export_smoke` (1) → —  ·  verifies: —
-- `integration.test_live_feed_smoke` (2) → —  ·  verifies: —
-- `integration.test_projection_ordering_smoke` (1) → —  ·  verifies: —
+- `integration.test_layer1_projection_smoke` (1) → —  ·  verifies: code:projections
+- `integration.test_layer2_enrichment_smoke` (1) → —  ·  verifies: code:enrichment
+- `integration.test_layer3_lens_smoke` (2) → —  ·  verifies: code:lens
+- `integration.test_layer4_resolution_smoke` (1) → —  ·  verifies: code:resolution
+- `integration.test_layer5_export_smoke` (1) → —  ·  verifies: code:export
+- `integration.test_live_feed_smoke` (2) → —  ·  verifies: code:ui
+- `integration.test_projection_ordering_smoke` (1) → —  ·  verifies: code:projections
 
 ## Verification rollup
 
@@ -212,7 +212,7 @@ Use-cases:
 - correct-what-the-system-got-wrong: VERIFIED
 - diagnose-a-stalled-analysis: UNVERIFIED
 - export-my-analysis-to-take-elsewhere: PARTIALLY_VERIFIED
-- get-a-grounded-answer-from-my-corpus: PARTIALLY_VERIFIED
+- get-a-grounded-answer-from-my-corpus: VERIFIED
 - govern-decisions-and-hold-specs-honest: VERIFIED
 - keep-the-codebase-legible: UNVERIFIED
 - keep-the-workbench-live: PARTIALLY_VERIFIED

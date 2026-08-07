@@ -5,6 +5,7 @@ transcript (events into ESDB), replay the resulting events through the real
 handler registry against Neo4j, and assert the Speaker/Utterance subgraph
 materializes. Requires the test infrastructure (`make test-infra-up`).
 """
+# verifies: code:projections
 
 import uuid as uuid_mod
 

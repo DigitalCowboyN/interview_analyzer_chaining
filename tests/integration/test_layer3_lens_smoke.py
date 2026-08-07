@@ -8,6 +8,7 @@ grounding). Also applies the persona lens to the same interview, proving the
 generic engine serves a second lens with zero per-lens code. Requires
 `make test-infra-up`.
 """
+# verifies: code:lens
 
 import uuid as uuid_mod
 

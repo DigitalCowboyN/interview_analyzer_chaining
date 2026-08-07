@@ -16,6 +16,7 @@ Usage Example:
 
 Note: Running the integration test requires a valid OPENAI_API_KEY environment variable.
 """
+# verifies: code:agents
 
 import json
 import os

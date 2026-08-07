@@ -12,6 +12,7 @@ These tests focus on testing the real agent behavior including:
 - Integration with actual configuration
 - Metrics tracking and logging
 """
+# verifies: code:agents
 
 import asyncio
 import json

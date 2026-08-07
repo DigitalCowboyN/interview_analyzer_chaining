@@ -8,6 +8,7 @@ events through the same registry, and asserts the canonical-entity / person
 overlay materializes in Neo4j. Also asserts the M4.8 single-label invariant
 (:Fragment only, no :Sentence on new nodes). Requires `make test-infra-up`.
 """
+# verifies: code:resolution
 
 import uuid as uuid_mod
 

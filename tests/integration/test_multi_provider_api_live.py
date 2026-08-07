@@ -13,6 +13,7 @@ Requirements:
 Usage:
     pytest tests/integration/test_multi_provider_api_live.py -xvs
 """
+# verifies: code:agents
 
 import os
 import pytest

@@ -5,6 +5,7 @@ through the real registry into real Neo4j -> OkfExporter -> assert the bundle
 is OKF-conformant with links, grounding, and front-matter round-trip.
 Requires `make test-infra-up`.
 """
+# verifies: code:export
 
 import uuid as uuid_mod
 

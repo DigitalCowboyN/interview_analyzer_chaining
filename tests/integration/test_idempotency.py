@@ -7,6 +7,7 @@ Tests that projection handlers can safely handle:
 3. Parked events (retry and DLQ)
 4. Version guards
 """
+# verifies: code:projections
 
 import uuid
 
