@@ -80,9 +80,11 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("index", parents=[common])
     sub.add_parser("check", parents=[common])
-    p_new = sub.add_parser("new", parents=[common]); p_new.add_argument("title")
+    p_new = sub.add_parser("new", parents=[common])
+    p_new.add_argument("title")
     sub.add_parser("context", parents=[common])
-    p_where = sub.add_parser("where", parents=[common]); p_where.add_argument("path")
+    p_where = sub.add_parser("where", parents=[common])
+    p_where.add_argument("path")
     args = parser.parse_args(argv)
     return {
         "index": cmd_index, "check": cmd_check, "new": cmd_new,

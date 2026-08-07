@@ -42,12 +42,17 @@ def _capability_state(cap: Capability, vunits: Set[str], direct: Set[str]) -> st
     return PARTIALLY_VERIFIED if hit else UNVERIFIED
 
 
+def _capability_states(
+    caps: List[Capability], vunits: Set[str], direct: Set[str]
+) -> Dict[str, str]:
+    return {c.slug: _capability_state(c, vunits, direct) for c in caps}
+
+
 def verify_capabilities(caps: List[Capability], tests: List[Test]) -> Dict[str, str]:
     """Derived verification state per capability: VERIFIED when every `implemented_by`
     unit is tested (or a direct marker names it), PARTIALLY when some are, else UNVERIFIED.
     """
-    vunits, direct = verified_units(tests), _direct(tests)
-    return {c.slug: _capability_state(c, vunits, direct) for c in caps}
+    return _capability_states(caps, verified_units(tests), _direct(tests))
 
 
 def verify_use_cases(
@@ -57,8 +62,8 @@ def verify_use_cases(
     marker or when every fulfilling capability is VERIFIED; PARTIALLY when some are; else
     UNVERIFIED. Rolls up the capability states, so a direct marker on a fulfilling
     capability propagates automatically."""
-    direct = _direct(tests)
-    cap_state = verify_capabilities(caps, tests)
+    vunits, direct = verified_units(tests), _direct(tests)
+    cap_state = _capability_states(caps, vunits, direct)
     known = {c.slug for c in caps}
     out: Dict[str, str] = {}
     for uc in use_cases:
