@@ -4,7 +4,7 @@
 
 | edge | inverse | from → to | source | properties | count |
 | --- | --- | --- | --- | --- | --- |
-| implements | implemented_by | Capability → CodeUnit | authored | — | 91 |
+| implements | implemented_by | Capability → CodeUnit | authored | — | 93 |
 | child_of | parent_of | Capability → Capability | authored | — | 39 |
 | depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 56 |
 | governs | governed_by | ADR → CodeUnit | authored | — | 24 |
@@ -15,7 +15,7 @@
 ## Nodes
 
 - ADR: 22
-- Capability: 53
+- Capability: 54
 - CodeUnit: 42
 - Test: 193
 - UseCase: 20

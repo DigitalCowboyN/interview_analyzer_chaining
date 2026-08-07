@@ -83,6 +83,12 @@ Serve the analyst-facing workbench (read + correct) and gallery (browse across i
 
 ### enabling
 
+#### embed-fragments
+Turn each fragment into a vector embedding so fragments can be found by meaning, not just by keyword.
+
+- **implemented_by:** enrichment, projections
+- pinned-embeddings — Pin embedding calls to one configured provider/model — never failed over, since vectors from different models aren't comparable. (enrichment)
+
 #### maintain-event-source-of-truth
 Hold the append-only, frozen-format event log that is the system's sole source of truth — every command validates intent, then appends; nothing rewrites history.
 
@@ -98,7 +104,6 @@ Provide configuration-driven, provider-agnostic LLM access — one focused, sche
 
 - **implemented_by:** agents
 - chat-failover _(variant)_ — Fail a chat call over to the next configured provider (Anthropic → Claude Code → OpenAI) on an availability error, transparent to the caller. (agents)
-- pinned-embeddings _(variant)_ — Pin embedding calls to one configured provider/model — never failed over, since vectors from different models aren't comparable. (enrichment)
 
 ## operations
 
