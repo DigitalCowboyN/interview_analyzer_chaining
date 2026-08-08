@@ -232,3 +232,145 @@ Reviewed against `docs/index.md` on 2026-08-07.
 | adr / cli / knowledge / glossary / api / prompts / graph-queries | no | — | unaffected |
 
 **Verdict:** reconciled — capabilities (C2) + tests (C3) subjects; graph regenerated; code/use-cases read-only; infra-test residual surfaced for an owner decision.
+
+---
+
+### Task 4: Code map sees top-level `src/*.py` modules + scan-completeness guard
+
+**Why:** the unmapped tests exposed a code-map blind spot — the reader scans packages + curated `KEY_MODULES` but never top-level `src/*.py` files, so `config`/`celery_app`/`tasks`/`main`/`run_projection_service` were invisible. This documents them AND adds a guard so undocumented top-level modules can't hide again.
+
+**Files:**
+- Modify: `tools/code/reader.py` (`_files_of` top-level-module resolution + `KEY_MODULES`)
+- Modify: `tools/code/check.py` (new `check_top_level_modules` + wire into `run_all`)
+- Create: `docs/code/config.md`, `celery_app.md`, `tasks.md`, `main.md`, `run_projection_service.md`
+- Test: `tests/code/test_reader.py`, `tests/code/test_check.py` (add cases)
+- Regenerate: `docs/code/index.md`, `docs/code/pipeline.md`
+
+- [ ] **Step 1 (reader test):** in `tests/code/test_reader.py`, assert a curated bare unit resolves to `src/<name>.py`:
+
+```python
+def test_files_of_resolves_top_level_module(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "config.py").write_text("x = 1\n", encoding="utf-8")
+    from tools.code.reader import _files_of
+    assert _files_of("config", str(tmp_path)) == [str(tmp_path / "src" / "config.py")]
+```
+
+- [ ] **Step 2 (reader fix):** in `tools/code/reader.py`, replace the final bare-unit branch of `_files_of` so a bare unit resolves a package dir OR a top-level module:
+
+```python
+    # bare: a src package dir, else a top-level src module (src/<unit>.py)
+    pkg_dir = os.path.join(root, "src", unit)
+    if os.path.isdir(pkg_dir):
+        return glob.glob(os.path.join(pkg_dir, "**", "*.py"), recursive=True)
+    mod = os.path.join(root, "src", unit + ".py")
+    return [mod] if os.path.exists(mod) else []
+```
+
+Add the 5 curated top-level modules to `KEY_MODULES` (so they become real units):
+
+```python
+    "resolution.engine", "agents.agent_factory",
+    # curated top-level src/*.py modules (resolved by _files_of to src/<name>.py)
+    "config", "celery_app", "tasks", "main", "run_projection_service",
+]
+```
+
+- [ ] **Step 3 (guard test):** in `tests/code/test_check.py`:
+
+```python
+def test_flags_undocumented_top_level_module(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "widget.py").write_text("x = 1\n", encoding="utf-8")
+    from tools.code.check import check_top_level_modules
+    findings = check_top_level_modules(str(tmp_path), [])   # nothing documented
+    assert any("widget" in f.message for f in findings)
+```
+
+- [ ] **Step 4 (guard):** in `tools/code/check.py`, add and wire the check:
+
+```python
+import glob  # if not already imported
+
+
+def check_top_level_modules(root: str, units) -> List[Finding]:
+    """A top-level src/*.py module not in the code map is invisible — flag it.
+    Closes the scan blind spot (the reader otherwise only sees packages + KEY_MODULES)."""
+    documented = {u.unit for u in units}
+    findings: List[Finding] = []
+    for path in sorted(glob.glob(os.path.join(root, "src", "*.py"))):
+        name = os.path.splitext(os.path.basename(path))[0]
+        if name != "__init__" and name not in documented:
+            findings.append(Finding(
+                f"code: top-level module src/{name}.py is not in the code map — "
+                f"document it (add to KEY_MODULES + a docs/code node)"))
+    return findings
+```
+
+Wire into `run_all` (after `check_coverage`): `findings += check_top_level_modules(root, units)`.
+
+- [ ] **Step 5 (document the 5 nodes):** create each `docs/code/<name>.md` with `type: CodeUnit`, `unit: <name>`, `role: infrastructure`, `key_modules: []`, and a one-line description:
+  - `config` — "System configuration: the Config singleton, YAML loading, env-var substitution, Pydantic validation — read by every layer."
+  - `celery_app` — "Celery application setup: broker/backend/serialization/task-discovery — the async task queue."
+  - `tasks` — "The background pipeline task: runs Layer 1 ingestion then Layer 2 enrichment as a Celery job."
+  - `main` — "FastAPI application entry point: wires routers, middleware, and lifespan into the served app object."
+  - `run_projection_service` — "Projection-service worker entry point: runs the subscriptions that build the Neo4j read model."
+
+- [ ] **Step 6:** regenerate + verify.
+
+```bash
+make code-index
+make code-check     # clean — 5 modules now documented; top-level guard passes; deps derived
+python -m pytest tests/code -q
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add tools/code/reader.py tools/code/check.py tests/code/ docs/code/
+git commit -m "feat(code): map top-level src modules + scan-completeness guard"
+```
+
+---
+
+### Task 5: Wire enablement + connect the 3 infra tests
+
+**Files:**
+- Modify (append one code-unit slug to `implemented_by`): the capability nodes below
+- Modify (marker-only): `tests/test_config.py`, `tests/test_celery_app.py`, `tests/test_tasks.py`
+- Regenerate: `docs/capabilities/index.md`, `docs/tests/index.md`, `docs/graph/index.md`, `docs/graph/graph.md`
+
+**The enablement wiring** (append the unit to each capability's `implemented_by` — "helps fulfill, not shares code"):
+- `config` → `provider-strategy-and-focused-calls`, `chat-failover`, `per-lens-extractors`, `pinned-embeddings`
+- `celery_app` → `ingest-transcripts`, `enrich-fragments`
+- `tasks` → `ingest-transcripts`, `enrich-fragments`
+- `run_projection_service` → `project-events-to-graph`
+- `main` → `serve-workbench-and-gallery`
+
+- [ ] **Step 1:** for each capability above, read its node and append the unit slug to the `implemented_by` list (e.g. `implemented_by: [agents]` → `implemented_by: [agents, config]`). Touch only the `implemented_by` line.
+
+- [ ] **Step 2 (markers):** add a module-level `# verifies:` marker just after the docstring in each:
+  - `tests/test_config.py` → `# verifies: code:config`
+  - `tests/test_celery_app.py` → `# verifies: code:celery_app`
+  - `tests/test_tasks.py` → `# verifies: code:tasks`
+
+- [ ] **Step 3:** regenerate + verify.
+
+```bash
+make capability-index && make testmap-index && make graph-index
+make capability-check   # clean — new implemented_by links resolve
+make graph-check        # clean — every edge resolves
+make testmap-check      # unmapped now 0
+make health
+python -m pytest tests/testmap tests/capability tests/graph tests/code -q
+```
+
+Expected: `testmap-check` unmapped = **0**; all checks clean.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add docs/capabilities/ tests/test_config.py tests/test_celery_app.py tests/test_tasks.py \
+        docs/tests/index.md docs/graph/index.md docs/graph/graph.md
+git commit -m "feat: wire config/celery/tasks/main/projection into the capabilities they enable; connect their tests"
+```
