@@ -4,6 +4,7 @@ tests/test_tasks.py
 Tests for the Celery task, which now runs Layer 1 ingestion + Layer 2
 enrichment (the task name is preserved for queue compatibility).
 """
+# verifies: code:tasks
 
 from unittest.mock import AsyncMock, MagicMock, patch
 

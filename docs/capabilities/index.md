@@ -31,7 +31,7 @@ Let an analyst correct anything the AI produced — text, speakers, segments, le
 #### enrich-fragments
 Classify each fragment's function, structure, and purpose — the analytic backbone the workbench and lenses read.
 
-- **implemented_by:** enrichment, enrichment.orchestrator, enrichment.executor, agents, models
+- **implemented_by:** enrichment, enrichment.orchestrator, enrichment.executor, agents, models, celery_app, tasks
 - classify-dimensions — Classify each fragment's function, structure, and purpose along fixed analytic dimensions, one focused LLM call per dimension. (enrichment.executor, agents)
 - extract-claims — Pull discrete factual and opinion claims out of each interview via a focused, schema-validated LLM call — raw material for lenses and ask. (enrichment.executor, agents)
 - tag-topics-keywords — Tag each fragment with topics and keywords for retrieval, browsing, and downstream lenses. (enrichment.executor, agents)
@@ -47,7 +47,7 @@ Produce a portable, git-versionable Markdown+YAML bundle of an interview's lens 
 Apply a purpose-built reading of an interview (meeting minutes, persona, …) via one generic, profile-driven engine — no per-lens code.
 
 - **implemented_by:** lens, lens.engine, agents
-- per-lens-extractors _(variant)_ — Per-lens extractor calls — `meeting_minutes`' objectives/decisions/action items, `persona`'s traits/goals/quotes — configured entirely by profile, no lens-specific code path. (lens.engine, agents)
+- per-lens-extractors _(variant)_ — Per-lens extractor calls — `meeting_minutes`' objectives/decisions/action items, `persona`'s traits/goals/quotes — configured entirely by profile, no lens-specific code path. (lens.engine, agents, config)
 - run-lens-engine — Drive any lens profile (YAML + prompts) through one generic engine: run extractors, resolve speaker references, and emit the lens events. (lens.engine)
 
 #### import-transcripts
@@ -58,7 +58,7 @@ Let an analyst bring source transcripts into the system to be analysed.
 #### ingest-transcripts
 Turn raw transcript files into structured, speaker-attributed, stitched utterances the rest of the system analyses.
 
-- **implemented_by:** ingestion, ingestion.orchestrator, ingestion.speaker_inference, ingestion.stitcher, agents
+- **implemented_by:** ingestion, ingestion.orchestrator, ingestion.speaker_inference, ingestion.stitcher, agents, celery_app, tasks
 - infer-speakers — Infer which speaker each fragment belongs to when the transcript doesn't label them, via windowed LLM proposals reconciled by majority vote. (ingestion.speaker_inference, agents)
 - parse-fragments — Read a transcript file and emit one `SentenceCreated` event per offset-grounded fragment, plus the map file used later for verbatim grounding. (ingestion.orchestrator)
 - segment-conversation — Normalize the raw transcript and segment it into sentence-level units via spaCy, before fragment and speaker events are emitted. (ingestion)
@@ -75,7 +75,7 @@ Link speakers to canonical Persons across interviews and canonicalize entity sur
 #### serve-workbench-and-gallery
 Serve the analyst-facing workbench (read + correct) and gallery (browse across interviews), kept current via live SSE notifications.
 
-- **implemented_by:** api, ui, ui.reader
+- **implemented_by:** api, ui, ui.reader, main
 - gallery-read — Serve the read-only gallery of projects and their lens outputs for browsing across interviews. (ui.reader)
 - live-notifications — Push surface-tagged live notifications over SSE so the workbench and gallery stay current without a manual refresh. (ui)
 - run-read-queries — Serve the Neo4j read queries — interviews, transcript, personas, worklist, lens items — that back the workbench. (api)
@@ -87,7 +87,7 @@ Serve the analyst-facing workbench (read + correct) and gallery (browse across i
 Turn each fragment into a vector embedding so fragments can be found by meaning, not just by keyword.
 
 - **implemented_by:** enrichment, projections
-- pinned-embeddings — Pin embedding calls to one configured provider/model — never failed over, since vectors from different models aren't comparable. (enrichment)
+- pinned-embeddings — Pin embedding calls to one configured provider/model — never failed over, since vectors from different models aren't comparable. (enrichment, config)
 
 #### maintain-event-source-of-truth
 Hold the append-only, frozen-format event log that is the system's sole source of truth — every command validates intent, then appends; nothing rewrites history.
@@ -97,13 +97,13 @@ Hold the append-only, frozen-format event log that is the system's sole source o
 #### project-events-to-graph
 Replay the event log in causal order into Neo4j as the sole writer, maintaining the queryable read model.
 
-- **implemented_by:** projections
+- **implemented_by:** projections, run_projection_service
 
 #### provider-strategy-and-focused-calls
 Provide configuration-driven, provider-agnostic LLM access — one focused, schema-validated call per task, with automatic failover across providers.
 
-- **implemented_by:** agents
-- chat-failover _(variant)_ — Fail a chat call over to the next configured provider (Anthropic → Claude Code → OpenAI) on an availability error, transparent to the caller. (agents)
+- **implemented_by:** agents, config
+- chat-failover _(variant)_ — Fail a chat call over to the next configured provider (Anthropic → Claude Code → OpenAI) on an availability error, transparent to the caller. (agents, config)
 
 ## operations
 

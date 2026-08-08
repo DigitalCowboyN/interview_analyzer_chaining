@@ -4,6 +4,7 @@ Tests for the Celery application configuration in src/celery_app.py.
 These tests verify that the Celery app is properly configured with correct
 broker settings, serialization, and task discovery.
 """
+# verifies: code:celery_app
 
 import os
 from unittest.mock import patch
