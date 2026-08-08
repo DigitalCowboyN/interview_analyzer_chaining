@@ -3,6 +3,7 @@
 ```mermaid
 graph LR
     agents --> utils
+    agents.agent_factory --> config
     agents.agent_factory --> utils
     api --> ask
     api --> commands
@@ -18,23 +19,28 @@ graph LR
     ask --> projections
     ask --> utils
     ask.engine --> agents
+    ask.engine --> config
     ask.engine --> enrichment
     ask.engine --> projections
     ask.engine --> utils
     ask.reader
+    celery_app
     commands --> events
+    config
     enrichment --> agents
     enrichment --> events
     enrichment --> utils
     enrichment.executor --> agents
     enrichment.executor --> utils
     enrichment.orchestrator --> agents
+    enrichment.orchestrator --> config
     enrichment.orchestrator --> events
     enrichment.orchestrator --> utils
     events --> utils
     export --> events
     export --> lens
     export --> utils
+    export.bundler --> config
     export.bundler --> events
     export.bundler --> lens
     export.bundler --> utils
@@ -59,9 +65,15 @@ graph LR
     lens --> events
     lens --> utils
     lens.engine --> agents
+    lens.engine --> config
     lens.engine --> enrichment
     lens.engine --> events
     lens.engine --> utils
+    main --> api
+    main --> config
+    main --> enrichment
+    main --> ingestion
+    main --> utils
     models
     persistence
     projections --> enrichment
@@ -70,9 +82,17 @@ graph LR
     resolution --> enrichment
     resolution --> events
     resolution --> utils
+    resolution.engine --> config
     resolution.engine --> enrichment
     resolution.engine --> events
     resolution.engine --> utils
+    run_projection_service --> events
+    run_projection_service --> projections
+    run_projection_service --> utils
+    tasks --> celery_app
+    tasks --> enrichment
+    tasks --> ingestion
+    tasks --> utils
     tools.adr --> ingestion
     tools.api
     tools.capability --> ingestion

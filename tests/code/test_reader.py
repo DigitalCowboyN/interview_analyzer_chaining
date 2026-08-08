@@ -17,6 +17,13 @@ def test_io_of_detects_signals(tmp_path):
     io = io_of("x", str(tmp_path))
     assert "ESDB" in io and "Neo4j" in io
 
+def test_files_of_resolves_top_level_module(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "config.py").write_text("x = 1\n", encoding="utf-8")
+    from tools.code.reader import _files_of
+    assert _files_of("config", str(tmp_path)) == [str(tmp_path / "src" / "config.py")]
+
+
 def test_load_units_attaches_derived(tmp_path):
     (tmp_path / "src" / "ingestion").mkdir(parents=True)
     (tmp_path / "src" / "ingestion" / "m.py").write_text("from src.events import E\n", encoding="utf-8")
@@ -30,3 +37,23 @@ def test_load_units_attaches_derived(tmp_path):
     u = next(x for x in units if x.unit == "ingestion")
     assert u.role == "pipeline-layer" and "events" in u.depends_on and "ESDB" in u.io
     assert "Ingests" in u.description
+
+
+def test_dep_edges_for_top_level_module(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "bar").mkdir()          # a package (dep target)
+    (tmp_path / "src" / "bar" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src" / "foo.py").write_text("from src.bar import x\n", encoding="utf-8")
+    from tools.code.reader import dep_edges_for_module
+    assert dep_edges_for_module("foo", str(tmp_path)) == ["bar"]
+
+
+def test_dep_edges_captures_top_level_module_target(tmp_path):
+    # the production case (e.g. tasks -> celery_app): a top-level module depending on
+    # ANOTHER top-level module — only captured because _dep_targets unions in bare
+    # KEY_MODULES. This would FAIL if that union regressed to packages-only.
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "foo.py").write_text(
+        "from src.celery_app import x\n", encoding="utf-8")  # celery_app is a bare KEY_MODULE
+    from tools.code.reader import dep_edges_for_module
+    assert dep_edges_for_module("foo", str(tmp_path)) == ["celery_app"]

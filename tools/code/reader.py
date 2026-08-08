@@ -16,6 +16,8 @@ KEY_MODULES = [
     "lens.engine", "export.reader", "export.renderer", "export.bundler",
     "ui.reader", "ask.reader", "ask.engine",
     "resolution.engine", "agents.agent_factory",
+    # curated top-level src/*.py modules (resolved by _files_of to src/<name>.py)
+    "config", "celery_app", "tasks", "main", "run_projection_service",
 ]
 
 _IMPORT = re.compile(r"(?:from|import)\s+(src|tools)\.(\w+)")
@@ -55,7 +57,12 @@ def _files_of(unit: str, root: str) -> List[str]:
         return glob.glob(os.path.join(root, "tools", pkg, "**", "*.py"), recursive=True)
     if "." in unit:
         return [os.path.join(root, "src", *unit.split(".")) + ".py"]
-    return glob.glob(os.path.join(root, "src", unit, "**", "*.py"), recursive=True)
+    # bare: a src package dir, else a top-level src module (src/<unit>.py)
+    pkg_dir = os.path.join(root, "src", unit)
+    if os.path.isdir(pkg_dir):
+        return glob.glob(os.path.join(pkg_dir, "**", "*.py"), recursive=True)
+    mod = os.path.join(root, "src", unit + ".py")
+    return [mod] if os.path.exists(mod) else []
 
 
 def dep_edges(root: str = ".") -> Dict[str, List[str]]:
@@ -114,10 +121,19 @@ def load_units(root: str = ".", code_dir: str = "docs/code") -> List[CodeUnit]:
     return units
 
 
+def _dep_targets(root: str) -> set:
+    # valid depends_on targets: src packages + curated top-level src modules (config, etc.)
+    return set(packages(root)) | {m for m in KEY_MODULES if "." not in m}
+
+
 def dep_edges_for_module(unit: str, root: str) -> List[str]:
-    if "." not in unit or unit.startswith("tools."):
+    if unit.startswith("tools."):
         return []
-    valid = set(packages(root))
+    # a bare unit that is a package is already covered by dep_edges(); only a top-level
+    # module (src/<unit>.py) or a dotted key-module needs per-file derivation here.
+    if "." not in unit and os.path.isdir(os.path.join(root, "src", unit)):
+        return []
+    targets = _dep_targets(root)
     parent = unit.split(".")[0]
     deps = set()
     for f in _files_of(unit, root):
@@ -127,6 +143,6 @@ def dep_edges_for_module(unit: str, root: str) -> List[str]:
             continue
         for m in _IMPORT.finditer(t):
             dep = _dep_slug(m)
-            if dep != parent and dep in valid:
+            if dep != parent and dep in targets:
                 deps.add(dep)
     return sorted(deps)

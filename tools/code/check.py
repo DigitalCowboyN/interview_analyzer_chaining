@@ -1,6 +1,7 @@
 # tools/code/check.py
 from __future__ import annotations
 
+import glob
 import os
 from dataclasses import dataclass
 from typing import List
@@ -38,12 +39,27 @@ def check_stale(units: List[CodeUnit], real_units: List[str]) -> List[Finding]:
     return [Finding(f"code: doc node {u.unit} no longer exists in src") for u in units if u.unit not in real]
 
 
+def check_top_level_modules(root: str, units) -> List[Finding]:
+    """A top-level src/*.py module not in the code map is invisible — flag it.
+    Closes the scan blind spot (the reader otherwise only sees packages + KEY_MODULES)."""
+    documented = {u.unit for u in units}
+    findings: List[Finding] = []
+    for path in sorted(glob.glob(os.path.join(root, "src", "*.py"))):
+        name = os.path.splitext(os.path.basename(path))[0]
+        if name != "__init__" and name not in documented:
+            findings.append(Finding(
+                f"code: top-level module src/{name}.py is not in the code map — "
+                f"document it (add to KEY_MODULES + a docs/code node)"))
+    return findings
+
+
 def run_all(root: str = ".") -> List[Finding]:
     pkgs = packages(root)
     units = load_units(root)
     real = pkgs + KEY_MODULES
     findings: List[Finding] = []
     findings += check_coverage(pkgs, units)
+    findings += check_top_level_modules(root, units)
     findings += check_classification(units)
     findings += check_map_in_sync(os.path.join(root, "docs/code/index.md"),
                                   os.path.join(root, "docs/code/pipeline.md"), units)
