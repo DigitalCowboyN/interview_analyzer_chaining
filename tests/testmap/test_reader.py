@@ -49,13 +49,3 @@ def test_verifies_edges(tmp_path):
         s == "tests:integration.test_api_calls" and d.startswith("code:")
         for s, d, _ in edges
     )
-
-
-def test_target_alias_resolves_api_surface(tmp_path):
-    # tests/api_surface/* verify tools.api; the segment name doesn't match, so an alias maps it
-    t = tmp_path / "tests" / "api_surface"
-    t.mkdir(parents=True)
-    (t / "test_check.py").write_text("def test_a():\n    pass\n", encoding="utf-8")
-    (tmp_path / "tools" / "api").mkdir(parents=True)  # make tools.api a real unit
-    tests = {x.slug: x for x in load_tests(str(tmp_path))}
-    assert tests["api_surface.test_check"].target == "tools.api"

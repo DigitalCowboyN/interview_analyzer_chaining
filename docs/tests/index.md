@@ -158,7 +158,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `test_tasks` (2) → —  ·  verifies: —
 - `testmap.test_check` (4) → tools.testmap  ·  verifies: —
 - `testmap.test_cli` (2) → tools.testmap  ·  verifies: —
-- `testmap.test_reader` (3) → tools.testmap  ·  verifies: —
+- `testmap.test_reader` (2) → tools.testmap  ·  verifies: —
 - `testmap.test_render` (2) → tools.testmap  ·  verifies: —
 - `testmap.test_verification` (3) → tools.testmap  ·  verifies: —
 - `ui.test_notifications` (31) → ui  ·  verifies: —
@@ -179,14 +179,14 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 
 ## integration
 
-- `integration.test_anthropic_api_messages` (4) → —  ·  verifies: code:agents
+- `integration.test_anthropic_api_messages` (4) → —  ·  verifies: capabilities:provider-strategy-and-focused-calls
 - `integration.test_api_calls` (3) → —  ·  verifies: code:agents
 - `integration.test_idempotency` (6) → —  ·  verifies: code:projections
 - `integration.test_migrate_shim_drop_live` (1) → —  ·  verifies: code:projections
 - `integration.test_multi_provider_api_live` (5) → —  ·  verifies: code:agents
 - `integration.test_neo4j_connection_reliability` (15) → —  ·  verifies: code:persistence
 - `integration.test_neo4j_data_integrity` (8) → —  ·  verifies: code:projections
-- `integration.test_openai_api_responses` (2) → —  ·  verifies: code:agents
+- `integration.test_openai_api_responses` (2) → —  ·  verifies: capabilities:provider-strategy-and-focused-calls
 - `integration.test_projection_replay` (3) → —  ·  verifies: code:projections
 - `integration.test_prompt_validation_live` (15) → —  ·  verifies: code:agents
 
