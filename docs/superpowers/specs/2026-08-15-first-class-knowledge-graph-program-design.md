@@ -190,11 +190,19 @@ slow.
 
 ## Relationship to existing decisions
 
-The inversion changes the ADR-0016-era assumption that domains are primary and the graph is a
-derived cascade view. This program will capture an **ADR** (refines/extends ADR-0016) stating
-that the corpus substrate is primary and domains are projections over it. ADR-0023 (forward
-loop) already supplies the currency half of L2 and is unchanged. New ADRs are captured per
-phase as decisions lock (`python -m tools.adr new …`), per CLAUDE.md policy.
+Two ADRs capture the decisions this program locks (both sourced to this spec):
+
+- **ADR-0024 — Corpus substrate is primary; type-primary intake; domains as projections.**
+  Refines ADR-0016 (domains stop being independent silos that each own discovery) and
+  ADR-0020 (nodes come from one type-primary corpus intake, not per-domain folder globs).
+- **ADR-0025 — The knowledge graph is a first-class, ephemeral, rebuilt-from-source traversal
+  substrate.** Extends ADR-0020 (`neighbors` → full `walk`; rendered-from-source becomes an
+  intentional feature, not a risk) and is explicitly separate from the transcript Neo4j.
+
+Neither supersedes anything. ADR-0023 (forward loop) already supplies the currency half of L2
+and is unchanged. Further ADRs are captured per phase as later decisions lock — notably L3's
+governance mechanism, which is deliberately undecided here (`python -m tools.adr new …`, per
+CLAUDE.md policy).
 
 ## Non-goals
 
