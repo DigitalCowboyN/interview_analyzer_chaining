@@ -32,9 +32,17 @@ The forward loop is **advisory by default, with a single mechanical exception**.
   plus the cross-cutting `graph` check, and always exits 0 — fast, relevant, informative.
 - **Full sweep + freshness gate in CI.** `.github/workflows/health.yml` runs the complete
   `make health` drift report (advisory, never fails), then an **index-freshness gate**:
-  `make regen-all` followed by `git diff --exit-code`. A non-empty diff means committed
-  indexes were stale → the job fails, printing the diff. This is implemented by
-  regenerate-then-diff, not by parsing finding text.
+  `make regen-derived` followed by `git diff --exit-code`. A non-empty diff means committed
+  indexes were stale → the job fails, printing the diff. Implemented by regenerate-then-diff,
+  not by parsing finding text.
+- **Only source-derived indexes are gated.** `regen-derived` covers the indexes that are
+  pure functions of committed source (code, capability, use-cases, tests, glossary,
+  graph-queries, prompts, adr, cli, graph) — a fresh render must be byte-identical, so a diff
+  is objective staleness. `api-index` is deliberately excluded: it is derived from the *live
+  app surface* (`load_app()`), which depends on the runtime environment (which routers import
+  successfully), so it can differ between a full dev env and CI without any source change.
+  Its drift stays covered by the advisory `api-check` (and openapi.json freshness by
+  `make ui-typegen`). `make regen-all` = `regen-derived` + `api-index` for local convenience.
 
 This **refines ADR-0016** — it does not reverse it. Every judgment finding remains
 non-blocking visibility. The only thing that can now fail a build is a generated index

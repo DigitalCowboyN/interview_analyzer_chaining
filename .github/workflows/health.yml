@@ -21,8 +21,12 @@ jobs:
       - name: Drift report (advisory — never fails)
         run: make health
       - name: Index freshness gate (blocks on stale generated files)
+        # Only the source-derived indexes are gated: they are pure functions of committed
+        # source, so a fresh render must be byte-identical. api-index is excluded because it
+        # is derived from the live app surface (load_app()), which depends on the runtime
+        # environment (which routers import) — its drift is covered by the advisory api-check.
         run: |
-          make regen-all
+          make regen-derived
           if ! git diff --exit-code; then
             echo "::error::committed generated indexes are stale — run 'make regen-all' and commit the result"
             git diff --stat
