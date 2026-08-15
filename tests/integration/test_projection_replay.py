@@ -7,6 +7,7 @@ This validates:
 2. Data integrity after replay
 3. Idempotency of projections
 """
+# verifies: code:projections
 
 import uuid
 

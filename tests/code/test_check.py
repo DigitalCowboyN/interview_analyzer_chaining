@@ -41,6 +41,14 @@ def test_map_in_sync_clean_then_drift(tmp_path):
     assert "index.md" in msgs and "pipeline.md" in msgs
 
 
+def test_flags_undocumented_top_level_module(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "widget.py").write_text("x = 1\n", encoding="utf-8")
+    from tools.code.check import check_top_level_modules
+    findings = check_top_level_modules(str(tmp_path), [])   # nothing documented
+    assert any("widget" in f.message for f in findings)
+
+
 def test_run_all_never_raises_on_empty_root(tmp_path):
     # no src/, no docs/code/ — every check must degrade to a finding, never raise
     findings = run_all(str(tmp_path))

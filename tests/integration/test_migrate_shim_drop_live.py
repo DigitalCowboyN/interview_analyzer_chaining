@@ -13,6 +13,7 @@ Requires `make test-infra-up`. Shares the test Neo4j with other suites, so
 every assertion is scoped to this test's seeded sentence_ids / the
 `fragment_embedding_testmodel` index name -- never a bare global count.
 """
+# verifies: code:projections
 
 import uuid as uuid_mod
 

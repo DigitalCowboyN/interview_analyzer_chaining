@@ -14,6 +14,7 @@ These tests focus on testing the real agent behavior including:
 
 Mirrors test_openai_agent_response.py but adapted for Anthropic's Messages API.
 """
+# verifies: code:agents
 
 import asyncio
 import json

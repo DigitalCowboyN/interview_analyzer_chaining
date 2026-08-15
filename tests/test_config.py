@@ -8,6 +8,7 @@ substitution, Pydantic validation, and access methods following cardinal rules:
 1. Always test real functionality (not just mocks)
 2. Never write tests just to pass (test actual behavior)
 """
+# verifies: code:config
 
 import os
 from unittest.mock import mock_open, patch

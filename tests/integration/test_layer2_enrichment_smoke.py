@@ -5,6 +5,7 @@ embedder mocked (deterministic, no live LLM), replays every event through the
 real handler registry in commit order against real Neo4j, and asserts the
 Entity/Claim/embedding subgraph materializes. Requires `make test-infra-up`.
 """
+# verifies: code:enrichment
 
 import uuid as uuid_mod
 

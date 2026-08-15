@@ -12,6 +12,7 @@ These tests focus on testing the real prompt system including:
 - Validation of prompt structure and content
 - Error handling with realistic scenarios
 """
+# verifies: code:tools.prompts
 
 import json
 from pathlib import Path

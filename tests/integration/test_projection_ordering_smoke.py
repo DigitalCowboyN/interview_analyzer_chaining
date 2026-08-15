@@ -26,6 +26,7 @@ host-run process (the committed .env points ESDB at the docker-internal
 Gated behind PROJECTION_SMOKE=1 (mirrors DEPLOYED_SMOKE=1); MUST NOT run in
 default suites.
 """
+# verifies: code:projections
 
 import asyncio
 import os

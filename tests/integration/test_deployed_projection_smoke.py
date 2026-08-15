@@ -11,6 +11,7 @@ Requires: `docker compose up -d --build neo4j eventstore projection-service`
 (the `make deployed-smoke` target does this). Manages real containers' data,
 so it is gated behind DEPLOYED_SMOKE=1 and MUST NOT run in default suites.
 """
+# verifies: code:projections
 
 import asyncio
 import os

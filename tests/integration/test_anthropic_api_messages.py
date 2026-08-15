@@ -17,6 +17,7 @@ Requirements:
 Usage:
     pytest tests/integration/test_anthropic_api_messages.py -xvs
 """
+# verifies: capabilities:provider-strategy-and-focused-calls
 
 import json
 import os

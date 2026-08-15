@@ -11,6 +11,7 @@ Usage Example:
     Run the tests using pytest:
         pytest tests/integration/test_api_calls.py
 """
+# verifies: code:agents
 
 import json
 from unittest.mock import AsyncMock, MagicMock, patch

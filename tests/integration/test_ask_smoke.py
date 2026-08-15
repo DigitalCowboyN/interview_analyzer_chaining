@@ -9,6 +9,7 @@ vector/fulltext/graph fusion + verbatim citation attachment); the e2e smoke
 owns the full ingest→enrich→lens→resolve→export chain. Requires
 `make test-infra-up`.
 """
+# verifies: use-cases:get-a-grounded-answer-from-my-corpus
 
 import uuid as uuid_mod
 from unittest.mock import AsyncMock, MagicMock

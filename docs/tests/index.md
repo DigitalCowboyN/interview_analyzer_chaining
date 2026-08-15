@@ -33,10 +33,10 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `api.test_segments_router` (9) → api  ·  verifies: —
 - `api.test_speakers_router` (11) → api  ·  verifies: —
 - `api.test_ui_router` (24) → api  ·  verifies: —
-- `api_surface.test_check` (4) → —  ·  verifies: —
-- `api_surface.test_cli` (1) → —  ·  verifies: —
-- `api_surface.test_reader` (3) → —  ·  verifies: —
-- `api_surface.test_render` (1) → —  ·  verifies: —
+- `api_surface.test_check` (4) → tools.api  ·  verifies: —
+- `api_surface.test_cli` (1) → tools.api  ·  verifies: —
+- `api_surface.test_reader` (3) → tools.api  ·  verifies: —
+- `api_surface.test_render` (1) → tools.api  ·  verifies: —
 - `ask.test_cli` (4) → ask  ·  verifies: —
 - `ask.test_context` (7) → ask  ·  verifies: —
 - `ask.test_engine` (12) → ask  ·  verifies: —
@@ -44,15 +44,15 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `ask.test_reader` (11) → ask  ·  verifies: —
 - `capability.test_check` (8) → tools.capability  ·  verifies: —
 - `capability.test_cli` (2) → tools.capability  ·  verifies: —
-- `capability.test_reader` (5) → tools.capability  ·  verifies: —
+- `capability.test_reader` (6) → tools.capability  ·  verifies: —
 - `capability.test_render` (3) → tools.capability  ·  verifies: —
 - `cli.test_check` (4) → tools.cli  ·  verifies: —
 - `cli.test_cli` (2) → tools.cli  ·  verifies: —
 - `cli.test_reader` (2) → tools.cli  ·  verifies: —
 - `cli.test_render` (2) → tools.cli  ·  verifies: —
-- `code.test_check` (5) → tools.code  ·  verifies: —
+- `code.test_check` (6) → tools.code  ·  verifies: —
 - `code.test_cli` (1) → tools.code  ·  verifies: —
-- `code.test_reader` (3) → tools.code  ·  verifies: —
+- `code.test_reader` (6) → tools.code  ·  verifies: —
 - `code.test_reader_tools` (4) → tools.code  ·  verifies: —
 - `code.test_render` (2) → tools.code  ·  verifies: —
 - `commands.test_command_handlers` (3) → commands  ·  verifies: —
@@ -113,7 +113,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `ingestion.test_sample_corpus` (8) → ingestion  ·  verifies: —
 - `ingestion.test_speaker_inference` (7) → ingestion  ·  verifies: —
 - `ingestion.test_stitcher` (8) → ingestion  ·  verifies: —
-- `knowledge.test_check` (6) → tools.knowledge  ·  verifies: —
+- `knowledge.test_check` (10) → tools.knowledge  ·  verifies: —
 - `knowledge.test_cli` (5) → tools.knowledge  ·  verifies: —
 - `lens.test_engine` (4) → lens  ·  verifies: —
 - `lens.test_lens_models` (11) → lens  ·  verifies: —
@@ -150,12 +150,12 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `resolution.test_engine` (7) → resolution  ·  verifies: —
 - `resolution.test_reader` (2) → resolution  ·  verifies: —
 - `resolution.test_suggestions` (10) → resolution  ·  verifies: —
-- `test_anthropic_agent_response` (10) → —  ·  verifies: —
-- `test_celery_app` (15) → —  ·  verifies: —
-- `test_config` (25) → —  ·  verifies: —
-- `test_openai_agent_response` (10) → —  ·  verifies: —
-- `test_prompts` (15) → —  ·  verifies: —
-- `test_tasks` (2) → —  ·  verifies: —
+- `test_anthropic_agent_response` (10) → —  ·  verifies: code:agents
+- `test_celery_app` (15) → —  ·  verifies: code:celery_app
+- `test_config` (25) → —  ·  verifies: code:config
+- `test_openai_agent_response` (10) → —  ·  verifies: code:agents
+- `test_prompts` (15) → —  ·  verifies: code:tools.prompts
+- `test_tasks` (2) → —  ·  verifies: code:tasks
 - `testmap.test_check` (4) → tools.testmap  ·  verifies: —
 - `testmap.test_cli` (2) → tools.testmap  ·  verifies: —
 - `testmap.test_reader` (2) → tools.testmap  ·  verifies: —
@@ -179,40 +179,40 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 
 ## integration
 
-- `integration.test_anthropic_api_messages` (4) → —  ·  verifies: —
-- `integration.test_api_calls` (3) → —  ·  verifies: —
-- `integration.test_idempotency` (6) → —  ·  verifies: —
-- `integration.test_migrate_shim_drop_live` (1) → —  ·  verifies: —
-- `integration.test_multi_provider_api_live` (5) → —  ·  verifies: —
-- `integration.test_neo4j_connection_reliability` (15) → —  ·  verifies: —
-- `integration.test_neo4j_data_integrity` (8) → —  ·  verifies: —
-- `integration.test_openai_api_responses` (2) → —  ·  verifies: —
-- `integration.test_projection_replay` (3) → —  ·  verifies: —
-- `integration.test_prompt_validation_live` (15) → —  ·  verifies: —
+- `integration.test_anthropic_api_messages` (4) → —  ·  verifies: capabilities:provider-strategy-and-focused-calls
+- `integration.test_api_calls` (3) → —  ·  verifies: code:agents
+- `integration.test_idempotency` (6) → —  ·  verifies: code:projections
+- `integration.test_migrate_shim_drop_live` (1) → —  ·  verifies: code:projections
+- `integration.test_multi_provider_api_live` (5) → —  ·  verifies: code:agents
+- `integration.test_neo4j_connection_reliability` (15) → —  ·  verifies: code:persistence
+- `integration.test_neo4j_data_integrity` (8) → —  ·  verifies: code:projections
+- `integration.test_openai_api_responses` (2) → —  ·  verifies: capabilities:provider-strategy-and-focused-calls
+- `integration.test_projection_replay` (3) → —  ·  verifies: code:projections
+- `integration.test_prompt_validation_live` (15) → —  ·  verifies: code:agents
 
 ## e2e
 
-- `integration.test_ask_smoke` (1) → —  ·  verifies: —
-- `integration.test_deployed_projection_smoke` (1) → —  ·  verifies: —
+- `integration.test_ask_smoke` (1) → —  ·  verifies: use-cases:get-a-grounded-answer-from-my-corpus
+- `integration.test_deployed_projection_smoke` (1) → —  ·  verifies: code:projections
 - `integration.test_e2e_user_edits` (3) → —  ·  verifies: use-cases:correct-what-the-system-got-wrong
 - `integration.test_end_to_end_smoke` (1) → —  ·  verifies: use-cases:surface-the-signal
-- `integration.test_layer1_projection_smoke` (1) → —  ·  verifies: —
-- `integration.test_layer2_enrichment_smoke` (1) → —  ·  verifies: —
-- `integration.test_layer3_lens_smoke` (2) → —  ·  verifies: —
-- `integration.test_layer4_resolution_smoke` (1) → —  ·  verifies: —
-- `integration.test_layer5_export_smoke` (1) → —  ·  verifies: —
-- `integration.test_live_feed_smoke` (2) → —  ·  verifies: —
-- `integration.test_projection_ordering_smoke` (1) → —  ·  verifies: —
+- `integration.test_layer1_projection_smoke` (1) → —  ·  verifies: code:projections
+- `integration.test_layer2_enrichment_smoke` (1) → —  ·  verifies: code:enrichment
+- `integration.test_layer3_lens_smoke` (2) → —  ·  verifies: code:lens
+- `integration.test_layer4_resolution_smoke` (1) → —  ·  verifies: code:resolution
+- `integration.test_layer5_export_smoke` (1) → —  ·  verifies: code:export
+- `integration.test_live_feed_smoke` (2) → —  ·  verifies: code:ui
+- `integration.test_projection_ordering_smoke` (1) → —  ·  verifies: code:projections
 
 ## Verification rollup
 
 Use-cases:
-- catalog-every-live-surface: PARTIALLY_VERIFIED
+- catalog-every-live-surface: VERIFIED
 - collaborate-with-my-team-on-a-corpus: UNVERIFIED
 - correct-what-the-system-got-wrong: VERIFIED
 - diagnose-a-stalled-analysis: UNVERIFIED
 - export-my-analysis-to-take-elsewhere: PARTIALLY_VERIFIED
-- get-a-grounded-answer-from-my-corpus: PARTIALLY_VERIFIED
+- get-a-grounded-answer-from-my-corpus: VERIFIED
 - govern-decisions-and-hold-specs-honest: VERIFIED
 - keep-the-codebase-legible: UNVERIFIED
 - keep-the-workbench-live: PARTIALLY_VERIFIED
@@ -224,26 +224,27 @@ Use-cases:
 - revisit-a-past-extraction: UNVERIFIED
 - structure-the-raw-transcript: PARTIALLY_VERIFIED
 - surface-the-signal: VERIFIED
-- survive-a-provider-outage: VERIFIED
+- survive-a-provider-outage: PARTIALLY_VERIFIED
 - tailor-the-reading-to-the-audience: PARTIALLY_VERIFIED
-- trust-the-event-record: VERIFIED
+- trust-the-event-record: PARTIALLY_VERIFIED
 
 Capabilities:
 - access-analysis-output-files: VERIFIED
 - ask-the-corpus: PARTIALLY_VERIFIED
 - assemble-bundle: UNVERIFIED
 - canonicalize-entities: UNVERIFIED
-- catalog-the-api-surface: UNVERIFIED
+- catalog-the-api-surface: VERIFIED
 - catalog-the-cli-surface: VERIFIED
 - catalog-the-graph-queries: VERIFIED
 - catalog-the-prompt-registry: VERIFIED
-- chat-failover: VERIFIED
+- chat-failover: PARTIALLY_VERIFIED
 - cited-synthesis: UNVERIFIED
 - classify-dimensions: PARTIALLY_VERIFIED
 - correct-resolution: VERIFIED
 - correct-the-analysis: VERIFIED
 - disclose-knowledge-and-check-specs: VERIFIED
 - edit-text: VERIFIED
+- embed-fragments: VERIFIED
 - enrich-fragments: PARTIALLY_VERIFIED
 - export-a-portable-bundle: PARTIALLY_VERIFIED
 - extract-claims: PARTIALLY_VERIFIED
@@ -267,8 +268,8 @@ Capabilities:
 - override-lens-items: VERIFIED
 - parse-fragments: UNVERIFIED
 - per-lens-extractors: PARTIALLY_VERIFIED
-- pinned-embeddings: VERIFIED
-- project-events-to-graph: VERIFIED
+- pinned-embeddings: PARTIALLY_VERIFIED
+- project-events-to-graph: PARTIALLY_VERIFIED
 - provider-strategy-and-focused-calls: VERIFIED
 - remove-segments: VERIFIED
 - rename-reattribute-speakers: VERIFIED

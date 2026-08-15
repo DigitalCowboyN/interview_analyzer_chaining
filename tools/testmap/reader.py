@@ -20,6 +20,10 @@ _CODE_ADDR = (
     "code"  # the code domain's prefix (hardcoded to avoid importing tools.graph)
 )
 
+# dir segments under tests/ whose name doesn't match their code unit (resolved after the
+# direct/`tools.`-prefixed attempts). One entry per known mismatch.
+_TARGET_ALIASES = {"api_surface": "tools.api"}
+
 
 @dataclass
 class Test:
@@ -46,6 +50,9 @@ def _target(rel: str, units: Set[str]) -> str:
         return seg
     if f"tools.{seg}" in units:
         return f"tools.{seg}"
+    alias = _TARGET_ALIASES.get(seg)
+    if alias and alias in units:
+        return alias
     return ""
 
 

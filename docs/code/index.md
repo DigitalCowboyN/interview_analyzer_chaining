@@ -7,16 +7,21 @@ See `pipeline.md` for the dependency graph.
 | unit | io | depends_on |
 | --- | --- | --- |
 | agents | LLM | utils |
-| agents.agent_factory | LLM | utils |
+| agents.agent_factory | LLM | config, utils |
 
 ## infrastructure
 
 | unit | io | depends_on |
 | --- | --- | --- |
+| celery_app |  |  |
 | commands | ESDB | events |
+| config | LLM, Neo4j, files |  |
 | events | ESDB | utils |
 | io |  |  |
+| main | HTTP, files | api, config, enrichment, ingestion, utils |
 | persistence | Neo4j |  |
+| run_projection_service | ESDB, Neo4j | events, projections, utils |
+| tasks | files | celery_app, enrichment, ingestion, utils |
 | utils | ESDB, HTTP, LLM, Neo4j, files |  |
 
 ## model
@@ -31,9 +36,9 @@ See `pipeline.md` for the dependency graph.
 | --- | --- | --- |
 | enrichment | ESDB, LLM | agents, events, utils |
 | enrichment.executor | LLM | agents, utils |
-| enrichment.orchestrator | ESDB, LLM | agents, events, utils |
+| enrichment.orchestrator | ESDB, LLM | agents, config, events, utils |
 | export | ESDB, Neo4j, files | events, lens, utils |
-| export.bundler | ESDB, Neo4j, files | events, lens, utils |
+| export.bundler | ESDB, Neo4j, files | config, events, lens, utils |
 | export.reader | Neo4j |  |
 | export.renderer | Neo4j | lens |
 | ingestion | ESDB, LLM, Neo4j, files | agents, enrichment, events, models, utils |
@@ -41,10 +46,10 @@ See `pipeline.md` for the dependency graph.
 | ingestion.speaker_inference | LLM | agents, models, utils |
 | ingestion.stitcher | LLM | agents, models, utils |
 | lens | ESDB, LLM, files | agents, enrichment, events, utils |
-| lens.engine | ESDB, LLM | agents, enrichment, events, utils |
+| lens.engine | ESDB, LLM | agents, config, enrichment, events, utils |
 | projections | ESDB, Neo4j | enrichment, events, utils |
 | resolution | ESDB, Neo4j | enrichment, events, utils |
-| resolution.engine | ESDB, Neo4j | enrichment, events, utils |
+| resolution.engine | ESDB, Neo4j | config, enrichment, events, utils |
 
 ## surface
 
@@ -52,7 +57,7 @@ See `pipeline.md` for the dependency graph.
 | --- | --- | --- |
 | api | ESDB, HTTP, Neo4j, files | ask, commands, enrichment, events, export, ingestion, resolution, ui, utils |
 | ask | LLM, Neo4j | agents, enrichment, projections, utils |
-| ask.engine | LLM, Neo4j | agents, enrichment, projections, utils |
+| ask.engine | LLM, Neo4j | agents, config, enrichment, projections, utils |
 | ask.reader | Neo4j |  |
 | ui | ESDB, HTTP, Neo4j | events |
 | ui.reader | ESDB, Neo4j |  |

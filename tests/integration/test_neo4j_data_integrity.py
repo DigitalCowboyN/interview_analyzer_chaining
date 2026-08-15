@@ -20,6 +20,7 @@ from events. Direct writes (Neo4jAnalysisWriter, Neo4jMapStorage) are deprecated
 The dual-write pattern was REMOVED in M3.0. The projection service is the SOLE
 writer to Neo4j. All tests must use events + projection handlers, not direct writes.
 """
+# verifies: code:projections
 
 import uuid
 from datetime import datetime, timezone

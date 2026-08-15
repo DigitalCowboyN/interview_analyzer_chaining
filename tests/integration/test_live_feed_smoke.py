@@ -35,6 +35,7 @@ lazily, on first use, not at import time).
 Gated behind LIVE_FEED_SMOKE=1 (mirrors DEPLOYED_SMOKE=1's skip idiom
 exactly); MUST NOT run in default suites.
 """
+# verifies: code:ui
 
 import asyncio
 import json
