@@ -118,6 +118,10 @@ Keep the codebase's own knowledge correct and discoverable: catalog each facet (
 - catalog-the-graph-queries — Catalog every Cypher query issued against Neo4j — purpose, scope, audience, and the graph vocabulary it touches — and guard it against the schema. (tools.graphq)
 - catalog-the-prompt-registry — Catalog every LLM prompt template — its classification, audience, and consumers — and guard it against the glossary vocabulary it draws on. (tools.prompts)
 - disclose-knowledge-and-check-specs — Nudge a spec or plan to reconcile against the domains it touches, then hold it honest — non-blocking check that a "Knowledge-graph check" addendum is present and each touched domain was consulted. (tools.knowledge)
+- discover-the-corpus — Discover every OKF record in the repo by its own `type:` declaration — the single, type-primary
+intake the knowledge graph is built from — and flag any record living outside its home (misfiled).
+The substrate that makes the graph's completeness a property of one intake instead of N
+per-domain folder scans. (tools.corpus)
 - govern-architectural-decisions — Capture and guard the durable architectural decision record — schema, id uniqueness, bidirectional supersede edges, and specs that lock a decision without one — non-blocking drift detection over the ADR corpus. (tools.adr)
 - link-the-domains — Assemble every domain's typed links into one cross-domain graph — traverse and guard it. (tools.graph)
 - maintain-the-glossary — Maintain the shared vocabulary — dimensions, enums, entity/claim kinds, graph labels — scaffolded from code and guarded against drift. (tools.glossary)
