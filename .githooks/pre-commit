@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Non-blocking ADR drift report. Never fails the commit.
-bash scripts/with-project-py.sh tools.adr check || true
-bash scripts/with-project-py.sh tools.graph check || true
+# Non-blocking drift report for the domains this commit touches (+ the cross-domain graph).
+# Never fails the commit — visibility, not a gate.
+files="$(git diff --cached --name-only)"
+domains="$(printf '%s\n' "$files" | bash scripts/with-project-py.sh tools.knowledge changed-domains 2>/dev/null)"
+for d in $domains graph; do
+    bash scripts/with-project-py.sh "tools.$d" check || true
+done
 exit 0

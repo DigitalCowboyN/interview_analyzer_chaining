@@ -94,6 +94,15 @@ graph-check: ## Reconcile the edge graph vs its sources (non-blocking)
 health: ## Run every domain check + the cross-domain graph check (full sweep)
 	@for d in adr cli api glossary prompts graphq code capability knowledge graph usecase testmap; do $(PYTHON) -m tools.$$d check || true; done
 
+.PHONY: regen-derived
+regen-derived: ## Regenerate the source-derived indexes (env-independent; the CI freshness gate's set)
+	@$(MAKE) code-index capability-index usecase-index testmap-index glossary-index \
+	         graphq-index prompt-index adr-index cli-index graph-index
+
+.PHONY: regen-all
+regen-all: ## Regenerate every generated index/doc (regen-derived + the app-derived api index)
+	@$(MAKE) regen-derived api-index
+
 .PHONY: knowledge-check
 knowledge-check: ## Reconcile specs/plans + cascade root vs the knowledge domains (non-blocking)
 	@$(PYTHON) -m tools.knowledge check

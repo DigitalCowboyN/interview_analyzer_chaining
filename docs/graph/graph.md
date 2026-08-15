@@ -445,6 +445,7 @@ graph LR
     n_tests_integration_test_prompt_validation_live["tests:integration.test_prompt_validation_live"] --> n_code_agents["code:agents"]
     n_tests_knowledge_test_check["tests:knowledge.test_check"] --> n_code_tools_knowledge["code:tools.knowledge"]
     n_tests_knowledge_test_cli["tests:knowledge.test_cli"] --> n_code_tools_knowledge["code:tools.knowledge"]
+    n_tests_knowledge_test_surfaces["tests:knowledge.test_surfaces"] --> n_code_tools_knowledge["code:tools.knowledge"]
     n_tests_lens_test_engine["tests:lens.test_engine"] --> n_code_lens["code:lens"]
     n_tests_lens_test_lens_models["tests:lens.test_lens_models"] --> n_code_lens["code:lens"]
     n_tests_models_test_extractor_responses["tests:models.test_extractor_responses"] --> n_code_models["code:models"]

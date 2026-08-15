@@ -115,6 +115,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `ingestion.test_stitcher` (8) → ingestion  ·  verifies: —
 - `knowledge.test_check` (10) → tools.knowledge  ·  verifies: —
 - `knowledge.test_cli` (5) → tools.knowledge  ·  verifies: —
+- `knowledge.test_surfaces` (4) → tools.knowledge  ·  verifies: —
 - `lens.test_engine` (4) → lens  ·  verifies: —
 - `lens.test_lens_models` (11) → lens  ·  verifies: —
 - `models.test_extractor_responses` (5) → models  ·  verifies: —

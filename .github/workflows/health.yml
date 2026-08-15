@@ -1,0 +1,34 @@
+name: knowledge-graph health
+on:
+  push:
+  pull_request:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    env:
+      # the checks import the app with placeholder keys; set them so imports never prompt
+      ANTHROPIC_API_KEY: ci-placeholder
+      OPENAI_API_KEY: ci-placeholder
+      PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10.7"
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Drift report (advisory — never fails)
+        run: make health
+      - name: Index freshness gate (blocks on stale generated files)
+        # Only the source-derived indexes are gated: they are pure functions of committed
+        # source, so a fresh render must be byte-identical. api-index is excluded because it
+        # is derived from the live app surface (load_app()), which depends on the runtime
+        # environment (which routers import) — its drift is covered by the advisory api-check.
+        run: |
+          make regen-derived
+          if ! git diff --exit-code; then
+            echo "::error::committed generated indexes are stale — run 'make regen-all' and commit the result"
+            git diff --stat
+            exit 1
+          fi

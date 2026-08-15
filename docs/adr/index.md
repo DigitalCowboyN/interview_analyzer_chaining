@@ -24,3 +24,4 @@
 | 0020 | Adopt an OKF-extension typed-edge graph model | accepted |
 | 0021 | Use-cases domain as the graph source layer | accepted |
 | 0022 | Tests domain with an orthogonal verification axis | accepted |
+| 0023 | Forward loop — advisory by default, index freshness enforced in CI | accepted |

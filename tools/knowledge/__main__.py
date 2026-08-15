@@ -5,6 +5,7 @@ import json
 import sys
 
 from tools.knowledge.check import run_all
+from tools.knowledge.surfaces import changed_domains
 
 _SPEC_PLAN_DIRS = ("docs/superpowers/specs/", "docs/superpowers/plans/")
 
@@ -40,13 +41,25 @@ def cmd_nudge(args) -> int:
     return 0
 
 
+def cmd_changed_domains(args) -> int:
+    files = [ln.strip() for ln in sys.stdin.read().splitlines() if ln.strip()]
+    for make in changed_domains(files):
+        print(make)
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="tools.knowledge")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("check")
     sub.add_parser("nudge")
+    sub.add_parser("changed-domains")
     args = parser.parse_args(argv)
-    return {"check": cmd_check, "nudge": cmd_nudge}[args.cmd](args)
+    return {
+        "check": cmd_check,
+        "nudge": cmd_nudge,
+        "changed-domains": cmd_changed_domains,
+    }[args.cmd](args)
 
 
 if __name__ == "__main__":
