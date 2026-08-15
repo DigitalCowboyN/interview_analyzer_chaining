@@ -10,14 +10,14 @@
 | governs | governed_by | ADR → CodeUnit | authored | — | 24 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 52 |
-| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 193 |
+| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 194 |
 
 ## Nodes
 
 - ADR: 22
 - Capability: 54
 - CodeUnit: 47
-- Test: 193
+- Test: 194
 - UseCase: 20
 
 ## Meta-schema

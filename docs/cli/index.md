@@ -57,6 +57,7 @@
 | projection-up | internal | Start the projection service (docker) |
 | prompt-check | everyday | Reconcile the prompt registry vs glossary + code consumers (non-blocking) |
 | prompt-index | everyday | Regenerate docs/prompts/index.md (probabilistic-components catalog) |
+| regen-all | everyday | Regenerate every generated index/doc (used by the CI index-freshness gate) |
 | run | everyday | Run application container (API) |
 | run-api | everyday | Run FastAPI server (local, dev) |
 | run-projection | everyday | Run the projection service (standalone) |
