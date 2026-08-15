@@ -4,26 +4,34 @@ import glob
 import os
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from tools.capability.reader import CATEGORIES, category_defined, load_capabilities
 from tools.usecase.reader import load_use_cases
 
-# Single source of truth for the knowledge-graph domains: (docs slug, make-name).
-# Each has docs/<slug>/index.md and a `make <make-name>-check`. Add a row here (and
-# to docs/index.md) when a new domain ships (e.g. capabilities).
-DOMAINS: List[Tuple[str, str]] = [
-    ("adr", "adr"),
-    ("api", "api"),
-    ("cli", "cli"),
-    ("code", "code"),
-    ("capabilities", "capability"),
-    ("glossary", "glossary"),
-    ("graph", "graph"),
-    ("graph-queries", "graphq"),
-    ("prompts", "prompt"),
-    ("use-cases", "usecase"),
-    ("tests", "testmap"),
+
+@dataclass
+class Domain:
+    slug: str            # docs/<slug>/  (cascade row + graph addressing)
+    make: str            # runnable module/check name: `python -m tools.<make> check`
+    surfaces: list        # path prefixes whose change can cause this check to find drift
+
+
+# Single source of truth for the knowledge-graph domains. `surfaces` drives the
+# changed-domain pre-commit (tools.knowledge.surfaces). Add a row here (+ a docs/index.md
+# row) when a new domain ships.
+DOMAINS = [
+    Domain("adr", "adr", ["docs/adr/", "src/"]),
+    Domain("api", "api", ["src/api/", "frontend/openapi.json"]),
+    Domain("cli", "cli", ["Makefile", "tools/"]),
+    Domain("code", "code", ["src/", "tools/"]),
+    Domain("capabilities", "capability", ["docs/capabilities/", "src/", "tools/"]),
+    Domain("glossary", "glossary", ["src/", "docs/glossary/"]),
+    Domain("graph", "graph", []),  # cross-domain: always appended by the hook/CI, never path-resolved
+    Domain("graph-queries", "graphq", ["src/projections/", "docs/graph-queries/"]),
+    Domain("prompts", "prompts", ["src/", "docs/prompts/"]),
+    Domain("use-cases", "usecase", ["docs/use-cases/"]),
+    Domain("tests", "testmap", ["tests/"]),
 ]
 
 ADOPTION_DATE = "2026-08-05"          # specs/plans dated >= this must carry the addendum
@@ -67,10 +75,10 @@ def check_cascade_covers_domains(root: str = ".", domains=DOMAINS) -> List[Findi
     except OSError:
         return [Finding("knowledge: cascade root docs/index.md is missing — author it")]
     findings: List[Finding] = []
-    for slug, _make in domains:
-        if f"{slug}/" not in text:
+    for d in domains:
+        if f"{d.slug}/" not in text:
             findings.append(Finding(
-                f"knowledge: cascade root docs/index.md has no row for '{slug}/'"))
+                f"knowledge: cascade root docs/index.md has no row for '{d.slug}/'"))
     return findings
 
 

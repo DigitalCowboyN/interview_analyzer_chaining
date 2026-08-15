@@ -14,4 +14,4 @@ def test_neighbors_reports_edges():
 
 def test_graph_in_knowledge_registry():
     from tools.knowledge.check import DOMAINS
-    assert "graph" in {slug for slug, _ in DOMAINS}
+    assert "graph" in {d.slug for d in DOMAINS}

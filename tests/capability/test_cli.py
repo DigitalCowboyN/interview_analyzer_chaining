@@ -11,5 +11,5 @@ def test_cli_check_exits_zero():
 
 def test_capabilities_in_knowledge_registry():
     from tools.knowledge.check import DOMAINS
-    slugs = {slug for slug, _ in DOMAINS}
+    slugs = {d.slug for d in DOMAINS}
     assert "capabilities" in slugs
