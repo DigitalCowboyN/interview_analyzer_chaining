@@ -33,11 +33,20 @@ Invert the model: a single **corpus substrate** is primary, and the domains beco
 
 - **The repo is the corpus.** Intake scans the whole repo (minus an ignore list), not one
   folder per domain.
-- **Discovery is type-primary.** A record is found by *what it is*: `type:` front-matter for
-  OKF documents (discovered anywhere), and path/AST for code and tests (walked from the code
-  roots `src/`, `tools/`, `tests/`, since `.py` files carry no front-matter). A record's
-  declared home folder becomes a **property to check against** (misfiled = a `type:` outside
-  its home), never the discovery key.
+- **Discovery is type-primary, by explicit self-declaration.** Every node declares *what it
+  is*, in place, the same way across the whole corpus: OKF documents via `type:` (and `kind:`)
+  front-matter — `ADR`, `Capability`, `UseCase`, `CodeUnit`, `Term` — discovered anywhere;
+  code-derived nodes (`Test`, `GraphQuery`, and future kinds) via a uniform in-code marker
+  `# okf: type=… kind=…`; prompt entries via `type:`/`kind:` keys on the YAML entry itself. A
+  record's declared home is a **property to check against** (misfiled = declared outside its
+  home), never the discovery key.
+- **Explicit, not positional or structural.** A node is never recognized by its folder, its
+  filename, or a heuristic on its shape (a `test_` prefix, a body that happens to contain
+  Cypher). It is recognized only by its own self-declaration. This is uniform — docs and code
+  declare identically — so a new node kind costs a *marker*, not a new parser. The accepted
+  cost is a one-time migration: existing tests, queries, and prompts must be tagged (they are
+  invisible to the graph until they are), and every new one carries its marker. `kind` becomes
+  uniform across the corpus as a side effect.
 - **One intake, not N.** The duplicated per-domain folder-scanners collapse into the single
   substrate; a domain reader now *selects its node type + its authored edges* from the
   substrate instead of globbing a folder.
@@ -74,3 +83,12 @@ Paired with ADR-0025, which makes that substrate a first-class ephemeral travers
 - **Big-bang cutover of all domains at once** (rejected: high risk for no benefit; the
   substrate can stand while domains migrate one at a time behind unchanged, non-blocking
   checks).
+- **Recognize code-derived nodes by shape** — a `test_` prefix, a function body containing
+  Cypher — instead of requiring an explicit marker (rejected: structural recognition is the
+  same failure mode as folder-recognition — fragile, silent on edge cases, and yields no
+  uniform `kind`; explicit self-declaration is the whole point, and the owner accepted the
+  one-time tagging cost to get it).
+- **Per-domain marker formats** (`graphq:`, `# verifies:`, bespoke keys) instead of one shared
+  `# okf:` convention (rejected: since every node is tagged anyway, per-domain formats buy
+  nothing and cost a new parser per domain and per future node kind; existing `# verifies:`
+  edge markers are unaffected — they declare relationships, not type).

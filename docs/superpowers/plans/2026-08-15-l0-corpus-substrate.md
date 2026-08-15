@@ -15,8 +15,8 @@
 - **Discovery keys on the file's OWN top-of-file frontmatter**, parsed by `parse_front_matter` — never a body/line grep. A plan or spec that contains `type: Capability` inside a fenced example MUST NOT be discovered as a record. This is the load-bearing correctness property.
 - **Type-primary, repo-wide.** A record is found by what it *is*, anywhere in the repo (minus the ignore list) — not by globbing a home folder. The home folder is only used to judge *misfiled*, never to *find*.
 - **Non-blocking.** `corpus-check` prints findings and returns 0, always (ADR-0016/0023 visibility-not-gates).
-- **Scope of THIS plan:** OKF *document* intake (ADR, Capability, UseCase) + the misfiled check. Explicitly **deferred to later L0 plans:** migrating the existing domain readers to consume `okf_records` (domains-as-projections), code/test-root intake, and orphan/reachability checks (L2).
-- **OKF document types + homes (verbatim):** `ADR → docs/adr`, `Capability → docs/capabilities`, `UseCase → docs/use-cases`.
+- **Scope of THIS plan:** OKF *document* intake (the five frontmatter'd types) + the misfiled check. Explicitly **deferred to later plans:** code-derived intake via `# okf:` markers (Test, GraphQuery, Prompt — an explicit-tagging migration, per ADR-0024), migrating the existing domain readers to consume `okf_records` (domains-as-projections), and orphan/reachability checks (L2).
+- **OKF document types + homes (verbatim):** `ADR → docs/adr`, `Capability → docs/capabilities`, `UseCase → docs/use-cases`, `CodeUnit → docs/code`, `Term → docs/glossary`. These are the five types that carry `type:` frontmatter today (verified 100% present). Code-derived nodes (Test/GraphQuery/Prompt) are **not** in this plan — they self-declare via `# okf:` markers in a later phase.
 - **Names verbatim:** module `tools/corpus`; `Record` (fields `type`, `id`, `path`, `frontmatter`, `body`); `OKF_HOMES`; `okf_records(root=".", ignore=_IGNORE_DIRS)`; `check_misfiled(records)`; `run_all(root=".")`; CLI subcommands `check` and `list`.
 
 ---
@@ -36,11 +36,13 @@
 from tools.corpus.model import OKF_HOMES, Record
 
 
-def test_okf_homes_cover_the_three_document_types():
+def test_okf_homes_cover_the_five_document_types():
     assert OKF_HOMES == {
         "ADR": "docs/adr",
         "Capability": "docs/capabilities",
         "UseCase": "docs/use-cases",
+        "CodeUnit": "docs/code",
+        "Term": "docs/glossary",
     }
 
 
@@ -65,12 +67,15 @@ from dataclasses import dataclass
 from typing import Dict
 
 # OKF document types → their expected home directory (repo-relative). A record of type X
-# found outside its home is "misfiled". Code/test nodes are NOT OKF documents (no
-# frontmatter); they are intake-ed by walking the code roots in a later L0 plan, not here.
+# found outside its home is "misfiled". These five all carry `type:` frontmatter today.
+# Code-DERIVED nodes (Test, GraphQuery, Prompt) are NOT documents — they self-declare via
+# `# okf:` markers in code / YAML keys, handled in a later phase (ADR-0024), not here.
 OKF_HOMES: Dict[str, str] = {
     "ADR": "docs/adr",
     "Capability": "docs/capabilities",
     "UseCase": "docs/use-cases",
+    "CodeUnit": "docs/code",
+    "Term": "docs/glossary",
 }
 
 
@@ -211,7 +216,7 @@ Expected: PASS (3 passed) — the plan-with-a-fenced-example is not discovered; 
 - [ ] **Step 5: Smoke against the real repo**
 
 Run: `python -c "from tools.corpus.reader import okf_records; rs=okf_records(); import collections; print(collections.Counter(r.type for r in rs))"`
-Expected: a Counter with `Capability`, `ADR`, `UseCase` counts in the dozens, and **no** records sourced from `docs/superpowers/` (verify: `python -c "from tools.corpus.reader import okf_records; print([r.path for r in okf_records() if 'superpowers' in r.path])"` prints `[]`).
+Expected: a Counter with all five types present — roughly `Capability` ~54, `ADR` ~25, `UseCase` ~20, `CodeUnit` ~47, `Term` ~111 — and **no** records sourced from `docs/superpowers/` (verify: `python -c "from tools.corpus.reader import okf_records; print([r.path for r in okf_records() if 'superpowers' in r.path])"` prints `[]`).
 
 - [ ] **Step 6: Commit**
 

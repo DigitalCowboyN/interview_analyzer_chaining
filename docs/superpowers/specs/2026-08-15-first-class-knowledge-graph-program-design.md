@@ -82,17 +82,26 @@ Every problem we have hit is a symptom:
 
 ### L0 — Substrate (the inversion)
 
-One corpus model is primary. It scans the whole repo once and classifies every record by what
-it *is*:
+One corpus model is primary. It scans the whole repo once and classifies every node by an
+**explicit self-declaration** — never by folder, filename, or a shape heuristic. The
+declaration is uniform across docs and code:
 
-- **OKF documents** (ADR, Capability, UseCase, and future GlossaryTerm / Prompt / GraphQuery /
-  Spec): discovered by `type:` frontmatter, **anywhere in the repo** (minus an ignore list).
-  The record's declared home folder becomes a *property to check against* (misfiled = a type
-  outside its home), never the discovery key.
-- **Code & tests**: discovered by walking the code roots (`src/`, `tools/`, `tests/`) via
-  path/AST — `.py` files have no frontmatter, so their "type" is "source in the code tree,"
-  and the orphan case is "a source file no unit claims" (R1's `check_top_level_modules`,
-  generalized to all roots).
+- **OKF documents** — `type:` (and `kind:`) frontmatter. Five types exist today and all carry
+  it, 100%: `ADR` (`docs/adr`), `Capability` (`docs/capabilities`), `UseCase`
+  (`docs/use-cases`), `CodeUnit` (`docs/code`), `Term` (`docs/glossary`). Discovered anywhere
+  in the repo (minus an ignore list); the declared home is a *property to check against*
+  (misfiled = declared outside its home), never the discovery key.
+- **Code-derived nodes** (`Test`, `GraphQuery`, and future kinds) — a uniform in-code marker
+  `# okf: type=… kind=…`. Explicit and required: a `test_` prefix or a Cypher-containing body
+  is *not* enough; an untagged test/query is invisible until tagged. Existing `# verifies:`
+  edge markers are unaffected (they declare relationships, not type).
+- **Prompts** — a `type:`/`kind:` key on the prompt's own YAML entry (`prompts/*.yaml`), the
+  frontmatter equivalent in place.
+
+This makes `kind` uniform across the whole corpus, and a new node kind costs a marker, not a
+new parser. The accepted one-time cost is **tagging the code-derived nodes** (tests, queries,
+prompts) — tracked as its own migration phase; R1's `check_top_level_modules` (generalized)
+still catches source that no node claims.
 
 A **Node** carries: an address (`<type>:<local-id>`, e.g. `code:api`, `adr:23`), its type,
 its provenance (the path it came from), derived/authored **properties**, and its **claim +
