@@ -1,3 +1,7 @@
+"""CLI entry point for the `tools.capability` domain: `index` renders
+`docs/capabilities/index.md` from the authored capability docs, `check` runs the
+non-blocking capability findings."""
+
 from __future__ import annotations
 
 import argparse

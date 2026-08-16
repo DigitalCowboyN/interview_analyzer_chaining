@@ -1,3 +1,6 @@
+"""Renders the `tools.capability` `Capability` list into the `docs/capabilities/index.md`
+catalog, grouped by category and tier with children/variants nested under their primary."""
+
 from __future__ import annotations
 
 from typing import Dict, List

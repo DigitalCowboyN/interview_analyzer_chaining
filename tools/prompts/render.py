@@ -1,3 +1,6 @@
+"""Renders loaded `PromptEntry` records into `docs/prompts/index.md`, one table per
+source YAML file listing each prompt's classification, metadata, and enumerated values."""
+
 from __future__ import annotations
 
 from typing import List

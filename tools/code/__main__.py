@@ -1,3 +1,7 @@
+"""CLI entry point for the `tools.code` domain: `index` renders `docs/code/index.md`,
+`pipeline.md`, and the docstring backlog from the derived code units, `check` runs the
+non-blocking code findings."""
+
 from __future__ import annotations
 
 import argparse

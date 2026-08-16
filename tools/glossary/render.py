@@ -1,3 +1,6 @@
+"""Glossary domain render: builds the docs/glossary/index.md term table (sorted by
+kind then name) from a list of `Term` records.
+"""
 from __future__ import annotations
 
 from typing import List

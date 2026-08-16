@@ -1,3 +1,7 @@
+"""Renders loaded `QueryEntry` records into `docs/graph-queries/index.md`, one table per
+source bundle listing each query's purpose, scope, audience, consumers, and schema
+footprint (labels/rels/returns)."""
+
 from __future__ import annotations
 
 from typing import List

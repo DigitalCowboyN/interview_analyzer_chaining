@@ -1,3 +1,7 @@
+"""CLI entry point for the ADR domain (`python -m tools.adr <cmd>`): `index` regenerates
+the generated files, `check` runs the non-blocking drift checks, `new` scaffolds an ADR,
+`context` is the UserPromptSubmit hook nudging toward the ADR index on architectural
+prompts, and `where` looks up which ADR governs a given path."""
 from __future__ import annotations
 
 import argparse

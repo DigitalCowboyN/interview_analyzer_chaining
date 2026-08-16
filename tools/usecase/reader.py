@@ -1,3 +1,6 @@
+"""Use-case domain reader: parse docs/use-cases/*.md frontmatter into UseCase
+records (slug, form, fulfilled_by, statement) for the graph and coverage checks.
+"""
 from __future__ import annotations
 
 import glob

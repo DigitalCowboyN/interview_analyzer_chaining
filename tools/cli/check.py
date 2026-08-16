@@ -1,3 +1,7 @@
+"""Non-blocking findings for the `tools.cli` domain: docs referencing `make`/module commands
+that don't resolve, a stale `docs/cli/index.md`, and `make` targets with no `##` description.
+`run_all` is the entry point `tools.cli.__main__` calls."""
+
 from __future__ import annotations
 
 import os

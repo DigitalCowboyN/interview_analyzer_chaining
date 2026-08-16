@@ -1,3 +1,8 @@
+"""Non-blocking drift checks for the ADR domain: structural integrity (duplicate ids,
+supersede symmetry, valid status), generated-file sync, specs that lock decisions without
+citing an ADR, staleness of an ADR against its source spec or governed code, front-matter
+parseability, and agreement between an ADR's `governs` list and `governed-by` markers found
+in code. `run_all` composes every check into the list `tools.adr.__main__ check` prints."""
 from __future__ import annotations
 
 import glob

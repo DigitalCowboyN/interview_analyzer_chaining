@@ -1,3 +1,9 @@
+"""Knowledge domain: the DOMAINS registry — the single source of truth for every
+knowledge-graph domain and the code/doc surfaces that can cause its check to drift
+— plus cross-domain guards for docs/index.md cascade coverage, category-axis
+validity, and spec/plan '## Knowledge-graph check' addendum presence. Non-blocking
+— findings are warnings, not build failures.
+"""
 from __future__ import annotations
 
 import glob

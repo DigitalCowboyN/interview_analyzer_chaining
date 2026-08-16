@@ -1,4 +1,10 @@
 # tools/code/reader.py
+"""Derives the code node registry — `CodeUnit` packages and modules — directly from source
+under `src/` and `tools/`: a directory holding `.py` files is a package, each non-`__init__`
+file a module, its docstring becomes the description, and its `from`/`import` statements
+resolve to `depends_on` edges. The heart of the derived code graph; `load_units` is the
+registry every other `tools.*` domain reads."""
+
 from __future__ import annotations
 
 import ast

@@ -1,3 +1,7 @@
+"""CLI entry point for the glossary domain (`python -m tools.glossary`): regenerate
+docs/glossary/index.md, run the non-blocking coverage/consistency check, and scaffold
+new enum/dimension term files.
+"""
 from __future__ import annotations
 
 import argparse

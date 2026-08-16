@@ -1,3 +1,8 @@
+"""The cross-domain graph's schema: `NODE_DOMAINS` maps each node type to its `<domain>:<id>`
+address slug, and `EDGES` is the extensible registry of `EdgeType`s (authored, from a
+frontmatter field, or derived, from a named builder in `tools.graph.reader`) that
+`tools.graph.reader.harvest` walks to assemble the graph — adding an edge on existing node
+types is a one-entry change here."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field as _field

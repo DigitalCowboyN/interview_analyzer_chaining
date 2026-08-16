@@ -1,3 +1,6 @@
+"""CLI entry point for the `tools.api` domain: `index` renders the live FastAPI route table
+into `docs/api/index.md`, `check` runs the non-blocking api-surface findings."""
+
 from __future__ import annotations
 
 import argparse

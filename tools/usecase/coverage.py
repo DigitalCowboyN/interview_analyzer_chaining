@@ -1,3 +1,7 @@
+"""Use-case domain coverage: derives each use-case's NOT_COVERED /
+PARTIALLY_COVERED / FULLY_COVERED state, transitively through the capabilities
+that fulfill it and whether those capabilities have resolving code.
+"""
 from __future__ import annotations
 
 from typing import Dict, List, Set

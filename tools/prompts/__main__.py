@@ -1,3 +1,7 @@
+"""CLI entry point for the `tools.prompts` domain: `index` renders the prompt registry
+(`docs/prompts/index.md`) from the `prompts/*.yaml` files, and `check` runs its
+non-blocking findings."""
+
 from __future__ import annotations
 
 import argparse

@@ -1,3 +1,8 @@
+"""Type-primary, repo-wide discovery of OKF documents: walks every `.md` file (skipping
+vendored/build/VCS directories), reads each file's own top-of-file `type:` frontmatter,
+and returns a `Record` for every one whose type is registered in `OKF_HOMES` — the corpus
+substrate's single intake point, consumed by `tools.corpus.check` and `__main__`."""
+
 from __future__ import annotations
 
 import os

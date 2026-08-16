@@ -1,3 +1,7 @@
+"""The shared model for the OKF corpus substrate: `OKF_HOMES` registers each document
+type's expected home directory, and `Record` is the discovered-document shape every other
+`tools.corpus` module reads or checks against."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

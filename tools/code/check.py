@@ -1,4 +1,8 @@
 # tools/code/check.py
+"""Non-blocking findings for the `tools.code` domain: modules with no docstring (no
+derivable context) and a stale `docs/code/index.md`/`pipeline.md`. `run_all` is the entry
+point `tools.code.__main__` calls."""
+
 from __future__ import annotations
 
 import os

@@ -1,3 +1,8 @@
+"""Use-case domain guards: validate form/category axis membership, flag use-cases
+missing acceptance criteria or with no fulfilling capability, and confirm
+docs/use-cases/index.md is in sync. Non-blocking — findings are warnings, not build
+failures.
+"""
 from __future__ import annotations
 
 import os

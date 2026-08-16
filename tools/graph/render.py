@@ -1,4 +1,8 @@
 # tools/graph/render.py
+"""Renders the cross-domain graph to Markdown: `render_catalog` writes the edge-type table,
+per-type node counts, and a mermaid meta-schema diagram for `docs/graph/index.md`; `render_graph`
+writes one mermaid diagram per edge type, listing every concrete edge instance, for
+`docs/graph/graph.md`."""
 from __future__ import annotations
 
 import re

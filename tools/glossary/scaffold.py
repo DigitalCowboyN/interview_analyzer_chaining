@@ -1,3 +1,7 @@
+"""Glossary domain scaffold: creates a new docs/glossary/<term>.md stub for an enum
+or dimension, pre-filling front matter (values, source) from the code so only the
+definition is left to write.
+"""
 from __future__ import annotations
 
 import os

@@ -1,3 +1,7 @@
+"""Non-blocking findings for the `tools.api` domain: `openapi.json` drift against the live
+FastAPI app, docs referencing endpoints that don't exist, and a stale `docs/api/index.md`.
+`run_all` is the entry point `tools.api.__main__` calls."""
+
 from __future__ import annotations
 
 import os

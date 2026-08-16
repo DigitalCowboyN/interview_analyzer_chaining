@@ -1,3 +1,6 @@
+"""CLI entry point for the `tools.corpus` domain: `check` runs the non-blocking
+misfiled/unregistered-type findings, and `list` prints every discovered OKF record."""
+
 from __future__ import annotations
 
 import argparse

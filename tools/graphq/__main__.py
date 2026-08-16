@@ -1,3 +1,7 @@
+"""CLI entry point for the `tools.graphq` domain: `index` renders the graph-query
+registry (`docs/graph-queries/index.md`) from Cypher discovered in source, and `check`
+runs its non-blocking findings."""
+
 from __future__ import annotations
 
 import argparse

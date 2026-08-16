@@ -1,3 +1,7 @@
+"""Knowledge domain surfaces: maps a set of changed file paths to the
+`make <domain>-check` targets whose surface they touch, driving the
+changed-domain pre-commit nudge.
+"""
 from __future__ import annotations
 
 from typing import Iterable, List

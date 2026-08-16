@@ -1,3 +1,7 @@
+"""CLI entry point for the cross-domain graph (`python -m tools.graph <cmd>`): `index`
+regenerates `docs/graph/index.md` + `graph.md` from a fresh harvest, `check` runs the
+non-blocking drift/reachability checks, `neighbors` lists a node's inbound/outbound edges,
+and `walk` prints the ephemeral subgraph reachable from an entry address or selector."""
 from __future__ import annotations
 
 import argparse

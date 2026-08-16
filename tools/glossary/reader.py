@@ -1,3 +1,7 @@
+"""Glossary domain reader: derives the code-side vocabulary — Enum classes,
+`AnalysisResult` dimensions, `Literal` fields, and graph labels/rel-types/properties
+mined from Cypher strings — that docs/glossary/*.md terms are checked against.
+"""
 from __future__ import annotations
 
 import ast

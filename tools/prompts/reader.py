@@ -1,3 +1,8 @@
+"""Parses `prompts/*.yaml` into `PromptEntry` records — one per prompt key with a
+`prompt` field — extracting its enumerated values (from a `"key": "a|b|c"` format string
+or an `options:` bullet list) and deriving which pipeline stage(s) under `src/` consume it
+by scanning for the file's own name."""
+
 from __future__ import annotations
 
 import glob

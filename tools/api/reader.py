@@ -1,3 +1,7 @@
+"""Derives the live API surface from the running FastAPI app (`src.main:app`): `Endpoint`
+nodes per route, plus the live/committed OpenAPI method+path pairs used to detect drift
+against `frontend/openapi.json`."""
+
 from __future__ import annotations
 
 import json

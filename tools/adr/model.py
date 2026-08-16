@@ -1,3 +1,6 @@
+"""The `Adr` record and its front-matter parsing/validation: `parse_adr` turns an ADR
+file's text into an `Adr`, and `validate_frontmatter` reports missing required keys or an
+invalid `status` — the shared model every other `tools.adr` module reads or checks against."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

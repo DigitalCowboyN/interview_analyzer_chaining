@@ -1,3 +1,7 @@
+"""Ephemeral graph traversal. `walk(entry, direction, depth)` rebuilds the reachable
+subgraph from source on each call — the LLM working-context substrate (ADR-0025) —
+resolving each node's claim/context via the per-type `_CONTEXT` table. Separate from the
+transcript Neo4j graph."""
 from __future__ import annotations
 
 import os

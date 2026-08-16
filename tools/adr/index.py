@@ -1,3 +1,6 @@
+"""Loads the ADR corpus from `docs/adr/*.md` and renders the three generated files
+(`index.md`, `log.md`, `by-code.md`) that `make adr-index` writes back out — the read side
+of the ADR bundle that `tools.adr.check` diffs against to detect drift."""
 from __future__ import annotations
 
 import glob
