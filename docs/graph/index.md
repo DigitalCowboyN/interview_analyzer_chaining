@@ -18,7 +18,7 @@
 
 ## Nodes
 
-- ADR: 25
+- ADR: 26
 - Capability: 55
 - CodeUnit: 198
 - GlossaryTerm: 111

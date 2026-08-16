@@ -27,3 +27,4 @@
 | 0023 | Forward loop — advisory by default, index freshness enforced in CI | accepted |
 | 0024 | Corpus substrate is primary — type-primary intake, domains as projections | accepted |
 | 0025 | Knowledge graph is a first-class, ephemeral, rebuilt-from-source traversal substrate | accepted |
+| 0026 | Code map derived from source, hierarchically; overlay retired | accepted |
