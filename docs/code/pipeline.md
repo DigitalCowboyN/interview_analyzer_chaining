@@ -104,6 +104,9 @@ graph LR
     tools.graph --> tools.adr
     tools.graph --> tools.capability
     tools.graph --> tools.code
+    tools.graph --> tools.glossary
+    tools.graph --> tools.graphq
+    tools.graph --> tools.prompts
     tools.graph --> tools.testmap
     tools.graph --> tools.usecase
     tools.graphq --> tools.glossary
