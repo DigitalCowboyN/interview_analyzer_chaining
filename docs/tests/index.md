@@ -97,6 +97,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `glossary.test_reader` (6) → tools.glossary  ·  verifies: —
 - `glossary.test_render` (1) → tools.glossary  ·  verifies: —
 - `graph.test_check` (4) → tools.graph  ·  verifies: —
+- `graph.test_classify` (2) → tools.graph  ·  verifies: —
 - `graph.test_cli` (3) → tools.graph  ·  verifies: —
 - `graph.test_nodeset_glossary` (2) → tools.graph  ·  verifies: —
 - `graph.test_nodeset_query_prompt` (2) → tools.graph  ·  verifies: —

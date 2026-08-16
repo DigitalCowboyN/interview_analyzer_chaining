@@ -7,6 +7,7 @@ import sys
 from tools.code.check import run_all
 from tools.code.reader import load_units
 from tools.code.render import render_index, render_pipeline
+from tools.graph.classify import derive_axes
 
 CODE_DIR = "docs/code"
 INDEX = f"{CODE_DIR}/index.md"
@@ -17,7 +18,7 @@ def cmd_index(args) -> int:
     os.makedirs(CODE_DIR, exist_ok=True)
     units = load_units()
     with open(INDEX, "w", encoding="utf-8") as fh:
-        fh.write(render_index(units))
+        fh.write(render_index(units, derive_axes()))
     with open(PIPELINE, "w", encoding="utf-8") as fh:
         fh.write(render_pipeline(units))
     print(f"wrote {INDEX} + {PIPELINE}")

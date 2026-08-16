@@ -9,9 +9,11 @@ UNITS = [
 
 
 def test_render_index_groups_by_level():
-    out = render_index(UNITS)
+    axes = {"api": ("product", "deterministic")}
+    out = render_index(UNITS, axes)
     assert "## Packages" in out and "## Modules" in out
     assert "api.main" in out and "events, api.routers" in out
+    assert "| api | product | deterministic |" in out
 
 
 def test_render_pipeline_is_mermaid():

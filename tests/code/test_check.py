@@ -23,6 +23,9 @@ def test_map_in_sync_clean_then_drift(tmp_path):
     drifted = units + [CodeUnit("api.new", level="module", depends_on=["events"])]
     msgs = " ".join(f.message for f in check_map_in_sync(str(idx), str(pipe), drifted))
     assert "index.md" in msgs and "pipeline.md" in msgs
+    # an axis change alone (same units) also drifts the index
+    assert any("index.md" in f.message
+               for f in check_map_in_sync(str(idx), str(pipe), units, {"api.main": ("product", "deterministic")}))
 
 
 def test_run_all_never_raises_on_empty_root(tmp_path):

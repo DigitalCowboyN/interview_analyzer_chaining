@@ -264,8 +264,10 @@ graph LR
     tools.code.__main__ --> tools.code.check
     tools.code.__main__ --> tools.code.reader
     tools.code.__main__ --> tools.code.render
+    tools.code.__main__ --> tools.graph.classify
     tools.code.check --> tools.code.reader
     tools.code.check --> tools.code.render
+    tools.code.check --> tools.graph.classify
     tools.code.render --> tools.code.reader
     tools.corpus.__main__ --> tools.corpus.check
     tools.corpus.__main__ --> tools.corpus.reader
@@ -292,6 +294,9 @@ graph LR
     tools.graph.check --> tools.graph.registry
     tools.graph.check --> tools.graph.render
     tools.graph.check --> tools.graph.traverse
+    tools.graph.classify --> tools.capability.reader
+    tools.graph.classify --> tools.code.reader
+    tools.graph.classify --> tools.graph.reader
     tools.graph.reader --> tools.adr.index
     tools.graph.reader --> tools.capability.reader
     tools.graph.reader --> tools.code.reader
