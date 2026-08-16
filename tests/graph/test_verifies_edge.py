@@ -17,9 +17,10 @@ def _seed(tmp_path):
         "---\ntype: CodeUnit\nunit: tools.capability\nrole: tooling\n---\nx\n",
         encoding="utf-8",
     )
-    # real tools dir so target resolution (packages()) sees tools.capability, in addition
-    # to the docs/code node above (which drives the CodeUnit node inventory):
+    # a real tools package (with a .py) so target resolution sees tools.capability as a
+    # derived CodeUnit node (code is derived from src/ + tools/, not docs/code overlays):
     (tmp_path / "tools" / "capability").mkdir(parents=True)
+    (tmp_path / "tools" / "capability" / "__init__.py").write_text("", encoding="utf-8")
     t = tmp_path / "tests" / "capability"
     t.mkdir(parents=True)
     (t / "test_check.py").write_text("def test_a():\n    pass\n", encoding="utf-8")

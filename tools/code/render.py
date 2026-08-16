@@ -6,17 +6,15 @@ from tools.code.reader import CodeUnit
 
 
 def render_index(units: List[CodeUnit]) -> str:
-    by_role: dict = {}
-    for u in units:
-        by_role.setdefault(u.role or "(unclassified)", []).append(u)
-    lines = ["# Code map", "", "See `pipeline.md` for the dependency graph.", ""]
-    for role in sorted(by_role):
-        lines.append(f"## {role}")
-        lines.append("")
-        lines.append("| unit | io | depends_on |")
-        lines.append("| --- | --- | --- |")
-        for u in sorted(by_role[role], key=lambda u: u.unit):
-            lines.append(f"| {u.unit} | {', '.join(u.io)} | {', '.join(u.depends_on)} |")
+    lines = ["# Code map", "",
+             "Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.", ""]
+    for level in ("package", "module"):
+        rows = sorted((u for u in units if u.level == level), key=lambda u: u.unit)
+        if not rows:
+            continue
+        lines += [f"## {level.capitalize()}s", "", "| unit | depends_on |", "| --- | --- |"]
+        for u in rows:
+            lines.append(f"| {u.unit} | {', '.join(u.depends_on)} |")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -24,9 +22,7 @@ def render_index(units: List[CodeUnit]) -> str:
 def render_pipeline(units: List[CodeUnit]) -> str:
     lines = ["# Dependency / pipeline map", "", "```mermaid", "graph LR"]
     for u in sorted(units, key=lambda u: u.unit):
-        if not u.depends_on:
-            lines.append(f"    {u.unit}")
-        for dep in u.depends_on:
+        for dep in u.depends_on:                         # modules only carry deps
             lines.append(f"    {u.unit} --> {dep}")
     lines.append("```")
     return "\n".join(lines) + "\n"

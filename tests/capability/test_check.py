@@ -18,16 +18,23 @@ def test_links_flag_unknown_unit():
     assert "not_a_unit" in msgs
 
 
-def test_coverage_flags_unclaimed_pipeline_unit_but_not_infra():
-    nodes = [NS(unit="lens", role="pipeline-layer"), NS(unit="utils", role="infrastructure")]
-    caps = [_cap("x", impl=["ingestion"])]  # claims neither
+def test_coverage_flags_unclaimed_src_package_but_not_infra():
+    nodes = [NS(unit="lens", level="package"), NS(unit="utils", level="package")]
+    caps = [_cap("x", impl=["ingestion"])]              # claims neither
     msgs = " ".join(f.message for f in check_coverage(caps, nodes))
-    assert "lens" in msgs and "utils" not in msgs  # infra advisory, not flagged
+    assert "lens" in msgs and "utils" not in msgs       # utils is infrastructure (_INFRA_PACKAGES)
 
 
-def test_coverage_parent_package_covers_key_module():
-    nodes = [NS(unit="lens.engine", role="pipeline-layer")]
-    caps = [_cap("x", impl=["lens"])]  # claims the package → covers the module
+def test_coverage_package_covered_by_a_module_claim():
+    nodes = [NS(unit="lens", level="package")]
+    caps = [_cap("x", impl=["lens.engine"])]            # a module under lens covers the package
+    assert check_coverage(caps, nodes) == []
+
+
+def test_coverage_ignores_modules_and_subpackages():
+    nodes = [NS(unit="lens.engine", level="module"), NS(unit="api.routers", level="package")]
+    caps = []                                           # nothing claimed
+    # modules and sub-packages are never flagged directly — they inherit the top-level package
     assert check_coverage(caps, nodes) == []
 
 
@@ -59,8 +66,8 @@ def test_classification_flags_primary_missing_category():
     assert "category" in msgs
 
 
-def test_coverage_now_flags_unclaimed_tooling():
-    nodes = [NS(unit="tools.adr", role="tooling"), NS(unit="utils", role="infrastructure")]
+def test_coverage_flags_unclaimed_tooling_package():
+    nodes = [NS(unit="tools.adr", level="package"), NS(unit="utils", level="package")]
     caps = [_cap("x", impl=["tools.code"])]
     msgs = " ".join(f.message for f in check_coverage(caps, nodes))
-    assert "tools.adr" in msgs and "utils" not in msgs  # tooling mandatory; infra still advisory
+    assert "tools.adr" in msgs and "utils" not in msgs  # tooling mandatory; infra advisory

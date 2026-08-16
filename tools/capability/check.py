@@ -5,10 +5,16 @@ import os
 from dataclasses import dataclass
 from typing import List
 
-from tools.capability.reader import CATEGORIES, code_nodes, load_capabilities, real_code_units
+from tools.capability.reader import CATEGORIES, load_capabilities, real_code_units
+from tools.code.reader import load_units
 from tools.capability.render import render_index
 
-_MANDATORY_ROLES = ("pipeline-layer", "surface", "tooling")
+# Top-level src packages that are infrastructure / model / agent — not expected to trace to a
+# capability. The source-derived replacement for the retired per-unit `role` exclusion; add a
+# package here (or give it a capability) when the coverage check flags a new infra area.
+_INFRA_PACKAGES = frozenset({
+    "agents", "models", "events", "persistence", "utils", "io", "commands",
+})
 _VALID_KINDS = ("primary", "child", "variant")
 
 
@@ -27,18 +33,28 @@ def check_links(caps, valid_units) -> List[Finding]:
     return findings
 
 
-def check_coverage(caps, nodes) -> List[Finding]:
+def check_coverage(caps, units) -> List[Finding]:
+    """A product/tooling package that no capability claims. Mandatory scope = every top-level
+    tools.* package and every top-level src package except infrastructure (_INFRA_PACKAGES).
+    A package is covered if it, or any module/sub-package under it, is implemented_by a capability."""
     claimed = set()
     for c in caps:
         claimed.update(c.implemented_by)
     findings: List[Finding] = []
-    for n in nodes:
-        if n.role not in _MANDATORY_ROLES:
-            continue  # infrastructure/model/agent — advisory, never flagged
-        parent_pkg = n.unit.split(".")[0]
-        if n.unit not in claimed and parent_pkg not in claimed:
-            findings.append(Finding(
-                f"capability: code unit {n.unit} ({n.role}) is claimed by no capability"))
+    for u in units:
+        if u.level != "package":
+            continue
+        is_tool = u.unit.startswith("tools.")
+        segs = u.unit.count(".")
+        if is_tool and segs != 1:
+            continue                              # only top-level tools.<name> packages
+        if not is_tool and segs != 0:
+            continue                              # only top-level src packages
+        if not is_tool and u.unit in _INFRA_PACKAGES:
+            continue                              # infrastructure — not expected to trace to a capability
+        covered = u.unit in claimed or any(t.startswith(u.unit + ".") for t in claimed)
+        if not covered:
+            findings.append(Finding(f"capability: package {u.unit} is claimed by no capability"))
     return findings
 
 
@@ -74,7 +90,7 @@ def run_all(root: str = ".") -> List[Finding]:
     caps = load_capabilities(root)
     findings: List[Finding] = []
     findings += check_links(caps, real_code_units(root))
-    findings += check_coverage(caps, code_nodes(root))
+    findings += check_coverage(caps, load_units(root))
     findings += check_classification(caps)
     findings += check_index_sync(os.path.join(root, "docs/capabilities/index.md"), caps)
     return findings
