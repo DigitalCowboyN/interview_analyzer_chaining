@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import os
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from tools.graph.reader import Edge, harvest
+from tools.graph.registry import NODE_DOMAINS
+from tools.capability.reader import load_capabilities
+from tools.usecase.reader import load_use_cases
+from tools.code.reader import load_units
+from tools.adr.index import load_bundle
+from tools.testmap.reader import load_tests
 
 
 @dataclass
@@ -27,6 +34,42 @@ def _adjacency(edges: List[Edge]):
         out[e.src].append((e.dst, e))
         inc[e.dst].append((e.src, e))
     return out, inc
+
+
+# slug -> node type name (inverse of NODE_DOMAINS)
+_SLUG_TYPE = {slug: t for t, slug in NODE_DOMAINS.items()}
+
+# node type -> (loader(root)->objs, id attribute, body function(obj)->str)
+_CONTEXT = {
+    "Capability": (load_capabilities, "slug", lambda o: o.statement),
+    "UseCase": (load_use_cases, "slug", lambda o: o.statement),
+    "CodeUnit": (load_units, "unit", lambda o: o.description),
+    "ADR": (lambda root: load_bundle(os.path.join(root, "docs/adr")), "id",
+            lambda o: f"{o.title}\n{o.body}"),
+    "Test": (load_tests, "slug",
+             lambda o: f"{o.slug} ({o.test_type}) verifies {o.target or o.verifies}"),
+}
+
+
+def resolve_context(addresses, root: str = "."):
+    """address -> (type, context body). Loads each needed type's objects once."""
+    want = defaultdict(set)                     # type -> {id}
+    for a in addresses:
+        slug, _, nid = a.partition(":")
+        t = _SLUG_TYPE.get(slug)
+        if t:
+            want[t].add(nid)
+    out = {}
+    for t, ids in want.items():
+        spec = _CONTEXT.get(t)
+        if not spec:
+            continue
+        load, idattr, body = spec
+        by_id = {str(getattr(o, idattr)): o for o in load(root)}
+        for nid in ids:
+            o = by_id.get(nid)
+            out[f"{NODE_DOMAINS[t]}:{nid}"] = (t, (body(o) or "").strip() if o else "")
+    return out
 
 
 def walk(entry, direction: str = "both", depth: Optional[int] = None, root: str = ".") -> Subgraph:
@@ -65,4 +108,9 @@ def walk(entry, direction: str = "both", depth: Optional[int] = None, root: str 
 
     # induced edges: only those whose BOTH endpoints are in the visited set
     induced = [e for e in used_edges if e.src in visited and e.dst in visited]
-    return Subgraph(nodes={a: Node(address=a, type="") for a in visited}, edges=induced)
+    ctx = resolve_context(visited, root)
+    nodes = {}
+    for a in visited:
+        t, body = ctx.get(a, ("", ""))
+        nodes[a] = Node(address=a, type=t, context=body)
+    return Subgraph(nodes=nodes, edges=induced)
