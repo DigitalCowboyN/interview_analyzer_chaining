@@ -99,6 +99,7 @@ graph LR
     tools.capability --> tools.code
     tools.cli
     tools.code --> ingestion
+    tools.corpus --> ingestion
     tools.glossary --> ingestion
     tools.graph --> tools.adr
     tools.graph --> tools.capability

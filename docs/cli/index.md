@@ -18,6 +18,7 @@
 | cli-index | everyday | Regenerate docs/cli/index.md (the CLI catalog) |
 | code-check | everyday | Reconcile the code map vs the import graph (non-blocking) |
 | code-index | everyday | Regenerate docs/code/index.md + pipeline.md (code map) |
+| corpus-check | everyday | Reconcile the OKF corpus: every record discoverable by type, none misfiled (non-blocking) |
 | coverage | internal | Coverage report (terminal) |
 | coverage-html | internal | Coverage report (HTML) |
 | coverage-xml | internal | Coverage report (XML, for CI) |
@@ -103,6 +104,7 @@
 | python -m tools.capability |  |
 | python -m tools.cli |  |
 | python -m tools.code |  |
+| python -m tools.corpus |  |
 | python -m tools.glossary |  |
 | python -m tools.graph |  |
 | python -m tools.graphq |  |

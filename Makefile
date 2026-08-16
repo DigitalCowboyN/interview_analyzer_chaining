@@ -92,7 +92,7 @@ graph-check: ## Reconcile the edge graph vs its sources (non-blocking)
 
 .PHONY: health
 health: ## Run every domain check + the cross-domain graph check (full sweep)
-	@for d in adr cli api glossary prompts graphq code capability knowledge graph usecase testmap; do $(PYTHON) -m tools.$$d check || true; done
+	@for d in adr cli api glossary prompts graphq code capability knowledge graph usecase testmap corpus; do $(PYTHON) -m tools.$$d check || true; done
 
 .PHONY: regen-derived
 regen-derived: ## Regenerate the source-derived indexes (env-independent; the CI freshness gate's set)
@@ -106,6 +106,10 @@ regen-all: ## Regenerate every generated index/doc (regen-derived + the app-deri
 .PHONY: knowledge-check
 knowledge-check: ## Reconcile specs/plans + cascade root vs the knowledge domains (non-blocking)
 	@$(PYTHON) -m tools.knowledge check
+
+.PHONY: corpus-check
+corpus-check: ## Reconcile the OKF corpus: every record discoverable by type, none misfiled (non-blocking)
+	@$(PYTHON) -m tools.corpus check
 
 .PHONY: capability-index
 capability-index: ## Regenerate docs/capabilities/index.md (the capability catalogue)

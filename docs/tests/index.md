@@ -57,6 +57,9 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `code.test_render` (2) → tools.code  ·  verifies: —
 - `commands.test_command_handlers` (3) → commands  ·  verifies: —
 - `commands.test_command_handlers_unit` (22) → commands  ·  verifies: —
+- `corpus.test_check` (2) → tools.corpus  ·  verifies: —
+- `corpus.test_model` (2) → tools.corpus  ·  verifies: —
+- `corpus.test_reader` (3) → tools.corpus  ·  verifies: —
 - `enrichment.test_embedder` (7) → enrichment  ·  verifies: —
 - `enrichment.test_executor` (11) → enrichment  ·  verifies: —
 - `enrichment.test_final_review_fixes` (7) → enrichment  ·  verifies: —
@@ -244,6 +247,7 @@ Capabilities:
 - correct-resolution: VERIFIED
 - correct-the-analysis: VERIFIED
 - disclose-knowledge-and-check-specs: VERIFIED
+- discover-the-corpus: VERIFIED
 - edit-text: VERIFIED
 - embed-fragments: VERIFIED
 - enrich-fragments: PARTIALLY_VERIFIED
