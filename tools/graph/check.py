@@ -109,6 +109,9 @@ def run_all(root: str = ".") -> List[Finding]:
     index_path = os.path.join(root, "docs/graph/index.md")
     graph_path = os.path.join(root, "docs/graph/graph.md")
     findings += check_index_sync(index_path, graph_path, edges, node_ids)
-    findings += check_reachability(root)
+    try:
+        findings += check_reachability(root)   # re-harvests via walk() — guard it too
+    except Exception as exc:  # non-blocking: reachability must never raise out
+        findings.append(Finding(f"graph: reachability check failed: {exc}"))
 
     return findings
