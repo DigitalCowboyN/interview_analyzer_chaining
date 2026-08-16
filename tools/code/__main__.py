@@ -6,12 +6,13 @@ import sys
 
 from tools.code.check import run_all
 from tools.code.reader import load_units
-from tools.code.render import render_index, render_pipeline
+from tools.code.render import render_docstring_backlog, render_index, render_pipeline
 from tools.graph.classify import derive_axes
 
 CODE_DIR = "docs/code"
 INDEX = f"{CODE_DIR}/index.md"
 PIPELINE = f"{CODE_DIR}/pipeline.md"
+BACKLOG = f"{CODE_DIR}/docstring-backlog.md"
 
 
 def cmd_index(args) -> int:
@@ -21,7 +22,9 @@ def cmd_index(args) -> int:
         fh.write(render_index(units, derive_axes()))
     with open(PIPELINE, "w", encoding="utf-8") as fh:
         fh.write(render_pipeline(units))
-    print(f"wrote {INDEX} + {PIPELINE}")
+    with open(BACKLOG, "w", encoding="utf-8") as fh:
+        fh.write(render_docstring_backlog(units))
+    print(f"wrote {INDEX} + {PIPELINE} + {BACKLOG}")
     return 0
 
 

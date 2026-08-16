@@ -999,6 +999,19 @@ git commit -m "docs(adr): code map derived from source, hierarchically; overlay 
 
 - [ ] **Step 5: Final whole-branch review.** Dispatch the code-reviewer subagent (superpowers:requesting-code-review) on the most capable model, with a review package for the full branch (`scripts/review-package "$(git merge-base main HEAD)" HEAD`). Then use **superpowers:finishing-a-development-branch**.
 
+### Task 6: Docstring-coverage backlog catalog (owner-requested follow-up)
+
+Turn `check_missing_docstring`'s wall of warnings into a burn-down worklist.
+
+**Files:** `tools/code/render.py` (`render_docstring_backlog`), `tools/code/__main__.py` (write
+`docs/code/docstring-backlog.md` in `cmd_index`), test in `tests/code/test_render.py`.
+
+- `render_docstring_backlog(units)` lists modules with no docstring, grouped by package, as
+  `- [ ]` checkboxes with a remaining count; top-level modules under `## (top-level)`.
+- `cmd_index` writes `docs/code/docstring-backlog.md` alongside index/pipeline — so `make
+  code-index` (and thus `regen-derived`) refreshes it and the freshness gate keeps it current.
+- Add a docstring → regen → the module drops off; when empty, `check_missing_docstring` goes silent.
+
 ## After all tasks
 
 - `make test-unit` green; `make regen-derived && git diff --exit-code` clean.

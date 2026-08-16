@@ -29,3 +29,26 @@ def render_pipeline(units: List[CodeUnit]) -> str:
             lines.append(f"    {u.unit} --> {dep}")
     lines.append("```")
     return "\n".join(lines) + "\n"
+
+
+def render_docstring_backlog(units: List[CodeUnit]) -> str:
+    """A burn-down worklist of modules missing a docstring (no derivable context), grouped by
+    package. Add a docstring, regenerate, and the module drops off the list; when empty, the
+    `check_missing_docstring` signal goes silent."""
+    missing = sorted((u for u in units if u.level == "module" and not u.description),
+                     key=lambda u: u.unit)
+    lines = ["# Docstring backlog", "",
+             "Modules with no module-level docstring — no derivable context. Burn this down: add a",
+             "docstring, run `make code-index`, and the module drops off this list.", "",
+             f"**{len(missing)} module(s)** remaining.", ""]
+    groups: dict = {}
+    for u in missing:
+        pkg = u.unit.rsplit(".", 1)[0] if "." in u.unit else "(top-level)"
+        groups.setdefault(pkg, []).append(u.unit)
+    for pkg in sorted(groups):
+        lines.append(f"## {pkg}")
+        lines.append("")
+        for uid in groups[pkg]:
+            lines.append(f"- [ ] {uid}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
