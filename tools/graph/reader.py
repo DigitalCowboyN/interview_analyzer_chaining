@@ -11,6 +11,7 @@ from tools.code.reader import dep_edges, load_units
 from tools.adr.index import load_bundle
 from tools.usecase.reader import load_use_cases
 from tools.testmap.reader import load_tests, verifies_edges
+from tools.glossary.model import load_glossary
 
 
 @dataclass
@@ -32,6 +33,7 @@ _ADAPTERS = {
     "ADR": (lambda root: load_bundle(os.path.join(root, "docs/adr")), "id"),
     "UseCase": (load_use_cases, "slug"),
     "Test": (load_tests, "slug"),
+    "GlossaryTerm": (lambda root: load_glossary(os.path.join(root, "docs/glossary")), "term"),
 }
 
 
@@ -55,6 +57,16 @@ def _units_under(path: str, code_ids: Set[str]) -> Set[str]:
     return {u for u in code_ids if _unit_dir(u).startswith(p)}
 
 
+def _unit_of_file(path: str, code_ids: Set[str]) -> List[str]:
+    """The top-level code unit that owns a src/tools file path (src/events/x.py -> 'events')."""
+    p = (path or "").replace("\\", "/")
+    parts = p.split("/")
+    if len(parts) >= 2 and parts[0] in ("src", "tools"):
+        unit = parts[1] if parts[0] == "src" else f"tools.{parts[1]}"
+        return [unit] if unit in code_ids else []
+    return []
+
+
 def _authored(edge: EdgeType, root: str, node_ids: Dict[str, Set[str]]) -> List[Edge]:
     load, idattr = _ADAPTERS[edge.from_type]
     out: List[Edge] = []
@@ -66,6 +78,8 @@ def _authored(edge: EdgeType, root: str, node_ids: Dict[str, Set[str]]) -> List[
         for t in targets:
             if edge.resolve == "path":
                 dsts = _units_under(str(t), node_ids[edge.to_type])
+            elif edge.resolve == "file":
+                dsts = _unit_of_file(str(t), node_ids[edge.to_type])
             else:
                 dsts = [str(t)]                        # kept even if unresolved — the guard flags it
             for d in dsts:

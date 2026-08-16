@@ -13,6 +13,7 @@ from tools.usecase.reader import load_use_cases
 from tools.code.reader import load_units
 from tools.adr.index import load_bundle
 from tools.testmap.reader import load_tests
+from tools.glossary.model import load_glossary
 
 
 @dataclass
@@ -49,6 +50,8 @@ _CONTEXT = {
             lambda o: f"{o.title}\n{o.body}"),
     "Test": (load_tests, "slug",
              lambda o: f"{o.slug} ({o.test_type}) verifies {o.target or o.verifies}"),
+    "GlossaryTerm": (lambda root: load_glossary(os.path.join(root, "docs/glossary")), "term",
+                     lambda o: o.definition),
 }
 
 

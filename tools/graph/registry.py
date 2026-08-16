@@ -31,7 +31,8 @@ NODE_DOMAINS = {
     "ADR": "adr",
     "UseCase": "use-cases",
     "Test": "tests",
-    # reserved: GlossaryTerm→glossary, Prompt→prompts, GraphQuery→graph-queries,
+    "GlossaryTerm": "glossary",
+    # reserved: Prompt→prompts, GraphQuery→graph-queries,
     # Spec→spec
 }
 
@@ -61,4 +62,7 @@ EDGES: List[EdgeType] = [
              field="verifies_edges", resolve="id",
              properties=[PropSpec("test_type", enum=["unit", "integration", "e2e"])],
              description="A test proves a code unit works, or an acceptance test proves an intent."),
+    EdgeType("defined_in", "defines", "GlossaryTerm", "CodeUnit", "authored",
+             field="source", resolve="file",
+             description="A glossary term is defined in the code unit that owns its source file."),
 ]
