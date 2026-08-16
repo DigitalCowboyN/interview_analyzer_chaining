@@ -59,7 +59,7 @@ def _fixture(tmp):
     _w(str(tmp / "src/api/main.py"), "from src.api.routers import segments\n")
     _w(str(tmp / "src/api/routers/__init__.py"))
     _w(str(tmp / "src/api/routers/segments.py"),
-       '"""Segment routes."""\nfrom src.events import store\n')
+       '"""Segment routes."""\nfrom src.events.store import thing\n')
     _w(str(tmp / "src/events/__init__.py"))
     _w(str(tmp / "src/events/store.py"), "x = 1\n")
     _w(str(tmp / "src/config.py"), '"""Settings."""\n')

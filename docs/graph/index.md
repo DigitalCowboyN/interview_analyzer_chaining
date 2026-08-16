@@ -10,7 +10,7 @@
 | governs | governed_by | ADR → CodeUnit | authored | — | 24 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 52 |
-| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 205 |
+| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 206 |
 | defined_in | defines | GlossaryTerm → CodeUnit | authored | — | 110 |
 | consumed_by | consumes | GraphQuery → CodeUnit | derived | — | 61 |
 | consumed_by | consumes | Prompt → CodeUnit | derived | — | 61 |
@@ -23,7 +23,7 @@
 - GlossaryTerm: 111
 - GraphQuery: 33
 - Prompt: 28
-- Test: 205
+- Test: 206
 - UseCase: 20
 
 ## Meta-schema
