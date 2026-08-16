@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from tools.graph.reader import Edge, harvest
+from tools.graph.reader import nodes as _all_nodes, _unit_dir
 from tools.graph.registry import NODE_DOMAINS
 from tools.capability.reader import load_capabilities
 from tools.usecase.reader import load_use_cases
@@ -72,13 +73,28 @@ def resolve_context(addresses, root: str = "."):
     return out
 
 
+def _entry_addresses(entry: str, root: str = ".") -> List[str]:
+    if entry.startswith("type:"):
+        t = entry[len("type:"):]
+        ids = _all_nodes(root).get(t, set())
+        slug = NODE_DOMAINS.get(t)
+        return sorted(f"{slug}:{i}" for i in ids) if slug else []
+    if entry.startswith("under:"):
+        path = entry[len("under:"):]
+        p = path if path.endswith("/") else path + "/"
+        return sorted(f"code:{u}" for u in _all_nodes(root).get("CodeUnit", set())
+                      if _unit_dir(u).startswith(p))
+    return [entry]
+
+
 def walk(entry, direction: str = "both", depth: Optional[int] = None, root: str = ".") -> Subgraph:
-    """Materialize the subgraph reachable from `entry` — a node address (selectors: Task 3) —
-    following edges `out` | `in` | `both`, to `depth` hops (None = to exhaustion). Rebuilt from
-    source each call (harvest())."""
+    """Materialize the subgraph reachable from `entry` — a node address, or a selector
+    (`type:<T>` / `under:<path>`) resolved by `_entry_addresses` — following edges
+    `out` | `in` | `both`, to `depth` hops (None = to exhaustion). Rebuilt from source
+    each call (harvest())."""
     edges = harvest(root)
     out, inc = _adjacency(edges)
-    starts = [entry] if isinstance(entry, str) else list(entry)
+    starts = _entry_addresses(entry, root) if isinstance(entry, str) else list(entry)
 
     visited = set(starts)
     frontier = deque((s, 0) for s in starts)
