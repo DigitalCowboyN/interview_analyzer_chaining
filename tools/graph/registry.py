@@ -32,8 +32,9 @@ NODE_DOMAINS = {
     "UseCase": "use-cases",
     "Test": "tests",
     "GlossaryTerm": "glossary",
-    # reserved: Prompt→prompts, GraphQuery→graph-queries,
-    # Spec→spec
+    "GraphQuery": "graph-queries",
+    "Prompt": "prompts",
+    # reserved: Spec→spec
 }
 
 # The extensible edge registry. Adding an authored edge on existing node types is a
@@ -65,4 +66,10 @@ EDGES: List[EdgeType] = [
     EdgeType("defined_in", "defines", "GlossaryTerm", "CodeUnit", "authored",
              field="source", resolve="file",
              description="A glossary term is defined in the code unit that owns its source file."),
+    EdgeType("consumed_by", "consumes", "GraphQuery", "CodeUnit", "derived",
+             field="gq_consumed_by", resolve="id",
+             description="A graph query is consumed by the code units that call it."),
+    EdgeType("consumed_by", "consumes", "Prompt", "CodeUnit", "derived",
+             field="prompt_consumed_by", resolve="id",
+             description="A prompt is consumed by the code units that use it."),
 ]

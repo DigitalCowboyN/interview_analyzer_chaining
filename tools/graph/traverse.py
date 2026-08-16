@@ -14,6 +14,8 @@ from tools.code.reader import load_units
 from tools.adr.index import load_bundle
 from tools.testmap.reader import load_tests
 from tools.glossary.model import load_glossary
+from tools.graphq.reader import load_queries
+from tools.prompts.reader import load_prompt_entries
 
 
 @dataclass
@@ -52,6 +54,10 @@ _CONTEXT = {
              lambda o: f"{o.slug} ({o.test_type}) verifies {o.target or o.verifies}"),
     "GlossaryTerm": (lambda root: load_glossary(os.path.join(root, "docs/glossary")), "term",
                      lambda o: o.definition),
+    "GraphQuery": (load_queries, "name",
+                   lambda o: f"{o.purpose or ''} returns={o.returns} labels={o.labels}".strip()),
+    "Prompt": (load_prompt_entries, "key",
+               lambda o: f"used_for={o.used_for} audience={o.audience}"),
 }
 
 

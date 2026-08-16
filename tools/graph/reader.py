@@ -12,6 +12,8 @@ from tools.adr.index import load_bundle
 from tools.usecase.reader import load_use_cases
 from tools.testmap.reader import load_tests, verifies_edges
 from tools.glossary.model import load_glossary
+from tools.graphq.reader import load_queries
+from tools.prompts.reader import load_prompt_entries
 
 
 @dataclass
@@ -34,6 +36,8 @@ _ADAPTERS = {
     "UseCase": (load_use_cases, "slug"),
     "Test": (load_tests, "slug"),
     "GlossaryTerm": (lambda root: load_glossary(os.path.join(root, "docs/glossary")), "term"),
+    "GraphQuery": (load_queries, "name"),
+    "Prompt": (load_prompt_entries, "key"),
 }
 
 
@@ -97,7 +101,23 @@ def _derived_verifies(edge: EdgeType, root: str) -> List[Edge]:
             for src, dst, tt in verifies_edges(root)]
 
 
-_DERIVED = {"dep_edges": _derived_deps, "verifies_edges": _derived_verifies}
+def _derived_consumers(from_type, id_attr, load):
+    def build(edge: EdgeType, root: str) -> List[Edge]:
+        out: List[Edge] = []
+        for o in load(root):
+            src = _addr(from_type, getattr(o, id_attr))
+            for c in getattr(o, "consumers", []):
+                out.append(Edge(edge.name, src, _addr("CodeUnit", c)))
+        return out
+    return build
+
+
+_DERIVED = {
+    "dep_edges": _derived_deps,
+    "verifies_edges": _derived_verifies,
+    "gq_consumed_by": _derived_consumers("GraphQuery", "name", load_queries),
+    "prompt_consumed_by": _derived_consumers("Prompt", "key", load_prompt_entries),
+}
 
 
 def harvest(root: str = ".", edges: List[EdgeType] = EDGES) -> List[Edge]:
