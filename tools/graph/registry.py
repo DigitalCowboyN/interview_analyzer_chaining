@@ -31,8 +31,10 @@ NODE_DOMAINS = {
     "ADR": "adr",
     "UseCase": "use-cases",
     "Test": "tests",
-    # reserved: GlossaryTerm→glossary, Prompt→prompts, GraphQuery→graph-queries,
-    # Spec→spec
+    "GlossaryTerm": "glossary",
+    "GraphQuery": "graph-queries",
+    "Prompt": "prompts",
+    # reserved: Spec→spec
 }
 
 # The extensible edge registry. Adding an authored edge on existing node types is a
@@ -61,4 +63,13 @@ EDGES: List[EdgeType] = [
              field="verifies_edges", resolve="id",
              properties=[PropSpec("test_type", enum=["unit", "integration", "e2e"])],
              description="A test proves a code unit works, or an acceptance test proves an intent."),
+    EdgeType("defined_in", "defines", "GlossaryTerm", "CodeUnit", "authored",
+             field="source", resolve="file",
+             description="A glossary term is defined in the code unit that owns its source file."),
+    EdgeType("consumed_by", "consumes", "GraphQuery", "CodeUnit", "derived",
+             field="gq_consumed_by", resolve="id",
+             description="A graph query is consumed by the code units that call it."),
+    EdgeType("consumed_by", "consumes", "Prompt", "CodeUnit", "derived",
+             field="prompt_consumed_by", resolve="id",
+             description="A prompt is consumed by the code units that use it."),
 ]

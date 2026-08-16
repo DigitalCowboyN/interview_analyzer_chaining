@@ -97,11 +97,17 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `glossary.test_render` (1) → tools.glossary  ·  verifies: —
 - `graph.test_check` (4) → tools.graph  ·  verifies: —
 - `graph.test_cli` (3) → tools.graph  ·  verifies: —
+- `graph.test_nodeset_glossary` (2) → tools.graph  ·  verifies: —
+- `graph.test_nodeset_query_prompt` (2) → tools.graph  ·  verifies: —
 - `graph.test_reader` (5) → tools.graph  ·  verifies: —
 - `graph.test_registry` (2) → tools.graph  ·  verifies: —
 - `graph.test_render` (2) → tools.graph  ·  verifies: —
+- `graph.test_traverse` (5) → tools.graph  ·  verifies: —
+- `graph.test_traverse_context` (1) → tools.graph  ·  verifies: —
+- `graph.test_traverse_selectors` (3) → tools.graph  ·  verifies: —
 - `graph.test_usecase_edge` (2) → tools.graph  ·  verifies: —
 - `graph.test_verifies_edge` (2) → tools.graph  ·  verifies: —
+- `graph.test_walk_cli` (1) → tools.graph  ·  verifies: —
 - `graphq.test_check` (3) → tools.graphq  ·  verifies: —
 - `graphq.test_cli` (1) → tools.graphq  ·  verifies: —
 - `graphq.test_reader` (3) → tools.graphq  ·  verifies: —

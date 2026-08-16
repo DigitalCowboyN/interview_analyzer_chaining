@@ -51,6 +51,21 @@ def cmd_neighbors(args) -> int:
     return 0
 
 
+def cmd_walk(args) -> int:
+    from tools.graph.traverse import walk
+    depth = None if args.depth == "full" else int(args.depth)
+    sg = walk(args.entry, direction=args.dir, depth=depth)
+    print(f"subgraph from {args.entry} (dir={args.dir}, depth={args.depth}): "
+          f"{len(sg.nodes)} nodes, {len(sg.edges)} edges")
+    for addr in sorted(sg.nodes):
+        n = sg.nodes[addr]
+        head = n.context.splitlines()[0] if n.context else ""
+        print(f"  {addr}  [{n.type}]  {head[:80]}")
+    for e in sg.edges:
+        print(f"    {e.src} --{e.type}--> {e.dst}")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="tools.graph")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -58,8 +73,17 @@ def main(argv=None) -> int:
     sub.add_parser("check")
     neighbors_parser = sub.add_parser("neighbors")
     neighbors_parser.add_argument("address")
+    wp = sub.add_parser("walk")
+    wp.add_argument("entry")
+    wp.add_argument("--dir", default="both", choices=["out", "in", "both"])
+    wp.add_argument("--depth", default="full")
     args = parser.parse_args(argv)
-    return {"index": cmd_index, "check": cmd_check, "neighbors": cmd_neighbors}[args.cmd](args)
+    return {
+        "index": cmd_index,
+        "check": cmd_check,
+        "neighbors": cmd_neighbors,
+        "walk": cmd_walk,
+    }[args.cmd](args)
 
 
 if __name__ == "__main__":

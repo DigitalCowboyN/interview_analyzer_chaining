@@ -11,6 +11,9 @@ from tools.code.reader import dep_edges, load_units
 from tools.adr.index import load_bundle
 from tools.usecase.reader import load_use_cases
 from tools.testmap.reader import load_tests, verifies_edges
+from tools.glossary.model import load_glossary
+from tools.graphq.reader import load_queries
+from tools.prompts.reader import load_prompt_entries
 
 
 @dataclass
@@ -32,6 +35,9 @@ _ADAPTERS = {
     "ADR": (lambda root: load_bundle(os.path.join(root, "docs/adr")), "id"),
     "UseCase": (load_use_cases, "slug"),
     "Test": (load_tests, "slug"),
+    "GlossaryTerm": (lambda root: load_glossary(os.path.join(root, "docs/glossary")), "term"),
+    "GraphQuery": (load_queries, "graph_id"),
+    "Prompt": (load_prompt_entries, "graph_id"),
 }
 
 
@@ -55,6 +61,16 @@ def _units_under(path: str, code_ids: Set[str]) -> Set[str]:
     return {u for u in code_ids if _unit_dir(u).startswith(p)}
 
 
+def _unit_of_file(path: str, code_ids: Set[str]) -> List[str]:
+    """The top-level code unit that owns a src/tools file path (src/events/x.py -> 'events')."""
+    p = (path or "").replace("\\", "/")
+    parts = p.split("/")
+    if len(parts) >= 2 and parts[0] in ("src", "tools"):
+        unit = parts[1] if parts[0] == "src" else f"tools.{parts[1]}"
+        return [unit] if unit in code_ids else []
+    return []
+
+
 def _authored(edge: EdgeType, root: str, node_ids: Dict[str, Set[str]]) -> List[Edge]:
     load, idattr = _ADAPTERS[edge.from_type]
     out: List[Edge] = []
@@ -66,6 +82,8 @@ def _authored(edge: EdgeType, root: str, node_ids: Dict[str, Set[str]]) -> List[
         for t in targets:
             if edge.resolve == "path":
                 dsts = _units_under(str(t), node_ids[edge.to_type])
+            elif edge.resolve == "file":
+                dsts = _unit_of_file(str(t), node_ids[edge.to_type])
             else:
                 dsts = [str(t)]                        # kept even if unresolved — the guard flags it
             for d in dsts:
@@ -83,7 +101,23 @@ def _derived_verifies(edge: EdgeType, root: str) -> List[Edge]:
             for src, dst, tt in verifies_edges(root)]
 
 
-_DERIVED = {"dep_edges": _derived_deps, "verifies_edges": _derived_verifies}
+def _derived_consumers(from_type, id_attr, load):
+    def build(edge: EdgeType, root: str) -> List[Edge]:
+        out: List[Edge] = []
+        for o in load(root):
+            src = _addr(from_type, getattr(o, id_attr))
+            for c in getattr(o, "consumers", []):
+                out.append(Edge(edge.name, src, _addr("CodeUnit", c)))
+        return out
+    return build
+
+
+_DERIVED = {
+    "dep_edges": _derived_deps,
+    "verifies_edges": _derived_verifies,
+    "gq_consumed_by": _derived_consumers("GraphQuery", "graph_id", load_queries),
+    "prompt_consumed_by": _derived_consumers("Prompt", "graph_id", load_prompt_entries),
+}
 
 
 def harvest(root: str = ".", edges: List[EdgeType] = EDGES) -> List[Edge]:
