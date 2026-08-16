@@ -1,0 +1,19 @@
+{
+  "id": "explore-tools-graph",
+  "category": "exploration",
+  "task": "What does the tools.graph package and each of its modules do?",
+  "entry": ["code:tools.graph"],
+  "direction": "out",
+  "depth": 1,
+  "gold_context": [
+    "code:tools.graph.__main__",
+    "code:tools.graph.check",
+    "code:tools.graph.classify",
+    "code:tools.graph.reader",
+    "code:tools.graph.registry",
+    "code:tools.graph.render",
+    "code:tools.graph.traverse"
+  ],
+  "gold_answer": "tools.graph builds and serves the cross-domain knowledge graph: registry (node/edge types), reader (harvest nodes+edges), traverse (walk), render (catalogs/mermaid), check (non-blocking guards), classify (derived category/determinism axes), __main__ (CLI).",
+  "source": "manual — package module listing"
+}

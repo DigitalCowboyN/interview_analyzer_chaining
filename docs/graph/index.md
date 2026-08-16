@@ -24,7 +24,7 @@
 - GlossaryTerm: 111
 - GraphQuery: 33
 - Prompt: 28
-- Test: 206
+- Test: 207
 - UseCase: 20
 
 ## Meta-schema

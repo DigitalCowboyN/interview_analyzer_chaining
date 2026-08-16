@@ -148,7 +148,6 @@ def test_gold_addresses_resolve_on_the_real_graph():
     # every entry + gold_context address must be a real node — no dangling gold
     from tools.graph.reader import nodes
     from tools.graph.registry import NODE_DOMAINS
-    slug_type = {v: k for k, v in NODE_DOMAINS.items()}
     ns = nodes(".")
     real = {f"{NODE_DOMAINS[t]}:{i}" for t, ids in ns.items() for i in ids}
     for s in load_scenarios():
