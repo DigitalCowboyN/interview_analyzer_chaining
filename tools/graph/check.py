@@ -8,6 +8,7 @@ from typing import Dict, List, Set
 from tools.graph.reader import Edge, harvest, nodes
 from tools.graph.registry import EDGES, NODE_DOMAINS, EdgeType
 from tools.graph.render import render_catalog, render_graph
+from tools.graph.traverse import walk
 
 
 @dataclass
@@ -79,6 +80,21 @@ def check_index_sync(
     return findings
 
 
+def check_reachability(root: str = ".") -> List[Finding]:
+    """Code the graph cannot explain: a CodeUnit reached by no Capability / UseCase / ADR.
+
+    One multi-start walk outward from every "why" node; anything not in the reached set has no
+    path from an intent, a use-case, or a decision (nor is a dependency of anything that does)."""
+    ns = nodes(root)
+    intents = ([f"capabilities:{i}" for i in ns.get("Capability", ())]
+               + [f"use-cases:{i}" for i in ns.get("UseCase", ())]
+               + [f"adr:{i}" for i in ns.get("ADR", ())])
+    reached = set(walk(intents, direction="out", depth=None, root=root).nodes)
+    code = {f"code:{u}" for u in ns.get("CodeUnit", ())}
+    return [Finding(f"graph: code unit {a} is reached by no capability / use-case / ADR (unexplained)")
+            for a in sorted(code - reached)]
+
+
 def run_all(root: str = ".") -> List[Finding]:
     try:
         edges = harvest(root)
@@ -93,5 +109,9 @@ def run_all(root: str = ".") -> List[Finding]:
     index_path = os.path.join(root, "docs/graph/index.md")
     graph_path = os.path.join(root, "docs/graph/graph.md")
     findings += check_index_sync(index_path, graph_path, edges, node_ids)
+    try:
+        findings += check_reachability(root)   # re-harvests via walk() — guard it too
+    except Exception as exc:  # non-blocking: reachability must never raise out
+        findings.append(Finding(f"graph: reachability check failed: {exc}"))
 
     return findings
