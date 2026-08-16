@@ -33,3 +33,17 @@ def test_determinism_from_agents_dependency(tmp_path):
     axes = derive_axes(str(tmp_path))
     assert axes["ask.engine"][1] == "probabilistic"   # depends_on agents
     assert axes["events.store"][1] == "deterministic"
+
+
+def test_category_inherited_from_parent_primary(tmp_path):
+    # parent primary carries category=operations with implemented_by=[]; the CHILD does the
+    # implementing and leaves category unset — the unit must inherit the parent's category.
+    _w(str(tmp_path / "docs/capabilities/maintain-graph.md"),
+       "---\ntype: Capability\nkind: primary\ntier: core\ncategory: operations\n"
+       "implemented_by: []\n---\nMaintain the graph.\n")
+    _w(str(tmp_path / "docs/capabilities/catalog-api.md"),
+       "---\ntype: Capability\nkind: child\nparent: maintain-graph\n"
+       "implemented_by: [tools.api]\n---\nCatalog the API.\n")
+    _w(str(tmp_path / "tools/api/__init__.py"))
+    axes = derive_axes(str(tmp_path))
+    assert axes["tools.api"][0] == "operations"   # inherited from the parent primary

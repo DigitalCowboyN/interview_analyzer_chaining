@@ -21,19 +21,19 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | projections | product | deterministic |  |
 | projections.handlers |  | deterministic |  |
 | resolution | product | deterministic |  |
-| tools.adr |  | deterministic |  |
-| tools.api |  | deterministic |  |
-| tools.capability |  | deterministic |  |
-| tools.cli |  | deterministic |  |
-| tools.code |  | deterministic |  |
-| tools.corpus |  | deterministic |  |
-| tools.glossary |  | deterministic |  |
-| tools.graph |  | deterministic |  |
-| tools.graphq |  | deterministic |  |
-| tools.knowledge |  | deterministic |  |
-| tools.prompts |  | deterministic |  |
-| tools.testmap |  | deterministic |  |
-| tools.usecase |  | deterministic |  |
+| tools.adr | operations | deterministic |  |
+| tools.api | operations | deterministic |  |
+| tools.capability | operations | deterministic |  |
+| tools.cli | operations | deterministic |  |
+| tools.code | operations | deterministic |  |
+| tools.corpus | operations | deterministic |  |
+| tools.glossary | operations | deterministic |  |
+| tools.graph | operations | deterministic |  |
+| tools.graphq | operations | deterministic |  |
+| tools.knowledge | operations | deterministic |  |
+| tools.prompts | operations | deterministic |  |
+| tools.testmap | operations | deterministic |  |
+| tools.usecase | operations | deterministic |  |
 | ui | product | deterministic |  |
 | utils |  | deterministic |  |
 

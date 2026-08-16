@@ -12,15 +12,33 @@ def _id(addr: str) -> str:
     return addr.split(":", 1)[1]
 
 
+def _effective_categories(caps) -> Dict[str, str]:
+    """slug -> category, honoring the codebase convention that children inherit their parent
+    primary's category (a child leaves `category:` unset). Walk `parent` to the first defined
+    category; guard against cycles."""
+    by_slug = {c.slug: c for c in caps}
+
+    def resolve(slug: str, seen: frozenset) -> str:
+        c = by_slug.get(slug)
+        if not c or slug in seen:
+            return ""
+        if c.category:
+            return c.category
+        return resolve(c.parent, seen | {slug}) if c.parent else ""
+
+    return {c.slug: resolve(c.slug, frozenset()) for c in caps}
+
+
 def derive_axes(root: str = ".") -> Dict[str, Tuple[str, str]]:
     """code unit id -> (category, determinism), computed from the assembled cross-domain edges.
 
-    category: the category of a capability that `implements` the unit (direct only; a unit no
-              capability implements has no category — the reachability signal, not a gap).
+    category: the category of a capability that `implements` the unit (children inherit their
+              parent primary's category; a unit no capability implements has no category — the
+              reachability signal, not a gap).
     determinism: probabilistic if the unit is consumed_by a Prompt, or depends_on the `agents`
                  package/module; else deterministic."""
     edges = harvest(root)
-    cap_category = {c.slug: c.category for c in load_capabilities(root)}
+    cap_category = _effective_categories(load_capabilities(root))
 
     category: Dict[str, str] = {}
     probabilistic = set()
