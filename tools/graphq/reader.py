@@ -31,6 +31,11 @@ class QueryEntry:
     returns: List[str] = field(default_factory=list)
     consumers: List[str] = field(default_factory=list)
 
+    @property
+    def graph_id(self) -> str:
+        # bundle-stem-qualified so queries sharing a function name across files stay distinct
+        return f"{os.path.splitext(os.path.basename(self.bundle))[0]}.{self.name}"
+
 
 def parse_cypher(text: str) -> Tuple[List[str], List[str], List[str], List[str]]:
     labels = sorted({m.group(1) for m in _LABEL.finditer(text) if not m.group(1).isupper()})

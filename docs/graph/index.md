@@ -22,7 +22,7 @@
 - CodeUnit: 48
 - GlossaryTerm: 111
 - GraphQuery: 33
-- Prompt: 26
+- Prompt: 28
 - Test: 203
 - UseCase: 20
 

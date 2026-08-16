@@ -36,8 +36,8 @@ _ADAPTERS = {
     "UseCase": (load_use_cases, "slug"),
     "Test": (load_tests, "slug"),
     "GlossaryTerm": (lambda root: load_glossary(os.path.join(root, "docs/glossary")), "term"),
-    "GraphQuery": (load_queries, "name"),
-    "Prompt": (load_prompt_entries, "key"),
+    "GraphQuery": (load_queries, "graph_id"),
+    "Prompt": (load_prompt_entries, "graph_id"),
 }
 
 
@@ -115,8 +115,8 @@ def _derived_consumers(from_type, id_attr, load):
 _DERIVED = {
     "dep_edges": _derived_deps,
     "verifies_edges": _derived_verifies,
-    "gq_consumed_by": _derived_consumers("GraphQuery", "name", load_queries),
-    "prompt_consumed_by": _derived_consumers("Prompt", "key", load_prompt_entries),
+    "gq_consumed_by": _derived_consumers("GraphQuery", "graph_id", load_queries),
+    "prompt_consumed_by": _derived_consumers("Prompt", "graph_id", load_prompt_entries),
 }
 
 

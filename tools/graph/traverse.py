@@ -54,9 +54,9 @@ _CONTEXT = {
              lambda o: f"{o.slug} ({o.test_type}) verifies {o.target or o.verifies}"),
     "GlossaryTerm": (lambda root: load_glossary(os.path.join(root, "docs/glossary")), "term",
                      lambda o: o.definition),
-    "GraphQuery": (load_queries, "name",
+    "GraphQuery": (load_queries, "graph_id",
                    lambda o: f"{o.purpose or ''} returns={o.returns} labels={o.labels}".strip()),
-    "Prompt": (load_prompt_entries, "key",
+    "Prompt": (load_prompt_entries, "graph_id",
                lambda o: f"used_for={o.used_for} audience={o.audience}"),
 }
 

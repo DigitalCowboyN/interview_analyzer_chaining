@@ -24,6 +24,11 @@ class PromptEntry:
     values: List[str] = field(default_factory=list)
     consumers: List[str] = field(default_factory=list)
 
+    @property
+    def graph_id(self) -> str:
+        # file-stem-qualified so prompts sharing a key across yaml files stay distinct nodes
+        return f"{os.path.splitext(self.file)[0]}.{self.key}"
+
 
 def extract_values(text: str) -> List[str]:
     for m in _FMT.finditer(text):
