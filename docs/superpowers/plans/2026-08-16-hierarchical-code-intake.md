@@ -259,7 +259,7 @@ Repoint `load_units`/`dep_edges` at the derived nodes, add the `contains` edge t
 - Modify: `tools/graph/registry.py` (add the `contains` edge)
 - Modify: `tools/graph/reader.py` (add `contains` derivation; rewrite `_unit_dir`, `_unit_of_file`)
 - Modify: `tools/capability/reader.py` (`real_code_units` → derived id set; drop `code_nodes`; drop `packages`/`KEY_MODULES` import)
-- Modify: `tools/capability/check.py` (drop `check_coverage` + `code_nodes` usage + `_MANDATORY_ROLES`)
+- Modify: `tools/capability/check.py` (re-express `check_coverage` on `level` + `_INFRA_PACKAGES`; drop `code_nodes` usage + `_MANDATORY_ROLES`)
 - Rewrite tests: `tests/code/test_reader.py`, `tests/code/test_check.py`, `tests/code/test_render.py`
 - Delete test: `tests/code/test_reader_tools.py` (its cases moved to `test_discover.py`)
 - Modify tests: `tests/capability/test_reader.py`, `tests/graph/test_verifies_edge.py`, `tests/testmap/test_reader.py`
@@ -452,14 +452,63 @@ def real_code_units(root: str = ".") -> set:
     return {u.unit for u in load_units(root)}
 ```
 
-  - Delete `code_nodes` (no longer used — coverage check retired below).
+  - Delete `code_nodes` (its only caller, `check_coverage`, now takes `load_units` directly).
 
-In `tools/capability/check.py`:
-  - Change the import to drop `code_nodes`: `from tools.capability.reader import CATEGORIES, load_capabilities, real_code_units`.
-  - Delete `check_coverage` and the `_MANDATORY_ROLES` constant it uses (search the file for `_MANDATORY_ROLES` and remove its definition too).
-  - In `run_all`, delete the line `findings += check_coverage(caps, code_nodes(root))`.
+In `tools/capability/check.py`, **re-express `check_coverage` on the derived `level` axis** (the source-derived replacement for the retired `role`). `role` used `_MANDATORY_ROLES = ("pipeline-layer", "surface", "tooling")` — i.e. every `tools.*` package (tooling) and every top-level `src` package that is *not* infrastructure/model/agent must be claimed by some capability. Without `role`, the exclusion becomes: all `tools.*` top-level packages are mandatory; all top-level `src` packages are mandatory except a small curated infrastructure set. This is one constant replacing 48 per-unit overlays, and it reproduces today's behavior (zero findings — every mandatory package is already claimed).
 
-Rationale to record for the reviewer: `role` was an overlay field; retiring the overlay removes it. The role-filtered capability coverage check is now redundant with L2's `check_reachability` (`tools/graph/check.py`), which flags any CodeUnit no capability/use-case/ADR reaches. `check_links` (implemented_by targets must resolve) is unaffected and stays.
+  - Change the import to drop `code_nodes` and add `load_units`:
+
+```python
+from tools.capability.reader import CATEGORIES, load_capabilities, real_code_units
+from tools.code.reader import load_units
+```
+
+  - Replace the `_MANDATORY_ROLES` constant with the infrastructure denylist:
+
+```python
+# Top-level src packages that are infrastructure / model / agent — not expected to trace to a
+# capability. The source-derived replacement for the retired per-unit `role` exclusion; add a
+# package here (or give it a capability) when the coverage check flags a new infra area.
+_INFRA_PACKAGES = frozenset({
+    "agents", "models", "events", "persistence", "utils", "io", "commands",
+})
+```
+
+  - Replace `check_coverage` (it now reads `.level`/`.unit`, and only checks top-level packages — modules and sub-packages inherit their top-level package's coverage):
+
+```python
+def check_coverage(caps, units) -> List[Finding]:
+    """A product/tooling package that no capability claims. Mandatory scope = every top-level
+    tools.* package and every top-level src package except infrastructure (_INFRA_PACKAGES).
+    A package is covered if it, or any module/sub-package under it, is implemented_by a capability."""
+    claimed = set()
+    for c in caps:
+        claimed.update(c.implemented_by)
+    findings: List[Finding] = []
+    for u in units:
+        if u.level != "package":
+            continue
+        is_tool = u.unit.startswith("tools.")
+        segs = u.unit.count(".")
+        if is_tool and segs != 1:
+            continue                              # only top-level tools.<name> packages
+        if not is_tool and segs != 0:
+            continue                              # only top-level src packages
+        if not is_tool and u.unit in _INFRA_PACKAGES:
+            continue                              # infrastructure — not expected to trace to a capability
+        covered = u.unit in claimed or any(t.startswith(u.unit + ".") for t in claimed)
+        if not covered:
+            findings.append(Finding(f"capability: package {u.unit} is claimed by no capability"))
+    return findings
+```
+
+  - In `run_all`, change the coverage line to pass the derived units:
+
+```python
+    findings += check_coverage(caps, load_units(root))
+```
+
+Rationale to record for the reviewer (owner decision, 2026-08-16): the capability coverage signal is *preserved* but re-expressed on `level` + `_INFRA_PACKAGES` instead of the retired authored `role`. `check_links` (implemented_by targets must resolve) is unaffected and stays.
 
 - [ ] **Step 7: Rewrite the code tests.** Replace `tests/code/test_reader.py` entirely:
 
@@ -589,6 +638,38 @@ def test_real_code_units_covers_packages_and_modules():
     assert "lens.engine" in units         # a module (src/lens/engine.py)
     assert "ask.reader" in units          # a module
 ```
+
+In `tests/capability/test_check.py`, the three coverage tests key on the retired `role` — re-express them on `level` + the new scope. Replace `test_coverage_flags_unclaimed_pipeline_unit_but_not_infra`, `test_coverage_parent_package_covers_key_module`, and `test_coverage_now_flags_unclaimed_tooling` with:
+
+```python
+def test_coverage_flags_unclaimed_src_package_but_not_infra():
+    nodes = [NS(unit="lens", level="package"), NS(unit="utils", level="package")]
+    caps = [_cap("x", impl=["ingestion"])]              # claims neither
+    msgs = " ".join(f.message for f in check_coverage(caps, nodes))
+    assert "lens" in msgs and "utils" not in msgs       # utils is infrastructure (_INFRA_PACKAGES)
+
+
+def test_coverage_package_covered_by_a_module_claim():
+    nodes = [NS(unit="lens", level="package")]
+    caps = [_cap("x", impl=["lens.engine"])]            # a module under lens covers the package
+    assert check_coverage(caps, nodes) == []
+
+
+def test_coverage_flags_unclaimed_tooling_package():
+    nodes = [NS(unit="tools.adr", level="package"), NS(unit="utils", level="package")]
+    caps = [_cap("x", impl=["tools.code"])]
+    msgs = " ".join(f.message for f in check_coverage(caps, nodes))
+    assert "tools.adr" in msgs and "utils" not in msgs  # tooling mandatory; infra advisory
+
+
+def test_coverage_ignores_modules_and_subpackages():
+    nodes = [NS(unit="lens.engine", level="module"), NS(unit="api.routers", level="package")]
+    caps = []                                           # nothing claimed
+    # modules and sub-packages are never flagged directly — they inherit the top-level package
+    assert check_coverage(caps, nodes) == []
+```
+
+(`NS` is the `SimpleNamespace` already imported in that file; the re-expressed check reads only `.level` and `.unit`.)
 
 - [ ] **Step 9: Run the affected suites**
 
@@ -933,9 +1014,9 @@ Reviewed against `docs/index.md` on 2026-08-16.
 | --- | --- | --- | --- |
 | code | yes | `load_units` derives packages+modules from source; `contains_edges`; module `dep_edges`; docstring context; render/check rewritten; overlay retired | the subject |
 | graph | yes | `contains` edge in registry; `_derived_contains`; `_unit_dir`/`_unit_of_file` rewritten; `classify.derive_axes` | co-subject |
-| capabilities | yes | `real_code_units` → derived id set; role-based `check_coverage`/`code_nodes` retired (redundant with L2 reachability; `role` retired) | consequence of retiring the overlay |
+| capabilities | yes | `real_code_units` → derived id set; `check_coverage` re-expressed on `level` + `_INFRA_PACKAGES` (replaces retired `role`); `code_nodes` dropped | consequence of retiring the overlay |
 | corpus | yes | `CodeUnit` dropped from `OKF_HOMES` — code is derived, not a document type | — |
 | adr | yes | new ADR (refines 0019/0024, extends 0020) | — |
 | tests / use-cases / glossary / prompts / graph-queries | no (logic) | edges into code still resolve at package+module grain; `defined_in` now resolves to the finer module node | — |
 
-**Verdict:** reconciled — code + graph are the subjects (code derived hierarchically from source, overlay retired, classifications derived); the capability domain loses its role-filtered coverage check as a direct consequence of retiring `role`; corpus drops `CodeUnit` as a document type; a new ADR captures the decision.
+**Verdict:** reconciled — code + graph are the subjects (code derived hierarchically from source, overlay retired, classifications derived); the capability domain's coverage check is preserved but re-expressed on the derived `level` axis (plus a small `_INFRA_PACKAGES` denylist) since `role` is retired; corpus drops `CodeUnit` as a document type; a new ADR captures the decision.
