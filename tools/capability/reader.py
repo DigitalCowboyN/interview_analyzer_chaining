@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import List
 
 from src.ingestion.front_matter import parse_front_matter
-from tools.code.reader import KEY_MODULES, load_units, packages
+from tools.code.reader import load_units
 
 # The capability category axis — an open, ordered set carrying each value's definition.
 # A non-empty definition = defined & in use; "" = reserved (declared; define on first use).
@@ -67,10 +67,5 @@ def load_capabilities(root: str = ".", cap_dir: str = "docs/capabilities") -> Li
 
 
 def real_code_units(root: str = ".") -> set:
-    """Valid implemented_by targets — the code map's unit registry (single source)."""
-    return set(packages(root)) | set(KEY_MODULES)
-
-
-def code_nodes(root: str = "."):
-    """CodeUnit nodes (with .unit + .role) for the coverage check."""
-    return load_units(root)
+    """Valid implemented_by / verifies targets — the derived code node registry (packages + modules)."""
+    return {u.unit for u in load_units(root)}

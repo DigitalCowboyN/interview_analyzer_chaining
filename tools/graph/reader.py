@@ -7,7 +7,7 @@ from typing import Dict, List, Set
 
 from tools.graph.registry import EDGES, NODE_DOMAINS, EdgeType
 from tools.capability.reader import load_capabilities
-from tools.code.reader import dep_edges, load_units
+from tools.code.reader import contains_edges, dep_edges, load_units
 from tools.adr.index import load_bundle
 from tools.usecase.reader import load_use_cases
 from tools.testmap.reader import load_tests, verifies_edges
@@ -50,10 +50,8 @@ def nodes(root: str = ".") -> Dict[str, Set[str]]:
 
 def _unit_dir(unit: str) -> str:
     if unit.startswith("tools."):
-        return f"tools/{unit.split('.', 1)[1]}/"
-    if "." in unit:                                   # src key module a.b -> its package dir
-        return "src/" + "/".join(unit.split(".")[:-1]) + "/"
-    return f"src/{unit}/"
+        return "tools/" + "/".join(unit.split(".")[1:]) + "/"
+    return "src/" + "/".join(unit.split(".")) + "/"
 
 
 def _units_under(path: str, code_ids: Set[str]) -> Set[str]:
@@ -62,13 +60,19 @@ def _units_under(path: str, code_ids: Set[str]) -> Set[str]:
 
 
 def _unit_of_file(path: str, code_ids: Set[str]) -> List[str]:
-    """The top-level code unit that owns a src/tools file path (src/events/x.py -> 'events')."""
+    """The code node that owns a src/tools file path (src/events/store.py -> 'events.store')."""
     p = (path or "").replace("\\", "/")
     parts = p.split("/")
-    if len(parts) >= 2 and parts[0] in ("src", "tools"):
-        unit = parts[1] if parts[0] == "src" else f"tools.{parts[1]}"
-        return [unit] if unit in code_ids else []
-    return []
+    if len(parts) < 2 or parts[0] not in ("src", "tools") or not parts[-1].endswith(".py"):
+        return []
+    prefix = "tools." if parts[0] == "tools" else ""
+    stem = parts[-1][:-3]
+    mid_parts = parts[1:-1] + ([stem] if stem != "__init__" else [])
+    module_id = prefix + ".".join(mid_parts)
+    if module_id in code_ids:
+        return [module_id]
+    pkg_id = prefix + ".".join(parts[1:-1])
+    return [pkg_id] if pkg_id in code_ids else []
 
 
 def _authored(edge: EdgeType, root: str, node_ids: Dict[str, Set[str]]) -> List[Edge]:
@@ -96,6 +100,11 @@ def _derived_deps(edge: EdgeType, root: str) -> List[Edge]:
             for u, deps in dep_edges(root).items() for d in deps]
 
 
+def _derived_contains(edge: EdgeType, root: str) -> List[Edge]:
+    return [Edge(edge.name, _addr("CodeUnit", p), _addr("CodeUnit", c))
+            for p, c in contains_edges(root)]
+
+
 def _derived_verifies(edge: EdgeType, root: str) -> List[Edge]:
     return [Edge(edge.name, src, dst, {"test_type": tt})
             for src, dst, tt in verifies_edges(root)]
@@ -114,6 +123,7 @@ def _derived_consumers(from_type, id_attr, load):
 
 _DERIVED = {
     "dep_edges": _derived_deps,
+    "contains_edges": _derived_contains,
     "verifies_edges": _derived_verifies,
     "gq_consumed_by": _derived_consumers("GraphQuery", "graph_id", load_queries),
     "prompt_consumed_by": _derived_consumers("Prompt", "graph_id", load_prompt_entries),

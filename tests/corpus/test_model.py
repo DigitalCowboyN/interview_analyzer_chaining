@@ -1,12 +1,11 @@
 from tools.corpus.model import OKF_HOMES, Record
 
 
-def test_okf_homes_cover_the_five_document_types():
+def test_okf_homes_cover_the_document_types():
     assert OKF_HOMES == {
         "ADR": "docs/adr",
         "Capability": "docs/capabilities",
         "UseCase": "docs/use-cases",
-        "CodeUnit": "docs/code",
         "Term": "docs/glossary",
     }
 

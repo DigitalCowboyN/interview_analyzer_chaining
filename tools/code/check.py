@@ -1,13 +1,13 @@
 # tools/code/check.py
 from __future__ import annotations
 
-import glob
 import os
 from dataclasses import dataclass
 from typing import List
 
-from tools.code.reader import CodeUnit, KEY_MODULES, load_units, packages
+from tools.code.reader import CodeUnit, load_units
 from tools.code.render import render_index, render_pipeline
+from tools.graph.classify import derive_axes
 
 
 @dataclass
@@ -15,53 +15,30 @@ class Finding:
     message: str
 
 
-def check_coverage(pkgs: List[str], units: List[CodeUnit]) -> List[Finding]:
-    have = {u.unit for u in units}
-    return [Finding(f"code: package src/{p} has no doc node") for p in pkgs if p not in have]
+def check_missing_docstring(units: List[CodeUnit]) -> List[Finding]:
+    """A module with no docstring has no derivable context — the completeness signal that
+    replaces the retired authored `role`/description overlay."""
+    return [Finding(f"code: module {u.unit} has no docstring (no derivable context)")
+            for u in units if u.level == "module" and not u.description]
 
 
-def check_classification(units: List[CodeUnit]) -> List[Finding]:
-    return [Finding(f"code: unit {u.unit} has no role classification") for u in units if not u.role]
-
-
-def check_map_in_sync(index_path: str, pipeline_path: str, units: List[CodeUnit]) -> List[Finding]:
+def check_map_in_sync(index_path: str, pipeline_path: str, units: List[CodeUnit], axes=None) -> List[Finding]:
     findings: List[Finding] = []
-    for path, render in ((index_path, render_index), (pipeline_path, render_pipeline)):
+    renders = ((index_path, lambda u: render_index(u, axes)), (pipeline_path, render_pipeline))
+    for path, render in renders:
         want = render(units)
         have = open(path, encoding="utf-8", errors="ignore").read() if os.path.exists(path) else ""
         if want != have:
-            findings.append(Finding(f"code: {os.path.basename(path)} out of sync — run make code-index (new dependency?)"))
-    return findings
-
-
-def check_stale(units: List[CodeUnit], real_units: List[str]) -> List[Finding]:
-    real = set(real_units)
-    return [Finding(f"code: doc node {u.unit} no longer exists in src") for u in units if u.unit not in real]
-
-
-def check_top_level_modules(root: str, units) -> List[Finding]:
-    """A top-level src/*.py module not in the code map is invisible — flag it.
-    Closes the scan blind spot (the reader otherwise only sees packages + KEY_MODULES)."""
-    documented = {u.unit for u in units}
-    findings: List[Finding] = []
-    for path in sorted(glob.glob(os.path.join(root, "src", "*.py"))):
-        name = os.path.splitext(os.path.basename(path))[0]
-        if name != "__init__" and name not in documented:
             findings.append(Finding(
-                f"code: top-level module src/{name}.py is not in the code map — "
-                f"document it (add to KEY_MODULES + a docs/code node)"))
+                f"code: {os.path.basename(path)} out of sync — run make code-index"))
     return findings
 
 
 def run_all(root: str = ".") -> List[Finding]:
-    pkgs = packages(root)
     units = load_units(root)
-    real = pkgs + KEY_MODULES
+    axes = derive_axes(root)
     findings: List[Finding] = []
-    findings += check_coverage(pkgs, units)
-    findings += check_top_level_modules(root, units)
-    findings += check_classification(units)
+    findings += check_missing_docstring(units)
     findings += check_map_in_sync(os.path.join(root, "docs/code/index.md"),
-                                  os.path.join(root, "docs/code/pipeline.md"), units)
-    findings += check_stale(units, real)
+                                  os.path.join(root, "docs/code/pipeline.md"), units, axes)
     return findings

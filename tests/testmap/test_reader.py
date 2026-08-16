@@ -16,9 +16,10 @@ def _seed(tmp_path):
     (t / "integration" / "test_api_calls.py").write_text(
         "def test_call():\n    pass\n", encoding="utf-8"
     )
-    # a real tools package DIR so real_code_units()/packages() resolves the target
+    # a real tools package (with a .py) so real_code_units() resolves the target
     # (resolution scans src/ + tools/ dirs, NOT docs/code nodes):
     (tmp_path / "tools" / "capability").mkdir(parents=True)
+    (tmp_path / "tools" / "capability" / "__init__.py").write_text("", encoding="utf-8")
 
 
 def test_type_and_target_derivation(tmp_path):

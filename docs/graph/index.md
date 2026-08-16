@@ -6,24 +6,25 @@
 | --- | --- | --- | --- | --- | --- |
 | implements | implemented_by | Capability → CodeUnit | authored | — | 104 |
 | child_of | parent_of | Capability → Capability | authored | — | 40 |
-| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 60 |
-| governs | governed_by | ADR → CodeUnit | authored | — | 24 |
+| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 372 |
+| contains | contained_by | CodeUnit → CodeUnit | derived | — | 165 |
+| governs | governed_by | ADR → CodeUnit | authored | — | 80 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 52 |
-| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 205 |
+| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 206 |
 | defined_in | defines | GlossaryTerm → CodeUnit | authored | — | 110 |
 | consumed_by | consumes | GraphQuery → CodeUnit | derived | — | 61 |
 | consumed_by | consumes | Prompt → CodeUnit | derived | — | 61 |
 
 ## Nodes
 
-- ADR: 25
+- ADR: 26
 - Capability: 55
-- CodeUnit: 48
+- CodeUnit: 198
 - GlossaryTerm: 111
 - GraphQuery: 33
 - Prompt: 28
-- Test: 205
+- Test: 206
 - UseCase: 20
 
 ## Meta-schema
@@ -33,6 +34,7 @@ graph LR
     Capability -->|implements| CodeUnit
     Capability -->|child_of| Capability
     CodeUnit -->|depends_on| CodeUnit
+    CodeUnit -->|contains| CodeUnit
     ADR -->|governs| CodeUnit
     ADR -->|supersedes| ADR
     UseCase -->|fulfilled_by| Capability

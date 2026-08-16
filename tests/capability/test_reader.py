@@ -3,7 +3,6 @@ from tools.capability.reader import (
     Capability,
     load_capabilities,
     real_code_units,
-    code_nodes,
     CATEGORIES,
     category_defined,
 )
@@ -32,15 +31,11 @@ def test_load_skips_non_capability_files(tmp_path):
     assert load_capabilities(str(tmp_path)) == []
 
 
-def test_real_code_units_includes_packages_and_key_modules():
+def test_real_code_units_covers_packages_and_modules():
     units = real_code_units(".")
-    assert "enrichment" in units and "lens.engine" in units and "ask.reader" in units
-
-
-def test_code_nodes_carry_roles():
-    nodes = code_nodes(".")
-    roles = {n.unit: n.role for n in nodes}
-    assert roles.get("api") == "surface" and roles.get("lens") == "pipeline-layer"
+    assert "enrichment" in units          # a package
+    assert "lens.engine" in units         # a module (src/lens/engine.py)
+    assert "ask.reader" in units          # a module
 
 
 def test_load_parses_category(tmp_path):
