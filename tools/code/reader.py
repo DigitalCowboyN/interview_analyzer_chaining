@@ -25,6 +25,7 @@ class CodeUnit:
 
 _SRC_TREES = (("src", ""), ("tools", "tools."))
 _IMPORT_DOTTED = re.compile(r"^\s*(?:from|import)\s+((?:src|tools)\.[\w.]+)", re.M)
+_CALLS_MARKER = re.compile(r"#\s*calls:\s*code:([\w.]+)")
 
 
 def _docstring(path: str) -> str:
@@ -160,25 +161,74 @@ def _module_path(module_id: str, root: str) -> str:
     return os.path.join(root, "src", *module_id.split(".")) + ".py"
 
 
+def _name_index(tree, module_id: str) -> Dict[str, str]:
+    """local name -> target symbol/module id, from imports + top-level defs of this module."""
+    idx: Dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module and \
+                (node.module.startswith("src.") or node.module.startswith("tools.")):
+            base = node.module[4:] if node.module.startswith("src.") else node.module
+            for alias in node.names:
+                idx[alias.asname or alias.name] = f"{base}.{alias.name}"
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.startswith(("src.", "tools.")):
+                    tgt = alias.name[4:] if alias.name.startswith("src.") else alias.name
+                    idx[alias.asname or alias.name] = tgt
+    for node in tree.body:                       # local top-level defs
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            idx[node.name] = f"{module_id}.{node.name}"
+    return idx
+
+
+def calls_of(func_node, name_index: Dict[str, str], marker_text: str = "") -> List[str]:
+    """Resolve a function/method body's calls via the module name index, plus `# calls:` markers.
+
+    Ceiling, not floor: `foo()` and `mod.foo()` resolve when `foo`/`mod` are in the name index
+    (imports + local top-level defs); a call on an unrecognized name (e.g. `obj.method()`) is
+    skipped rather than guessed."""
+    out = set(_CALLS_MARKER.findall(marker_text))         # explicit markers
+    for n in ast.walk(func_node):
+        if isinstance(n, ast.Call):
+            f = n.func
+            if isinstance(f, ast.Name) and f.id in name_index:          # foo()
+                out.add(name_index[f.id])
+            elif isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) \
+                    and f.value.id in name_index:                       # mod.foo()
+                out.add(f"{name_index[f.value.id]}.{f.attr}")
+            # obj.method() on an unknown Name -> not in name_index -> skipped (ceiling)
+    return sorted(out)
+
+
 def symbols_of(module_id: str, root: str = ".") -> List[Symbol]:
-    """Top-level functions/classes of a module, and a class's methods (one level of nesting)."""
+    """Top-level functions/classes of a module, and a class's methods (one level of nesting).
+
+    Each function/method Symbol's `.calls` is resolved pragmatically from this file's own
+    imports + local defs (see `_name_index`/`calls_of`) — a same-file ceiling, not a full
+    cross-repo call graph."""
     path = _module_path(module_id, root)
     try:
-        tree = ast.parse(open(path, encoding="utf-8", errors="ignore").read())
+        source = open(path, encoding="utf-8", errors="ignore").read()
+        tree = ast.parse(source)
     except (OSError, SyntaxError):
         return []
+    nidx = _name_index(tree, module_id)
     out: List[Symbol] = []
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            out.append(Symbol(f"{module_id}.{node.name}", "function",
-                              render_signature(node), (ast.get_docstring(node) or "").strip(),
-                              module_id))
+            sym = Symbol(f"{module_id}.{node.name}", "function",
+                         render_signature(node), (ast.get_docstring(node) or "").strip(),
+                         module_id)
+            sym.calls = calls_of(node, nidx, marker_text=source)
+            out.append(sym)
         elif isinstance(node, ast.ClassDef):
             cid = f"{module_id}.{node.name}"
             out.append(Symbol(cid, "class", f"class {node.name}",
                               (ast.get_docstring(node) or "").strip(), module_id))
             for m in node.body:
                 if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    out.append(Symbol(f"{cid}.{m.name}", "method",
-                                      render_signature(m), (ast.get_docstring(m) or "").strip(), cid))
+                    msym = Symbol(f"{cid}.{m.name}", "method",
+                                  render_signature(m), (ast.get_docstring(m) or "").strip(), cid)
+                    msym.calls = calls_of(m, nidx, marker_text=source)
+                    out.append(msym)
     return out

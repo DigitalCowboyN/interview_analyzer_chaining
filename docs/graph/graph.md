@@ -907,6 +907,7 @@ graph LR
     n_tests_cli_test_cli["tests:cli.test_cli"] --> n_code_tools_cli["code:tools.cli"]
     n_tests_cli_test_reader["tests:cli.test_reader"] --> n_code_tools_cli["code:tools.cli"]
     n_tests_cli_test_render["tests:cli.test_render"] --> n_code_tools_cli["code:tools.cli"]
+    n_tests_code_test_calls["tests:code.test_calls"] --> n_code_tools_code["code:tools.code"]
     n_tests_code_test_check["tests:code.test_check"] --> n_code_tools_code["code:tools.code"]
     n_tests_code_test_cli["tests:code.test_cli"] --> n_code_tools_code["code:tools.code"]
     n_tests_code_test_discover["tests:code.test_discover"] --> n_code_tools_code["code:tools.code"]
