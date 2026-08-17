@@ -26,6 +26,22 @@ def check_missing_docstring(units: List[CodeUnit]) -> List[Finding]:
             for u in units if u.level == "module" and not u.description]
 
 
+def check_missing_symbol_docstring(root: str = ".") -> List[Finding]:
+    """Opt-in symbol-grain completeness: functions/classes/methods with no docstring. A symbol is
+    'thin, not empty' (its signature is always derivable), so this is a lower-priority backlog than
+    the module one — deliberately NOT wired into `run_all`. Parses every module (eager), so callers
+    invoke it explicitly when they want a symbol burn-down worklist."""
+    from tools.code.reader import symbols_of
+    findings: List[Finding] = []
+    for u in load_units(root):
+        if u.level != "module":
+            continue
+        for s in symbols_of(u.unit, root):
+            if not s.docstring:
+                findings.append(Finding(f"code: symbol {s.id} has no docstring (thin — signature only)"))
+    return findings
+
+
 def check_map_in_sync(index_path: str, pipeline_path: str, units: List[CodeUnit], axes=None) -> List[Finding]:
     findings: List[Finding] = []
     renders = ((index_path, lambda u: render_index(u, axes)), (pipeline_path, render_pipeline))
