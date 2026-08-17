@@ -1,3 +1,6 @@
+"""Renders the `tools.cli` `Command` list into the `make help` output and the
+`docs/cli/index.md` catalog."""
+
 from __future__ import annotations
 
 from typing import List

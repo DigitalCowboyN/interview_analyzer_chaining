@@ -99,16 +99,16 @@
 | python -m src.ingestion | Ingestion layer. |
 | python -m src.lens | Lens engine. |
 | python -m src.resolution | Resolution layer. |
-| python -m tools.adr |  |
-| python -m tools.api |  |
-| python -m tools.capability |  |
-| python -m tools.cli |  |
-| python -m tools.code |  |
-| python -m tools.corpus |  |
-| python -m tools.glossary |  |
-| python -m tools.graph |  |
-| python -m tools.graphq |  |
-| python -m tools.knowledge |  |
-| python -m tools.prompts |  |
-| python -m tools.testmap |  |
-| python -m tools.usecase |  |
+| python -m tools.adr | CLI entry point for the ADR domain (`python -m tools.adr <cmd>`): `index` regenerates |
+| python -m tools.api | CLI entry point for the `tools.api` domain: `index` renders the live FastAPI route table |
+| python -m tools.capability | CLI entry point for the `tools.capability` domain: `index` renders |
+| python -m tools.cli | CLI entry point for the `tools.cli` domain: `help` prints the everyday `make` targets, |
+| python -m tools.code | CLI entry point for the `tools.code` domain: `index` renders `docs/code/index.md`, |
+| python -m tools.corpus | CLI entry point for the `tools.corpus` domain: `check` runs the non-blocking |
+| python -m tools.glossary | CLI entry point for the glossary domain (`python -m tools.glossary`): regenerate |
+| python -m tools.graph | CLI entry point for the cross-domain graph (`python -m tools.graph <cmd>`): `index` |
+| python -m tools.graphq | CLI entry point for the `tools.graphq` domain: `index` renders the graph-query |
+| python -m tools.knowledge | CLI entry point for the knowledge domain (`python -m tools.knowledge`): run the |
+| python -m tools.prompts | CLI entry point for the `tools.prompts` domain: `index` renders the prompt registry |
+| python -m tools.testmap | CLI entry point for the `tools.testmap` domain: `index` renders `docs/tests/index.md` |
+| python -m tools.usecase | CLI entry point for the use-case domain (`python -m tools.usecase`): regenerate |

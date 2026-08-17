@@ -1,0 +1,21 @@
+{
+  "id": "spec-code-intake",
+  "category": "spec",
+  "task": "Gather the minimal necessary context to spec the hierarchical-code-intake change (derive the code map from source, retire the overlay).",
+  "entry": ["code:tools.code.reader", "code:tools.graph.reader"],
+  "direction": "both",
+  "depth": 2,
+  "gold_context": [
+    "code:tools.code.reader",
+    "code:tools.graph.reader",
+    "code:tools.graph.registry",
+    "code:tools.graph.traverse",
+    "code:tools.graph.classify",
+    "capabilities:link-the-domains",
+    "capabilities:map-the-code",
+    "adr:19",
+    "adr:20",
+    "adr:24"
+  ],
+  "source": "PR #43 spec — docs/superpowers/specs/2026-08-16-hierarchical-code-intake-design.md. NOTE: adr:19/20/24 are in gold deliberately to expose that no `governs` edge links the KG-tooling ADRs to this code — recall < 1.0 is a real finding, not a scenario bug."
+}

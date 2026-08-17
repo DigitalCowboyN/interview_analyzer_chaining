@@ -1,4 +1,9 @@
 # tools/graphq/reader.py
+"""Discovers Cypher-emitting functions under `src/**/reader.py` and `src/api/routers/*.py`
+by walking their AST for string constants containing Cypher keywords, then parses each
+query's labels/rels/props/returns and its `graphq:` docstring marker (purpose, scope,
+audience) into a `QueryEntry`, deriving consumers by scanning for call sites."""
+
 from __future__ import annotations
 
 import ast

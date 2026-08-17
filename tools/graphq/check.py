@@ -1,4 +1,9 @@
 # tools/graphq/check.py
+"""Non-blocking findings for the `tools.graphq` domain: query labels/rels not produced by
+any projection (schema drift against the glossary's graph vocabulary), code that reads a
+field a query doesn't return, queries with no `graphq:` marker, and a stale
+`docs/graph-queries/index.md`. `run_all` is the entry point `tools.graphq.__main__` calls."""
+
 from __future__ import annotations
 
 import ast

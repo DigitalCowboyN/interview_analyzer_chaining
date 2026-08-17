@@ -1,3 +1,8 @@
+"""Non-blocking findings for the `tools.corpus` domain: records whose path falls outside
+their registered type's home directory (misfiled), and `.md` files declaring a `type:`
+that isn't in `OKF_HOMES` (a new record kind invisible to the corpus until wired in).
+`run_all` is the entry point `tools.corpus.__main__` calls."""
+
 from __future__ import annotations
 
 import collections

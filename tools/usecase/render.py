@@ -1,3 +1,6 @@
+"""Use-case domain render: builds docs/use-cases/index.md, grouping use-cases by
+category and form and annotating each with its derived coverage state.
+"""
 from __future__ import annotations
 
 from typing import Dict, List

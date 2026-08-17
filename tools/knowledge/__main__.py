@@ -1,3 +1,7 @@
+"""CLI entry point for the knowledge domain (`python -m tools.knowledge`): run the
+cross-domain consistency check, print the spec/plan honesty-check nudge for a
+PostToolUse hook, and list which domain `make` targets a changed-file set touches.
+"""
 from __future__ import annotations
 
 import argparse

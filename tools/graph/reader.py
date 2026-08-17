@@ -1,4 +1,9 @@
 # tools/graph/reader.py
+"""Assembles the cross-domain graph's `Edge` list and node-id sets by calling each domain's
+reader (`tools.capability`, `tools.code`, `tools.adr`, ...) through the registry-driven
+adapters in `tools.graph.registry`: `nodes()` collects every domain's ids, and `harvest()`
+resolves each registered `EdgeType` — authored edges from a frontmatter field, derived edges
+from a domain-specific builder — into concrete `Edge`s addressed as `<domain>:<id>`."""
 from __future__ import annotations
 
 import os

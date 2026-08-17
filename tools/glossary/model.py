@@ -1,3 +1,6 @@
+"""Glossary term model: parses a docs/glossary/*.md file's front matter into a
+`Term` record and loads the full term set for rendering and consistency checks.
+"""
 from __future__ import annotations
 
 import glob

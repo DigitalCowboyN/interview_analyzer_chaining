@@ -1,3 +1,8 @@
+"""Glossary domain guards: compare code-derived enums, dimensions, and graph
+vocabulary against docs/glossary/*.md terms to flag missing coverage, value drift,
+stale entries, and an out-of-sync index. Non-blocking — findings are warnings, not
+build failures.
+"""
 from __future__ import annotations
 
 import os

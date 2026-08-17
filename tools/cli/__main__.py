@@ -1,3 +1,6 @@
+"""CLI entry point for the `tools.cli` domain: `help` prints the everyday `make` targets,
+`index` renders `docs/cli/index.md`, `check` runs the non-blocking cli-surface findings."""
+
 from __future__ import annotations
 
 import argparse

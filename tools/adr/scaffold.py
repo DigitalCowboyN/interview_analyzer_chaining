@@ -1,3 +1,6 @@
+"""Scaffolds a new ADR file: `new_adr` picks the next free id (via `tools.adr.index`), slugs
+the title, and writes a blank front-matter + section template to `docs/adr/`, backing the
+`tools.adr.__main__ new` subcommand."""
 from __future__ import annotations
 
 import os

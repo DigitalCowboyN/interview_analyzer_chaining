@@ -1,4 +1,8 @@
 # src/utils/text_processing.py
+"""Sentence segmentation for raw transcript text via a module-level spaCy pipeline
+(`en_core_web_sm`, loaded once at import): `segment_text` returns stripped sentence
+strings, `segment_text_with_offsets` additionally returns each sentence's character
+offsets into the source text."""
 from typing import List, Tuple
 
 import spacy

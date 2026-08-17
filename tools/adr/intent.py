@@ -1,3 +1,6 @@
+"""Keyword heuristic deciding whether a user prompt reads as an architectural decision in
+progress, used by the `context` UserPromptSubmit hook (`tools.adr.__main__`) to gate its
+ADR-index nudge to prompts that plausibly need it."""
 from __future__ import annotations
 
 import re

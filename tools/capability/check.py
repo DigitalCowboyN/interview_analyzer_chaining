@@ -1,4 +1,9 @@
 # tools/capability/check.py
+"""Non-blocking findings for the `tools.capability` domain: `implemented_by` links to
+unknown code units, source packages claimed by no capability, primaries/children with
+invalid kind/tier/category, and a stale `docs/capabilities/index.md`. `run_all` is the
+entry point `tools.capability.__main__` calls."""
+
 from __future__ import annotations
 
 import os

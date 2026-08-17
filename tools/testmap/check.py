@@ -1,3 +1,7 @@
+"""Non-blocking findings for the `tools.testmap` domain: unknown `test_type` values, tests
+that verify nothing the graph can see, use-cases left UNVERIFIED, and a stale
+`docs/tests/index.md`. `run_all` is the entry point `tools.testmap.__main__` calls."""
+
 from __future__ import annotations
 
 import os

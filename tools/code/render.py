@@ -1,3 +1,6 @@
+"""Renders `tools.code` `CodeUnit`s into the `docs/code/index.md` catalog, the
+`pipeline.md` mermaid dependency graph, and the docstring backlog worklist."""
+
 from __future__ import annotations
 
 from typing import List

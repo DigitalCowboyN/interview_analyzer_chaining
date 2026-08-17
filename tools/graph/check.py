@@ -1,4 +1,8 @@
 # tools/graph/check.py
+"""Non-blocking drift checks for the cross-domain graph: edge endpoints that fail to
+resolve to a known node, an edge-type registry entry pointing at an unknown node type, the
+generated `index.md`/`graph.md` going stale against a fresh render, and reachability —
+code units unreached by any capability, use-case, or ADR walked outward from `run_all`."""
 from __future__ import annotations
 
 import os

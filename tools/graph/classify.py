@@ -1,4 +1,8 @@
 # tools/graph/classify.py
+"""Derives the two display axes for a code unit — category (inherited from the capability
+that `implements` it) and determinism (probabilistic if consumed by a Prompt or dependent
+on the `agents` package, else deterministic) — from the harvested cross-domain edges, for
+callers that render or filter code units by these axes."""
 from __future__ import annotations
 
 from typing import Dict, Tuple

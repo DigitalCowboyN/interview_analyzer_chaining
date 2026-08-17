@@ -1,3 +1,6 @@
+"""Scans `.py` and `README.md` files under given subdirs for `governed-by: ADR-####` markers
+and extracts the referenced ADR ids, giving `tools.adr.check` the code-side half of the
+governs/governed-by agreement check."""
 from __future__ import annotations
 
 import os

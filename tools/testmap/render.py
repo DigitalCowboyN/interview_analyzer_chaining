@@ -1,3 +1,7 @@
+"""Renders the loaded `Test` list and verification rollups into `docs/tests/index.md`:
+tests grouped by type with what each verifies, followed by the derived
+use-case/capability verification state."""
+
 from __future__ import annotations
 
 from typing import Dict, List

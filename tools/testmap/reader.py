@@ -1,3 +1,8 @@
+"""Discovers `test_*.py` files under `tests/` and turns each into a `Test` node: its
+type (unit/integration/e2e, by directory and naming convention), its derived target code
+unit, and any authored `# verifies:` markers. `verifies_edges` is the graph-facing export
+consumed when wiring tests to code and intent."""
+
 from __future__ import annotations
 
 import glob

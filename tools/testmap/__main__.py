@@ -1,3 +1,7 @@
+"""CLI entry point for the `tools.testmap` domain: `index` renders `docs/tests/index.md`
+(the test suite as a graph node set plus its derived capability/use-case verification
+rollup), `check` runs the non-blocking findings, and `verification` prints the rollup."""
+
 from __future__ import annotations
 
 import argparse

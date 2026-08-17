@@ -1,3 +1,8 @@
+"""Non-blocking findings for the `tools.prompts` domain: enumerated prompt values out of
+sync with their glossary term, declared audience roles with no matching code consumer (or
+vice versa), orphaned prompts, prompts missing `used_for`/`audience` metadata, and a stale
+`docs/prompts/index.md`. `run_all` is the entry point `tools.prompts.__main__` calls."""
+
 from __future__ import annotations
 
 import os

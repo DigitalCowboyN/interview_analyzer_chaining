@@ -1,3 +1,6 @@
+"""Renders the `tools.api` `Endpoint` list into the `docs/api/index.md` catalog, grouped by
+router module."""
+
 from __future__ import annotations
 
 from typing import List

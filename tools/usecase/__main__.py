@@ -1,3 +1,7 @@
+"""CLI entry point for the use-case domain (`python -m tools.usecase`): regenerate
+docs/use-cases/index.md, run the non-blocking consistency check, and print derived
+coverage state per use-case.
+"""
 from __future__ import annotations
 
 import argparse

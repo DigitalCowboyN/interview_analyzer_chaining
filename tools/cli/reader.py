@@ -1,3 +1,7 @@
+"""Derives the CLI surface as `Command` nodes: `make` targets parsed from the `Makefile`
+(with `##`/`##@` visibility markers) and `python -m` module entry points discovered under
+`src/` and `tools/`."""
+
 from __future__ import annotations
 
 import os

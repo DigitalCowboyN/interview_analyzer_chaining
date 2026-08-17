@@ -1,0 +1,11 @@
+{
+  "id": "trace-classify-obligation",
+  "category": "implement",
+  "task": "What obligation does tools/graph/classify.py fulfill (which capability does it serve)?",
+  "entry": ["code:tools.graph.classify"],
+  "direction": "in",
+  "depth": 2,
+  "gold_context": ["capabilities:link-the-domains"],
+  "gold_answer": "tools.graph.classify is contained by the tools.graph package, which is implemented_by the capability 'link-the-domains' — so classify fulfills that capability. (Walk up contained_by, then implemented_by.)",
+  "source": "PR #43 — walk-up via contained_by then implemented_by"
+}

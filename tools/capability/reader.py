@@ -1,4 +1,8 @@
 # tools/capability/reader.py
+"""Parses authored capability docs (`docs/capabilities/*.md`) into `Capability` nodes and
+defines the category axis (`CATEGORIES`) they classify against; `real_code_units` exposes
+the code-node registry used to validate `implemented_by` links."""
+
 from __future__ import annotations
 
 import glob
