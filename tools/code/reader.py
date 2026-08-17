@@ -162,10 +162,18 @@ def _module_path(module_id: str, root: str) -> str:
 
 
 def _name_index(tree, module_id: str) -> Dict[str, str]:
-    """local name -> target symbol/module id, from imports + top-level defs of this module."""
+    """local name -> target symbol/module id, from imports (absolute + relative) + top-level defs."""
     idx: Dict[str, str] = {}
+    pkg = module_id.split(".")[:-1]                 # this module's package parts
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module and \
+        if isinstance(node, ast.ImportFrom) and node.level and node.level > 0:
+            # relative import: `from . / .. import x` — resolve against this module's package
+            base = pkg[: len(pkg) - (node.level - 1)]
+            prefix = ".".join(base + ([node.module] if node.module else []))
+            if prefix:
+                for alias in node.names:
+                    idx[alias.asname or alias.name] = f"{prefix}.{alias.name}"
+        elif isinstance(node, ast.ImportFrom) and node.module and \
                 (node.module.startswith("src.") or node.module.startswith("tools.")):
             base = node.module[4:] if node.module.startswith("src.") else node.module
             for alias in node.names:
@@ -213,13 +221,17 @@ def symbols_of(module_id: str, root: str = ".") -> List[Symbol]:
     except (OSError, SyntaxError):
         return []
     nidx = _name_index(tree, module_id)
+
+    def _marker(n):                                   # a `# calls:` marker applies to its own def
+        return ast.get_source_segment(source, n) or ""
+
     out: List[Symbol] = []
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             sym = Symbol(f"{module_id}.{node.name}", "function",
                          render_signature(node), (ast.get_docstring(node) or "").strip(),
                          module_id)
-            sym.calls = calls_of(node, nidx, marker_text=source)
+            sym.calls = calls_of(node, nidx, marker_text=_marker(node))
             out.append(sym)
         elif isinstance(node, ast.ClassDef):
             cid = f"{module_id}.{node.name}"
@@ -229,6 +241,6 @@ def symbols_of(module_id: str, root: str = ".") -> List[Symbol]:
                 if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     msym = Symbol(f"{cid}.{m.name}", "method",
                                   render_signature(m), (ast.get_docstring(m) or "").strip(), cid)
-                    msym.calls = calls_of(m, nidx, marker_text=source)
+                    msym.calls = calls_of(m, nidx, marker_text=_marker(m))
                     out.append(msym)
     return out

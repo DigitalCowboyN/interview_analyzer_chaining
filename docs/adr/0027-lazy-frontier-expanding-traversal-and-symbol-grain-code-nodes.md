@@ -32,8 +32,9 @@ neighbors on demand, coarse-to-fine).
 - **Symbols are a deeper `level`** (`package | module | symbol`) — top-level functions/classes and a
   class's methods, existence from the AST, context = signature (free) + docstring (derived). No
   frontmatter; a symbol with no docstring still exists (thin, not absent).
-- **`contains` extends to symbol grain**; **pragmatic `calls`/`called_by`** edges resolve a symbol's
-  local-def + imported-symbol + class-instantiation calls from its own file. Inferred-type
+- **`contains` extends to symbol grain**; a **pragmatic `calls`** edge resolves a symbol's local-def +
+  imported-symbol + class-instantiation calls from its own file (absolute and relative imports). The
+  reverse `called_by` is deferred (see Consequences). Inferred-type
   `obj.method()`, inheritance, and dynamic dispatch are **not** resolved (they'd need whole-program
   type inference — a precomputed global index against the ephemeral model); a `# calls:` marker is the
   escape hatch. The `calls` edge is **walk-time only** — never registered in the harvested edge set,
@@ -46,7 +47,8 @@ neighbors on demand, coarse-to-fine).
 This **extends ADR-0025** — the ephemeral, rebuilt-from-source substrate matures from
 full-rebuild-per-call to **incremental, lazy per-frontier expansion** (still ephemeral; now the
 per-node symbol cost is paid only where the walk goes) — and **extends ADR-0020** (adds the `symbol`
-level value and the `calls`/`called_by` edge type to the model). Consistent with **ADR-0019**.
+level value and the walk-time `calls` edge to the model; `called_by` reserved, deferred). Consistent
+with **ADR-0019**.
 
 ## Consequences
 
@@ -56,8 +58,10 @@ level value and the `calls`/`called_by` edge type to the model). Consistent with
 - The graph reaches the real code: an agent can walk from a symbol to its callees (`calls`), up to its
   module and governing capability/ADR (`contained_by` walk-up), and disclose signature→docstring
   on demand.
-- Fidelity ceiling: symbol `calls` are the statically-decidable subset; `called_by` (reverse) is scoped
-  to symbols already materialized in a walk. Both are documented, not hidden.
+- Fidelity ceiling: symbol `calls` are the statically-decidable subset (local + imported, absolute and
+  relative). The **reverse `called_by` is deferred** — finding a symbol's callers requires scanning
+  bodies the walk hasn't visited, against the frontier-lazy model; a walk `in` from a symbol reaches its
+  container (via `contained_by`) but not its callers this milestone. Documented, not hidden.
 - Module-grain behavior, generated catalogs, checks, and the freshness gate are unchanged (harvest is
   retained for the whole-graph renders; symbols/`calls` never enter it).
 - Deferred (recorded in the spec): **full semantic resolution** (inferred-type/inheritance calls — a

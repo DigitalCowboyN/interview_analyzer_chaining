@@ -36,15 +36,6 @@ class Subgraph:
     edges: List[Edge] = field(default_factory=list)
 
 
-def _adjacency(edges: List[Edge]):
-    out = defaultdict(list)   # addr -> list[(neighbor, edge)] following edge direction
-    inc = defaultdict(list)   # addr -> list[(neighbor, edge)] against edge direction
-    for e in edges:
-        out[e.src].append((e.dst, e))
-        inc[e.dst].append((e.src, e))
-    return out, inc
-
-
 # slug -> node type name (inverse of NODE_DOMAINS)
 _SLUG_TYPE = {slug: t for t, slug in NODE_DOMAINS.items()}
 

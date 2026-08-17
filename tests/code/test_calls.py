@@ -32,3 +32,24 @@ def test_calls_marker_escape_hatch(tmp_path):
         "def run(obj):\n    # calls: code:svc.render.draw\n    obj.method()\n", encoding="utf-8")
     by_id = {s.id: s for s in symbols_of("svc.main", str(tmp_path))}
     assert "svc.render.draw" in by_id["svc.main.run"].calls   # asserted by marker
+
+
+def test_calls_resolve_relative_import(tmp_path):
+    # `from .render import draw` (relative) must resolve against the module's package
+    _w(str(tmp_path / "src/svc/__init__.py"), "")
+    _w(str(tmp_path / "src/svc/render.py"), "def draw(x):\n    return x\n")
+    _w(str(tmp_path / "src/svc/main.py"),
+       "from .render import draw\n\ndef run():\n    draw(3)\n")
+    by_id = {s.id: s for s in symbols_of("svc.main", str(tmp_path))}
+    assert "svc.render.draw" in by_id["svc.main.run"].calls
+
+
+def test_calls_marker_is_scoped_to_its_own_function(tmp_path):
+    # a marker in one function must NOT attach to a sibling function in the same module
+    _w(str(tmp_path / "src/svc/__init__.py"), "")
+    _w(str(tmp_path / "src/svc/render.py"), "def draw(x):\n    return x\n")
+    _w(str(tmp_path / "src/svc/main.py"),
+       "def a():\n    # calls: code:svc.render.draw\n    pass\n\ndef b():\n    return 1\n")
+    by_id = {s.id: s for s in symbols_of("svc.main", str(tmp_path))}
+    assert "svc.render.draw" in by_id["svc.main.a"].calls        # marker's own function
+    assert "svc.render.draw" not in by_id["svc.main.b"].calls    # sibling: unaffected

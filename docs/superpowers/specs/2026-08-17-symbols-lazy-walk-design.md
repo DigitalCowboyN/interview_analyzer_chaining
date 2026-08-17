@@ -86,9 +86,10 @@ The `level` axis gains **`symbol`** (`package | module | symbol`). A symbol node
 
 - **`contains`/`contained_by`** extends to symbol grain: a module contains its top-level
   functions/classes; a class contains its methods. Pure AST nesting. This is the disclosure spine.
-- **`calls`/`called_by`** (new edge type, CodeUnit→CodeUnit, derived) — **pragmatic resolution**,
-  done the lazy way: when a symbol is expanded, parse *its body* and resolve `Call` targets against
-  *that file's* imports + local defs:
+- **`calls`** (walk-time edge, CodeUnit→CodeUnit; reverse `called_by` deferred — finding callers needs
+  scanning unvisited bodies, against the frontier-lazy model) — **pragmatic resolution**, done the lazy
+  way: when a symbol is expanded, parse *its body* and resolve `Call` targets against *that file's*
+  imports (absolute and relative) + local defs:
   - `render_index(...)` (local def or `from .render import render_index`) → `calls` →
     `code:tools.code.render.render_index`.
   - `import x; x.foo()` / `from x import foo; foo()` → `code:x.foo`.
