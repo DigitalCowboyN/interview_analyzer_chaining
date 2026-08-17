@@ -129,6 +129,14 @@ def walk(entry, direction: str = "both", depth: Optional[int] = None,
 
     induced = [e for e in used_edges if e.src in visited and e.dst in visited]
     ctx_map = resolve_context(visited, root)
-    nodes = {a: Node(address=a, type=ctx_map.get(a, ("", ""))[0],
-                     context=ctx_map.get(a, ("", ""))[1]) for a in visited}
+    nodes = {}
+    for a in visited:
+        rec = ctx.symbol_record(a.partition(":")[2]) if (
+            level == "symbol" and a.startswith("code:")) else None
+        if rec is not None:                                  # symbol node: signature + docstring
+            body = rec.signature + ("\n" + rec.docstring if rec.docstring else "")
+            nodes[a] = Node(address=a, type="CodeUnit", context=body.strip())
+        else:
+            t, body = ctx_map.get(a, ("", ""))
+            nodes[a] = Node(address=a, type=t, context=body)
     return Subgraph(nodes=nodes, edges=induced)

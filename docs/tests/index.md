@@ -109,6 +109,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `graph.test_reader` (5) → tools.graph  ·  verifies: —
 - `graph.test_registry` (2) → tools.graph  ·  verifies: —
 - `graph.test_render` (2) → tools.graph  ·  verifies: —
+- `graph.test_symbol_walk` (5) → tools.graph  ·  verifies: —
 - `graph.test_traverse` (5) → tools.graph  ·  verifies: —
 - `graph.test_traverse_context` (1) → tools.graph  ·  verifies: —
 - `graph.test_traverse_selectors` (3) → tools.graph  ·  verifies: —
