@@ -28,27 +28,37 @@ expansion, never flat materialization** — realized here as two composing axes:
 
 ## Decision 1 — Lazy, frontier-expanding `walk` (the engine)
 
-Replace "harvest-all + BFS" with **neighbor-on-demand expansion**: `walk` starts at the entry and,
-at each frontier hop, materializes **only that node's neighbors**, so we `ast.parse` only the files
-we actually visit and never touch the rest.
+`walk` becomes **BFS over a `neighbors` seam** rather than over a pre-built full adjacency, so that
+the expensive per-node work — **symbol bodies** — is done **strictly on the frontier**: a module's
+symbols are parsed only when the walk actually reaches that module at `level="symbol"`. The
+~1,160-symbol cost is *never* built eagerly.
 
-- **`neighbors(addr, direction, root, ...) -> list[(neighbor_addr, Edge)]`** — the core new
-  primitive. Dispatches by node type:
-  - **Code/symbol nodes:** structural neighbors computed from *that node's own* file/AST —
-    `contains`/`contained_by` (children from its dir/AST; parent from its id) and outbound
-    `depends_on`/`calls` (from its own imports/body). No global parse.
+The **realization is pragmatic** (owner decision, 2026-08-17): pure per-node expansion of *everything*
+buys ~nothing at module grain — at module grain there are no symbols, so today's `harvest` is already
+"the cheap base with zero symbol cost," and inbound edges ("who imports/implements me") can't be
+computed from a node's own file anyway (they need an index). So:
+
+- **The cheap module/doc base is memoized once per `walk`** (via the existing `harvest`, or an
+  equivalent cheap index) and cached on a `WalkContext` — no symbol bodies, fast (~200 nodes).
+- **Only symbol expansion is frontier-lazy** — `neighbors` splices a module's symbols (nodes +
+  `contains` + `calls`) in on demand, the first time the frontier reaches that module at
+  `level="symbol"`, memoized per module.
+
+- **`neighbors(addr, direction, ctx) -> list[(neighbor_addr, Edge)]`** — the seam. At `level="module"`
+  it returns the cached base edges. At `level="symbol"` it additionally returns a visited module's
+  symbol edges (computed lazily from *that module's* AST).
   - **Inbound authored/intent edges** (`implements`/`governs`/`verifies`/`consumed_by`): come from
     the *doc/test* side pointing *at* code. To answer "what implements code:X" without a full scan,
     build a **cheap reverse index** of the small authored domains (capabilities, ADRs, tests,
     prompts, glossary — dozens of files) **once per walk, cached**. This is the honest nuance: we
     never parse *unvisited code/symbols* (where the ~1,160-node cost lives); the tiny doc domains
     are indexed cheaply. Cache is per-`walk` call (still ephemeral, ADR-0025).
-- **`walk` becomes BFS over `neighbors`** instead of over a pre-built adjacency. Same `Subgraph`
-  output shape (`nodes`, induced `edges`), same `direction`/`depth` semantics.
-- **`harvest()` stays** — it is still how the generated catalogs (`docs/graph/*`) and the
-  non-blocking checks are built (they genuinely need the whole graph). Lazy expansion is for `walk`
-  (the agent-facing traversal), not for the whole-graph renders. `harvest` = `neighbors` closed over
-  every node (or the existing implementation, unchanged) — an equivalence the tests assert.
+- **`walk` becomes BFS over the `neighbors` seam** (base adjacency memoized once per walk; symbol
+  edges spliced lazily on top). Same `Subgraph` output shape (`nodes`, induced `edges`), same
+  `direction`/`depth` semantics.
+- **`harvest()` stays and is unchanged** — it still backs the generated catalogs (`docs/graph/*`) and
+  the non-blocking checks (they genuinely need the whole graph). Symbols/`calls` never enter
+  `harvest` (they'd force eager derivation); they live only on the lazy `walk` path.
 - **Correctness gate (the point of engine-first):** for the existing 8 node types, lazy `walk`
   must produce **identical** `Subgraph`s to today's harvest-based `walk` for the same
   entry/direction/depth. A regression test drives real entries through both and asserts equality.
