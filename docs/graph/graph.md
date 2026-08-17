@@ -912,6 +912,7 @@ graph LR
     n_tests_code_test_discover["tests:code.test_discover"] --> n_code_tools_code["code:tools.code"]
     n_tests_code_test_reader["tests:code.test_reader"] --> n_code_tools_code["code:tools.code"]
     n_tests_code_test_render["tests:code.test_render"] --> n_code_tools_code["code:tools.code"]
+    n_tests_code_test_symbols["tests:code.test_symbols"] --> n_code_tools_code["code:tools.code"]
     n_tests_commands_test_command_handlers["tests:commands.test_command_handlers"] --> n_code_commands["code:commands"]
     n_tests_commands_test_command_handlers_unit["tests:commands.test_command_handlers_unit"] --> n_code_commands["code:commands"]
     n_tests_corpus_test_check["tests:corpus.test_check"] --> n_code_tools_corpus["code:tools.corpus"]

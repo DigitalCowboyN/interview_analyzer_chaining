@@ -122,3 +122,63 @@ def load_units(root: str = ".") -> List[CodeUnit]:
 def dep_edges(root: str = ".") -> Dict[str, List[str]]:
     """unit id -> module-granular depends_on targets (modules only carry deps)."""
     return {u.unit: u.depends_on for u in load_units(root) if u.depends_on}
+
+
+@dataclass
+class Symbol:
+    id: str                                  # dotted, e.g. "api.main.Router.add"
+    kind: str                                # function | class | method
+    signature: str = ""
+    docstring: str = ""
+    parent: str = ""                         # module id, or the class id for a method
+    calls: List[str] = field(default_factory=list)   # filled by Task 3
+
+
+def render_signature(node) -> str:
+    a = node.args
+    parts = [arg.arg for arg in a.args]
+    if a.vararg:
+        parts.append("*" + a.vararg.arg)
+    if a.kwarg:
+        parts.append("**" + a.kwarg.arg)
+    # attach simple defaults to the trailing positional args
+    defaults = list(a.defaults)
+    if defaults:
+        base = len(a.args) - len(defaults)
+        for i, d in enumerate(defaults):
+            try:
+                parts[base + i] = f"{a.args[base + i].arg}={ast.unparse(d)}"
+            except Exception:
+                pass
+    ret = f" -> {ast.unparse(node.returns)}" if getattr(node, "returns", None) else ""
+    return f"{node.name}({', '.join(parts)}){ret}"
+
+
+def _module_path(module_id: str, root: str) -> str:
+    if module_id.startswith("tools."):
+        return os.path.join(root, "tools", *module_id.split(".")[1:]) + ".py"
+    return os.path.join(root, "src", *module_id.split(".")) + ".py"
+
+
+def symbols_of(module_id: str, root: str = ".") -> List[Symbol]:
+    """Top-level functions/classes of a module, and a class's methods (one level of nesting)."""
+    path = _module_path(module_id, root)
+    try:
+        tree = ast.parse(open(path, encoding="utf-8", errors="ignore").read())
+    except (OSError, SyntaxError):
+        return []
+    out: List[Symbol] = []
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            out.append(Symbol(f"{module_id}.{node.name}", "function",
+                              render_signature(node), (ast.get_docstring(node) or "").strip(),
+                              module_id))
+        elif isinstance(node, ast.ClassDef):
+            cid = f"{module_id}.{node.name}"
+            out.append(Symbol(cid, "class", f"class {node.name}",
+                              (ast.get_docstring(node) or "").strip(), module_id))
+            for m in node.body:
+                if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    out.append(Symbol(f"{cid}.{m.name}", "method",
+                                      render_signature(m), (ast.get_docstring(m) or "").strip(), cid))
+    return out
