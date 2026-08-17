@@ -9,9 +9,10 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from tools.graph.reader import Edge, harvest
+from tools.graph.reader import Edge
 from tools.graph.reader import nodes as _all_nodes, _unit_dir
 from tools.graph.registry import NODE_DOMAINS
+from tools.graph.neighbors import WalkContext, neighbors
 from tools.capability.reader import load_capabilities
 from tools.usecase.reader import load_use_cases
 from tools.code.reader import load_units
@@ -100,13 +101,12 @@ def _entry_addresses(entry: str, root: str = ".") -> List[str]:
     return [entry]
 
 
-def walk(entry, direction: str = "both", depth: Optional[int] = None, root: str = ".") -> Subgraph:
-    """Materialize the subgraph reachable from `entry` — a node address, or a selector
-    (`type:<T>` / `under:<path>`) resolved by `_entry_addresses` — following edges
-    `out` | `in` | `both`, to `depth` hops (None = to exhaustion). Rebuilt from source
-    each call (harvest())."""
-    edges = harvest(root)
-    out, inc = _adjacency(edges)
+def walk(entry, direction: str = "both", depth: Optional[int] = None,
+         root: str = ".", level: str = "module") -> Subgraph:
+    """Materialize the subgraph reachable from `entry` by expanding neighbors on demand
+    (lazy, frontier-driven). `level` gates disclosure: 'module' (default) never descends into
+    symbols; 'symbol' expands symbol nodes along the frontier."""
+    ctx = WalkContext(root=root, level=level)
     starts = _entry_addresses(entry, root) if isinstance(entry, str) else list(entry)
 
     visited = set(starts)
@@ -114,19 +114,11 @@ def walk(entry, direction: str = "both", depth: Optional[int] = None, root: str 
     used_edges: List[Edge] = []
     seen_edge = set()
 
-    def _neighbors(addr):
-        pairs = []
-        if direction in ("out", "both"):
-            pairs += out.get(addr, [])
-        if direction in ("in", "both"):
-            pairs += inc.get(addr, [])
-        return pairs
-
     while frontier:
         addr, d = frontier.popleft()
         if depth is not None and d >= depth:
             continue
-        for nbr, e in _neighbors(addr):
+        for nbr, e in neighbors(addr, direction, ctx):
             key = (e.src, e.dst, e.type)
             if key not in seen_edge:
                 seen_edge.add(key)
@@ -135,11 +127,8 @@ def walk(entry, direction: str = "both", depth: Optional[int] = None, root: str 
                 visited.add(nbr)
                 frontier.append((nbr, d + 1))
 
-    # induced edges: only those whose BOTH endpoints are in the visited set
     induced = [e for e in used_edges if e.src in visited and e.dst in visited]
-    ctx = resolve_context(visited, root)
-    nodes = {}
-    for a in visited:
-        t, body = ctx.get(a, ("", ""))
-        nodes[a] = Node(address=a, type=t, context=body)
+    ctx_map = resolve_context(visited, root)
+    nodes = {a: Node(address=a, type=ctx_map.get(a, ("", ""))[0],
+                     context=ctx_map.get(a, ("", ""))[1]) for a in visited}
     return Subgraph(nodes=nodes, edges=induced)

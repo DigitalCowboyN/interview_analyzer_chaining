@@ -297,6 +297,7 @@ graph LR
     tools.graph.classify --> tools.capability.reader
     tools.graph.classify --> tools.code.reader
     tools.graph.classify --> tools.graph.reader
+    tools.graph.neighbors --> tools.graph.reader
     tools.graph.reader --> tools.adr.index
     tools.graph.reader --> tools.capability.reader
     tools.graph.reader --> tools.code.reader
@@ -312,6 +313,7 @@ graph LR
     tools.graph.traverse --> tools.capability.reader
     tools.graph.traverse --> tools.code.reader
     tools.graph.traverse --> tools.glossary.model
+    tools.graph.traverse --> tools.graph.neighbors
     tools.graph.traverse --> tools.graph.reader
     tools.graph.traverse --> tools.graph.registry
     tools.graph.traverse --> tools.graphq.reader

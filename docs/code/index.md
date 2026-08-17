@@ -174,10 +174,11 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | tools.graph.__main__ |  | deterministic | tools.graph.check, tools.graph.reader, tools.graph.render, tools.graph.traverse |
 | tools.graph.check |  | deterministic | tools.graph.reader, tools.graph.registry, tools.graph.render, tools.graph.traverse |
 | tools.graph.classify |  | deterministic | tools.capability.reader, tools.code.reader, tools.graph.reader |
+| tools.graph.neighbors |  | deterministic | tools.graph.reader |
 | tools.graph.reader |  | deterministic | tools.adr.index, tools.capability.reader, tools.code.reader, tools.glossary.model, tools.graph.registry, tools.graphq.reader, tools.prompts.reader, tools.testmap.reader, tools.usecase.reader |
 | tools.graph.registry |  | deterministic |  |
 | tools.graph.render |  | deterministic | tools.graph.reader, tools.graph.registry |
-| tools.graph.traverse |  | deterministic | tools.adr.index, tools.capability.reader, tools.code.reader, tools.glossary.model, tools.graph.reader, tools.graph.registry, tools.graphq.reader, tools.prompts.reader, tools.testmap.reader, tools.usecase.reader |
+| tools.graph.traverse |  | deterministic | tools.adr.index, tools.capability.reader, tools.code.reader, tools.glossary.model, tools.graph.neighbors, tools.graph.reader, tools.graph.registry, tools.graphq.reader, tools.prompts.reader, tools.testmap.reader, tools.usecase.reader |
 | tools.graphq.__main__ |  | deterministic | tools.graphq.check, tools.graphq.reader, tools.graphq.render |
 | tools.graphq.check |  | deterministic | tools.glossary.reader, tools.graphq.reader, tools.graphq.render |
 | tools.graphq.reader |  | deterministic |  |

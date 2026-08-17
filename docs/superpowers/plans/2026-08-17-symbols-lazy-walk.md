@@ -50,7 +50,8 @@ def _harvest_walk(entry, direction, depth, root="."):
     edges = harvest(root)
     out, inc = defaultdict(list), defaultdict(list)
     for e in edges:
-        out[e.src].append((e.dst, e)); inc[e.dst].append((e.src, e))
+        out[e.src].append((e.dst, e))
+        inc[e.dst].append((e.src, e))
     starts = [entry] if isinstance(entry, str) else list(entry)
     visited, frontier, seen = set(starts), deque((s, 0) for s in starts), set()
     used = []
@@ -63,9 +64,11 @@ def _harvest_walk(entry, direction, depth, root="."):
         for nbr, e in nbrs:
             k = (e.src, e.dst, e.type)
             if k not in seen:
-                seen.add(k); used.append(e)
+                seen.add(k)
+                used.append(e)
             if nbr not in visited:
-                visited.add(nbr); frontier.append((nbr, d + 1))
+                visited.add(nbr)
+                frontier.append((nbr, d + 1))
     return visited, {(e.src, e.dst, e.type) for e in used if e.src in visited and e.dst in visited}
 
 
