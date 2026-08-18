@@ -10,3 +10,9 @@
 | src/persistence/ | 0001 |
 | src/projections/ | 0003 |
 | src/resolution/ | 0011 |
+| tools/code/ | 0026 |
+| tools/code/reader | 0027 |
+| tools/corpus/ | 0024 |
+| tools/graph/ | 0020 |
+| tools/graph/neighbors | 0025, 0027 |
+| tools/graph/traverse | 0025, 0027 |

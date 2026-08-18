@@ -8,10 +8,10 @@
 | child_of | parent_of | Capability → Capability | authored | — | 41 |
 | depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 375 |
 | contains | contained_by | CodeUnit → CodeUnit | derived | — | 166 |
-| governs | governed_by | ADR → CodeUnit | authored | — | 80 |
+| governs | governed_by | ADR → CodeUnit | authored | — | 104 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 55 |
-| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 211 |
+| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 212 |
 | defined_in | defines | GlossaryTerm → CodeUnit | authored | — | 110 |
 | consumed_by | consumes | GraphQuery → CodeUnit | derived | — | 61 |
 | consumed_by | consumes | Prompt → CodeUnit | derived | — | 61 |
@@ -24,7 +24,7 @@
 - GlossaryTerm: 111
 - GraphQuery: 33
 - Prompt: 28
-- Test: 212
+- Test: 213
 - UseCase: 21
 
 ## Meta-schema

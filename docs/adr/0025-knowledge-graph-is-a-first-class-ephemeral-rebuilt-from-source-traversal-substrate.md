@@ -6,6 +6,9 @@ status: accepted
 date: 2026-08-15
 supersedes: []
 superseded_by: []
+governs:
+  - tools/graph/traverse
+  - tools/graph/neighbors
 tags: [adr, knowledge-management, okf, graph, tooling, context-engineering]
 source: docs/superpowers/specs/2026-08-15-first-class-knowledge-graph-program-design.md
 ---
