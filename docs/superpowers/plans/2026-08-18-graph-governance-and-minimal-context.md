@@ -12,7 +12,11 @@
 
 ## Global Constraints
 
-- **`governs` paths are directory/module style, no `.py`** — verified: `tools/graph/traverse` resolves to `code:tools.graph.traverse`; `…/traverse.py` resolves to nothing.
+- **`governs` paths:** directories (`tools/graph/`) resolve by prefix; **specific files use `.py`**
+  (`tools/graph/traverse.py`) — `_units_under` was enhanced to resolve a `.py` path to its module node
+  via `_unit_of_file`. The `.py` form is required so the path also passes `adr-check`'s
+  `os.path.exists` and matches the `scan_markers` file-key. (Bare `tools/graph/traverse` resolves the
+  graph edge but does NOT exist on disk — hence `.py`.)
 - **Only true `governs` edges** — each added edge must genuinely reflect the ADR constraining that code; every new edge must resolve (no dangling, per `graph-check`).
 - **Module-grain `walk` is unchanged** — `gather_context` is additive; the harvest-equivalence regression stays green.
 - **Names verbatim:** `gather_context(entry, root=".", level="module", max_up=6)`, CLI `context` subcommand, `walk --level`.

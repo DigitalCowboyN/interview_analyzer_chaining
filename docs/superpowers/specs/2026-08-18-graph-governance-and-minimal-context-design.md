@@ -38,9 +38,11 @@ pointing at the `tools/` code it actually decides:
 | 0026 — hierarchical code intake | `tools/code` |
 | 0027 — lazy walk + symbols | `tools/graph/traverse`, `tools/graph/neighbors`, `tools/code/reader` |
 
-- Paths are **directory/module style, no `.py`** (`tools/graph/traverse`, not `…/traverse.py`) —
-  that's what `_units_under`'s prefix match against `_unit_dir` requires; a build step verifies each
-  new `governs` edge resolves to a real node (no dangling).
+- Paths are **directories** (`tools/graph/`) for broad ADRs and **specific `.py` files**
+  (`tools/graph/traverse.py`) for precise ones — `_units_under` was enhanced to resolve a `.py` path
+  to its module node (via `_unit_of_file`), so the `.py` form both resolves the graph edge AND passes
+  `adr-check`'s on-disk existence check + matches the `governed-by` marker key. Reciprocal
+  `# governed-by:` markers are added to the governed files, and `adr-check` scans `tools/`.
 - Only edges that are **genuinely true** are added (the ADR really constrains that code). This is
   authored intent, guarded by `adr-check` staleness like every other `governs` edge — not a blanket
   auto-link.
