@@ -7,9 +7,9 @@ date: 2026-08-17
 supersedes: []
 superseded_by: []
 governs:
-  - tools/graph/traverse
-  - tools/graph/neighbors
-  - tools/code/reader
+  - tools/graph/traverse.py
+  - tools/graph/neighbors.py
+  - tools/code/reader.py
 tags: [adr, knowledge-management, okf, graph, code, traversal, tooling]
 source: docs/superpowers/specs/2026-08-17-symbols-lazy-walk-design.md
 ---

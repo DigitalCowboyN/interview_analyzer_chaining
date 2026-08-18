@@ -7,8 +7,8 @@ date: 2026-08-15
 supersedes: []
 superseded_by: []
 governs:
-  - tools/graph/traverse
-  - tools/graph/neighbors
+  - tools/graph/traverse.py
+  - tools/graph/neighbors.py
 tags: [adr, knowledge-management, okf, graph, tooling, context-engineering]
 source: docs/superpowers/specs/2026-08-15-first-class-knowledge-graph-program-design.md
 ---

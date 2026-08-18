@@ -4,6 +4,7 @@ under `src/` and `tools/`: a directory holding `.py` files is a package, each no
 file a module, its docstring becomes the description, and its `from`/`import` statements
 resolve to `depends_on` edges. The heart of the derived code graph; `load_units` is the
 registry every other `tools.*` domain reads."""
+# governed-by: ADR-0027
 
 from __future__ import annotations
 

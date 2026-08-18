@@ -2,6 +2,7 @@
 subgraph from source on each call — the LLM working-context substrate (ADR-0025) —
 resolving each node's claim/context via the per-type `_CONTEXT` table. Separate from the
 transcript Neo4j graph."""
+# governed-by: ADR-0025 ADR-0027
 from __future__ import annotations
 
 import os
