@@ -28,6 +28,14 @@ _SRC_TREES = (("src", ""), ("tools", "tools."))
 _IMPORT_DOTTED = re.compile(r"^\s*(?:from|import)\s+((?:src|tools)\.[\w.]+)", re.M)
 _CALLS_MARKER = re.compile(r"#\s*calls:\s*code:([\w.]+)")
 
+# builtin container/str/obj method names — an `x.get()` / `x.append()` call is not a graph edge
+_BUILTIN_METHODS = frozenset({
+    "get", "keys", "values", "items", "pop", "setdefault", "update", "copy", "clear",
+    "append", "extend", "insert", "add", "discard", "remove", "sort", "reverse", "index",
+    "count", "join", "split", "lstrip", "rstrip", "strip", "format", "replace", "startswith",
+    "endswith", "lower", "upper", "encode", "decode", "read", "write", "close",
+})
+
 
 def _docstring(path: str) -> str:
     try:
@@ -203,7 +211,7 @@ def calls_of(func_node, name_index: Dict[str, str], marker_text: str = "") -> Li
             if isinstance(f, ast.Name) and f.id in name_index:          # foo()
                 out.add(name_index[f.id])
             elif isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) \
-                    and f.value.id in name_index:                       # mod.foo()
+                    and f.value.id in name_index and f.attr not in _BUILTIN_METHODS:  # mod.foo()
                 out.add(f"{name_index[f.value.id]}.{f.attr}")
             # obj.method() on an unknown Name -> not in name_index -> skipped (ceiling)
     return sorted(out)
