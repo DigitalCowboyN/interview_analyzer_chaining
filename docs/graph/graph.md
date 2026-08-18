@@ -990,6 +990,7 @@ graph LR
     n_tests_graph_test_check["tests:graph.test_check"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_classify["tests:graph.test_classify"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_cli["tests:graph.test_cli"] --> n_code_tools_graph["code:tools.graph"]
+    n_tests_graph_test_context_cli["tests:graph.test_context_cli"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_gather_context["tests:graph.test_gather_context"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_lazy_walk["tests:graph.test_lazy_walk"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_nodeset_glossary["tests:graph.test_nodeset_glossary"] --> n_code_tools_graph["code:tools.graph"]
