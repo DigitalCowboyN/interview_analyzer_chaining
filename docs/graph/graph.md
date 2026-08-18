@@ -104,6 +104,8 @@ graph LR
     n_capabilities_stitch_utterances["capabilities:stitch-utterances"] --> n_code_ingestion_stitcher["code:ingestion.stitcher"]
     n_capabilities_tag_topics_keywords["capabilities:tag-topics-keywords"] --> n_code_agents["code:agents"]
     n_capabilities_tag_topics_keywords["capabilities:tag-topics-keywords"] --> n_code_enrichment_executor["code:enrichment.executor"]
+    n_capabilities_walk_the_graph_for_context["capabilities:walk-the-graph-for-context"] --> n_code_tools_graph_neighbors["code:tools.graph.neighbors"]
+    n_capabilities_walk_the_graph_for_context["capabilities:walk-the-graph-for-context"] --> n_code_tools_graph_traverse["code:tools.graph.traverse"]
     n_capabilities_workbench_write["capabilities:workbench-write"] --> n_code_api["code:api"]
     n_capabilities_workbench_write["capabilities:workbench-write"] --> n_code_commands["code:commands"]
 ```
@@ -151,6 +153,7 @@ graph LR
     n_capabilities_segment_conversation["capabilities:segment-conversation"] --> n_capabilities_ingest_transcripts["capabilities:ingest-transcripts"]
     n_capabilities_stitch_utterances["capabilities:stitch-utterances"] --> n_capabilities_ingest_transcripts["capabilities:ingest-transcripts"]
     n_capabilities_tag_topics_keywords["capabilities:tag-topics-keywords"] --> n_capabilities_enrich_fragments["capabilities:enrich-fragments"]
+    n_capabilities_walk_the_graph_for_context["capabilities:walk-the-graph-for-context"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
     n_capabilities_workbench_write["capabilities:workbench-write"] --> n_capabilities_serve_workbench_and_gallery["capabilities:serve-workbench-and-gallery"]
 ```
 
@@ -820,6 +823,9 @@ graph LR
     n_use_cases_export_my_analysis_to_take_elsewhere["use-cases:export-my-analysis-to-take-elsewhere"] --> n_capabilities_assemble_bundle["capabilities:assemble-bundle"]
     n_use_cases_export_my_analysis_to_take_elsewhere["use-cases:export-my-analysis-to-take-elsewhere"] --> n_capabilities_export_a_portable_bundle["capabilities:export-a-portable-bundle"]
     n_use_cases_export_my_analysis_to_take_elsewhere["use-cases:export-my-analysis-to-take-elsewhere"] --> n_capabilities_render_bundle["capabilities:render-bundle"]
+    n_use_cases_gather_context_with_the_graph["use-cases:gather-context-with-the-graph"] --> n_capabilities_link_the_domains["capabilities:link-the-domains"]
+    n_use_cases_gather_context_with_the_graph["use-cases:gather-context-with-the-graph"] --> n_capabilities_map_the_code["capabilities:map-the-code"]
+    n_use_cases_gather_context_with_the_graph["use-cases:gather-context-with-the-graph"] --> n_capabilities_walk_the_graph_for_context["capabilities:walk-the-graph-for-context"]
     n_use_cases_get_a_grounded_answer_from_my_corpus["use-cases:get-a-grounded-answer-from-my-corpus"] --> n_capabilities_ask_the_corpus["capabilities:ask-the-corpus"]
     n_use_cases_get_a_grounded_answer_from_my_corpus["use-cases:get-a-grounded-answer-from-my-corpus"] --> n_capabilities_cited_synthesis["capabilities:cited-synthesis"]
     n_use_cases_get_a_grounded_answer_from_my_corpus["use-cases:get-a-grounded-answer-from-my-corpus"] --> n_capabilities_hybrid_retrieval["capabilities:hybrid-retrieval"]

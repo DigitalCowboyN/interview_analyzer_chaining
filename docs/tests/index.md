@@ -231,6 +231,7 @@ Use-cases:
 - correct-what-the-system-got-wrong: VERIFIED
 - diagnose-a-stalled-analysis: UNVERIFIED
 - export-my-analysis-to-take-elsewhere: PARTIALLY_VERIFIED
+- gather-context-with-the-graph: PARTIALLY_VERIFIED
 - get-a-grounded-answer-from-my-corpus: VERIFIED
 - govern-decisions-and-hold-specs-honest: VERIFIED
 - keep-the-codebase-legible: UNVERIFIED
@@ -302,4 +303,5 @@ Capabilities:
 - serve-workbench-and-gallery: PARTIALLY_VERIFIED
 - stitch-utterances: PARTIALLY_VERIFIED
 - tag-topics-keywords: PARTIALLY_VERIFIED
+- walk-the-graph-for-context: UNVERIFIED
 - workbench-write: VERIFIED
