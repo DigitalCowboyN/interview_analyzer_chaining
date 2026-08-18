@@ -103,6 +103,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `graph.test_check` (4) → tools.graph  ·  verifies: —
 - `graph.test_classify` (3) → tools.graph  ·  verifies: —
 - `graph.test_cli` (3) → tools.graph  ·  verifies: —
+- `graph.test_gather_context` (2) → tools.graph  ·  verifies: —
 - `graph.test_lazy_walk` (1) → tools.graph  ·  verifies: —
 - `graph.test_nodeset_glossary` (2) → tools.graph  ·  verifies: —
 - `graph.test_nodeset_query_prompt` (2) → tools.graph  ·  verifies: —

@@ -132,3 +132,29 @@ def walk(entry, direction: str = "both", depth: Optional[int] = None,
             t, body = ctx_map.get(a, ("", ""))
             nodes[a] = Node(address=a, type=t, context=body)
     return Subgraph(nodes=nodes, edges=induced)
+
+
+_INTENT_SLUGS = ("capabilities", "use-cases", "adr")
+
+
+def gather_context(entry, root: str = ".", level: str = "module", max_up: int = 6) -> Subgraph:
+    """The minimal necessary context for a task targeting `entry`: walk UP progressively (following
+    `in` edges) until the nearest governing intent (capability / use-case / ADR) appears — the
+    shortest path up — unioned with the entry's direct OUT-neighbors (its deps / calls / contained
+    symbols). Far smaller than the full closure; the agent-facing 'give me the right small context'."""
+    up = walk(entry, direction="in", depth=1, root=root, level=level)
+    for d in range(2, max_up + 1):
+        if any(a.partition(":")[0] in _INTENT_SLUGS for a in up.nodes):
+            break
+        up = walk(entry, direction="in", depth=d, root=root, level=level)
+    out = walk(entry, direction="out", depth=1, root=root, level=level)
+
+    nodes = dict(up.nodes)
+    nodes.update(out.nodes)
+    seen, edges = set(), []
+    for e in list(up.edges) + list(out.edges):
+        k = (e.src, e.dst, e.type)
+        if k not in seen:
+            seen.add(k)
+            edges.append(e)
+    return Subgraph(nodes=nodes, edges=edges)
