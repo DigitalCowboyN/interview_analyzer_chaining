@@ -6,6 +6,8 @@ status: accepted
 date: 2026-08-16
 supersedes: []
 superseded_by: []
+governs:
+  - tools/code/
 tags: [adr, knowledge-management, okf, graph, code, tooling]
 source: docs/superpowers/specs/2026-08-16-hierarchical-code-intake-design.md
 ---

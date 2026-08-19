@@ -3,6 +3,7 @@
 file/AST/id (outbound + structural) and from a per-walk cached base index (module/doc grain),
 so a traversal never eagerly builds symbols. Symbol expansion (level='symbol') parses a module's
 bodies only when the frontier reaches it — memoized per module on the WalkContext."""
+# governed-by: ADR-0025 ADR-0027
 from __future__ import annotations
 
 from dataclasses import dataclass, field

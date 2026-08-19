@@ -50,7 +50,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `cli.test_cli` (2) → tools.cli  ·  verifies: —
 - `cli.test_reader` (2) → tools.cli  ·  verifies: —
 - `cli.test_render` (2) → tools.cli  ·  verifies: —
-- `code.test_calls` (4) → tools.code  ·  verifies: —
+- `code.test_calls` (5) → tools.code  ·  verifies: —
 - `code.test_check` (3) → tools.code  ·  verifies: —
 - `code.test_cli` (1) → tools.code  ·  verifies: —
 - `code.test_discover` (4) → tools.code  ·  verifies: —
@@ -103,6 +103,8 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `graph.test_check` (4) → tools.graph  ·  verifies: —
 - `graph.test_classify` (3) → tools.graph  ·  verifies: —
 - `graph.test_cli` (3) → tools.graph  ·  verifies: —
+- `graph.test_context_cli` (2) → tools.graph  ·  verifies: —
+- `graph.test_gather_context` (2) → tools.graph  ·  verifies: —
 - `graph.test_lazy_walk` (1) → tools.graph  ·  verifies: —
 - `graph.test_nodeset_glossary` (2) → tools.graph  ·  verifies: —
 - `graph.test_nodeset_query_prompt` (2) → tools.graph  ·  verifies: —
@@ -111,6 +113,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `graph.test_registry` (2) → tools.graph  ·  verifies: —
 - `graph.test_render` (2) → tools.graph  ·  verifies: —
 - `graph.test_symbol_walk` (5) → tools.graph  ·  verifies: —
+- `graph.test_tooling_governs` (2) → tools.graph  ·  verifies: —
 - `graph.test_traverse` (5) → tools.graph  ·  verifies: —
 - `graph.test_traverse_context` (1) → tools.graph  ·  verifies: —
 - `graph.test_traverse_selectors` (3) → tools.graph  ·  verifies: —
@@ -231,6 +234,7 @@ Use-cases:
 - correct-what-the-system-got-wrong: VERIFIED
 - diagnose-a-stalled-analysis: UNVERIFIED
 - export-my-analysis-to-take-elsewhere: PARTIALLY_VERIFIED
+- gather-context-with-the-graph: PARTIALLY_VERIFIED
 - get-a-grounded-answer-from-my-corpus: VERIFIED
 - govern-decisions-and-hold-specs-honest: VERIFIED
 - keep-the-codebase-legible: UNVERIFIED
@@ -302,4 +306,5 @@ Capabilities:
 - serve-workbench-and-gallery: PARTIALLY_VERIFIED
 - stitch-utterances: PARTIALLY_VERIFIED
 - tag-topics-keywords: PARTIALLY_VERIFIED
+- walk-the-graph-for-context: UNVERIFIED
 - workbench-write: VERIFIED

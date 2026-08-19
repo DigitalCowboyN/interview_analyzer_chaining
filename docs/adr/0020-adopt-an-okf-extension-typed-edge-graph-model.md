@@ -6,6 +6,8 @@ status: accepted
 date: 2026-08-06
 supersedes: []
 superseded_by: []
+governs:
+  - tools/graph/
 tags: [adr, knowledge-management, okf, graph, tooling]
 source: docs/superpowers/specs/2026-08-06-graph-links-model-design.md
 ---

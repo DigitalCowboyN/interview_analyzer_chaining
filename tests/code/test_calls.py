@@ -53,3 +53,17 @@ def test_calls_marker_is_scoped_to_its_own_function(tmp_path):
     by_id = {s.id: s for s in symbols_of("svc.main", str(tmp_path))}
     assert "svc.render.draw" in by_id["svc.main.a"].calls        # marker's own function
     assert "svc.render.draw" not in by_id["svc.main.b"].calls    # sibling: unaffected
+
+
+def test_builtin_method_calls_are_not_edges(tmp_path):
+    # `render` IS imported (in the name index), so render.get() WOULD resolve to svc.render.get
+    # without the denylist — this genuinely exercises _BUILTIN_METHODS, not the pre-existing guard.
+    _w(str(tmp_path / "src/svc/__init__.py"), "")
+    _w(str(tmp_path / "src/svc/render.py"), "def harvest():\n    return 1\n")
+    _w(str(tmp_path / "src/svc/m.py"),
+       "from src.svc import render\n\n"
+       "def run():\n    render.get('x')\n    render.harvest()\n")
+    by_id = {s.id: s for s in symbols_of("svc.m", str(tmp_path))}
+    calls = set(by_id["svc.m.run"].calls)
+    assert "svc.render.harvest" in calls              # real submodule call kept
+    assert "svc.render.get" not in calls              # render.get() -> builtin denylist, dropped

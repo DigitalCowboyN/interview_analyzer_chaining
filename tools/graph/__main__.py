@@ -1,7 +1,9 @@
 """CLI entry point for the cross-domain graph (`python -m tools.graph <cmd>`): `index`
 regenerates `docs/graph/index.md` + `graph.md` from a fresh harvest, `check` runs the
 non-blocking drift/reachability checks, `neighbors` lists a node's inbound/outbound edges,
-and `walk` prints the ephemeral subgraph reachable from an entry address or selector."""
+`walk` prints the ephemeral subgraph reachable from an entry (`--dir`/`--depth`/`--level
+module|symbol`), and `context` prints the minimal task-context subgraph (walk up to the nearest
+governing intent + local neighborhood) for an entry."""
 from __future__ import annotations
 
 import argparse
@@ -55,18 +57,28 @@ def cmd_neighbors(args) -> int:
     return 0
 
 
-def cmd_walk(args) -> int:
-    from tools.graph.traverse import walk
-    depth = None if args.depth == "full" else int(args.depth)
-    sg = walk(args.entry, direction=args.dir, depth=depth)
-    print(f"subgraph from {args.entry} (dir={args.dir}, depth={args.depth}): "
-          f"{len(sg.nodes)} nodes, {len(sg.edges)} edges")
+def _print_subgraph(entry, sg, meta) -> None:
+    print(f"subgraph from {entry} ({meta}): {len(sg.nodes)} nodes, {len(sg.edges)} edges")
     for addr in sorted(sg.nodes):
         n = sg.nodes[addr]
         head = n.context.splitlines()[0] if n.context else ""
         print(f"  {addr}  [{n.type}]  {head[:80]}")
     for e in sg.edges:
         print(f"    {e.src} --{e.type}--> {e.dst}")
+
+
+def cmd_walk(args) -> int:
+    from tools.graph.traverse import walk
+    depth = None if args.depth == "full" else int(args.depth)
+    sg = walk(args.entry, direction=args.dir, depth=depth, level=args.level)
+    _print_subgraph(args.entry, sg, f"dir={args.dir}, depth={args.depth}, level={args.level}")
+    return 0
+
+
+def cmd_context(args) -> int:
+    from tools.graph.traverse import gather_context
+    sg = gather_context(args.entry, level=args.level)
+    _print_subgraph(args.entry, sg, f"minimal context, level={args.level}")
     return 0
 
 
@@ -81,12 +93,17 @@ def main(argv=None) -> int:
     wp.add_argument("entry")
     wp.add_argument("--dir", default="both", choices=["out", "in", "both"])
     wp.add_argument("--depth", default="full")
+    wp.add_argument("--level", default="module", choices=["module", "symbol"])
+    cp = sub.add_parser("context")
+    cp.add_argument("entry")
+    cp.add_argument("--level", default="module", choices=["module", "symbol"])
     args = parser.parse_args(argv)
     return {
         "index": cmd_index,
         "check": cmd_check,
         "neighbors": cmd_neighbors,
         "walk": cmd_walk,
+        "context": cmd_context,
     }[args.cmd](args)
 
 

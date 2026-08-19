@@ -132,6 +132,13 @@ As an operator responsible for the system's integrity, I want every change captu
 
 ### use-case
 
+#### gather-context-with-the-graph — FULLY_COVERED
+As a maintainer (often working through an AI agent that carries no memory forward), I want to walk the codebase's own knowledge graph to gather the correct, minimal context at the right layer for whatever task I'm on — tracing code up to the intent that governs it and out to what it relates to — so I spend effort on the task, not on re-reading the whole system.
+
+- **actor:** maintainer
+- **fulfilled_by:** walk-the-graph-for-context, link-the-domains, map-the-code
+- **acceptance_criteria:** 3
+
 #### keep-the-codebase-legible — PARTIALLY_COVERED
 As a maintainer inheriting a system built and extended across many sessions — including by AI agents that don't carry memory forward — I want the codebase's own knowledge to explain itself, so work compounds instead of every session rediscovering the same ground.
 

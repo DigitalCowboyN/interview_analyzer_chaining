@@ -60,6 +60,8 @@ def _unit_dir(unit: str) -> str:
 
 
 def _units_under(path: str, code_ids: Set[str]) -> Set[str]:
+    if path.endswith(".py"):                            # a specific file -> its module node
+        return set(_unit_of_file(path, code_ids))
     p = path if path.endswith("/") else path + "/"
     return {u for u in code_ids if _unit_dir(u).startswith(p)}
 

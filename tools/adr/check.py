@@ -192,7 +192,7 @@ def check_governs_staleness(adrs: List[Adr],
 
 def run_all(adr_dir: str, specs_dir: str, root: str = ".") -> List[Finding]:
     adrs = load_bundle(adr_dir)
-    markers = scan_markers(root)
+    markers = scan_markers(root, subdirs=("src", "tools"))
     findings: List[Finding] = []
     findings += check_structural(adrs)
     findings += check_generated_in_sync(adr_dir, adrs)
