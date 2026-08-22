@@ -396,8 +396,11 @@ def main(argv=None) -> int:
             if not os.path.exists(path):
                 continue
             rec = json.load(open(path, encoding="utf-8"))
-            rec["verdict"] = run_judge(s, rec["answer"], rec["trajectory"]) \
-                if probe() else rec.get("verdict", {"verdict": "fail", "rationale": "no judge"})
+            # Prefer a verdict the session-driven judge already wrote; only fall back to a headless
+            # judge (Mode A) when the record has none.
+            if "verdict" not in rec:
+                rec["verdict"] = (run_judge(s, rec["answer"], rec["trajectory"]) if probe()
+                                  else {"verdict": "fail", "rationale": "no judge available"})
             records.append(rec)
     else:                                             # Mode A: fully headless
         if not probe():

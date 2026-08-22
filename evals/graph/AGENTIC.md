@@ -99,3 +99,20 @@ verdicts by hand; `aggregate()` only needs a `verdict` key per record, however i
 `evals/graph/.runs/` is scratch — it is listed in `.gitignore` and must never be committed. Clear
 it (or just let the next run overwrite it) once you've captured the aggregate result you need
 (e.g. pasted into `evals/graph/RESULTS.md` or a spec's baseline section).
+
+## Optional: run Layer 1 as a pre-commit check (local, non-blocking)
+
+The deterministic Layer-1 scorecard is fast and CI-safe; wire it as a local pre-commit if you want
+regressions surfaced before each commit. Install a git hook (opt-in — the repo does not force one):
+
+```bash
+cat > .git/hooks/pre-commit <<'HOOK'
+#!/usr/bin/env bash
+# Non-blocking: print the graph agentic-fitness scorecard; never fail the commit.
+make eval-graph || true
+HOOK
+chmod +x .git/hooks/pre-commit
+```
+
+Layer 2 (`make eval-graph-agentic` / this routine) stays **manual** — it spawns real agents on the
+subscription and is not suited to run on every commit.

@@ -30,6 +30,8 @@
 | es-logs | internal | Tail event sourcing logs |
 | es-status | internal | Show event sourcing system status |
 | es-up | internal | Start EventStore + projection service |
+| eval-graph | everyday | Layer-1 agentic-fitness scorecard (deterministic; does the graph surface gold context?) |
+| eval-graph-agentic | everyday | Layer-2 agentic eval (subscription; Mode A headless probe, else Mode B — see evals/graph/AGENTIC.md) |
 | eventstore-clear | internal | Delete all EventStoreDB data (destructive) |
 | eventstore-down | internal | Stop EventStoreDB |
 | eventstore-health | internal | Check EventStoreDB health |

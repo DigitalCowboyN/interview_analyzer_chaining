@@ -40,3 +40,24 @@ By expected (mean recall) — gap/partial are meant to be low (the roadmap):
   partial    recall=0.88  n=2
   solvable   recall=0.98  n=11
 ```
+
+## Layer 2 (agentic) — baseline
+
+**Mechanism (finding):** the headless-subscription probe (`--probe`) returns `True` for a trivial call,
+but a full multi-turn tool-using `claude -p` agent nested inside a driving session did **not** complete
+reliably here. Per the owner's constraint (subscription only, "if headless doesn't work, pre-commit
+routine here"), **Mode B — the subagent-driven routine (`AGENTIC.md`)** — is the shipping path. It uses
+subagents (subscription-backed) as the agent-under-test and the judge; `agentic.py`'s prompt builders,
+`.runs/` records, and rubric are shared. Mode A stays wired for environments where headless runs cleanly.
+
+**Baseline run (Mode B):**
+
+| scenario | category | expected | verdict | dims (ans/ctx/traj/hon) |
+| --- | --- | --- | --- | --- |
+| govern-projection-service | governance | solvable | **pass** | 2/2/2/2 |
+
+Trajectory: `CONTEXT projection_service` → `WALK adr:3 both full`. The agent found `adr:3 --governs-->`
+the service (via the govern edges added in the prior milestone), verified no `superseded_by` edge, and
+answered correctly + grounded. Corroborating: the pre-milestone in-session eval redo ran two more
+scenarios via this same loop — a trace (`derive_axes → capability`, pass) and the govern-gap case
+(correctly reported "no ADR governs the traversal tooling", pass) — the escape-hatch/honesty case.
