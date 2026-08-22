@@ -160,3 +160,6 @@ frontend/node_modules/
 frontend/.next/
 frontend/test-results/
 frontend/coverage/
+
+# Layer-2 agentic eval Mode B scratch runs (session-driven; never committed)
+evals/graph/.runs/

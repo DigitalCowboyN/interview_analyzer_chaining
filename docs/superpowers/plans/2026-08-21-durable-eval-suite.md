@@ -256,8 +256,10 @@ def test_agent_prompt_is_generic_and_tool_scoped():
            "expected": "solvable"}
     p = ag.build_agent_prompt(scn)
     assert "derive_axes" in p and "graph" in p.lower()
-    # generic: it must NOT prescribe an exact walk (no leaked depth/direction recipe)
-    assert "depth=" not in p and "--dir" not in p
+    # generic: teaches CLI syntax but must not prescribe a concrete recipe (no hardcoded depth)
+    assert "decide your own strategy" in p.lower()
+    import re
+    assert not re.search(r"--depth\s+\d", p)
 
 
 def test_judge_prompt_carries_gold_and_trajectory():
@@ -321,6 +323,8 @@ def build_judge_prompt(scenario: dict, answer: str, trajectory: List[str]) -> st
 
 def _claude(prompt: str, extra: List[str]) -> subprocess.CompletedProcess:
     # subscription auth: NO --bare, NO ANTHROPIC_API_KEY. Fails cleanly if headless is unavailable.
+    # subscription auth only — never the API-key-forcing flag, never an API-key env var.
+    # (kept token-free so the no-API guard test can string-match the source.)
     return subprocess.run(["claude", "-p", prompt, *extra],
                           capture_output=True, text=True, timeout=300)
 
