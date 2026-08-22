@@ -111,6 +111,14 @@ knowledge-check: ## Reconcile specs/plans + cascade root vs the knowledge domain
 corpus-check: ## Reconcile the OKF corpus: every record discoverable by type, none misfiled (non-blocking)
 	@$(PYTHON) -m tools.corpus check
 
+.PHONY: eval-graph
+eval-graph: ## Layer-1 agentic-fitness scorecard (deterministic; does the graph surface gold context?)
+	@$(PYTHON) -m evals.graph.run --results
+
+.PHONY: eval-graph-agentic
+eval-graph-agentic: ## Layer-2 agentic eval (subscription; Mode A headless probe, else Mode B — see evals/graph/AGENTIC.md)
+	@$(PYTHON) -m evals.graph.agentic --probe
+
 .PHONY: capability-index
 capability-index: ## Regenerate docs/capabilities/index.md (the capability catalogue)
 	@$(PYTHON) -m tools.capability index

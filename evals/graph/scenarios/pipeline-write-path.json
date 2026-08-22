@@ -1,0 +1,11 @@
+{
+  "id": "pipeline-write-path",
+  "category": "pipeline",
+  "level": "subsystem",
+  "task": "A user submits a correction command. Trace what happens to it end to end — through the event store, the projection service, into the read model the API serves.",
+  "entry": ["code:commands"],
+  "gold_context": ["code:commands", "code:events", "code:projections.projection_service", "code:api"],
+  "expected": "gap",
+  "gap_note": "This is a RUNTIME/async path (command -> ESDB event -> projection service -> Neo4j read model -> API). The graph has no edge spanning it; only the entry is reachable. Closes when flow/architecture-nodes land.",
+  "source": "hand-authored, gold verified against live graph"
+}

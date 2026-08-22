@@ -15,5 +15,7 @@
     "code:tools.graph.traverse"
   ],
   "gold_answer": "tools.graph builds and serves the cross-domain knowledge graph: registry (node/edge types), reader (harvest nodes+edges), traverse (walk), render (catalogs/mermaid), check (non-blocking guards), classify (derived category/determinism axes), __main__ (CLI).",
-  "source": "manual — package module listing"
+  "source": "manual — package module listing",
+  "expected": "solvable",
+  "level": "subsystem"
 }

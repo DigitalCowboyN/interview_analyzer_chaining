@@ -1,0 +1,10 @@
+{
+  "id": "add-enrichment-extractor",
+  "category": "new-component",
+  "level": "module",
+  "task": "I want to add a new enrichment extractor (a new analysis dimension). Show me the registry it plugs into and the governing decision.",
+  "entry": ["code:enrichment.registry"],
+  "gold_context": ["code:enrichment.registry", "code:enrichment.orchestrator", "adr:5"],
+  "expected": "solvable",
+  "source": "hand-authored, gold verified against live graph"
+}

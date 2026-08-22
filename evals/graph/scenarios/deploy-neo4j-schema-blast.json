@@ -1,0 +1,16 @@
+{
+  "id": "deploy-neo4j-schema-blast",
+  "category": "deployment",
+  "level": "subsystem",
+  "task": "If I change the Neo4j graph schema, what downstream code could break?",
+  "entry": ["code:projections.schema"],
+  "gold_context": [
+    "code:projections.schema",
+    "code:projections.ensure_schema",
+    "code:persistence.graph_persistence",
+    "adr:3"
+  ],
+  "expected": "partial",
+  "gap_note": "Some schema-adjacent code is reachable, but the full set of read-side consumers of the Neo4j schema is not connected by a single edge type, so the blast radius is only partially recoverable. Improves with flow/consumer edges.",
+  "source": "hand-authored, gold verified against live graph"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "refactor-resolution-engine",
+  "category": "refactor",
+  "level": "subsystem",
+  "task": "I'm refactoring the entity-resolution engine. Gather the context I need: the code it spans, the decision that governs it, and the capabilities it serves.",
+  "entry": ["code:resolution.engine"],
+  "gold_context": [
+    "code:resolution.engine",
+    "code:resolution",
+    "adr:11",
+    "capabilities:resolve-entities-and-people"
+  ],
+  "expected": "solvable",
+  "source": "hand-authored, gold verified against live graph"
+}
