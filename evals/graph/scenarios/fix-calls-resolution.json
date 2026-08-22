@@ -1,0 +1,10 @@
+{
+  "id": "fix-calls-resolution",
+  "category": "bug-fix",
+  "level": "symbol",
+  "task": "There's a bug in how the code graph resolves a symbol's function calls. Find the code that does call resolution and the decision that governs it.",
+  "entry": ["code:tools.code.reader"],
+  "gold_context": ["code:tools.code.reader", "adr:27", "adr:26"],
+  "expected": "solvable",
+  "source": "hand-authored, gold verified against live graph"
+}

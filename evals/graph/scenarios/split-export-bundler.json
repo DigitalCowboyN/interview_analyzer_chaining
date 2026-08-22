@@ -1,0 +1,16 @@
+{
+  "id": "split-export-bundler",
+  "category": "refactor",
+  "level": "subsystem",
+  "task": "The export bundler has grown too large and I want to split it. Gather the export code, the governing decision, and the capability it fulfills.",
+  "entry": ["code:export.bundler"],
+  "gold_context": [
+    "code:export.bundler",
+    "code:export.renderer",
+    "code:export",
+    "adr:13",
+    "capabilities:export-a-portable-bundle"
+  ],
+  "expected": "solvable",
+  "source": "hand-authored, gold verified against live graph"
+}

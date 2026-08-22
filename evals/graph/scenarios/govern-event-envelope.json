@@ -1,0 +1,11 @@
+{
+  "id": "govern-event-envelope",
+  "category": "governance",
+  "level": "module",
+  "task": "I'm about to change the event envelope (the event wire format). Which architectural decision governs this, and what code would be affected?",
+  "entry": ["code:events.envelope"],
+  "gold_context": ["code:events.envelope", "code:events", "adr:4"],
+  "gold_answer": "ADR-0004 (event-sourcing wire format / envelope compatibility) governs the event envelope; changing it affects the many consumers that read events.",
+  "expected": "solvable",
+  "source": "hand-authored, gold verified against live graph"
+}

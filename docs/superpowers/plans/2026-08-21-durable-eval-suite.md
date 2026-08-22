@@ -98,7 +98,7 @@ from tools.graph.reader import nodes
 from tools.graph.registry import NODE_DOMAINS
 
 _VALID_CATEGORY = {"bug-fix", "new-component", "refactor", "governance",
-                   "pipeline", "deployment", "exploration", "meta"}
+                   "pipeline", "deployment", "exploration", "meta", "spec", "implement"}
 _VALID_EXPECTED = {"solvable", "partial", "gap"}
 
 

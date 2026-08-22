@@ -1,0 +1,16 @@
+{
+  "id": "deploy-projection-service",
+  "category": "deployment",
+  "level": "subsystem",
+  "task": "What does the projection-service container need in order to run — its configuration, dependencies, and the services it talks to?",
+  "entry": ["code:projections.projection_service"],
+  "gold_context": [
+    "code:projections.projection_service",
+    "code:config",
+    "code:events.store",
+    "code:projections.subscription_manager"
+  ],
+  "expected": "gap",
+  "gap_note": "Deployment/infra (container config, env, compose topology) is not modeled in the graph; config and subscription_manager are not reached from the service node. Closes when infra-modeling lands.",
+  "source": "hand-authored, gold verified against live graph"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "pipeline-ingestion-flow",
+  "category": "pipeline",
+  "level": "subsystem",
+  "task": "Trace the transcript analysis pipeline end to end: from ingestion, through enrichment, through the lens engine, to export.",
+  "entry": ["code:ingestion"],
+  "gold_context": ["code:ingestion", "code:enrichment", "code:lens", "code:export"],
+  "expected": "gap",
+  "gap_note": "These stages each exist as nodes but the graph has no ordered runtime-FLOW edge across them (only static depends_on, which does not connect ingestion->enrichment->lens->export). Only the entry stage is reachable. Closes when the flow/architecture-nodes milestone lands.",
+  "source": "hand-authored, gold verified against live graph"
+}

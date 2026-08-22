@@ -1,0 +1,15 @@
+{
+  "id": "add-projection-handler",
+  "category": "new-component",
+  "level": "module",
+  "task": "I need to add a projection handler for a new event type. Find the handler registry, how handlers are wired, and the decision that governs projections.",
+  "entry": ["code:projections.handlers.registry"],
+  "gold_context": [
+    "code:projections.handlers.registry",
+    "code:projections.handlers",
+    "code:events.envelope",
+    "adr:3"
+  ],
+  "expected": "solvable",
+  "source": "hand-authored, gold verified against live graph"
+}

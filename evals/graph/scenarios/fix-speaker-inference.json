@@ -1,0 +1,15 @@
+{
+  "id": "fix-speaker-inference",
+  "category": "bug-fix",
+  "level": "module",
+  "task": "Speaker inference is mislabeling speakers on a messy transcript. Gather the context to fix it: the code, what it depends on, and the capability it serves.",
+  "entry": ["code:ingestion.speaker_inference"],
+  "gold_context": [
+    "code:ingestion.speaker_inference",
+    "code:ingestion.orchestrator",
+    "capabilities:infer-speakers",
+    "adr:5"
+  ],
+  "expected": "solvable",
+  "source": "hand-authored, gold verified against live graph"
+}

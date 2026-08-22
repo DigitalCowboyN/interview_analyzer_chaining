@@ -17,5 +17,7 @@
     "adr:20",
     "adr:24"
   ],
-  "source": "PR #43 spec — docs/superpowers/specs/2026-08-16-hierarchical-code-intake-design.md. NOTE: adr:19/20/24 are in gold deliberately to expose that no `governs` edge links the KG-tooling ADRs to this code — recall < 1.0 is a real finding, not a scenario bug."
+  "source": "PR #43 spec — docs/superpowers/specs/2026-08-16-hierarchical-code-intake-design.md. NOTE: adr:19/20/24 are in gold deliberately to expose that no `governs` edge links the KG-tooling ADRs to this code — recall < 1.0 is a real finding, not a scenario bug.",
+  "expected": "solvable",
+  "level": "subsystem"
 }

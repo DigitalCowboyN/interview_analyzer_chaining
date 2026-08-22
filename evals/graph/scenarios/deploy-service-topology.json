@@ -1,0 +1,11 @@
+{
+  "id": "deploy-service-topology",
+  "category": "deployment",
+  "level": "subsystem",
+  "task": "Which backing services must be running for the API to serve reads?",
+  "entry": ["code:api"],
+  "gold_context": ["code:api", "code:persistence", "code:events.store"],
+  "expected": "gap",
+  "gap_note": "Service topology (which processes/containers must be up) is not modeled as graph edges; persistence and events.store are not reached from the api node. Closes when infra-modeling lands.",
+  "source": "hand-authored, gold verified against live graph"
+}

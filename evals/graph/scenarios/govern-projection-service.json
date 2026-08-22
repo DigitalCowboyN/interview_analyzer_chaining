@@ -1,0 +1,11 @@
+{
+  "id": "govern-projection-service",
+  "category": "governance",
+  "level": "subsystem",
+  "task": "Which architectural decision governs the projection service, and is that decision still current?",
+  "entry": ["code:projections.projection_service"],
+  "gold_context": ["code:projections.projection_service", "code:projections", "adr:3"],
+  "gold_answer": "ADR-0003 governs the projection service.",
+  "expected": "solvable",
+  "source": "hand-authored, gold verified against live graph"
+}
