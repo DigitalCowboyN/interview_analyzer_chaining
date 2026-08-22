@@ -1,5 +1,5 @@
 from tools.graph.traverse import Node, Subgraph
-from evals.graph.run import load_scenarios, score, substantive
+from evals.graph.run import load_scenarios, score, substantive, scorecard
 
 
 def _sg(nodes):
@@ -28,6 +28,19 @@ def test_load_scenarios_reads_all():
     # load_scenarios just parses the scenario dir; validity-on-real-graph is checked separately
     ids = {s["id"] for s in load_scenarios()}
     assert {"explore-tools-graph", "spec-code-intake", "trace-classify-obligation"} <= ids
+
+
+def test_scorecard_aggregates_by_category_and_expected():
+    results = [
+        {"id": "a", "category": "bug-fix", "expected": "solvable", "recall": 1.0, "coverage": 1.0},
+        {"id": "b", "category": "bug-fix", "expected": "solvable", "recall": 0.5, "coverage": None},
+        {"id": "c", "category": "pipeline", "expected": "gap", "recall": 0.25, "coverage": 0.0},
+    ]
+    sc = scorecard(results)
+    assert sc["by_category"]["bug-fix"]["recall"] == 0.75      # mean of 1.0 and 0.5
+    assert sc["by_category"]["bug-fix"]["n"] == 2
+    assert sc["by_expected"]["gap"]["recall"] == 0.25         # low, surfaced not dropped
+    assert sc["by_category"]["bug-fix"]["coverage"] == 1.0    # None values ignored in the mean
 
 
 def test_gold_addresses_resolve_on_the_real_graph():

@@ -75,7 +75,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `enrichment.test_segment_extractor_decl` (3) → enrichment  ·  verifies: —
 - `enrichment.test_segment_validation` (4) → enrichment  ·  verifies: —
 - `enrichment.test_syntax_check` (6) → enrichment  ·  verifies: —
-- `evals.test_run` (4) → —  ·  verifies: —
+- `evals.test_run` (5) → —  ·  verifies: —
 - `evals.test_scenarios` (3) → —  ·  verifies: —
 - `events.test_aggregates_unit` (37) → events  ·  verifies: —
 - `events.test_analysis_payload_v2` (4) → events  ·  verifies: —
