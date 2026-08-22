@@ -21,11 +21,12 @@ scores rise when a future milestone closes the gap).
   `gather_context`/`walk` and score whether the graph *surfaces the gold context*: **recall** (gold
   nodes reached), **minimality** (over-fetch vs gold), and **answer-reach** (the answer node is on
   the path). Pure, fast, deterministic — run it every change. Extends today's `evals/graph/run.py`.
-- **Layer 2 — full agentic eval, purpose-built on Claude Code (owner decision, 2026-08-21).** For
-  each scenario, a **headless `claude` agent** (the agent-under-test) is given the generic goal and
-  **only the graph CLI** as a tool; it drives its own exploration; a second headless **`claude`
-  judge** scores its answer + trajectory against a rubric + the reference solution. **Runs locally /
-  pre-commit, not CI** (it spawns real agents; non-deterministic, costs tokens).
+- **Layer 2 — full agentic eval, driven by the Claude Code *subscription* (owner decision,
+  2026-08-21; revised — NO API / usage-based billing).** For each scenario an agent-under-test is
+  given the generic goal and **only the graph CLI** as a tool, drives its own exploration, and a
+  **judge** agent scores its answer + trajectory against a rubric + the reference solution. **Runs
+  locally / pre-commit, never CI, never an API key.** See "Layer 2 mechanism" for how the subscription
+  drives it.
 
 ## Scenario schema
 
@@ -89,39 +90,65 @@ when those land.
   low* (not a failure).
 - CI-safe and fast (no agents). This is the durable regression number.
 
-## Layer 2 — agentic harness (`evals/graph/agentic.py`, new; Claude-Code-native)
+## Layer 2 — agentic harness (subscription-driven; NO API, NO usage-based billing)
 
-A script the owner runs locally. Per scenario:
+**Hard constraint (owner):** the LLM is the Claude Code **subscription**, never an API key, never a
+usage-metered endpoint. `--bare` is therefore **forbidden** — it forces `ANTHROPIC_API_KEY`. Two
+subscription-native mechanisms; the harness prefers Mode A and falls back to Mode B, and **either way
+it is a local pre-commit routine, not CI.**
 
-1. **Agent-under-test** — headless `claude`, isolated and tool-restricted so it can *only* query the
-   graph (it cannot read source files — the eval measures the graph, not the agent's file reading):
+### Mode A — headless `claude -p` on the subscription (if it runs cleanly here)
 
-   ```bash
-   claude -p "<scenario.task + how to address nodes + the walk/context tool>" \
-     --model claude-sonnet-5 --max-turns 8 --bare \
-     --allowedTools "Bash(python -m tools.graph walk:*),Bash(python -m tools.graph context:*)" \
-     --append-system-prompt "You are an eval agent. Explore ONLY via the graph CLI. Start coarse, \
-        expand progressively. If the graph cannot answer, say so explicitly (do not infer relevance \
-        from proximity). End with a clear answer." \
-     --output-format stream-json --verbose
-   ```
-   The harness parses the stream for `tool_use` events (the **trajectory** — which `walk`/`context`
-   commands, in order) and the final `result` (the **answer**).
+Per scenario, spawn the agent-under-test as a subprocess that authenticates via the **logged-in
+subscription** (no `--bare`, no `ANTHROPIC_API_KEY`):
 
-2. **Judge** — a second headless `claude` (most capable model), given the scenario's task,
-   `gold_context`/`gold_answer`, the agent's answer, and its trajectory; returns a JSON verdict:
+```bash
+claude -p "<scenario.task + node-addressing + the graph CLI is your only tool>" \
+  --max-turns 8 \
+  --allowedTools "Bash(python -m tools.graph walk:*),Bash(python -m tools.graph context:*)" \
+  --append-system-prompt "You are an eval agent. Investigate ONLY via the graph CLI shown; do NOT \
+     read source files or repo docs. Start coarse, expand progressively (walk up to intent, then \
+     out). If the graph cannot answer, say so explicitly — never infer relevance from proximity. \
+     End with a clear final answer." \
+  --output-format stream-json --verbose
+```
 
-   ```bash
-   claude -p "<rubric + scenario gold + agent answer + agent trajectory>" \
-     --model claude-opus-4-8 --bare --output-format json
-   ```
+- **Isolation without `--bare`:** the `--append-system-prompt` instructs the agent to ignore repo
+  docs/CLAUDE.md, and **`--allowedTools` scoped to the two graph commands physically prevents it from
+  reading files** — so actions are graph-only even though CLAUDE.md is nominally in context. That
+  tool restriction is the real isolation; the system prompt handles the soft part.
+- The harness parses `stream-json` for `tool_use` events (the **trajectory**) and the final `result`
+  (the **answer**).
+- The **judge** is a second subscription `claude -p` (no `--bare`), given the rubric + the scenario's
+  gold + the agent's answer + trajectory, `--output-format json`, returning a JSON verdict.
 
-3. **Aggregate** — collect verdicts into the scorecard alongside the Layer-1 numbers.
+### Mode B — pre-commit routine driven *inside* a Claude Code session (the robust primary)
 
-**Isolation/auth notes:** `--bare` skips this repo's hooks/skills/CLAUDE.md so the agent isn't fed
-repo docs (clean measurement); `--allowedTools` scoped to the graph CLI enforces graph-only
-exploration. The build verifies the exact flags/auth locally (subscription vs `ANTHROPIC_API_KEY`)
-and the exact model IDs.
+If headless `claude -p` does not run cleanly on the subscription in this environment (e.g. nested
+invocation is unreliable — observed during the brainstorm), the harness runs **as a routine within a
+Claude Code session**, using **subagents** (subscription-backed, already the reliable mechanism this
+whole project was built with) as the agent-under-test and the judge:
+
+- A driver (a small skill/script + a checklist the session follows) reads each scenario, dispatches a
+  subagent whose prompt is the generic task + the tool-loop protocol (the subagent emits a
+  `WALK …`/`CONTEXT …` request; the session executes the graph CLI and returns the result; loop until
+  the subagent concludes — the exact validated loop from the pre-PR-46 eval redo). The subagent's
+  final message = the answer; the emitted requests = the trajectory.
+- A second subagent is the **judge**: given the rubric + gold + answer + trajectory, it returns a
+  structured verdict.
+- A **pre-commit hook** invokes this routine (or prints the one command to launch it), so the suite
+  runs before commits locally.
+
+Mode B needs no headless subprocess and no API key at all — it is the same subscription-backed
+subagent mechanism used throughout, wrapped as a repeatable, scenario-driven routine.
+
+### Which mode ships
+
+The build **verifies Mode A locally first** (does subscription `claude -p` run headless here without
+an API key?). If yes, Mode A is the automated script. If not, **Mode B ships as the routine** and Mode
+A is documented as an optional upgrade. Both produce the same scorecard; neither uses the API.
+
+3. **Aggregate** — verdicts (from whichever mode) join the Layer-1 numbers in the scorecard.
 
 ## The judge rubric (`evals/graph/RUBRIC.md`)
 
@@ -142,13 +169,14 @@ wording is fixed so runs are comparable.
 ## Scope
 
 **This milestone:** the ~16-scenario corpus (schema + hand-verified gold + gap flags); Layer 1
-deterministic runner + scorecard by category/expected; Layer 2 agentic harness on the `claude` CLI
-(agent-under-test + judge) + the rubric; a `RESULTS.md` scorecard; one full local run recorded as the
-baseline. Makefile target(s) to run each layer locally.
+deterministic runner + scorecard by category/expected; Layer 2 **subscription-driven** agentic harness
+(agent-under-test + judge — Mode A headless `claude -p` on subscription if it runs here, else Mode B
+subagent-driven pre-commit routine) + the rubric; a `RESULTS.md` scorecard; one full local run
+recorded as the baseline. Make target(s) + a pre-commit hook entry to run it locally.
 
-**Deferred:** CI integration (deliberately local); auto-mining scenarios from PR history; the
-flow/architecture-nodes and infra-modeling that would flip the `gap` scenarios to `solvable` (own
-milestones); a golden-answer human-calibration pass on the judge.
+**Deferred:** CI integration (deliberately local); any API/usage-based path (forbidden); auto-mining
+scenarios from PR history; the flow/architecture-nodes and infra-modeling that would flip the `gap`
+scenarios to `solvable` (own milestones); a golden-answer human-calibration pass on the judge.
 
 ## Testing
 
@@ -157,9 +185,10 @@ milestones); a golden-answer human-calibration pass on the judge.
 - **Layer 1 runner:** `score` computes recall/coverage/overfetch correctly on a fixture; on the real
   repo it runs all scenarios and a `solvable` control (e.g. `explore-ask-subsystem`) scores high while
   a `gap` scenario (e.g. `pipeline-write-path`) scores low — both as expected.
-- **Layer 2 harness:** the `claude`-CLI invocation is exercised on at least one scenario end-to-end
-  (agent → trajectory captured → judge → JSON verdict parsed); the script is resilient to a failed/
-  empty agent run (records a `fail`, never crashes the suite). Full local baseline run recorded.
+- **Layer 2 harness:** exercised on at least one scenario end-to-end (agent → trajectory captured →
+  judge → verdict parsed) via whichever mode ships; **no `ANTHROPIC_API_KEY` is set or required** (a
+  guard asserts the harness never invokes `--bare` / an API path). Resilient to a failed/empty agent
+  run (records a `fail`, never crashes the suite). Full local baseline run recorded.
 - **Freshness/regression:** adding `evals/` files doesn't disturb generated indexes beyond the new
   test nodes; full unit suite green.
 
@@ -175,10 +204,11 @@ Reviewed against `docs/index.md` on 2026-08-21.
 
 | domain | touched? | note |
 | --- | --- | --- |
-| evals (new area) | yes — scenario corpus + Layer-1 runner + Layer-2 `claude`-CLI harness + rubric + results | the suite; a measurement harness, not a guarded domain |
+| evals (new area) | yes — scenario corpus + Layer-1 runner + Layer-2 subscription-driven harness (headless `claude -p` or subagent routine) + rubric + results | the suite; a measurement harness, not a guarded domain |
 | graph / code | yes (read-only) — Layer 1 consumes `gather_context`/`walk`; Layer 2 drives the `walk`/`context` CLI | consumed, not changed |
 | capabilities / adr | no (logic) — referenced as scenario gold only | gold references |
 
-**Verdict:** reconciled — a durable, Claude-Code-native agentic-fitness suite: a deterministic
-regression core + a full local agentic harness over a broad scenario corpus that doubles as a gap
-roadmap. No graph-model change, no new ADR; CI integration and the gap-closing milestones are deferred.
+**Verdict:** reconciled — a durable, subscription-driven agentic-fitness suite (NO API / usage-based
+billing): a deterministic regression core + a local agentic harness (headless subscription `claude -p`,
+or a subagent-driven pre-commit routine) over a broad scenario corpus that doubles as a gap roadmap. No
+graph-model change, no new ADR; CI integration and the gap-closing milestones are deferred.
