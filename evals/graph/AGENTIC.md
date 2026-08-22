@@ -91,8 +91,15 @@ This reads each `evals/graph/.runs/<id>.json`, and:
 It then prints `aggregate(records)` — `{"n", "pass", "partial", "fail"}` — as the run summary.
 
 If the judge subscription path is also unavailable in this environment, judge the runs manually
-using `evals/graph/RUBRIC.md` (the same rubric `build_judge_prompt` embeds) and record the
-verdicts by hand; `aggregate()` only needs a `verdict` key per record, however it was produced.
+using `evals/graph/RUBRIC.md` (the same rubric `build_judge_prompt` embeds) and record the verdict
+by hand into each run file. `aggregate()` reads `record["verdict"]["verdict"]`, so the verdict must be
+the **nested rubric object**, not a bare string — e.g.:
+
+```json
+{"id": "...", "answer": "...", "trajectory": ["..."],
+ "verdict": {"answer_correctness": 2, "context_sufficiency": 2, "trajectory_quality": 2,
+             "honesty": 2, "verdict": "pass", "rationale": "one line"}}
+```
 
 ## Cleanup
 

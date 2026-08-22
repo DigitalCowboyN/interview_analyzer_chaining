@@ -9,12 +9,11 @@ reused, and answers/trajectories are read from evals/graph/.runs/<id>.json writt
 from __future__ import annotations
 
 import argparse
-import glob
 import json
 import os
 import subprocess
 import sys
-from typing import Dict, List
+from typing import List
 
 from evals.graph.run import load_scenarios
 
