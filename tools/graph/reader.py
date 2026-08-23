@@ -128,6 +128,12 @@ def _derived_consumers(from_type, id_attr, load):
     return build
 
 
+def _derived_writes(edge: EdgeType, root: str) -> List[Edge]:
+    from tools.graph.flow import writes_edges
+    return [Edge(edge.name, _addr("CodeUnit", mod), _addr("GlossaryTerm", label))
+            for mod, labels in writes_edges(root).items() for label in labels]
+
+
 def _derived_reads(edge: EdgeType, root: str) -> List[Edge]:
     from tools.glossary.model import load_glossary
     terms = {t.term for t in load_glossary(os.path.join(root, "docs/glossary"))}
@@ -147,6 +153,7 @@ _DERIVED = {
     "gq_consumed_by": _derived_consumers("GraphQuery", "graph_id", load_queries),
     "prompt_consumed_by": _derived_consumers("Prompt", "graph_id", load_prompt_entries),
     "reads_edges": _derived_reads,
+    "writes_edges": _derived_writes,
 }
 
 

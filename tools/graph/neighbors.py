@@ -96,6 +96,8 @@ def _symbol_edges(addr: str, direction: str, ctx: WalkContext) -> List[Tuple[str
         hid = ctx.event_handler_map().get(cid)       # cid is an event-class symbol id
         if hid:
             out.append((f"code:{hid}", Edge("handled_by", addr, f"code:{hid}")))
+        # `writes` (handler-module -> label) is harvest-grain (see reader._derived_writes) so the
+        # schema blast-radius is discoverable INBOUND from a label; not spliced here.
     return out
 
 

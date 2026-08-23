@@ -83,4 +83,7 @@ EDGES: List[EdgeType] = [
     EdgeType("reads", "read_by", "GraphQuery", "GlossaryTerm", "derived",
              field="reads_edges", resolve="id",
              description="A graph query reads nodes of a Neo4j label (a glossary term)."),
+    EdgeType("writes", "written_by", "CodeUnit", "GlossaryTerm", "derived",
+             field="writes_edges", resolve="id",
+             description="A projection-handler module writes nodes of a Neo4j label (glossary term)."),
 ]

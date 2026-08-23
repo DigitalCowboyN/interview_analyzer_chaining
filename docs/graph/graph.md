@@ -457,6 +457,7 @@ graph LR
     n_code_tools_graph_classify["code:tools.graph.classify"] --> n_code_tools_code_reader["code:tools.code.reader"]
     n_code_tools_graph_classify["code:tools.graph.classify"] --> n_code_tools_graph_reader["code:tools.graph.reader"]
     n_code_tools_graph_flow["code:tools.graph.flow"] --> n_code_tools_code_reader["code:tools.code.reader"]
+    n_code_tools_graph_flow["code:tools.graph.flow"] --> n_code_tools_glossary_model["code:tools.glossary.model"]
     n_code_tools_graph_neighbors["code:tools.graph.neighbors"] --> n_code_tools_code_reader["code:tools.code.reader"]
     n_code_tools_graph_neighbors["code:tools.graph.neighbors"] --> n_code_tools_graph_flow["code:tools.graph.flow"]
     n_code_tools_graph_neighbors["code:tools.graph.neighbors"] --> n_code_tools_graph_reader["code:tools.graph.reader"]
@@ -464,6 +465,7 @@ graph LR
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_capability_reader["code:tools.capability.reader"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_code_reader["code:tools.code.reader"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_glossary_model["code:tools.glossary.model"]
+    n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_graph_flow["code:tools.graph.flow"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_graph_registry["code:tools.graph.registry"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_graphq_reader["code:tools.graphq.reader"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_prompts_reader["code:tools.prompts.reader"]
@@ -998,6 +1000,7 @@ graph LR
     n_tests_graph_test_context_cli["tests:graph.test_context_cli"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_flow_registry["tests:graph.test_flow_registry"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_flow_walk["tests:graph.test_flow_walk"] --> n_code_tools_graph["code:tools.graph"]
+    n_tests_graph_test_flow_writes["tests:graph.test_flow_writes"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_gather_context["tests:graph.test_gather_context"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_lazy_walk["tests:graph.test_lazy_walk"] --> n_code_tools_graph["code:tools.graph"]
     n_tests_graph_test_nodeset_glossary["tests:graph.test_nodeset_glossary"] --> n_code_tools_graph["code:tools.graph"]
@@ -1504,4 +1507,25 @@ graph LR
     n_graph_queries_reader_worklist_rows["graph-queries:reader.worklist_rows"] --> n_glossary_LensItem["glossary:LensItem"]
     n_graph_queries_reader_worklist_rows["graph-queries:reader.worklist_rows"] --> n_glossary_Project["glossary:Project"]
     n_graph_queries_segments_list_segments["graph-queries:segments.list_segments"] --> n_glossary_Interview["glossary:Interview"]
+```
+
+## writes
+
+```mermaid
+graph LR
+    n_code_projections_handlers_claim_handlers["code:projections.handlers.claim_handlers"] --> n_glossary_Claim["glossary:Claim"]
+    n_code_projections_handlers_entity_handlers["code:projections.handlers.entity_handlers"] --> n_glossary_Entity["glossary:Entity"]
+    n_code_projections_handlers_interview_handlers["code:projections.handlers.interview_handlers"] --> n_glossary_Interview["glossary:Interview"]
+    n_code_projections_handlers_interview_handlers["code:projections.handlers.interview_handlers"] --> n_glossary_Project["glossary:Project"]
+    n_code_projections_handlers_lens_handlers["code:projections.handlers.lens_handlers"] --> n_glossary_LensItem["glossary:LensItem"]
+    n_code_projections_handlers_resolution_handlers["code:projections.handlers.resolution_handlers"] --> n_glossary_CanonicalEntity["glossary:CanonicalEntity"]
+    n_code_projections_handlers_resolution_handlers["code:projections.handlers.resolution_handlers"] --> n_glossary_Person["glossary:Person"]
+    n_code_projections_handlers_segment_handlers["code:projections.handlers.segment_handlers"] --> n_glossary_Segment["glossary:Segment"]
+    n_code_projections_handlers_sentence_handlers["code:projections.handlers.sentence_handlers"] --> n_glossary_Analysis["glossary:Analysis"]
+    n_code_projections_handlers_sentence_handlers["code:projections.handlers.sentence_handlers"] --> n_glossary_Fragment["glossary:Fragment"]
+    n_code_projections_handlers_sentence_handlers["code:projections.handlers.sentence_handlers"] --> n_glossary_FunctionType["glossary:FunctionType"]
+    n_code_projections_handlers_sentence_handlers["code:projections.handlers.sentence_handlers"] --> n_glossary_Purpose["glossary:Purpose"]
+    n_code_projections_handlers_sentence_handlers["code:projections.handlers.sentence_handlers"] --> n_glossary_StructureType["glossary:StructureType"]
+    n_code_projections_handlers_speaker_handlers["code:projections.handlers.speaker_handlers"] --> n_glossary_Speaker["glossary:Speaker"]
+    n_code_projections_handlers_utterance_handlers["code:projections.handlers.utterance_handlers"] --> n_glossary_Utterance["glossary:Utterance"]
 ```

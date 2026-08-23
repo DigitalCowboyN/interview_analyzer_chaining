@@ -298,6 +298,7 @@ graph LR
     tools.graph.classify --> tools.code.reader
     tools.graph.classify --> tools.graph.reader
     tools.graph.flow --> tools.code.reader
+    tools.graph.flow --> tools.glossary.model
     tools.graph.neighbors --> tools.code.reader
     tools.graph.neighbors --> tools.graph.flow
     tools.graph.neighbors --> tools.graph.reader
@@ -305,6 +306,7 @@ graph LR
     tools.graph.reader --> tools.capability.reader
     tools.graph.reader --> tools.code.reader
     tools.graph.reader --> tools.glossary.model
+    tools.graph.reader --> tools.graph.flow
     tools.graph.reader --> tools.graph.registry
     tools.graph.reader --> tools.graphq.reader
     tools.graph.reader --> tools.prompts.reader

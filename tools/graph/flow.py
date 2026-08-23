@@ -9,6 +9,7 @@ from typing import Dict, List
 from tools.code.reader import load_units, symbols_of
 
 _REGISTER = re.compile(r'register\(\s*["\'](\w+)["\']\s*,\s*(\w+)\s*\(')
+_MERGE_LABEL = re.compile(r"(?:MERGE|CREATE)\s*\(\s*\w*\s*:\s*(\w+)")
 
 
 def _class_index(root: str, pkg_prefix: str) -> Dict[str, str]:
@@ -39,3 +40,27 @@ def register_map(root: str = ".") -> Dict[str, str]:
         if ev and hid:
             out[ev] = hid
     return out
+
+
+def _module_file(module_id: str, root: str) -> str:
+    from tools.code.reader import _module_path
+    return _module_path(module_id, root)
+
+
+def handler_labels(handler_id: str, root: str = ".") -> List[str]:
+    module_id = handler_id.rsplit(".", 1)[0]         # handler class -> its module
+    from tools.glossary.model import load_glossary
+    terms = {t.term for t in load_glossary(os.path.join(root, "docs/glossary"))}
+    try:
+        text = open(_module_file(module_id, root), encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return []
+    return sorted({lbl for lbl in _MERGE_LABEL.findall(text) if lbl in terms})
+
+
+def writes_edges(root: str = ".") -> Dict[str, List[str]]:
+    """handler-MODULE id -> the glossary-term labels it writes (Cypher MERGE). Module-grain so the
+    schema blast-radius is traversable INBOUND from a label (symmetric with `reads`); the handler
+    modules are exactly those hosting a registered handler class."""
+    modules = sorted({hid.rsplit(".", 1)[0] for hid in register_map(root).values()})
+    return {m: handler_labels(m + ".X", root) for m in modules}
