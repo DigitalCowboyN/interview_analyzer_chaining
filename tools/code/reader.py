@@ -27,6 +27,13 @@ class CodeUnit:
 _SRC_TREES = (("src", ""), ("tools", "tools."))
 _IMPORT_DOTTED = re.compile(r"^\s*(?:from|import)\s+((?:src|tools)\.[\w.]+)", re.M)
 _CALLS_MARKER = re.compile(r"#\s*calls:\s*code:([\w.]+)")
+_EMITS_MARKER = re.compile(r"#\s*emits:\s*([\w.]+)")
+
+
+def _is_event_class(dotted_id: str) -> bool:
+    parts = dotted_id.split(".")
+    return len(parts) >= 3 and parts[0] == "events" and parts[-1].endswith("Data")
+
 
 # builtin container/str/obj method names — an `x.get()` / `x.append()` call is not a graph edge
 _BUILTIN_METHODS = frozenset({
@@ -142,6 +149,7 @@ class Symbol:
     docstring: str = ""
     parent: str = ""                         # module id, or the class id for a method
     calls: List[str] = field(default_factory=list)   # filled by Task 3
+    emits: List[str] = field(default_factory=list)   # filled by Task 2 (KG-2)
 
 
 def render_signature(node) -> str:
@@ -241,6 +249,8 @@ def symbols_of(module_id: str, root: str = ".") -> List[Symbol]:
                          render_signature(node), (ast.get_docstring(node) or "").strip(),
                          module_id)
             sym.calls = calls_of(node, nidx, marker_text=_marker(node))
+            sym.emits = sorted({c for c in sym.calls if _is_event_class(c)}
+                               | set(_EMITS_MARKER.findall(_marker(node))))
             out.append(sym)
         elif isinstance(node, ast.ClassDef):
             cid = f"{module_id}.{node.name}"
@@ -251,5 +261,7 @@ def symbols_of(module_id: str, root: str = ".") -> List[Symbol]:
                     msym = Symbol(f"{cid}.{m.name}", "method",
                                   render_signature(m), (ast.get_docstring(m) or "").strip(), cid)
                     msym.calls = calls_of(m, nidx, marker_text=_marker(m))
+                    msym.emits = sorted({c for c in msym.calls if _is_event_class(c)}
+                                        | set(_EMITS_MARKER.findall(_marker(m))))
                     out.append(msym)
     return out

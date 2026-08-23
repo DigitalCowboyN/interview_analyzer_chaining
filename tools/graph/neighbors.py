@@ -84,6 +84,8 @@ def _symbol_edges(addr: str, direction: str, ctx: WalkContext) -> List[Tuple[str
                 out.append((f"code:{s.id}", Edge("contains", addr, f"code:{s.id}")))
         for callee in rec.calls:
             out.append((f"code:{callee}", Edge("calls", addr, f"code:{callee}")))
+        for ev in getattr(rec, "emits", []):
+            out.append((f"code:{ev}", Edge("emits", addr, f"code:{ev}")))
     return out
 
 
