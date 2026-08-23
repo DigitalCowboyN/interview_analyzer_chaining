@@ -50,14 +50,44 @@ routine here"), **Mode B — the subagent-driven routine (`AGENTIC.md`)** — is
 subagents (subscription-backed) as the agent-under-test and the judge; `agentic.py`'s prompt builders,
 `.runs/` records, and rubric are shared. Mode A stays wired for environments where headless runs cleanly.
 
-**Baseline run (Mode B):**
+The first proof was `govern-projection-service` (pass 2/2/2/2). The **full 17-scenario baseline (KG-1)**
+is below; in it, Mode B runs autonomous subagents that drive the graph CLI themselves (they gained
+`python -m tools.graph` access), so no interactive relay is needed — one dispatch per agent + one judge.
+## Layer 2 (agentic) — full baseline (KG-1)
 
-| scenario | category | expected | verdict | dims (ans/ctx/traj/hon) |
-| --- | --- | --- | --- | --- |
-| govern-projection-service | governance | solvable | **pass** | 2/2/2/2 |
+Run 2026-08-23 via **Mode B autonomous subagents** (agent-under-test drives the graph CLI itself; judge scores against RUBRIC.md). 16 of 17 scenarios completed; `spec-code-intake` was truncated by a session limit and is pending a re-run (not counted). **Every completed scenario passed** — and every `gap`/`partial` scenario passed by *honestly reporting the graph's limitation*, never by fabricating.
 
-Trajectory: `CONTEXT projection_service` → `WALK adr:3 both full`. The agent found `adr:3 --governs-->`
-the service (via the govern edges added in the prior milestone), verified no `superseded_by` edge, and
-answered correctly + grounded. Corroborating: the pre-milestone in-session eval redo ran two more
-scenarios via this same loop — a trace (`derive_axes → capability`, pass) and the govern-gap case
-(correctly reported "no ADR governs the traversal tooling", pass) — the escape-hatch/honesty case.
+| scenario | category | expected | verdict |
+| --- | --- | --- | --- |
+| add-enrichment-extractor | new-component | solvable | **pass** |
+| add-projection-handler | new-component | solvable | **pass** |
+| deploy-neo4j-schema-blast | deployment | partial | **pass** |
+| deploy-projection-service | deployment | gap | **pass** |
+| deploy-service-topology | deployment | gap | **pass** |
+| explore-tools-graph | exploration | solvable | **pass** |
+| fix-calls-resolution | bug-fix | solvable | **pass** |
+| fix-speaker-inference | bug-fix | solvable | **pass** |
+| govern-event-envelope | governance | solvable | **pass** |
+| govern-projection-service | governance | solvable | **pass** |
+| govern-superseded-near-ingestion | governance | partial | **pass** |
+| pipeline-ingestion-flow | pipeline | gap | **pass** |
+| pipeline-write-path | pipeline | gap | **pass** |
+| refactor-resolution-engine | refactor | solvable | **pass** |
+| spec-code-intake | spec | solvable | incomplete |
+| split-export-bundler | refactor | solvable | **pass** |
+| trace-classify-obligation | implement | solvable | **pass** |
+
+**By expected:**
+- solvable: 10/11 pass
+- partial: 2/2 pass
+- gap: 4/4 pass
+
+**Highlights (honesty / escape-hatch on gap+partial):**
+- `pipeline-write-path` / `pipeline-ingestion-flow` (gap): correctly reported the graph has no runtime data-flow edge across the event-sourced choreography — one distinguished the single real edge (ingestion→enrichment) from the absent ones and explained the store+projection indirection.
+- `deploy-service-topology` / `deploy-projection-service` (gap): stated the graph models no service/container topology, then gave a *labeled* static-import inference (Neo4j, EventStoreDB) without fabricating env vars/ports/compose.
+- `govern-superseded-near-ingestion` (partial): found the governing ADR, then ran a **control check** and honestly reported supersession status is indeterminate from the traversal.
+- `deploy-neo4j-schema-blast` (partial): full write-side blast radius; honest that the read-side is only partially recoverable (label-string match, no edge) — refused to fabricate.
+
+**Method caveats:** Mode-B autonomous subagents aren't tool-restricted like Mode A's `--allowedTools`, so isolation is prompt-enforced ("graph CLI only, no file reads") + judge-verified; one run (`explore-tools-graph`) read graph-CLI *output* via a scratchpad file (not source), reflected in its trajectory score. Three verdicts (pipeline-ingestion-flow, deploy-neo4j-schema-blast, trace-classify-obligation) are controller-judged against the fixed rubric because the judge-subagents hit the same session limit; the rest are judge-subagent (Opus) verdicts.
+
+**Eval-surfaced graph findings (roadmap backlog):** supersede/superseded_by ADR→ADR edges don't appear to be surfaced by walk/context/neighbors; and the Neo4j-schema→read-consumer link is only a label-string match, not a graph edge (a 'reads-shape-of' edge type would make schema blast-radius traversable).
