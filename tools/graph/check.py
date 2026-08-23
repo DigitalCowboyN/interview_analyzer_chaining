@@ -99,6 +99,40 @@ def check_reachability(root: str = ".") -> List[Finding]:
             for a in sorted(code - reached)]
 
 
+def check_flow_registrations(root: str = ".") -> List[Finding]:
+    """KG-2 flow-overlay drift: a `registry.register("Type", Handler)` whose `TypeData` event class
+    or handler class can't be resolved (so `handled_by` silently drops it); and a registered handler
+    module that writes Neo4j (Cypher MERGE) but resolves no glossary label (a candidate missing term)."""
+    from tools.graph.flow import register_map, writes_edges, _class_index, _REGISTER, _MERGE_LABEL
+    findings: List[Finding] = []
+    events = _class_index(root, "events")
+    handlers = _class_index(root, "projections.handlers")
+    path = os.path.join(root, "src", "projections", "bootstrap.py")
+    try:
+        text = open(path, encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return findings
+    for m in _REGISTER.finditer(text):
+        etype, handler = m.group(1), m.group(2)
+        if (etype + "Data") not in events or handler not in handlers:
+            findings.append(Finding(
+                f"graph: register(\"{etype}\", {handler}) has no resolvable event/handler class "
+                f"— handled_by will drop it"))
+    wl = writes_edges(root)
+    for mod, labels in wl.items():
+        if not labels:
+            from tools.graph.flow import _module_file
+            try:
+                src = open(_module_file(mod, root), encoding="utf-8", errors="ignore").read()
+            except OSError:
+                continue
+            if _MERGE_LABEL.search(src):
+                findings.append(Finding(
+                    f"graph: handler module {mod} writes Neo4j (MERGE) but no label maps to a "
+                    f"glossary term — add the term, or writes is blind"))
+    return findings
+
+
 def run_all(root: str = ".") -> List[Finding]:
     try:
         edges = harvest(root)
@@ -117,5 +151,9 @@ def run_all(root: str = ".") -> List[Finding]:
         findings += check_reachability(root)   # re-harvests via walk() — guard it too
     except Exception as exc:  # non-blocking: reachability must never raise out
         findings.append(Finding(f"graph: reachability check failed: {exc}"))
+    try:
+        findings += check_flow_registrations(root)
+    except Exception as exc:  # non-blocking
+        findings.append(Finding(f"graph: flow-registration check failed: {exc}"))
 
     return findings

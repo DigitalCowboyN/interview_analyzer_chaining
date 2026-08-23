@@ -290,6 +290,7 @@ graph LR
     tools.graph.__main__ --> tools.graph.reader
     tools.graph.__main__ --> tools.graph.render
     tools.graph.__main__ --> tools.graph.traverse
+    tools.graph.check --> tools.graph.flow
     tools.graph.check --> tools.graph.reader
     tools.graph.check --> tools.graph.registry
     tools.graph.check --> tools.graph.render
