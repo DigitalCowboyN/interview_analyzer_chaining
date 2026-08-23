@@ -49,10 +49,15 @@ these — closing a gap should visibly move its scenarios' recall.
   rubric; auto-mining scenarios from PR history; Mode A hardening if headless-nested becomes reliable.
 - **`render_signature`** — lossy for keyword-only / positional-only args (0 occurrences today).
 - **Corpus/domain projections** — migrate remaining doc-readers to project over `okf_records`.
-- **Supersede edges not surfaced by traversal** (found by KG-1's `govern-superseded` eval) — `walk`/
-  `context`/`neighbors` don't appear to expose ADR→ADR `supersedes`/`superseded_by`, so an agent can't
-  tell whether a governing ADR is current. Verify + surface; would flip `govern-superseded` toward solvable.
-- **Schema→consumer is only a label-string match** (found by KG-1's `deploy-neo4j-schema-blast` eval) —
+- ~~**Supersede edges not surfaced by traversal**~~ — **RETRACTED (false alarm, verified 2026-08-23).**
+  The KG-1 `govern-superseded` agent claimed `walk`/`context` don't expose supersede edges, but that was
+  an unlucky control (it only tested ADRs with `supersedes: []`). Verified: the one real edge
+  `adr:14 → adr:8` **is** in `harvest()` and `walk(adr:8, both)` surfaces it. No graph bug. (adr:5, near
+  ingestion, is genuinely not superseded — so the correct answer was "not superseded.") **Eval-quality
+  lessons instead:** (a) `govern-superseded` is arguably mis-graded `partial` — the graph *can* answer it,
+  so it's closer to `solvable`; (b) the rubric should require a *positive control* before crediting a
+  confident "the tool can't do X" as honesty rather than an unverified negative.
+- **Schema→consumer is only a label-string match** (found by KG-1's `deploy-neo4j-schema-blast` eval, **verified real 2026-08-23**: `walk(projections.schema, in, full)` reaches 58 nodes, zero api/export read-consumers) —
   the Neo4j schema's read-consumers (`export.reader`, `api` routers, `graph-queries:reader.*`) connect to
   `projections.schema` only by matching `labels=[...]` strings, not a graph edge. A `reads-shape-of` edge
   type would make schema blast-radius traversable (overlaps KG-2/KG-3).
