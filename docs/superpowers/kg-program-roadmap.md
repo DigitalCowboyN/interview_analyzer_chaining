@@ -32,7 +32,7 @@ these — closing a gap should visibly move its scenarios' recall.
 
 | # | Milestone | Why now | Eval signal it moves | Status |
 | --- | --- | --- | --- | --- |
-| KG-1 | **Complete the agentic baseline** | Turn the validated Layer-2 *mechanism* into a full agentic scorecard — run the remaining ~14 scenarios through Mode B (subagent routine), record verdicts. Cheap; banks the eval investment. | Layer-2 coverage: 1 judged → 17 judged | **NEXT (in progress)** |
+| KG-1 | **Complete the agentic baseline** | Full Layer-2 agentic scorecard via Mode-B autonomous subagents (agent drives the graph CLI itself + judge). | **16/17 pass** (spec-code-intake truncated by a session limit → 1 re-run pending); every gap/partial passed by honest reporting | ✅ **DONE** (RESULTS.md Layer 2) |
 | KG-2 | **Flow / architecture nodes** | The biggest structural gap, and the eval now *proves* it costs usability: pipeline scored 0.25 because the graph has no runtime-flow edges (command→event→projection→read-model; ingestion→enrichment→lens→export). Authored, linked, drift-guarded flow nodes for the behavioral seams static analysis can't derive. | pipeline `gap` scenarios 0.25 → higher | queued |
 | KG-3 | **Infra / deployment modeling** | Closes the other gap: deployment scored 0.53. Model the container/service topology (compose services, config, what must be up) as graph nodes/edges so "what does X need to run / what breaks if Y changes" is answerable. | deployment `gap` scenarios 0.33–0.50 → higher | queued |
 | KG-4 | **L3 governance on shapes** | The program's original payoff (R3): rules/policies/hooks keyed on graph shapes + traversals (canonical: editing a CodeUnit → walk inbound `governs` → surface the ADR's scope → flag out-of-scope drift). Mechanism (hook vs rule) still to brainstorm. | (new checks; not a current eval category) | parked (needs its own brainstorm) |
@@ -49,6 +49,15 @@ these — closing a gap should visibly move its scenarios' recall.
   rubric; auto-mining scenarios from PR history; Mode A hardening if headless-nested becomes reliable.
 - **`render_signature`** — lossy for keyword-only / positional-only args (0 occurrences today).
 - **Corpus/domain projections** — migrate remaining doc-readers to project over `okf_records`.
+- **Supersede edges not surfaced by traversal** (found by KG-1's `govern-superseded` eval) — `walk`/
+  `context`/`neighbors` don't appear to expose ADR→ADR `supersedes`/`superseded_by`, so an agent can't
+  tell whether a governing ADR is current. Verify + surface; would flip `govern-superseded` toward solvable.
+- **Schema→consumer is only a label-string match** (found by KG-1's `deploy-neo4j-schema-blast` eval) —
+  the Neo4j schema's read-consumers (`export.reader`, `api` routers, `graph-queries:reader.*`) connect to
+  `projections.schema` only by matching `labels=[...]` strings, not a graph edge. A `reads-shape-of` edge
+  type would make schema blast-radius traversable (overlaps KG-2/KG-3).
+- **spec-code-intake agentic re-run** — one KG-1 scenario truncated by a session limit; a single autonomous
+  Mode-B dispatch away from a complete 17/17 Layer-2 scorecard.
 
 ## How this maps to the program phases
 
