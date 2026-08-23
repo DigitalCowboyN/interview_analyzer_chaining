@@ -10,6 +10,9 @@ silently. Every domain is an OKF-conformant bundle plus a generated index plus a
 **You are here.** Land on this page, then follow the domain you're working in: read its
 `index.md` / `README.md`, and run its check when you change a surface it covers.
 
+**Where this is going:** the program's forward roadmap (upcoming milestones, parked items) lives in
+[`docs/superpowers/kg-program-roadmap.md`](superpowers/kg-program-roadmap.md).
+
 ## How it's organized — the traceability spine
 
 The domains aren't a flat list; they form a **Requirements Traceability Matrix** — a spine
