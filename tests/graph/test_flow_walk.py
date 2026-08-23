@@ -11,3 +11,10 @@ def test_aggregate_emits_event_at_symbol_level():
 def test_module_grain_has_no_flow_edges():
     sg = walk("code:events.aggregates", direction="out", depth=1, level="module")
     assert not any(e.type in ("emits", "handled_by", "writes") for e in sg.edges)
+
+
+def test_event_handled_by_handler():
+    sg = walk("code:events.interview_events.InterviewCreatedData", direction="out",
+              depth=1, level="symbol")
+    assert any(e.type == "handled_by" and e.dst.endswith("InterviewCreatedHandler")
+               for e in sg.edges)

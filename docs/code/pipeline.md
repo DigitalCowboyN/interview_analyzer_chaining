@@ -297,7 +297,9 @@ graph LR
     tools.graph.classify --> tools.capability.reader
     tools.graph.classify --> tools.code.reader
     tools.graph.classify --> tools.graph.reader
+    tools.graph.flow --> tools.code.reader
     tools.graph.neighbors --> tools.code.reader
+    tools.graph.neighbors --> tools.graph.flow
     tools.graph.neighbors --> tools.graph.reader
     tools.graph.reader --> tools.adr.index
     tools.graph.reader --> tools.capability.reader
