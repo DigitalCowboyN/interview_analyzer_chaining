@@ -25,4 +25,14 @@ def test_unresolvable_command_is_flagged(tmp_path):
         "    build: .\n"
         "    command: [\"bash\", \"start.sh\"]\n")   # code service, no resolvable src.* module
     msgs = [f.message for f in check_infra(str(tmp_path))]
-    assert any("app" in m and "command" in m for m in msgs)
+    assert any("app" in m and "entrypoint" in m for m in msgs)
+
+
+def test_code_service_with_no_command_is_flagged(tmp_path):
+    # a code service (build:) with NO command at all also silently gets no `runs` edge — flag it
+    open(tmp_path / "docker-compose.yml", "w").write(
+        "services:\n"
+        "  app:\n"
+        "    build: .\n")   # code service, entrypoint via Dockerfile CMD — invisible to `runs`
+    msgs = [f.message for f in check_infra(str(tmp_path))]
+    assert any("app" in m and "entrypoint" in m for m in msgs)

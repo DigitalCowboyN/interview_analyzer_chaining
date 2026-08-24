@@ -20,10 +20,10 @@ def check_infra(root: str = ".") -> List[Finding]:
     findings: List[Finding] = []
     code_ids = {u.unit for u in load_units(root)}
     for s in load_services(root):
-        if s.kind == "code" and s.command and _entrypoint_module(s.command, code_ids) is None:
+        if s.kind == "code" and _entrypoint_module(s.command, code_ids) is None:
             findings.append(Finding(
-                f"infra: service {s.id} command {s.command!r} resolves to no code module "
-                f"— `runs` will drop it (use exec-form src.* or a marker)"))
+                f"infra: code service {s.id} has no resolvable src.* entrypoint "
+                f"(command: {s.command!r}) — `runs` will drop it (use an exec-form src.* command)"))
     service_ids = {s.id for s in load_services(root)}
     for u in load_units(root):
         if getattr(u, "level", "") != "module" or not str(u.path).endswith(".py"):
