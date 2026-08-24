@@ -97,4 +97,7 @@ EDGES: List[EdgeType] = [
     EdgeType("runs", "run_by", "Service", "CodeUnit", "derived",
              field="runs_edges", resolve="id",
              description="A code service launches a code module (its compose command entrypoint)."),
+    EdgeType("talks_to", "talked_to_by", "CodeUnit", "Service", "derived",
+             field="talks_to_edges", resolve="id",
+             description="A code module connects to a backing service (client-lib import or # talks-to: marker)."),
 ]

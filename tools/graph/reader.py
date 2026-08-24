@@ -167,6 +167,12 @@ def _derived_runs(edge: EdgeType, root: str) -> List[Edge]:
             for s, mod in runs_pairs(root)]
 
 
+def _derived_talks_to(edge: EdgeType, root: str) -> List[Edge]:
+    from tools.infra.reader import talks_to_pairs
+    return [Edge(edge.name, _addr("CodeUnit", u), _addr("Service", svc))
+            for u, svc in talks_to_pairs(root)]
+
+
 _DERIVED = {
     "dep_edges": _derived_deps,
     "contains_edges": _derived_contains,
@@ -178,6 +184,7 @@ _DERIVED = {
     "requires_edges": _derived_requires,
     "configured_by_edges": _derived_configured_by,
     "runs_edges": _derived_runs,
+    "talks_to_edges": _derived_talks_to,
 }
 
 

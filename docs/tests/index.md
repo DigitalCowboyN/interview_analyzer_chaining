@@ -135,6 +135,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `infra.test_edges_compose` (3) → tools.infra  ·  verifies: —
 - `infra.test_reader` (2) → tools.infra  ·  verifies: —
 - `infra.test_runs` (3) → tools.infra  ·  verifies: —
+- `infra.test_talks_to` (3) → tools.infra  ·  verifies: —
 - `ingestion.test_format_detector` (4) → ingestion  ·  verifies: —
 - `ingestion.test_front_matter` (7) → ingestion  ·  verifies: —
 - `ingestion.test_front_matter_seeding` (5) → ingestion  ·  verifies: —

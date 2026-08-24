@@ -1031,6 +1031,7 @@ graph LR
     n_tests_infra_test_edges_compose["tests:infra.test_edges_compose"] --> n_code_tools_infra["code:tools.infra"]
     n_tests_infra_test_reader["tests:infra.test_reader"] --> n_code_tools_infra["code:tools.infra"]
     n_tests_infra_test_runs["tests:infra.test_runs"] --> n_code_tools_infra["code:tools.infra"]
+    n_tests_infra_test_talks_to["tests:infra.test_talks_to"] --> n_code_tools_infra["code:tools.infra"]
     n_tests_ingestion_test_format_detector["tests:ingestion.test_format_detector"] --> n_code_ingestion["code:ingestion"]
     n_tests_ingestion_test_front_matter["tests:ingestion.test_front_matter"] --> n_code_ingestion["code:ingestion"]
     n_tests_ingestion_test_front_matter_seeding["tests:ingestion.test_front_matter_seeding"] --> n_code_ingestion["code:ingestion"]
@@ -1588,4 +1589,15 @@ graph LR
     n_service_app["service:app"] --> n_code_main["code:main"]
     n_service_projection_service["service:projection-service"] --> n_code_run_projection_service["code:run_projection_service"]
     n_service_worker["service:worker"] --> n_code_celery_app["code:celery_app"]
+```
+
+## talks_to
+
+```mermaid
+graph LR
+    n_code_celery_app["code:celery_app"] --> n_service_redis["service:redis"]
+    n_code_events_store["code:events.store"] --> n_service_eventstore["service:eventstore"]
+    n_code_projections_parked_events["code:projections.parked_events"] --> n_service_eventstore["service:eventstore"]
+    n_code_projections_subscription_manager["code:projections.subscription_manager"] --> n_service_eventstore["service:eventstore"]
+    n_code_utils_neo4j_driver["code:utils.neo4j_driver"] --> n_service_neo4j["service:neo4j"]
 ```

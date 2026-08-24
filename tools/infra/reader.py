@@ -5,6 +5,7 @@ tools.graph.reader via _ADAPTERS + _DERIVED. Must not import tools.graph.reader 
 # governed-by: ADR-0029
 from __future__ import annotations
 
+import ast
 import os
 import re
 from dataclasses import dataclass, field
@@ -104,4 +105,41 @@ def runs_pairs(root: str = ".") -> List[Tuple[str, str]]:
         mod = _entrypoint_module(s.command, code_ids)
         if mod:
             out.append((s.id, mod))
+    return out
+
+
+def _module_imports(src: str) -> Set[str]:
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return set()
+    libs: Set[str] = set()
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Import):
+            for a in n.names:
+                libs.add(a.name.split(".")[0])
+        elif isinstance(n, ast.ImportFrom) and n.module:
+            libs.add(n.module.split(".")[0])
+    return libs
+
+
+def talks_to_pairs(root: str = ".") -> List[Tuple[str, str]]:
+    service_ids = {s.id for s in load_services(root)}
+    out: List[Tuple[str, str]] = []
+    for u in load_units(root):
+        if getattr(u, "level", "") != "module" or not str(u.path).endswith(".py"):
+            continue
+        try:
+            src = open(u.path, encoding="utf-8", errors="ignore").read()
+        except OSError:
+            continue
+        targets: Set[str] = set()
+        for lib in _module_imports(src):                       # derived: client-lib import
+            svc = _CLIENT_LIBS.get(lib)
+            if svc in service_ids:
+                targets.add(svc)
+        for svc in _TALKS_MARKER.findall(src):                 # marker fallback
+            if svc in service_ids:
+                targets.add(svc)
+        out += [(u.unit, svc) for svc in sorted(targets)]
     return out
