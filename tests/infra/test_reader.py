@@ -1,5 +1,12 @@
 # tests/infra/test_reader.py
-from tools.infra.reader import load_services, load_env_vars
+from tools.infra.reader import load_env_vars, load_services
+
+
+def test_no_compose_file_yields_no_services(tmp_path):
+    # a root without docker-compose.yml must return empty (never raise) so nodes()/harvest()
+    # stay robust for compose-less roots (test fixtures, subtrees)
+    assert load_services(str(tmp_path)) == []
+    assert load_env_vars(str(tmp_path)) == []
 
 
 def test_services_have_kind_axis():

@@ -58,7 +58,12 @@ class EnvVar:
 
 
 def _compose(root: str) -> dict:
-    with open(os.path.join(root, COMPOSE), encoding="utf-8") as fh:
+    # No compose file -> no infra overlay (empty). Keeps nodes()/harvest() robust for any root
+    # (e.g. a test fixture or subtree) that has no docker-compose.yml, like other domain loaders.
+    path = os.path.join(root, COMPOSE)
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as fh:
         return yaml.safe_load(fh) or {}
 
 
