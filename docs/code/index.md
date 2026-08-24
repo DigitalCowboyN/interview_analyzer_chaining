@@ -30,6 +30,7 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | tools.glossary | operations | deterministic |  |
 | tools.graph | operations | deterministic |  |
 | tools.graphq | operations | deterministic |  |
+| tools.infra |  | deterministic |  |
 | tools.knowledge | operations | deterministic |  |
 | tools.prompts | operations | deterministic |  |
 | tools.testmap | operations | deterministic |  |
@@ -176,7 +177,7 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | tools.graph.classify |  | deterministic | tools.capability.reader, tools.code.reader, tools.graph.reader |
 | tools.graph.flow |  | deterministic | tools.code.reader, tools.glossary.model |
 | tools.graph.neighbors | operations | deterministic | tools.code.reader, tools.graph.flow, tools.graph.reader |
-| tools.graph.reader |  | deterministic | tools.adr.index, tools.capability.reader, tools.code.reader, tools.glossary.model, tools.graph.flow, tools.graph.registry, tools.graphq.reader, tools.prompts.reader, tools.testmap.reader, tools.usecase.reader |
+| tools.graph.reader |  | deterministic | tools.adr.index, tools.capability.reader, tools.code.reader, tools.glossary.model, tools.graph.flow, tools.graph.registry, tools.graphq.reader, tools.infra.reader, tools.prompts.reader, tools.testmap.reader, tools.usecase.reader |
 | tools.graph.registry |  | deterministic |  |
 | tools.graph.render |  | deterministic | tools.graph.reader, tools.graph.registry |
 | tools.graph.traverse | operations | deterministic | tools.adr.index, tools.capability.reader, tools.code.reader, tools.glossary.model, tools.graph.neighbors, tools.graph.reader, tools.graph.registry, tools.graphq.reader, tools.prompts.reader, tools.testmap.reader, tools.usecase.reader |
@@ -184,6 +185,7 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | tools.graphq.check |  | deterministic | tools.glossary.reader, tools.graphq.reader, tools.graphq.render |
 | tools.graphq.reader |  | deterministic |  |
 | tools.graphq.render |  | deterministic | tools.graphq.reader |
+| tools.infra.reader |  | deterministic |  |
 | tools.knowledge.__main__ |  | deterministic | tools.knowledge.check, tools.knowledge.surfaces |
 | tools.knowledge.check |  | deterministic | tools.capability.reader, tools.usecase.reader |
 | tools.knowledge.surfaces |  | deterministic | tools.knowledge.check |

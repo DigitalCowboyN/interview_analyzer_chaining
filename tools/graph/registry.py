@@ -39,6 +39,8 @@ NODE_DOMAINS = {
     "GlossaryTerm": "glossary",
     "GraphQuery": "graph-queries",
     "Prompt": "prompts",
+    "Service": "service",
+    "EnvVar": "env",
     # reserved: Spec→spec
 }
 

@@ -310,6 +310,7 @@ graph LR
     tools.graph.reader --> tools.graph.flow
     tools.graph.reader --> tools.graph.registry
     tools.graph.reader --> tools.graphq.reader
+    tools.graph.reader --> tools.infra.reader
     tools.graph.reader --> tools.prompts.reader
     tools.graph.reader --> tools.testmap.reader
     tools.graph.reader --> tools.usecase.reader

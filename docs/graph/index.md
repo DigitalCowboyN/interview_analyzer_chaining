@@ -6,12 +6,12 @@
 | --- | --- | --- | --- | --- | --- |
 | implements | implemented_by | Capability → CodeUnit | authored | — | 106 |
 | child_of | parent_of | Capability → Capability | authored | — | 41 |
-| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 380 |
-| contains | contained_by | CodeUnit → CodeUnit | derived | — | 167 |
+| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 381 |
+| contains | contained_by | CodeUnit → CodeUnit | derived | — | 168 |
 | governs | governed_by | ADR → CodeUnit | authored | — | 106 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 55 |
-| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 220 |
+| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 221 |
 | defined_in | defines | GlossaryTerm → CodeUnit | authored | — | 110 |
 | consumed_by | consumes | GraphQuery → CodeUnit | derived | — | 61 |
 | consumed_by | consumes | Prompt → CodeUnit | derived | — | 61 |
@@ -22,11 +22,13 @@
 
 - ADR: 28
 - Capability: 56
-- CodeUnit: 200
+- CodeUnit: 202
+- EnvVar: 15
 - GlossaryTerm: 111
 - GraphQuery: 33
 - Prompt: 28
-- Test: 223
+- Service: 7
+- Test: 224
 - UseCase: 21
 
 ## Meta-schema

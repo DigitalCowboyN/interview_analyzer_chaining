@@ -19,6 +19,7 @@ from tools.testmap.reader import load_tests, verifies_edges
 from tools.glossary.model import load_glossary
 from tools.graphq.reader import load_queries
 from tools.prompts.reader import load_prompt_entries
+from tools.infra.reader import load_services, load_env_vars
 
 
 @dataclass
@@ -43,6 +44,8 @@ _ADAPTERS = {
     "GlossaryTerm": (lambda root: load_glossary(os.path.join(root, "docs/glossary")), "term"),
     "GraphQuery": (load_queries, "graph_id"),
     "Prompt": (load_prompt_entries, "graph_id"),
+    "Service": (load_services, "id"),
+    "EnvVar": (load_env_vars, "name"),
 }
 
 
