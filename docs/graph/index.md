@@ -4,14 +4,14 @@
 
 | edge | inverse | from → to | source | properties | count |
 | --- | --- | --- | --- | --- | --- |
-| implements | implemented_by | Capability → CodeUnit | authored | — | 106 |
-| child_of | parent_of | Capability → Capability | authored | — | 41 |
+| implements | implemented_by | Capability → CodeUnit | authored | — | 107 |
+| child_of | parent_of | Capability → Capability | authored | — | 42 |
 | depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 388 |
 | contains | contained_by | CodeUnit → CodeUnit | derived | — | 171 |
-| governs | governed_by | ADR → CodeUnit | authored | — | 106 |
+| governs | governed_by | ADR → CodeUnit | authored | — | 111 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 55 |
-| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 226 |
+| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 227 |
 | defined_in | defines | GlossaryTerm → CodeUnit | authored | — | 110 |
 | consumed_by | consumes | GraphQuery → CodeUnit | derived | — | 61 |
 | consumed_by | consumes | Prompt → CodeUnit | derived | — | 61 |
@@ -24,15 +24,15 @@
 
 ## Nodes
 
-- ADR: 28
-- Capability: 56
+- ADR: 29
+- Capability: 57
 - CodeUnit: 205
 - EnvVar: 15
 - GlossaryTerm: 111
 - GraphQuery: 33
 - Prompt: 28
 - Service: 7
-- Test: 229
+- Test: 230
 - UseCase: 21
 
 ## Meta-schema

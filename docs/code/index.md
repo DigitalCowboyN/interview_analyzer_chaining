@@ -30,7 +30,7 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | tools.glossary | operations | deterministic |  |
 | tools.graph | operations | deterministic |  |
 | tools.graphq | operations | deterministic |  |
-| tools.infra |  | deterministic |  |
+| tools.infra | operations | deterministic |  |
 | tools.knowledge | operations | deterministic |  |
 | tools.prompts | operations | deterministic |  |
 | tools.testmap | operations | deterministic |  |

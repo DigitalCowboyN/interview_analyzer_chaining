@@ -138,6 +138,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `infra.test_render` (1) → tools.infra  ·  verifies: —
 - `infra.test_runs` (3) → tools.infra  ·  verifies: —
 - `infra.test_talks_to` (3) → tools.infra  ·  verifies: —
+- `infra.test_topology_walk` (3) → tools.infra  ·  verifies: —
 - `ingestion.test_format_detector` (4) → ingestion  ·  verifies: —
 - `ingestion.test_front_matter` (7) → ingestion  ·  verifies: —
 - `ingestion.test_front_matter_seeding` (5) → ingestion  ·  verifies: —
@@ -300,6 +301,7 @@ Capabilities:
 - maintain-the-glossary: VERIFIED
 - map-capabilities: VERIFIED
 - map-the-code: VERIFIED
+- map-the-deployment: VERIFIED
 - map-the-tests: VERIFIED
 - map-use-cases: VERIFIED
 - merge-split-link-alias: UNVERIFIED

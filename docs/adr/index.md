@@ -30,3 +30,4 @@
 | 0026 | Code map derived from source, hierarchically; overlay retired | accepted |
 | 0027 | Lazy frontier-expanding traversal and symbol-grain code nodes | accepted |
 | 0028 | Event-and-label flow overlay is derived, not authored | accepted |
+| 0029 | Infra and deployment overlay is derived from docker-compose | accepted |

@@ -28,3 +28,4 @@
 - 2026-08-16 — **0026** Code map derived from source, hierarchically; overlay retired · _accepted_
 - 2026-08-17 — **0027** Lazy frontier-expanding traversal and symbol-grain code nodes · _accepted_
 - 2026-08-23 — **0028** Event-and-label flow overlay is derived, not authored · _accepted_
+- 2026-08-24 — **0029** Infra and deployment overlay is derived from docker-compose · _accepted_
