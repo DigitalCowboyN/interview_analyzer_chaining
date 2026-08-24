@@ -48,6 +48,8 @@
 | health | everyday | Run every domain check + the cross-domain graph check (full sweep) |
 | help | everyday | Show the everyday commands |
 | hooks-install | everyday | Install the shared project git hooks |
+| infra-check | everyday | Reconcile the infra overlay vs docker-compose (non-blocking) |
+| infra-index | everyday | Regenerate docs/infra/index.md (deployment topology) |
 | ingest | everyday | Ingest + enrich a transcript (FILE=<path>) |
 | knowledge-check | everyday | Reconcile specs/plans + cascade root vs the knowledge domains (non-blocking) |
 | lint | everyday | Run flake8 linter |
@@ -110,6 +112,7 @@
 | python -m tools.glossary | CLI entry point for the glossary domain (`python -m tools.glossary`): regenerate |
 | python -m tools.graph | CLI entry point for the cross-domain graph (`python -m tools.graph <cmd>`): `index` |
 | python -m tools.graphq | CLI entry point for the `tools.graphq` domain: `index` renders the graph-query |
+| python -m tools.infra | CLI for the tools.infra domain: `index` renders docs/infra/index.md; `check` runs the |
 | python -m tools.knowledge | CLI entry point for the knowledge domain (`python -m tools.knowledge`): run the |
 | python -m tools.prompts | CLI entry point for the `tools.prompts` domain: `index` renders the prompt registry |
 | python -m tools.testmap | CLI entry point for the `tools.testmap` domain: `index` renders `docs/tests/index.md` |

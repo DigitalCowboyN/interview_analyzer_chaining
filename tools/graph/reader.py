@@ -19,6 +19,7 @@ from tools.testmap.reader import load_tests, verifies_edges
 from tools.glossary.model import load_glossary
 from tools.graphq.reader import load_queries
 from tools.prompts.reader import load_prompt_entries
+from tools.infra.reader import load_services, load_env_vars
 
 
 @dataclass
@@ -43,6 +44,8 @@ _ADAPTERS = {
     "GlossaryTerm": (lambda root: load_glossary(os.path.join(root, "docs/glossary")), "term"),
     "GraphQuery": (load_queries, "graph_id"),
     "Prompt": (load_prompt_entries, "graph_id"),
+    "Service": (load_services, "id"),
+    "EnvVar": (load_env_vars, "name"),
 }
 
 
@@ -146,6 +149,30 @@ def _derived_reads(edge: EdgeType, root: str) -> List[Edge]:
     return out
 
 
+def _derived_requires(edge: EdgeType, root: str) -> List[Edge]:
+    from tools.infra.reader import requires_pairs
+    return [Edge(edge.name, _addr("Service", a), _addr("Service", b))
+            for a, b in requires_pairs(root)]
+
+
+def _derived_configured_by(edge: EdgeType, root: str) -> List[Edge]:
+    from tools.infra.reader import configured_by_pairs
+    return [Edge(edge.name, _addr("Service", s), _addr("EnvVar", v))
+            for s, v in configured_by_pairs(root)]
+
+
+def _derived_runs(edge: EdgeType, root: str) -> List[Edge]:
+    from tools.infra.reader import runs_pairs
+    return [Edge(edge.name, _addr("Service", s), _addr("CodeUnit", mod))
+            for s, mod in runs_pairs(root)]
+
+
+def _derived_talks_to(edge: EdgeType, root: str) -> List[Edge]:
+    from tools.infra.reader import talks_to_pairs
+    return [Edge(edge.name, _addr("CodeUnit", u), _addr("Service", svc))
+            for u, svc in talks_to_pairs(root)]
+
+
 _DERIVED = {
     "dep_edges": _derived_deps,
     "contains_edges": _derived_contains,
@@ -154,6 +181,10 @@ _DERIVED = {
     "prompt_consumed_by": _derived_consumers("Prompt", "graph_id", load_prompt_entries),
     "reads_edges": _derived_reads,
     "writes_edges": _derived_writes,
+    "requires_edges": _derived_requires,
+    "configured_by_edges": _derived_configured_by,
+    "runs_edges": _derived_runs,
+    "talks_to_edges": _derived_talks_to,
 }
 
 

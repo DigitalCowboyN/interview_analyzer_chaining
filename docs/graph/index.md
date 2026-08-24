@@ -4,29 +4,35 @@
 
 | edge | inverse | from → to | source | properties | count |
 | --- | --- | --- | --- | --- | --- |
-| implements | implemented_by | Capability → CodeUnit | authored | — | 106 |
-| child_of | parent_of | Capability → Capability | authored | — | 41 |
-| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 380 |
-| contains | contained_by | CodeUnit → CodeUnit | derived | — | 167 |
-| governs | governed_by | ADR → CodeUnit | authored | — | 106 |
+| implements | implemented_by | Capability → CodeUnit | authored | — | 107 |
+| child_of | parent_of | Capability → Capability | authored | — | 42 |
+| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 388 |
+| contains | contained_by | CodeUnit → CodeUnit | derived | — | 171 |
+| governs | governed_by | ADR → CodeUnit | authored | — | 111 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 55 |
-| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 220 |
+| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 227 |
 | defined_in | defines | GlossaryTerm → CodeUnit | authored | — | 110 |
 | consumed_by | consumes | GraphQuery → CodeUnit | derived | — | 61 |
 | consumed_by | consumes | Prompt → CodeUnit | derived | — | 61 |
 | reads | read_by | GraphQuery → GlossaryTerm | derived | — | 134 |
 | writes | written_by | CodeUnit → GlossaryTerm | derived | — | 15 |
+| requires | required_by | Service → Service | derived | — | 9 |
+| configured_by | configures | Service → EnvVar | derived | — | 21 |
+| runs | run_by | Service → CodeUnit | derived | — | 3 |
+| talks_to | talked_to_by | CodeUnit → Service | derived | — | 5 |
 
 ## Nodes
 
-- ADR: 28
-- Capability: 56
-- CodeUnit: 200
+- ADR: 29
+- Capability: 57
+- CodeUnit: 205
+- EnvVar: 15
 - GlossaryTerm: 111
 - GraphQuery: 33
 - Prompt: 28
-- Test: 223
+- Service: 7
+- Test: 230
 - UseCase: 21
 
 ## Meta-schema
@@ -48,4 +54,8 @@ graph LR
     Prompt -->|consumed_by| CodeUnit
     GraphQuery -->|reads| GlossaryTerm
     CodeUnit -->|writes| GlossaryTerm
+    Service -->|requires| Service
+    Service -->|configured_by| EnvVar
+    Service -->|runs| CodeUnit
+    CodeUnit -->|talks_to| Service
 ```

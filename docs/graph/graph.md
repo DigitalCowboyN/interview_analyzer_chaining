@@ -67,6 +67,7 @@ graph LR
     n_capabilities_maintain_the_glossary["capabilities:maintain-the-glossary"] --> n_code_tools_glossary["code:tools.glossary"]
     n_capabilities_map_capabilities["capabilities:map-capabilities"] --> n_code_tools_capability["code:tools.capability"]
     n_capabilities_map_the_code["capabilities:map-the-code"] --> n_code_tools_code["code:tools.code"]
+    n_capabilities_map_the_deployment["capabilities:map-the-deployment"] --> n_code_tools_infra["code:tools.infra"]
     n_capabilities_map_the_tests["capabilities:map-the-tests"] --> n_code_tools_testmap["code:tools.testmap"]
     n_capabilities_map_use_cases["capabilities:map-use-cases"] --> n_code_tools_usecase["code:tools.usecase"]
     n_capabilities_merge_split_link_alias["capabilities:merge-split-link-alias"] --> n_code_resolution_engine["code:resolution.engine"]
@@ -137,6 +138,7 @@ graph LR
     n_capabilities_maintain_the_glossary["capabilities:maintain-the-glossary"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
     n_capabilities_map_capabilities["capabilities:map-capabilities"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
     n_capabilities_map_the_code["capabilities:map-the-code"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
+    n_capabilities_map_the_deployment["capabilities:map-the-deployment"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
     n_capabilities_map_the_tests["capabilities:map-the-tests"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
     n_capabilities_map_use_cases["capabilities:map-use-cases"] --> n_capabilities_maintain_a_guarded_knowledge_graph["capabilities:maintain-a-guarded-knowledge-graph"]
     n_capabilities_merge_split_link_alias["capabilities:merge-split-link-alias"] --> n_capabilities_resolve_entities_and_people["capabilities:resolve-entities-and-people"]
@@ -469,6 +471,7 @@ graph LR
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_graph_flow["code:tools.graph.flow"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_graph_registry["code:tools.graph.registry"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_graphq_reader["code:tools.graphq.reader"]
+    n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_infra_reader["code:tools.infra.reader"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_prompts_reader["code:tools.prompts.reader"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_testmap_reader["code:tools.testmap.reader"]
     n_code_tools_graph_reader["code:tools.graph.reader"] --> n_code_tools_usecase_reader["code:tools.usecase.reader"]
@@ -492,6 +495,13 @@ graph LR
     n_code_tools_graphq_check["code:tools.graphq.check"] --> n_code_tools_graphq_reader["code:tools.graphq.reader"]
     n_code_tools_graphq_check["code:tools.graphq.check"] --> n_code_tools_graphq_render["code:tools.graphq.render"]
     n_code_tools_graphq_render["code:tools.graphq.render"] --> n_code_tools_graphq_reader["code:tools.graphq.reader"]
+    n_code_tools_infra___main__["code:tools.infra.__main__"] --> n_code_tools_infra_check["code:tools.infra.check"]
+    n_code_tools_infra___main__["code:tools.infra.__main__"] --> n_code_tools_infra_reader["code:tools.infra.reader"]
+    n_code_tools_infra___main__["code:tools.infra.__main__"] --> n_code_tools_infra_render["code:tools.infra.render"]
+    n_code_tools_infra_check["code:tools.infra.check"] --> n_code_tools_code_reader["code:tools.code.reader"]
+    n_code_tools_infra_check["code:tools.infra.check"] --> n_code_tools_infra_reader["code:tools.infra.reader"]
+    n_code_tools_infra_reader["code:tools.infra.reader"] --> n_code_tools_code_reader["code:tools.code.reader"]
+    n_code_tools_infra_render["code:tools.infra.render"] --> n_code_tools_infra_reader["code:tools.infra.reader"]
     n_code_tools_knowledge___main__["code:tools.knowledge.__main__"] --> n_code_tools_knowledge_check["code:tools.knowledge.check"]
     n_code_tools_knowledge___main__["code:tools.knowledge.__main__"] --> n_code_tools_knowledge_surfaces["code:tools.knowledge.surfaces"]
     n_code_tools_knowledge_check["code:tools.knowledge.check"] --> n_code_tools_capability_reader["code:tools.capability.reader"]
@@ -687,6 +697,10 @@ graph LR
     n_code_tools_graphq["code:tools.graphq"] --> n_code_tools_graphq_check["code:tools.graphq.check"]
     n_code_tools_graphq["code:tools.graphq"] --> n_code_tools_graphq_reader["code:tools.graphq.reader"]
     n_code_tools_graphq["code:tools.graphq"] --> n_code_tools_graphq_render["code:tools.graphq.render"]
+    n_code_tools_infra["code:tools.infra"] --> n_code_tools_infra___main__["code:tools.infra.__main__"]
+    n_code_tools_infra["code:tools.infra"] --> n_code_tools_infra_check["code:tools.infra.check"]
+    n_code_tools_infra["code:tools.infra"] --> n_code_tools_infra_reader["code:tools.infra.reader"]
+    n_code_tools_infra["code:tools.infra"] --> n_code_tools_infra_render["code:tools.infra.render"]
     n_code_tools_knowledge["code:tools.knowledge"] --> n_code_tools_knowledge___main__["code:tools.knowledge.__main__"]
     n_code_tools_knowledge["code:tools.knowledge"] --> n_code_tools_knowledge_check["code:tools.knowledge.check"]
     n_code_tools_knowledge["code:tools.knowledge"] --> n_code_tools_knowledge_surfaces["code:tools.knowledge.surfaces"]
@@ -759,6 +773,11 @@ graph LR
     n_adr_27["adr:27"] --> n_code_tools_graph_neighbors["code:tools.graph.neighbors"]
     n_adr_27["adr:27"] --> n_code_tools_graph_traverse["code:tools.graph.traverse"]
     n_adr_28["adr:28"] --> n_code_tools_graph_flow["code:tools.graph.flow"]
+    n_adr_29["adr:29"] --> n_code_tools_infra["code:tools.infra"]
+    n_adr_29["adr:29"] --> n_code_tools_infra___main__["code:tools.infra.__main__"]
+    n_adr_29["adr:29"] --> n_code_tools_infra_check["code:tools.infra.check"]
+    n_adr_29["adr:29"] --> n_code_tools_infra_reader["code:tools.infra.reader"]
+    n_adr_29["adr:29"] --> n_code_tools_infra_render["code:tools.infra.render"]
     n_adr_3["adr:3"] --> n_code_projections["code:projections"]
     n_adr_3["adr:3"] --> n_code_projections_bootstrap["code:projections.bootstrap"]
     n_adr_3["adr:3"] --> n_code_projections_config["code:projections.config"]
@@ -1025,6 +1044,13 @@ graph LR
     n_tests_graphq_test_cli["tests:graphq.test_cli"] --> n_code_tools_graphq["code:tools.graphq"]
     n_tests_graphq_test_reader["tests:graphq.test_reader"] --> n_code_tools_graphq["code:tools.graphq"]
     n_tests_graphq_test_render["tests:graphq.test_render"] --> n_code_tools_graphq["code:tools.graphq"]
+    n_tests_infra_test_check["tests:infra.test_check"] --> n_code_tools_infra["code:tools.infra"]
+    n_tests_infra_test_edges_compose["tests:infra.test_edges_compose"] --> n_code_tools_infra["code:tools.infra"]
+    n_tests_infra_test_reader["tests:infra.test_reader"] --> n_code_tools_infra["code:tools.infra"]
+    n_tests_infra_test_render["tests:infra.test_render"] --> n_code_tools_infra["code:tools.infra"]
+    n_tests_infra_test_runs["tests:infra.test_runs"] --> n_code_tools_infra["code:tools.infra"]
+    n_tests_infra_test_talks_to["tests:infra.test_talks_to"] --> n_code_tools_infra["code:tools.infra"]
+    n_tests_infra_test_topology_walk["tests:infra.test_topology_walk"] --> n_code_tools_infra["code:tools.infra"]
     n_tests_ingestion_test_format_detector["tests:ingestion.test_format_detector"] --> n_code_ingestion["code:ingestion"]
     n_tests_ingestion_test_front_matter["tests:ingestion.test_front_matter"] --> n_code_ingestion["code:ingestion"]
     n_tests_ingestion_test_front_matter_seeding["tests:ingestion.test_front_matter_seeding"] --> n_code_ingestion["code:ingestion"]
@@ -1531,4 +1557,66 @@ graph LR
     n_code_projections_handlers_sentence_handlers["code:projections.handlers.sentence_handlers"] --> n_glossary_StructureType["glossary:StructureType"]
     n_code_projections_handlers_speaker_handlers["code:projections.handlers.speaker_handlers"] --> n_glossary_Speaker["glossary:Speaker"]
     n_code_projections_handlers_utterance_handlers["code:projections.handlers.utterance_handlers"] --> n_glossary_Utterance["glossary:Utterance"]
+```
+
+## requires
+
+```mermaid
+graph LR
+    n_service_app["service:app"] --> n_service_eventstore["service:eventstore"]
+    n_service_app["service:app"] --> n_service_neo4j["service:neo4j"]
+    n_service_app["service:app"] --> n_service_neo4j_test["service:neo4j-test"]
+    n_service_app["service:app"] --> n_service_redis["service:redis"]
+    n_service_projection_service["service:projection-service"] --> n_service_eventstore["service:eventstore"]
+    n_service_projection_service["service:projection-service"] --> n_service_neo4j["service:neo4j"]
+    n_service_worker["service:worker"] --> n_service_eventstore["service:eventstore"]
+    n_service_worker["service:worker"] --> n_service_neo4j["service:neo4j"]
+    n_service_worker["service:worker"] --> n_service_redis["service:redis"]
+```
+
+## configured_by
+
+```mermaid
+graph LR
+    n_service_app["service:app"] --> n_env_ESDB_CONNECTION_STRING["env:ESDB_CONNECTION_STRING"]
+    n_service_app["service:app"] --> n_env_PYTHONUNBUFFERED["env:PYTHONUNBUFFERED"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_CLUSTER_SIZE["env:EVENTSTORE_CLUSTER_SIZE"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP["env:EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_HTTP_PORT["env:EVENTSTORE_HTTP_PORT"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_INSECURE["env:EVENTSTORE_INSECURE"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_INT_TCP_PORT["env:EVENTSTORE_INT_TCP_PORT"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_MEM_DB["env:EVENTSTORE_MEM_DB"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_RUN_PROJECTIONS["env:EVENTSTORE_RUN_PROJECTIONS"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_SKIP_INDEX_VERIFY["env:EVENTSTORE_SKIP_INDEX_VERIFY"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_START_STANDARD_PROJECTIONS["env:EVENTSTORE_START_STANDARD_PROJECTIONS"]
+    n_service_neo4j["service:neo4j"] --> n_env_NEO4J_ACCEPT_LICENSE_AGREEMENT["env:NEO4J_ACCEPT_LICENSE_AGREEMENT"]
+    n_service_neo4j["service:neo4j"] --> n_env_NEO4J_AUTH["env:NEO4J_AUTH"]
+    n_service_neo4j_test["service:neo4j-test"] --> n_env_NEO4J_ACCEPT_LICENSE_AGREEMENT["env:NEO4J_ACCEPT_LICENSE_AGREEMENT"]
+    n_service_neo4j_test["service:neo4j-test"] --> n_env_NEO4J_AUTH["env:NEO4J_AUTH"]
+    n_service_projection_service["service:projection-service"] --> n_env_ENABLE_PROJECTION_SERVICE["env:ENABLE_PROJECTION_SERVICE"]
+    n_service_projection_service["service:projection-service"] --> n_env_ESDB_CONNECTION_STRING["env:ESDB_CONNECTION_STRING"]
+    n_service_projection_service["service:projection-service"] --> n_env_PROJECTION_LANE_COUNT["env:PROJECTION_LANE_COUNT"]
+    n_service_projection_service["service:projection-service"] --> n_env_PYTHONUNBUFFERED["env:PYTHONUNBUFFERED"]
+    n_service_worker["service:worker"] --> n_env_ESDB_CONNECTION_STRING["env:ESDB_CONNECTION_STRING"]
+    n_service_worker["service:worker"] --> n_env_PYTHONUNBUFFERED["env:PYTHONUNBUFFERED"]
+```
+
+## runs
+
+```mermaid
+graph LR
+    n_service_app["service:app"] --> n_code_main["code:main"]
+    n_service_projection_service["service:projection-service"] --> n_code_run_projection_service["code:run_projection_service"]
+    n_service_worker["service:worker"] --> n_code_celery_app["code:celery_app"]
+```
+
+## talks_to
+
+```mermaid
+graph LR
+    n_code_celery_app["code:celery_app"] --> n_service_redis["service:redis"]
+    n_code_events_store["code:events.store"] --> n_service_eventstore["service:eventstore"]
+    n_code_projections_parked_events["code:projections.parked_events"] --> n_service_eventstore["service:eventstore"]
+    n_code_projections_subscription_manager["code:projections.subscription_manager"] --> n_service_eventstore["service:eventstore"]
+    n_code_utils_neo4j_driver["code:utils.neo4j_driver"] --> n_service_neo4j["service:neo4j"]
 ```
