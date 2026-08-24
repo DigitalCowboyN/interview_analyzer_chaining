@@ -55,7 +55,7 @@ is below; in it, Mode B runs autonomous subagents that drive the graph CLI thems
 `python -m tools.graph` access), so no interactive relay is needed — one dispatch per agent + one judge.
 ## Layer 2 (agentic) — full baseline (KG-1)
 
-Run 2026-08-23 via **Mode B autonomous subagents** (agent-under-test drives the graph CLI itself; judge scores against RUBRIC.md). 16 of 17 scenarios completed; `spec-code-intake` was truncated by a session limit and is pending a re-run (not counted). **Every completed scenario passed** — and every `gap`/`partial` scenario passed by *honestly reporting the graph's limitation*, never by fabricating.
+Run 2026-08-23 via **Mode B autonomous subagents** (agent-under-test drives the graph CLI itself; judge scores against RUBRIC.md). **All 17 scenarios completed and passed** (`spec-code-intake` was session-limited on 2026-08-23 and re-run 2026-08-24 → **pass**; see note below). Every `gap`/`partial` scenario passed by *honestly reporting the graph's limitation*, never by fabricating.
 
 | scenario | category | expected | verdict |
 | --- | --- | --- | --- |
@@ -73,14 +73,16 @@ Run 2026-08-23 via **Mode B autonomous subagents** (agent-under-test drives the 
 | pipeline-ingestion-flow | pipeline | gap | **pass** |
 | pipeline-write-path | pipeline | gap | **pass** |
 | refactor-resolution-engine | refactor | solvable | **pass** |
-| spec-code-intake | spec | solvable | incomplete |
+| spec-code-intake | spec | solvable | **pass** |
 | split-export-bundler | refactor | solvable | **pass** |
 | trace-classify-obligation | implement | solvable | **pass** |
 
-**By expected:**
-- solvable: 10/11 pass
+**By expected (17/17 pass):**
+- solvable: 11/11 pass
 - partial: 2/2 pass
 - gap: 4/4 pass
+
+**`spec-code-intake` re-run (2026-08-24, completes the baseline).** Autonomous AUT + judge (controller-orchestrated, same Mode-B method). Verdict **pass** (answer 2 / context 1 / trajectory 2 / honesty 2). The agent walked coarse→intent→horizontal (12 graph-only calls), reached the target `code:tools.code.reader`, the *operative* governing decision **ADR-0026** ("code map derived from source; overlay retired" — the exact decision to spec), ADR-0020/0027, and `capabilities:map-the-code`, and honestly flagged that the graph cannot tell whether an overlay artifact still exists on disk. Context scored 1 (a well-justified miss): it did not cite `capabilities:link-the-domains` (reachable but uncited) and did not reach `adr:19`/`adr:24`. **Confirmed real graph limitation:** walking inbound from `code:tools.code.reader` reaches ADR-20/25/26/27 but *not* adr:19 or adr:24 — adr:19 never received a `governs` edge and adr:24 governs a different path — so the sub-1.0 recall the scenario deliberately probed is still a genuine gap (see backlog), not an exploration failure.
 
 **Highlights (honesty / escape-hatch on gap+partial):**
 - `pipeline-write-path` / `pipeline-ingestion-flow` (gap): correctly reported the graph has no runtime data-flow edge across the event-sourced choreography — one distinguished the single real edge (ingestion→enrichment) from the absent ones and explained the store+projection indirection.

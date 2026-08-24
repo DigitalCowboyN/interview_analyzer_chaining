@@ -32,13 +32,20 @@ these — closing a gap should visibly move its scenarios' recall.
 
 | # | Milestone | Why now | Eval signal it moves | Status |
 | --- | --- | --- | --- | --- |
-| KG-1 | **Complete the agentic baseline** | Full Layer-2 agentic scorecard via Mode-B autonomous subagents (agent drives the graph CLI itself + judge). | **16/17 pass** (spec-code-intake truncated by a session limit → 1 re-run pending); every gap/partial passed by honest reporting | ✅ **DONE** (RESULTS.md Layer 2) |
+| KG-1 | **Complete the agentic baseline** | Full Layer-2 agentic scorecard via Mode-B autonomous subagents (agent drives the graph CLI itself + judge). | **17/17 pass** (spec-code-intake re-run 2026-08-24 → pass); every gap/partial passed by honest reporting | ✅ **DONE** (RESULTS.md Layer 2) |
 | KG-2 | **Flow / architecture nodes** | The biggest structural gap. Shipped as a **derived** event-and-label overlay (ADR-0028: `emits`/`handled_by`/`writes`/`reads` over existing event-class symbols + glossary labels), not authored flow nodes — the coupling was already latent. | pipeline `gap` scenarios: KG-1 passed by *reporting* the missing edge → KG-2 re-run **traverses** the write path + full schema blast-radius (RESULTS.md "KG-2 re-run") | ✅ **DONE** |
 | KG-3 | **Infra / deployment modeling** | Closes the other gap: deployment scored 0.53. Model the container/service topology (compose services, config, what must be up) as graph nodes/edges so "what does X need to run / what breaks if Y changes" is answerable. | deployment `gap` scenarios 0.33–0.50 → higher | queued |
 | KG-4 | **L3 governance on shapes** | The program's original payoff (R3): rules/policies/hooks keyed on graph shapes + traversals (canonical: editing a CodeUnit → walk inbound `governs` → surface the ADR's scope → flag out-of-scope drift). Mechanism (hook vs rule) still to brainstorm. | (new checks; not a current eval category) | parked (needs its own brainstorm) |
 
 ## Parked / backlog (smaller, not lost)
 
+- **ADR-0019 / ADR-0024 have no `governs` edge to the KG-tooling code** (confirmed by the `spec-code-intake`
+  re-run, 2026-08-24). Walking inbound from `code:tools.code.reader` reaches adr:20/25/26/27 but NOT adr:19
+  (never given a govern edge — it's a cross-cutting principle: "intent authored, implementation derived") or
+  adr:24 (governs a different path). PR #46 wired govern edges for 0020/24/25/26/27→tools/, but the code→ADR
+  walk still can't surface 19/24 from this module, so spec-context recall stays <1.0 on those. Options: add a
+  `refines`/`refined_by` ADR→ADR edge so walking from adr:26 (which the agent DID reach) surfaces its 0019/0024
+  ancestors; or a targeted govern edge. Small; the operative ADR (26) is already reachable, so low urgency.
 - **Symbol-docstring backlog** — many symbols are thin (signature only); `check_missing_symbol_docstring`
   exists (opt-in) but no burn-down done. A generated `docs/code/` backlog + burn-down, like the module one.
 - **Reverse `called_by`** — symbol callers aren't resolvable (only `calls`); deferred at PR #45 because
