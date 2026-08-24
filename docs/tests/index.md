@@ -132,6 +132,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `graphq.test_cli` (1) → tools.graphq  ·  verifies: —
 - `graphq.test_reader` (3) → tools.graphq  ·  verifies: —
 - `graphq.test_render` (1) → tools.graphq  ·  verifies: —
+- `infra.test_edges_compose` (3) → tools.infra  ·  verifies: —
 - `infra.test_reader` (2) → tools.infra  ·  verifies: —
 - `ingestion.test_format_detector` (4) → ingestion  ·  verifies: —
 - `ingestion.test_front_matter` (7) → ingestion  ·  verifies: —

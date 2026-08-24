@@ -1027,6 +1027,7 @@ graph LR
     n_tests_graphq_test_cli["tests:graphq.test_cli"] --> n_code_tools_graphq["code:tools.graphq"]
     n_tests_graphq_test_reader["tests:graphq.test_reader"] --> n_code_tools_graphq["code:tools.graphq"]
     n_tests_graphq_test_render["tests:graphq.test_render"] --> n_code_tools_graphq["code:tools.graphq"]
+    n_tests_infra_test_edges_compose["tests:infra.test_edges_compose"] --> n_code_tools_infra["code:tools.infra"]
     n_tests_infra_test_reader["tests:infra.test_reader"] --> n_code_tools_infra["code:tools.infra"]
     n_tests_ingestion_test_format_detector["tests:ingestion.test_format_detector"] --> n_code_ingestion["code:ingestion"]
     n_tests_ingestion_test_front_matter["tests:ingestion.test_front_matter"] --> n_code_ingestion["code:ingestion"]
@@ -1534,4 +1535,46 @@ graph LR
     n_code_projections_handlers_sentence_handlers["code:projections.handlers.sentence_handlers"] --> n_glossary_StructureType["glossary:StructureType"]
     n_code_projections_handlers_speaker_handlers["code:projections.handlers.speaker_handlers"] --> n_glossary_Speaker["glossary:Speaker"]
     n_code_projections_handlers_utterance_handlers["code:projections.handlers.utterance_handlers"] --> n_glossary_Utterance["glossary:Utterance"]
+```
+
+## requires
+
+```mermaid
+graph LR
+    n_service_app["service:app"] --> n_service_eventstore["service:eventstore"]
+    n_service_app["service:app"] --> n_service_neo4j["service:neo4j"]
+    n_service_app["service:app"] --> n_service_neo4j_test["service:neo4j-test"]
+    n_service_app["service:app"] --> n_service_redis["service:redis"]
+    n_service_projection_service["service:projection-service"] --> n_service_eventstore["service:eventstore"]
+    n_service_projection_service["service:projection-service"] --> n_service_neo4j["service:neo4j"]
+    n_service_worker["service:worker"] --> n_service_eventstore["service:eventstore"]
+    n_service_worker["service:worker"] --> n_service_neo4j["service:neo4j"]
+    n_service_worker["service:worker"] --> n_service_redis["service:redis"]
+```
+
+## configured_by
+
+```mermaid
+graph LR
+    n_service_app["service:app"] --> n_env_ESDB_CONNECTION_STRING["env:ESDB_CONNECTION_STRING"]
+    n_service_app["service:app"] --> n_env_PYTHONUNBUFFERED["env:PYTHONUNBUFFERED"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_CLUSTER_SIZE["env:EVENTSTORE_CLUSTER_SIZE"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP["env:EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_HTTP_PORT["env:EVENTSTORE_HTTP_PORT"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_INSECURE["env:EVENTSTORE_INSECURE"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_INT_TCP_PORT["env:EVENTSTORE_INT_TCP_PORT"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_MEM_DB["env:EVENTSTORE_MEM_DB"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_RUN_PROJECTIONS["env:EVENTSTORE_RUN_PROJECTIONS"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_SKIP_INDEX_VERIFY["env:EVENTSTORE_SKIP_INDEX_VERIFY"]
+    n_service_eventstore["service:eventstore"] --> n_env_EVENTSTORE_START_STANDARD_PROJECTIONS["env:EVENTSTORE_START_STANDARD_PROJECTIONS"]
+    n_service_neo4j["service:neo4j"] --> n_env_NEO4J_ACCEPT_LICENSE_AGREEMENT["env:NEO4J_ACCEPT_LICENSE_AGREEMENT"]
+    n_service_neo4j["service:neo4j"] --> n_env_NEO4J_AUTH["env:NEO4J_AUTH"]
+    n_service_neo4j_test["service:neo4j-test"] --> n_env_NEO4J_ACCEPT_LICENSE_AGREEMENT["env:NEO4J_ACCEPT_LICENSE_AGREEMENT"]
+    n_service_neo4j_test["service:neo4j-test"] --> n_env_NEO4J_AUTH["env:NEO4J_AUTH"]
+    n_service_projection_service["service:projection-service"] --> n_env_ENABLE_PROJECTION_SERVICE["env:ENABLE_PROJECTION_SERVICE"]
+    n_service_projection_service["service:projection-service"] --> n_env_ESDB_CONNECTION_STRING["env:ESDB_CONNECTION_STRING"]
+    n_service_projection_service["service:projection-service"] --> n_env_PROJECTION_LANE_COUNT["env:PROJECTION_LANE_COUNT"]
+    n_service_projection_service["service:projection-service"] --> n_env_PYTHONUNBUFFERED["env:PYTHONUNBUFFERED"]
+    n_service_worker["service:worker"] --> n_env_ESDB_CONNECTION_STRING["env:ESDB_CONNECTION_STRING"]
+    n_service_worker["service:worker"] --> n_env_PYTHONUNBUFFERED["env:PYTHONUNBUFFERED"]
 ```

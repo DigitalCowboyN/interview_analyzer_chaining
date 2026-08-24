@@ -149,6 +149,18 @@ def _derived_reads(edge: EdgeType, root: str) -> List[Edge]:
     return out
 
 
+def _derived_requires(edge: EdgeType, root: str) -> List[Edge]:
+    from tools.infra.reader import requires_pairs
+    return [Edge(edge.name, _addr("Service", a), _addr("Service", b))
+            for a, b in requires_pairs(root)]
+
+
+def _derived_configured_by(edge: EdgeType, root: str) -> List[Edge]:
+    from tools.infra.reader import configured_by_pairs
+    return [Edge(edge.name, _addr("Service", s), _addr("EnvVar", v))
+            for s, v in configured_by_pairs(root)]
+
+
 _DERIVED = {
     "dep_edges": _derived_deps,
     "contains_edges": _derived_contains,
@@ -157,6 +169,8 @@ _DERIVED = {
     "prompt_consumed_by": _derived_consumers("Prompt", "graph_id", load_prompt_entries),
     "reads_edges": _derived_reads,
     "writes_edges": _derived_writes,
+    "requires_edges": _derived_requires,
+    "configured_by_edges": _derived_configured_by,
 }
 
 

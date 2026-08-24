@@ -88,4 +88,10 @@ EDGES: List[EdgeType] = [
     EdgeType("writes", "written_by", "CodeUnit", "GlossaryTerm", "derived",
              field="writes_edges", resolve="id",
              description="A projection-handler module writes nodes of a Neo4j label (glossary term)."),
+    EdgeType("requires", "required_by", "Service", "Service", "derived",
+             field="requires_edges", resolve="id",
+             description="A compose service must be up before this one (compose depends_on)."),
+    EdgeType("configured_by", "configures", "Service", "EnvVar", "derived",
+             field="configured_by_edges", resolve="id",
+             description="A compose service is configured by an inline environment variable."),
 ]

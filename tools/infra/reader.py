@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Tuple
 
 import yaml
 
@@ -76,3 +76,12 @@ def load_services(root: str = ".") -> List[Service]:
 def load_env_vars(root: str = ".") -> List[EnvVar]:
     names = sorted({v for s in load_services(root) for v in s.env})
     return [EnvVar(n) for n in names]
+
+
+def requires_pairs(root: str = ".") -> List[Tuple[str, str]]:
+    ids = {s.id for s in load_services(root)}
+    return [(s.id, dep) for s in load_services(root) for dep in s.requires if dep in ids]
+
+
+def configured_by_pairs(root: str = ".") -> List[Tuple[str, str]]:
+    return [(s.id, var) for s in load_services(root) for var in s.env]
