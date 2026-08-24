@@ -54,7 +54,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `code.test_check` (3) → tools.code  ·  verifies: —
 - `code.test_cli` (1) → tools.code  ·  verifies: —
 - `code.test_discover` (4) → tools.code  ·  verifies: —
-- `code.test_emits` (3) → tools.code  ·  verifies: —
+- `code.test_emits` (4) → tools.code  ·  verifies: —
 - `code.test_reader` (2) → tools.code  ·  verifies: —
 - `code.test_render` (3) → tools.code  ·  verifies: —
 - `code.test_symbol_backlog` (2) → tools.code  ·  verifies: —

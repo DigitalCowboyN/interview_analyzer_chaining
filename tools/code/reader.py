@@ -31,8 +31,12 @@ _EMITS_MARKER = re.compile(r"#\s*emits:\s*([\w.]+)")
 
 
 def _is_event_class(dotted_id: str) -> bool:
+    # An event payload class: `events.<name>_events.<Name>Data`. The `_events` module guard keeps
+    # `endswith("Data")` from also matching envelope/metadata types like events.envelope.EventMetadata.
     parts = dotted_id.split(".")
-    return len(parts) >= 3 and parts[0] == "events" and parts[-1].endswith("Data")
+    return (len(parts) >= 3 and parts[0] == "events"
+            and any(p.endswith("_events") for p in parts[1:-1])
+            and parts[-1].endswith("Data"))
 
 
 # builtin container/str/obj method names — an `x.get()` / `x.append()` call is not a graph edge
