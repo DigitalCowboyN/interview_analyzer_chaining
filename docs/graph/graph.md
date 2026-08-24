@@ -493,6 +493,7 @@ graph LR
     n_code_tools_graphq_check["code:tools.graphq.check"] --> n_code_tools_graphq_reader["code:tools.graphq.reader"]
     n_code_tools_graphq_check["code:tools.graphq.check"] --> n_code_tools_graphq_render["code:tools.graphq.render"]
     n_code_tools_graphq_render["code:tools.graphq.render"] --> n_code_tools_graphq_reader["code:tools.graphq.reader"]
+    n_code_tools_infra_reader["code:tools.infra.reader"] --> n_code_tools_code_reader["code:tools.code.reader"]
     n_code_tools_knowledge___main__["code:tools.knowledge.__main__"] --> n_code_tools_knowledge_check["code:tools.knowledge.check"]
     n_code_tools_knowledge___main__["code:tools.knowledge.__main__"] --> n_code_tools_knowledge_surfaces["code:tools.knowledge.surfaces"]
     n_code_tools_knowledge_check["code:tools.knowledge.check"] --> n_code_tools_capability_reader["code:tools.capability.reader"]
@@ -1029,6 +1030,7 @@ graph LR
     n_tests_graphq_test_render["tests:graphq.test_render"] --> n_code_tools_graphq["code:tools.graphq"]
     n_tests_infra_test_edges_compose["tests:infra.test_edges_compose"] --> n_code_tools_infra["code:tools.infra"]
     n_tests_infra_test_reader["tests:infra.test_reader"] --> n_code_tools_infra["code:tools.infra"]
+    n_tests_infra_test_runs["tests:infra.test_runs"] --> n_code_tools_infra["code:tools.infra"]
     n_tests_ingestion_test_format_detector["tests:ingestion.test_format_detector"] --> n_code_ingestion["code:ingestion"]
     n_tests_ingestion_test_front_matter["tests:ingestion.test_front_matter"] --> n_code_ingestion["code:ingestion"]
     n_tests_ingestion_test_front_matter_seeding["tests:ingestion.test_front_matter_seeding"] --> n_code_ingestion["code:ingestion"]
@@ -1577,4 +1579,13 @@ graph LR
     n_service_projection_service["service:projection-service"] --> n_env_PYTHONUNBUFFERED["env:PYTHONUNBUFFERED"]
     n_service_worker["service:worker"] --> n_env_ESDB_CONNECTION_STRING["env:ESDB_CONNECTION_STRING"]
     n_service_worker["service:worker"] --> n_env_PYTHONUNBUFFERED["env:PYTHONUNBUFFERED"]
+```
+
+## runs
+
+```mermaid
+graph LR
+    n_service_app["service:app"] --> n_code_main["code:main"]
+    n_service_projection_service["service:projection-service"] --> n_code_run_projection_service["code:run_projection_service"]
+    n_service_worker["service:worker"] --> n_code_celery_app["code:celery_app"]
 ```

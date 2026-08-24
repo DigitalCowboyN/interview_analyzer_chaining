@@ -8,9 +8,11 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Optional, Set, Tuple
 
 import yaml
+
+from tools.code.reader import load_units
 
 COMPOSE = "docker-compose.yml"
 
@@ -85,3 +87,21 @@ def requires_pairs(root: str = ".") -> List[Tuple[str, str]]:
 
 def configured_by_pairs(root: str = ".") -> List[Tuple[str, str]]:
     return [(s.id, var) for s in load_services(root) for var in s.env]
+
+
+def _entrypoint_module(command: List[str], code_ids: Set[str]) -> Optional[str]:
+    for tok in command:
+        m = _SRC_TOKEN.match(str(tok))
+        if m and m.group(1) in code_ids:
+            return m.group(1)
+    return None
+
+
+def runs_pairs(root: str = ".") -> List[Tuple[str, str]]:
+    code_ids = {u.unit for u in load_units(root)}
+    out: List[Tuple[str, str]] = []
+    for s in load_services(root):
+        mod = _entrypoint_module(s.command, code_ids)
+        if mod:
+            out.append((s.id, mod))
+    return out

@@ -6,12 +6,12 @@
 | --- | --- | --- | --- | --- | --- |
 | implements | implemented_by | Capability → CodeUnit | authored | — | 106 |
 | child_of | parent_of | Capability → Capability | authored | — | 41 |
-| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 381 |
+| depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 382 |
 | contains | contained_by | CodeUnit → CodeUnit | derived | — | 168 |
 | governs | governed_by | ADR → CodeUnit | authored | — | 106 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 55 |
-| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 222 |
+| verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 223 |
 | defined_in | defines | GlossaryTerm → CodeUnit | authored | — | 110 |
 | consumed_by | consumes | GraphQuery → CodeUnit | derived | — | 61 |
 | consumed_by | consumes | Prompt → CodeUnit | derived | — | 61 |
@@ -19,6 +19,7 @@
 | writes | written_by | CodeUnit → GlossaryTerm | derived | — | 15 |
 | requires | required_by | Service → Service | derived | — | 9 |
 | configured_by | configures | Service → EnvVar | derived | — | 21 |
+| runs | run_by | Service → CodeUnit | derived | — | 3 |
 
 ## Nodes
 
@@ -30,7 +31,7 @@
 - GraphQuery: 33
 - Prompt: 28
 - Service: 7
-- Test: 225
+- Test: 226
 - UseCase: 21
 
 ## Meta-schema
@@ -54,4 +55,5 @@ graph LR
     CodeUnit -->|writes| GlossaryTerm
     Service -->|requires| Service
     Service -->|configured_by| EnvVar
+    Service -->|runs| CodeUnit
 ```

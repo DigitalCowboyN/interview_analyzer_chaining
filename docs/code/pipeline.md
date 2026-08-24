@@ -334,6 +334,7 @@ graph LR
     tools.graphq.check --> tools.graphq.reader
     tools.graphq.check --> tools.graphq.render
     tools.graphq.render --> tools.graphq.reader
+    tools.infra.reader --> tools.code.reader
     tools.knowledge.__main__ --> tools.knowledge.check
     tools.knowledge.__main__ --> tools.knowledge.surfaces
     tools.knowledge.check --> tools.capability.reader

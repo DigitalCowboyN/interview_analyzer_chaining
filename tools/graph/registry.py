@@ -94,4 +94,7 @@ EDGES: List[EdgeType] = [
     EdgeType("configured_by", "configures", "Service", "EnvVar", "derived",
              field="configured_by_edges", resolve="id",
              description="A compose service is configured by an inline environment variable."),
+    EdgeType("runs", "run_by", "Service", "CodeUnit", "derived",
+             field="runs_edges", resolve="id",
+             description="A code service launches a code module (its compose command entrypoint)."),
 ]
