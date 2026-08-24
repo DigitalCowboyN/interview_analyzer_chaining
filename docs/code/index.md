@@ -185,7 +185,10 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | tools.graphq.check |  | deterministic | tools.glossary.reader, tools.graphq.reader, tools.graphq.render |
 | tools.graphq.reader |  | deterministic |  |
 | tools.graphq.render |  | deterministic | tools.graphq.reader |
+| tools.infra.__main__ |  | deterministic | tools.infra.check, tools.infra.reader, tools.infra.render |
+| tools.infra.check |  | deterministic | tools.code.reader, tools.infra.reader |
 | tools.infra.reader |  | deterministic | tools.code.reader |
+| tools.infra.render |  | deterministic | tools.infra.reader |
 | tools.knowledge.__main__ |  | deterministic | tools.knowledge.check, tools.knowledge.surfaces |
 | tools.knowledge.check |  | deterministic | tools.capability.reader, tools.usecase.reader |
 | tools.knowledge.surfaces |  | deterministic | tools.knowledge.check |

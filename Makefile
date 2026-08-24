@@ -81,6 +81,14 @@ code-index: ## Regenerate docs/code/index.md + pipeline.md (code map)
 code-check: ## Reconcile the code map vs the import graph (non-blocking)
 	@$(PYTHON) -m tools.code check
 
+.PHONY: infra-index
+infra-index: ## Regenerate docs/infra/index.md (deployment topology)
+	@$(PYTHON) -m tools.infra index
+
+.PHONY: infra-check
+infra-check: ## Reconcile the infra overlay vs docker-compose (non-blocking)
+	@$(PYTHON) -m tools.infra check
+
 # Cross-domain edge graph: typed links between nodes across all domains (non-blocking)
 .PHONY: graph-index
 graph-index: ## Regenerate docs/graph/index.md + graph.md (cross-domain edge graph)
@@ -97,7 +105,7 @@ health: ## Run every domain check + the cross-domain graph check (full sweep)
 .PHONY: regen-derived
 regen-derived: ## Regenerate the source-derived indexes (env-independent; the CI freshness gate's set)
 	@$(MAKE) code-index capability-index usecase-index testmap-index glossary-index \
-	         graphq-index prompt-index adr-index cli-index graph-index
+	         graphq-index prompt-index adr-index cli-index graph-index infra-index
 
 .PHONY: regen-all
 regen-all: ## Regenerate every generated index/doc (regen-derived + the app-derived api index)

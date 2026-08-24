@@ -6,8 +6,10 @@ tools.graph.reader via _ADAPTERS + _DERIVED. Must not import tools.graph.reader 
 from __future__ import annotations
 
 import ast
+import io
 import os
 import re
+import tokenize
 from dataclasses import dataclass, field
 from typing import List, Optional, Set, Tuple
 
@@ -20,6 +22,21 @@ COMPOSE = "docker-compose.yml"
 # backing-service client library (top-level import) -> the compose service it connects to
 _CLIENT_LIBS = {"neo4j": "neo4j", "esdbclient": "eventstore", "celery": "redis"}
 _TALKS_MARKER = re.compile(r"#\s*talks-to:\s*([\w-]+)")
+
+
+def _marker_services(src: str) -> Set[str]:
+    """Service names from `# talks-to:` markers in REAL comment tokens only — never string
+    literals (e.g. a docstring or an EdgeType description that mentions the marker syntax)."""
+    out: Set[str] = set()
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+            if tok.type == tokenize.COMMENT:
+                out.update(_TALKS_MARKER.findall(tok.string))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        pass
+    return out
+
+
 _SRC_TOKEN = re.compile(r"^src\.([\w.]+?)(?::\w+)?$")   # "src.main:app" -> "main"
 
 
@@ -138,7 +155,7 @@ def talks_to_pairs(root: str = ".") -> List[Tuple[str, str]]:
             svc = _CLIENT_LIBS.get(lib)
             if svc in service_ids:
                 targets.add(svc)
-        for svc in _TALKS_MARKER.findall(src):                 # marker fallback
+        for svc in _marker_services(src):                      # marker fallback (comments only)
             if svc in service_ids:
                 targets.add(svc)
         out += [(u.unit, svc) for svc in sorted(targets)]
