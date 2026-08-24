@@ -758,6 +758,7 @@ graph LR
     n_adr_27["adr:27"] --> n_code_tools_code_reader["code:tools.code.reader"]
     n_adr_27["adr:27"] --> n_code_tools_graph_neighbors["code:tools.graph.neighbors"]
     n_adr_27["adr:27"] --> n_code_tools_graph_traverse["code:tools.graph.traverse"]
+    n_adr_28["adr:28"] --> n_code_tools_graph_flow["code:tools.graph.flow"]
     n_adr_3["adr:3"] --> n_code_projections["code:projections"]
     n_adr_3["adr:3"] --> n_code_projections_bootstrap["code:projections.bootstrap"]
     n_adr_3["adr:3"] --> n_code_projections_config["code:projections.config"]

@@ -8,7 +8,7 @@
 | child_of | parent_of | Capability → Capability | authored | — | 41 |
 | depends_on | depended_on_by | CodeUnit → CodeUnit | derived | — | 380 |
 | contains | contained_by | CodeUnit → CodeUnit | derived | — | 167 |
-| governs | governed_by | ADR → CodeUnit | authored | — | 105 |
+| governs | governed_by | ADR → CodeUnit | authored | — | 106 |
 | supersedes | superseded_by | ADR → ADR | authored | — | 1 |
 | fulfilled_by | fulfills | UseCase → Capability | authored | — | 55 |
 | verifies | verified_by | Test → CodeUnit\|UseCase\|Capability | derived | test_type | 220 |
@@ -20,7 +20,7 @@
 
 ## Nodes
 
-- ADR: 27
+- ADR: 28
 - Capability: 56
 - CodeUnit: 200
 - GlossaryTerm: 111

@@ -1,5 +1,6 @@
 """KG-2 flow derivations parsed from source: the event->handler registry map and each handler's
 written Neo4j labels. Consumed by tools.graph.neighbors at level='symbol' (memoized per walk)."""
+# governed-by: ADR-0028
 from __future__ import annotations
 
 import os
