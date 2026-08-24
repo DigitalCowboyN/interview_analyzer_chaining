@@ -21,6 +21,7 @@ class WalkContext:
     _built: bool = False
     _code_ids: Set[str] = field(default_factory=set)     # module/package node ids (base grain)
     _sym_cache: Dict[str, list] = field(default_factory=dict)   # module_id -> [Symbol]
+    _reg: Optional[Dict[str, str]] = None
 
     def _ensure(self):
         # Module-grain base graph: cheap (no symbol bodies). Built once per walk, cached.
@@ -59,6 +60,12 @@ class WalkContext:
                 return s
         return None
 
+    def event_handler_map(self):
+        if getattr(self, "_reg", None) is None:
+            from tools.graph.flow import register_map
+            self._reg = register_map(self.root)
+        return self._reg
+
 
 def _symbol_edges(addr: str, direction: str, ctx: WalkContext) -> List[Tuple[str, Edge]]:
     """Symbol-grain edges spliced in at level='symbol' — a module's `contains` to its top-level
@@ -84,6 +91,13 @@ def _symbol_edges(addr: str, direction: str, ctx: WalkContext) -> List[Tuple[str
                 out.append((f"code:{s.id}", Edge("contains", addr, f"code:{s.id}")))
         for callee in rec.calls:
             out.append((f"code:{callee}", Edge("calls", addr, f"code:{callee}")))
+        for ev in getattr(rec, "emits", []):
+            out.append((f"code:{ev}", Edge("emits", addr, f"code:{ev}")))
+        hid = ctx.event_handler_map().get(cid)       # cid is an event-class symbol id
+        if hid:
+            out.append((f"code:{hid}", Edge("handled_by", addr, f"code:{hid}")))
+        # `writes` (handler-module -> label) is harvest-grain (see reader._derived_writes) so the
+        # schema blast-radius is discoverable INBOUND from a label; not spliced here.
     return out
 
 

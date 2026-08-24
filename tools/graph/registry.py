@@ -80,4 +80,10 @@ EDGES: List[EdgeType] = [
     EdgeType("consumed_by", "consumes", "Prompt", "CodeUnit", "derived",
              field="prompt_consumed_by", resolve="id",
              description="A prompt is consumed by the code units that use it."),
+    EdgeType("reads", "read_by", "GraphQuery", "GlossaryTerm", "derived",
+             field="reads_edges", resolve="id",
+             description="A graph query reads nodes of a Neo4j label (a glossary term)."),
+    EdgeType("writes", "written_by", "CodeUnit", "GlossaryTerm", "derived",
+             field="writes_edges", resolve="id",
+             description="A projection-handler module writes nodes of a Neo4j label (glossary term)."),
 ]

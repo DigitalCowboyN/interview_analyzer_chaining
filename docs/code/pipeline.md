@@ -290,6 +290,7 @@ graph LR
     tools.graph.__main__ --> tools.graph.reader
     tools.graph.__main__ --> tools.graph.render
     tools.graph.__main__ --> tools.graph.traverse
+    tools.graph.check --> tools.graph.flow
     tools.graph.check --> tools.graph.reader
     tools.graph.check --> tools.graph.registry
     tools.graph.check --> tools.graph.render
@@ -297,12 +298,16 @@ graph LR
     tools.graph.classify --> tools.capability.reader
     tools.graph.classify --> tools.code.reader
     tools.graph.classify --> tools.graph.reader
+    tools.graph.flow --> tools.code.reader
+    tools.graph.flow --> tools.glossary.model
     tools.graph.neighbors --> tools.code.reader
+    tools.graph.neighbors --> tools.graph.flow
     tools.graph.neighbors --> tools.graph.reader
     tools.graph.reader --> tools.adr.index
     tools.graph.reader --> tools.capability.reader
     tools.graph.reader --> tools.code.reader
     tools.graph.reader --> tools.glossary.model
+    tools.graph.reader --> tools.graph.flow
     tools.graph.reader --> tools.graph.registry
     tools.graph.reader --> tools.graphq.reader
     tools.graph.reader --> tools.prompts.reader
