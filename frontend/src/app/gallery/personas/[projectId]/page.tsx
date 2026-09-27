@@ -35,7 +35,7 @@ export default function ProjectPersonasPage() {
         <LiveIndicator status={liveStatus} />
       </div>
       <h1 className="text-lg font-semibold">Personas</h1>
-      <p className="mt-1 text-xs text-neutral-400">
+      <p className="mt-1 text-xs text-fg-muted">
         Persona profiles are currently seeded from per-person contributions.
       </p>
 
@@ -46,9 +46,9 @@ export default function ProjectPersonasPage() {
           error={error}
           isEmpty={personas?.length === 0}
           emptyFallback={
-            <div className="p-4 text-sm text-neutral-500">
+            <div className="p-4 text-sm text-fg-muted">
               No persona profiles yet. Run the persona lens for an interview:{" "}
-              <code className="rounded bg-neutral-100 px-1 py-0.5 text-neutral-700">
+              <code className="rounded bg-surface-raised px-1 py-0.5 text-fg">
                 python -m src.lens &lt;interview_id&gt; persona
               </code>
             </div>

@@ -21,29 +21,29 @@ export function PersonaCardGrid({
             href={`/gallery/personas/${encodeURIComponent(projectId)}/${encodeURIComponent(
               persona.person_id,
             )}`}
-            className="block rounded border border-neutral-200 p-4 hover:bg-neutral-50"
+            className="block rounded border border-border p-4 hover:bg-surface-raised"
           >
-            <h3 className="font-medium text-neutral-900">{persona.display_name}</h3>
-            <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
+            <h3 className="font-medium text-fg">{persona.display_name}</h3>
+            <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted">
               <div className="flex items-center gap-1">
                 <dt>Traits</dt>
-                <dd className="font-medium text-neutral-700">{persona.trait_count}</dd>
+                <dd className="font-medium text-fg">{persona.trait_count}</dd>
               </div>
               <div className="flex items-center gap-1">
                 <dt>Goals</dt>
-                <dd className="font-medium text-neutral-700">{persona.goal_count}</dd>
+                <dd className="font-medium text-fg">{persona.goal_count}</dd>
               </div>
               <div className="flex items-center gap-1">
                 <dt>Pain points</dt>
-                <dd className="font-medium text-neutral-700">{persona.pain_point_count}</dd>
+                <dd className="font-medium text-fg">{persona.pain_point_count}</dd>
               </div>
               <div className="flex items-center gap-1">
                 <dt>Quotes</dt>
-                <dd className="font-medium text-neutral-700">{persona.quote_count}</dd>
+                <dd className="font-medium text-fg">{persona.quote_count}</dd>
               </div>
             </dl>
             {persona.representative_quote && (
-              <p className="mt-3 line-clamp-2 text-sm italic text-neutral-600">
+              <p className="mt-3 line-clamp-2 text-sm italic text-fg-muted">
                 &ldquo;{persona.representative_quote}&rdquo;
               </p>
             )}

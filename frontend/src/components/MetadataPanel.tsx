@@ -16,18 +16,18 @@ export function MetadataPanel({
   const entries = Object.entries(metadata);
 
   return (
-    <div className="rounded border border-neutral-200 p-4">
-      <h1 className="text-lg font-semibold text-neutral-900">{title}</h1>
+    <div className="rounded border border-border p-4 bg-surface">
+      <h1 className="text-lg font-semibold text-fg">{title}</h1>
       {entries.length === 0 ? (
-        <p className="mt-2 text-sm text-neutral-400">
+        <p className="mt-2 text-sm text-fg-muted">
           No metadata available.
         </p>
       ) : (
         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
           {entries.map(([key, value]) => (
             <div key={key} className="contents">
-              <dt className="text-neutral-500">{key}</dt>
-              <dd className="text-neutral-900">{String(value)}</dd>
+              <dt className="text-fg-muted">{key}</dt>
+              <dd className="text-fg">{String(value)}</dd>
             </div>
           ))}
         </dl>

@@ -13,7 +13,7 @@ export function AppHeader() {
   const pathname = usePathname();
 
   return (
-    <header className="flex items-center justify-between border-b border-neutral-200 px-6 py-3">
+    <header className="flex items-center justify-between border-b border-border px-6 py-3 bg-surface">
       <div className="flex items-center gap-8">
         <span className="font-semibold">Interview Analyzer</span>
         <nav className="flex items-center gap-4 text-sm">
@@ -25,8 +25,8 @@ export function AppHeader() {
                 href={link.href}
                 className={
                   isActive
-                    ? "font-medium text-neutral-900"
-                    : "text-neutral-500 hover:text-neutral-900"
+                    ? "font-medium text-fg"
+                    : "text-fg-muted hover:text-fg"
                 }
               >
                 {link.label}

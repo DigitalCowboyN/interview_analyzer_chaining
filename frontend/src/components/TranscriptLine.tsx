@@ -32,21 +32,21 @@ export function TranscriptLine({
       onClick={() => onSelect(line)}
       data-utterance-id={line.utterance_id ?? undefined}
       data-continues-utterance={continuesUtterance}
-      className={`block w-full text-left px-3 py-2 hover:bg-neutral-50 ${
+      className={`block w-full text-left px-3 py-2 hover:bg-surface-raised ${
         continuesUtterance
-          ? "border-l-2 border-neutral-300 ml-3"
+          ? "border-l-2 border-border ml-3"
           : "border-l-2 border-transparent mt-2"
       }`}
     >
-      <div className="flex items-center gap-2 text-xs text-neutral-500">
-        {label && <span className="font-medium text-neutral-700">{label}</span>}
+      <div className="flex items-center gap-2 text-xs text-fg-muted">
+        {label && <span className="font-medium text-fg">{label}</span>}
         {line.edited && (
-          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">
+          <span className="rounded bg-warning-subtle px-1.5 py-0.5 text-warning">
             edited
           </span>
         )}
       </div>
-      <p className="text-sm text-neutral-900">{line.text}</p>
+      <p className="text-sm text-fg">{line.text}</p>
     </button>
   );
 }

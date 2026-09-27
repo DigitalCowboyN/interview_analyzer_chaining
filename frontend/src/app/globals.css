@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
+/* Semantic color tokens (spec §E). Components use ONLY these utilities —
+   src/__tests__/palette-guard.test.ts fails on raw palette classes. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-raised: #eef0f3;
+  --fg: #16181d;
+  --fg-muted: #525866;
+  --border: #dde1e7;
+  --accent: #2458d6;
+  --accent-fg: #ffffff;
+  --accent-subtle: #e3ebfd;
+  --danger: #b42318;
+  --danger-subtle: #fdecea;
+  --warning: #8a4b00;
+  --warning-subtle: #fdf1dc;
+  --success: #067647;
+  --success-subtle: #e3f6ec;
+  --highlight: #fff4c2;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0f1115;
+    --surface: #171a20;
+    --surface-raised: #20242c;
+    --fg: #e8eaee;
+    --fg-muted: #a3aab6;
+    --border: #2d323c;
+    --accent: #7aa7ff;
+    --accent-fg: #0b1220;
+    --accent-subtle: #1b2a47;
+    --danger: #ff8a80;
+    --danger-subtle: #3a1614;
+    --warning: #f5c26b;
+    --warning-subtle: #3a2a0c;
+    --success: #5fd4a0;
+    --success-subtle: #0f2e22;
+    --highlight: #3d3514;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-highlight: var(--highlight);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
 }

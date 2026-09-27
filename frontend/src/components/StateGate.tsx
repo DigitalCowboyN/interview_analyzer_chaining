@@ -39,7 +39,7 @@ export function StateGate({
 }: StateGateProps) {
   if (isLoading) {
     return (
-      <>{loadingFallback ?? <div role="status" className="p-4 text-sm text-neutral-500">Loading…</div>}</>
+      <>{loadingFallback ?? <div role="status" className="p-4 text-sm text-fg-muted">Loading…</div>}</>
     );
   }
 
@@ -47,7 +47,7 @@ export function StateGate({
     return (
       <>
         {errorFallback ?? (
-          <div role="alert" className="p-4 text-sm text-red-600">
+          <div role="alert" className="p-4 text-sm text-danger bg-surface">
             {defaultErrorMessage(error)}
           </div>
         )}
@@ -57,7 +57,7 @@ export function StateGate({
 
   if (isEmpty) {
     return (
-      <>{emptyFallback ?? <div className="p-4 text-sm text-neutral-500">Nothing here yet.</div>}</>
+      <>{emptyFallback ?? <div className="p-4 text-sm text-fg-muted">Nothing here yet.</div>}</>
     );
   }
 

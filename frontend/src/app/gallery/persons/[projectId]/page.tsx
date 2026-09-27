@@ -35,7 +35,7 @@ export default function ProjectPersonsPage() {
           error={error}
           isEmpty={persons?.length === 0}
           emptyFallback={
-            <div className="p-4 text-sm text-neutral-500">No persons yet.</div>
+            <div className="p-4 text-sm text-fg-muted">No persons yet.</div>
           }
         >
           <PersonCardGrid projectId={projectId} persons={persons ?? []} />

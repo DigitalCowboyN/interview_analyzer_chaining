@@ -33,7 +33,7 @@ export default function ProjectInterviewsPage() {
           error={error}
           isEmpty={interviews?.length === 0}
           emptyFallback={
-            <div className="p-4 text-sm text-neutral-500">
+            <div className="p-4 text-sm text-fg-muted">
               No interviews yet.
             </div>
           }

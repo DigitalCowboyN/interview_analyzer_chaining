@@ -48,7 +48,7 @@ export default function TranscriptPage() {
           error={error}
           isEmpty={transcript?.lines.length === 0}
           emptyFallback={
-            <div className="p-4 text-sm text-neutral-500">
+            <div className="p-4 text-sm text-fg-muted">
               This interview has no transcript lines yet.
             </div>
           }

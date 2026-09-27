@@ -31,14 +31,14 @@ export function IdentitySwitcher() {
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      <label htmlFor="identity-select" className="text-neutral-500">
+      <label htmlFor="identity-select" className="text-fg-muted">
         User
       </label>
       <select
         id="identity-select"
         value={showCustomInput ? CUSTOM_OPTION : userId}
         onChange={handleSelectChange}
-        className="rounded border border-neutral-300 bg-white px-2 py-1"
+        className="rounded border border-border bg-surface px-2 py-1"
       >
         {PRESET_USER_IDS.map((preset) => (
           <option key={preset} value={preset}>
@@ -54,11 +54,11 @@ export function IdentitySwitcher() {
             value={customValue}
             onChange={(event) => setCustomValue(event.target.value)}
             placeholder="user id"
-            className="w-28 rounded border border-neutral-300 px-2 py-1"
+            className="w-28 rounded border border-border px-2 py-1"
           />
           <button
             type="submit"
-            className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100"
+            className="rounded border border-border px-2 py-1 hover:bg-surface-raised"
           >
             Set
           </button>

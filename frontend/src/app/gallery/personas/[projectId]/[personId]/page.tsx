@@ -27,7 +27,7 @@ export default function PersonaDetailPage() {
         <LiveIndicator status={liveStatus} />
       </div>
       <h1 className="text-lg font-semibold">{persona?.display_name ?? personId}</h1>
-      <p className="mt-1 text-xs text-neutral-400">
+      <p className="mt-1 text-xs text-fg-muted">
         Persona profiles are currently seeded from per-person contributions.
       </p>
 

@@ -10,19 +10,19 @@ export function InterviewList({
   interviews: InterviewSummary[];
 }) {
   return (
-    <ul className="divide-y divide-neutral-200">
+    <ul className="divide-y divide-border">
       {interviews.map((interview) => (
         <li key={interview.interview_id}>
           <Link
             href={`/workbench/${encodeURIComponent(projectId)}/${encodeURIComponent(
               interview.interview_id,
             )}`}
-            className="flex items-center justify-between py-3 hover:bg-neutral-50"
+            className="flex items-center justify-between py-3 hover:bg-surface-raised"
           >
-            <span className="font-medium text-neutral-900">
+            <span className="font-medium text-fg">
               {interview.title}
             </span>
-            <span className="flex items-center gap-4 text-sm text-neutral-500">
+            <span className="flex items-center gap-4 text-sm text-fg-muted">
               <span>{interview.created_at}</span>
               <span>
                 {interview.fragment_count}{" "}

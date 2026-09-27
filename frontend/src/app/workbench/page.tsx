@@ -20,7 +20,7 @@ export default function WorkbenchPage() {
           error={error}
           isEmpty={projects?.length === 0}
           emptyFallback={
-            <div className="p-4 text-sm text-neutral-500">
+            <div className="p-4 text-sm text-fg-muted">
               No projects yet.
             </div>
           }

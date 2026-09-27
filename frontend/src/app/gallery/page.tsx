@@ -26,12 +26,12 @@ export default function GalleryPage() {
           error={error}
           isEmpty={projects?.length === 0}
           emptyFallback={
-            <div className="p-4 text-sm text-neutral-500">No projects yet.</div>
+            <div className="p-4 text-sm text-fg-muted">No projects yet.</div>
           }
         >
           <label
             htmlFor="gallery-project-select"
-            className="text-xs font-semibold uppercase text-neutral-500"
+            className="text-xs font-semibold uppercase text-fg-muted"
           >
             Project
           </label>
@@ -39,7 +39,7 @@ export default function GalleryPage() {
             id="gallery-project-select"
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="mt-1 block rounded border border-neutral-300 p-1 text-sm"
+            className="mt-1 block rounded border border-border p-1 text-sm"
           >
             <option value="">Select a project…</option>
             {projects?.map((project) => (
@@ -54,10 +54,10 @@ export default function GalleryPage() {
               <li>
                 <Link
                   href={`/gallery/personas/${encodeURIComponent(selectedProjectId)}`}
-                  className="block rounded border border-neutral-200 p-4 hover:bg-neutral-50"
+                  className="block rounded border border-border p-4 hover:bg-surface-raised"
                 >
-                  <h2 className="font-medium text-neutral-900">Personas</h2>
-                  <p className="mt-1 text-sm text-neutral-500">
+                  <h2 className="font-medium text-fg">Personas</h2>
+                  <p className="mt-1 text-sm text-fg-muted">
                     Persona profiles seeded from interview contributions.
                   </p>
                 </Link>
@@ -65,10 +65,10 @@ export default function GalleryPage() {
               <li>
                 <Link
                   href={`/gallery/persons/${encodeURIComponent(selectedProjectId)}`}
-                  className="block rounded border border-neutral-200 p-4 hover:bg-neutral-50"
+                  className="block rounded border border-border p-4 hover:bg-surface-raised"
                 >
-                  <h2 className="font-medium text-neutral-900">Persons</h2>
-                  <p className="mt-1 text-sm text-neutral-500">
+                  <h2 className="font-medium text-fg">Persons</h2>
+                  <p className="mt-1 text-sm text-fg-muted">
                     Identity facts — linked speakers per interview.
                   </p>
                 </Link>
@@ -76,10 +76,10 @@ export default function GalleryPage() {
               <li>
                 <Link
                   href={`/gallery/worklist?project=${encodeURIComponent(selectedProjectId)}`}
-                  className="block rounded border border-neutral-200 p-4 hover:bg-neutral-50"
+                  className="block rounded border border-border p-4 hover:bg-surface-raised"
                 >
-                  <h2 className="font-medium text-neutral-900">Worklist</h2>
-                  <p className="mt-1 text-sm text-neutral-500">
+                  <h2 className="font-medium text-fg">Worklist</h2>
+                  <p className="mt-1 text-sm text-fg-muted">
                     Review queue and suggestions.
                   </p>
                 </Link>

@@ -45,7 +45,7 @@ function WorklistContent() {
 
       <div className="mt-4">
         {!projectId ? (
-          <div className="p-4 text-sm text-neutral-500">
+          <div className="p-4 text-sm text-fg-muted">
             Select a project from the Gallery to view its worklist.
           </div>
         ) : (
@@ -55,7 +55,7 @@ function WorklistContent() {
             error={error}
             isEmpty={isEmpty}
             emptyFallback={
-              <div className="p-4 text-sm text-neutral-500">Nothing to review.</div>
+              <div className="p-4 text-sm text-fg-muted">Nothing to review.</div>
             }
           >
             {data && <WorklistRows projectId={projectId} data={data} />}
@@ -68,7 +68,7 @@ function WorklistContent() {
 
 export default function WorklistPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-neutral-500">Loading…</div>}>
+    <Suspense fallback={<div className="p-6 text-sm text-fg-muted">Loading…</div>}>
       <WorklistContent />
     </Suspense>
   );

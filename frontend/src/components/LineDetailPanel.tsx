@@ -45,7 +45,7 @@ function TextEditControl({
             setDraft(line.text);
             setEditing(true);
           }}
-          className="text-xs text-blue-700 hover:underline"
+          className="text-xs text-accent hover:underline"
         >
           Edit text
         </button>
@@ -59,7 +59,7 @@ function TextEditControl({
       <textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        className="w-full rounded border border-neutral-300 p-2 text-sm"
+        className="w-full rounded border border-border p-2 text-sm"
         rows={3}
         aria-label="Edit sentence text"
       />
@@ -71,7 +71,7 @@ function TextEditControl({
             const outcome = await editText(line.sequence_order, draft);
             if (outcome.status === "settled") setEditing(false);
           }}
-          className="rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+          className="rounded bg-accent px-2 py-1 text-xs text-accent-fg disabled:opacity-50"
         >
           {isPending ? "Saving…" : "Save"}
         </button>
@@ -79,7 +79,7 @@ function TextEditControl({
           type="button"
           disabled={isPending}
           onClick={() => setEditing(false)}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs"
+          className="rounded border border-border px-2 py-1 text-xs"
         >
           Cancel
         </button>
@@ -115,7 +115,7 @@ function SpeakerRenameControl({
             setDraft(line.speaker!.display_name);
             setEditing(true);
           }}
-          className="text-xs text-blue-700 hover:underline"
+          className="text-xs text-accent hover:underline"
         >
           Rename speaker
         </button>
@@ -129,7 +129,7 @@ function SpeakerRenameControl({
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        className="w-full rounded border border-neutral-300 p-1 text-sm"
+        className="w-full rounded border border-border p-1 text-sm"
         aria-label="New speaker display name"
       />
       <div className="mt-1 flex gap-2">
@@ -140,7 +140,7 @@ function SpeakerRenameControl({
             const outcome = await renameSpeaker(line.speaker!.speaker_id, draft.trim());
             if (outcome.status === "settled") setEditing(false);
           }}
-          className="rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+          className="rounded bg-accent px-2 py-1 text-xs text-accent-fg disabled:opacity-50"
         >
           {isPending ? "Saving…" : "Save"}
         </button>
@@ -148,7 +148,7 @@ function SpeakerRenameControl({
           type="button"
           disabled={isPending}
           onClick={() => setEditing(false)}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs"
+          className="rounded border border-border px-2 py-1 text-xs"
         >
           Cancel
         </button>
@@ -186,7 +186,7 @@ function FragmentReattributeControl({
             setDraft("");
             setEditing(true);
           }}
-          className="text-xs text-blue-700 hover:underline"
+          className="text-xs text-accent hover:underline"
         >
           Reattribute to another speaker
         </button>
@@ -201,7 +201,7 @@ function FragmentReattributeControl({
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder="Target speaker id"
-        className="w-full rounded border border-neutral-300 p-1 text-sm"
+        className="w-full rounded border border-border p-1 text-sm"
         aria-label="Target speaker id"
       />
       <div className="mt-1 flex gap-2">
@@ -212,7 +212,7 @@ function FragmentReattributeControl({
             const outcome = await reattributeFragment(line.sequence_order, draft.trim());
             if (outcome.status === "settled") setEditing(false);
           }}
-          className="rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+          className="rounded bg-accent px-2 py-1 text-xs text-accent-fg disabled:opacity-50"
         >
           {isPending ? "Saving…" : "Save"}
         </button>
@@ -220,7 +220,7 @@ function FragmentReattributeControl({
           type="button"
           disabled={isPending}
           onClick={() => setEditing(false)}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs"
+          className="rounded border border-border px-2 py-1 text-xs"
         >
           Cancel
         </button>
@@ -262,7 +262,7 @@ function PersonLinkControl({
           type="button"
           disabled={isPending}
           onClick={() => unlinkPerson(line.person!.person_id, line.speaker!.speaker_id)}
-          className="text-xs text-red-700 hover:underline disabled:opacity-50"
+          className="text-xs text-danger hover:underline disabled:opacity-50"
         >
           {isPending ? "Unlinking…" : "Unlink person"}
         </button>
@@ -288,7 +288,7 @@ function PersonLinkControl({
       <button
         type="button"
         onClick={() => setPicking(true)}
-        className="text-xs text-blue-700 hover:underline"
+        className="text-xs text-accent hover:underline"
       >
         Identify as person…
       </button>
@@ -319,7 +319,7 @@ function SegmentRemoveControl({
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          className="text-xs text-red-700 hover:underline"
+          className="text-xs text-danger hover:underline"
         >
           Remove segment
         </button>
@@ -334,7 +334,7 @@ function SegmentRemoveControl({
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="Reason (optional)"
-        className="w-full rounded border border-neutral-300 p-1 text-sm"
+        className="w-full rounded border border-border p-1 text-sm"
         aria-label="Reason for removing this segment"
       />
       <div className="mt-1 flex gap-2">
@@ -348,7 +348,7 @@ function SegmentRemoveControl({
             );
             if (outcome.status === "settled") setConfirming(false);
           }}
-          className="rounded bg-red-700 px-2 py-1 text-xs text-white disabled:opacity-50"
+          className="rounded bg-danger px-2 py-1 text-xs text-surface disabled:opacity-50"
         >
           {isPending ? "Removing…" : "Confirm remove"}
         </button>
@@ -356,7 +356,7 @@ function SegmentRemoveControl({
           type="button"
           disabled={isPending}
           onClick={() => setConfirming(false)}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs"
+          className="rounded border border-border px-2 py-1 text-xs"
         >
           Cancel
         </button>
@@ -392,7 +392,7 @@ function LensItemOverrideControl({
             setDraft(currentText);
             setEditing(true);
           }}
-          className="text-xs text-blue-700 hover:underline"
+          className="text-xs text-accent hover:underline"
         >
           Correct
         </button>
@@ -406,7 +406,7 @@ function LensItemOverrideControl({
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        className="w-full rounded border border-neutral-300 p-1 text-sm"
+        className="w-full rounded border border-border p-1 text-sm"
         aria-label="Corrected lens item text"
       />
       <div className="mt-1 flex gap-2">
@@ -417,7 +417,7 @@ function LensItemOverrideControl({
             const outcome = await overrideLensItem(itemId, { text: draft.trim() });
             if (outcome.status === "settled") setEditing(false);
           }}
-          className="rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+          className="rounded bg-accent px-2 py-1 text-xs text-accent-fg disabled:opacity-50"
         >
           {isPending ? "Saving…" : "Save"}
         </button>
@@ -425,7 +425,7 @@ function LensItemOverrideControl({
           type="button"
           disabled={isPending}
           onClick={() => setEditing(false)}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs"
+          className="rounded border border-border px-2 py-1 text-xs"
         >
           Cancel
         </button>
@@ -461,25 +461,25 @@ export function LineDetailPanel({
     <aside
       role="dialog"
       aria-label="Line detail"
-      className="w-96 shrink-0 border-l border-neutral-200 p-4"
+      className="w-96 shrink-0 border-l border-border p-4 bg-surface"
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-neutral-900">Line detail</h2>
+        <h2 className="text-sm font-semibold text-fg">Line detail</h2>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close detail panel"
-          className="text-neutral-500 hover:text-neutral-900"
+          className="text-fg-muted hover:text-fg"
         >
           ×
         </button>
       </div>
 
-      <p className="mt-3 text-sm text-neutral-900">{line.text}</p>
+      <p className="mt-3 text-sm text-fg">{line.text}</p>
       <TextEditControl interviewId={interviewId} line={line} />
 
       <section className="mt-4">
-        <h3 className="text-xs font-semibold uppercase text-neutral-500">
+        <h3 className="text-xs font-semibold uppercase text-fg-muted">
           Speaker
         </h3>
         <SpeakerRenameControl interviewId={interviewId} line={line} />
@@ -488,33 +488,33 @@ export function LineDetailPanel({
       </section>
 
       <section className="mt-4">
-        <h3 className="text-xs font-semibold uppercase text-neutral-500">
+        <h3 className="text-xs font-semibold uppercase text-fg-muted">
           Segment
         </h3>
         {line.segment ? (
           <>
-            <p className="mt-1 text-sm text-neutral-900">
+            <p className="mt-1 text-sm text-fg">
               {line.segment.topic ?? "Untitled segment"}
             </p>
             <SegmentRemoveControl interviewId={interviewId} line={line} />
           </>
         ) : (
-          <p className="mt-1 text-sm text-neutral-400">Not part of a segment.</p>
+          <p className="mt-1 text-sm text-fg-muted">Not part of a segment.</p>
         )}
       </section>
 
       <section className="mt-4">
-        <h3 className="text-xs font-semibold uppercase text-neutral-500">
+        <h3 className="text-xs font-semibold uppercase text-fg-muted">
           Entities
         </h3>
         {line.entities.length === 0 ? (
-          <p className="mt-1 text-sm text-neutral-400">No entities.</p>
+          <p className="mt-1 text-sm text-fg-muted">No entities.</p>
         ) : (
           <ul className="mt-1 space-y-1 text-sm">
             {line.entities.map((entity, index) => (
               <li key={`${entity.surface}-${index}`}>
                 {entity.surface}{" "}
-                <span className="text-neutral-500">({entity.entity_type})</span>
+                <span className="text-fg-muted">({entity.entity_type})</span>
               </li>
             ))}
           </ul>
@@ -522,24 +522,24 @@ export function LineDetailPanel({
       </section>
 
       <section className="mt-4">
-        <h3 className="text-xs font-semibold uppercase text-neutral-500">
+        <h3 className="text-xs font-semibold uppercase text-fg-muted">
           Lens items
         </h3>
         {line.lens_items.length === 0 ? (
-          <p className="mt-1 text-sm text-neutral-400">No lens items.</p>
+          <p className="mt-1 text-sm text-fg-muted">No lens items.</p>
         ) : (
           <ul className="mt-1 space-y-2 text-sm">
             {line.lens_items.map((item) => (
-              <li key={item.item_id} className="rounded border border-neutral-200 p-2">
-                <div className="flex items-center gap-2 text-xs text-neutral-500">
-                  <span className="font-medium text-neutral-700">{item.lens}</span>
+              <li key={item.item_id} className="rounded border border-border p-2 bg-surface">
+                <div className="flex items-center gap-2 text-xs text-fg-muted">
+                  <span className="font-medium text-fg">{item.lens}</span>
                   <span>{item.node_type}</span>
                   <span>{(item.confidence * 100).toFixed(0)}%</span>
                   {item.human_locked && (
-                    <span className="rounded bg-neutral-200 px-1.5 py-0.5">locked</span>
+                    <span className="rounded bg-surface-raised px-1.5 py-0.5">locked</span>
                   )}
                 </div>
-                <p className="mt-1 text-neutral-900">{item.text}</p>
+                <p className="mt-1 text-fg">{item.text}</p>
                 <LensItemOverrideControl
                   interviewId={interviewId}
                   itemId={item.item_id}
@@ -552,7 +552,7 @@ export function LineDetailPanel({
       </section>
 
       <section className="mt-4">
-        <h3 className="text-xs font-semibold uppercase text-neutral-500">
+        <h3 className="text-xs font-semibold uppercase text-fg-muted">
           Edit history
         </h3>
         <StateGate
@@ -560,13 +560,13 @@ export function LineDetailPanel({
           isError={isError}
           error={error}
           isEmpty={history?.events.length === 0}
-          emptyFallback={<p className="mt-1 text-sm text-neutral-400">No edits yet.</p>}
+          emptyFallback={<p className="mt-1 text-sm text-fg-muted">No edits yet.</p>}
         >
           <ul className="mt-1 space-y-1 text-sm">
             {history?.events.map((event, index) => (
-              <li key={`${event.correlation_id}-${index}`} className="text-neutral-700">
+              <li key={`${event.correlation_id}-${index}`} className="text-fg">
                 <span className="font-medium">{event.event_type}</span>{" "}
-                <span className="text-neutral-500">
+                <span className="text-fg-muted">
                   v{event.version} · {event.actor.user_id} · {event.occurred_at}
                 </span>
               </li>

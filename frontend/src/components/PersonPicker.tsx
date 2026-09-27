@@ -79,16 +79,16 @@ export function PersonPicker({
   const busy = isPending || deriving;
 
   return (
-    <div role="dialog" aria-label="Identify as person" className="mt-2 rounded border border-neutral-300 p-3">
+    <div role="dialog" aria-label="Identify as person" className="mt-2 rounded border border-border p-3 bg-surface">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase text-neutral-500">
+        <h3 className="text-xs font-semibold uppercase text-fg-muted">
           Identify as person
         </h3>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close person picker"
-          className="text-neutral-500 hover:text-neutral-900"
+          className="text-fg-muted hover:text-fg"
         >
           ×
         </button>
@@ -99,7 +99,7 @@ export function PersonPicker({
         isError={isError}
         error={error}
         isEmpty={persons?.length === 0}
-        emptyFallback={<p className="mt-2 text-sm text-neutral-400">No persons yet.</p>}
+        emptyFallback={<p className="mt-2 text-sm text-fg-muted">No persons yet.</p>}
       >
         <ul className="mt-2 space-y-1">
           {persons?.map((person) => (
@@ -108,7 +108,7 @@ export function PersonPicker({
                 type="button"
                 disabled={busy}
                 onClick={() => handleLinkExisting(person.person_id)}
-                className="w-full rounded border border-neutral-200 px-2 py-1 text-left text-sm hover:bg-neutral-50 disabled:opacity-50"
+                className="w-full rounded border border-border px-2 py-1 text-left text-sm hover:bg-surface-raised disabled:opacity-50"
               >
                 {person.display_name}
               </button>
@@ -117,8 +117,8 @@ export function PersonPicker({
         </ul>
       </StateGate>
 
-      <div className="mt-3 border-t border-neutral-200 pt-3">
-        <label className="text-xs font-semibold uppercase text-neutral-500" htmlFor="new-person-name">
+      <div className="mt-3 border-t border-border pt-3">
+        <label className="text-xs font-semibold uppercase text-fg-muted" htmlFor="new-person-name">
           Create new person
         </label>
         <input
@@ -126,14 +126,14 @@ export function PersonPicker({
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder="Display name"
-          className="mt-1 w-full rounded border border-neutral-300 p-1 text-sm"
+          className="mt-1 w-full rounded border border-border p-1 text-sm"
           aria-label="New person display name"
         />
         <button
           type="button"
           disabled={busy || newName.trim().length === 0}
           onClick={handleCreateNew}
-          className="mt-1 rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+          className="mt-1 rounded bg-accent px-2 py-1 text-xs text-accent-fg disabled:opacity-50"
         >
           {busy ? "Linking…" : "Create and link"}
         </button>
