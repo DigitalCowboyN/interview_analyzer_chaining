@@ -108,7 +108,7 @@ test.afterAll(() => {
   );
 });
 
-test("workbench nav renders seeded transcript, and a text edit settles", async ({ page }) => {
+test("nav renders seeded transcript, and a text edit settles", async ({ page }) => {
   const data = seeded!;
 
   // Nav: this project's own URL (it's a test project, reached via its own
@@ -162,6 +162,13 @@ test("one click into a project, one into an interview, Back returns to the proje
   await page.goBack();
   await expect(page).toHaveURL(/\/projects\/samples$/);
   await expect(page.getByRole("combobox", { name: "Project" })).toHaveValue("samples");
+
+  // Header switcher: jumping to another project navigates via the URL, not
+  // component state (ADR-0030) -- proven by the URL assertion below.
+  await page
+    .getByRole("combobox", { name: "Project" })
+    .selectOption({ label: "Real Interviews" });
+  await expect(page).toHaveURL(/\/projects\/real-interviews$/);
 });
 
 test("a server-side line append appears live on an open transcript page with no user action", async ({
