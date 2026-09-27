@@ -1,6 +1,6 @@
-/** Every in-app URL (ADR-0030: the project is the top-level nav scope).
+/** Every in-app URL (ADR-0034: the project is the top-level nav scope).
  * Components link via these builders only — never hand-built strings. */
-// governed-by: ADR-0030
+// governed-by: ADR-0034
 const e = encodeURIComponent;
 
 export const TEST_RUNS_ID = "test-runs";

@@ -8,7 +8,7 @@
 
 **Tech Stack:** FastAPI + Neo4j (Python 3.10, pytest, FakeSession reader tests), Next.js 15 App Router + React 19 + TanStack Query 5 + Tailwind v4, Vitest + Testing Library, Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-09-27-ui-nav-theme-organization-design.md` (ADR-0030)
+**Spec:** `docs/superpowers/specs/2026-09-27-ui-nav-theme-organization-design.md` (ADR-0034)
 
 ## Global Constraints
 
@@ -72,7 +72,7 @@
 - [ ] **Step 1: Write the failing test**
 
 ```python
-"""project_kind (ADR-0030): read-time real/test classification of project ids."""
+"""project_kind (ADR-0034): read-time real/test classification of project ids."""
 
 import pytest
 
@@ -123,7 +123,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'src.ui.project_kind'`
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-"""Read-time project classification (ADR-0030).
+"""Read-time project classification (ADR-0034).
 
 Projects carry no stored name or kind. Integration tests mint one project per
 run under a known id prefix, so kind is derived here from the id alone — one
@@ -134,7 +134,7 @@ added to TEST_PREFIXES or its runs will show up as real projects.
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-# governed-by: ADR-0030
+# governed-by: ADR-0034
 
 TEST_RUNS_ID = "test-runs"  # reserved: the UI's single bucket for all test runs
 
@@ -179,7 +179,7 @@ Expected: PASS (all parametrized cases)
 
 ```bash
 git add src/ui/project_kind.py tests/ui/test_project_kind.py
-git commit -m "feat(ui): read-time project kind classifier (ADR-0030)"
+git commit -m "feat(ui): read-time project kind classifier (ADR-0034)"
 ```
 
 ---
@@ -260,7 +260,7 @@ Add `from src.ui.project_kind import classify` to the imports. Replace `project_
 
 ```python
 async def project_rows(session) -> List[Dict[str, Any]]:
-    """Every project with its interview count and derived kind (ADR-0030).
+    """Every project with its interview count and derived kind (ADR-0034).
     Real projects first, then test runs; each group ordered by project_id.
 
     graphq: purpose=ui scope=domain-broad audience=[api]
@@ -322,7 +322,7 @@ async def interview_rows(session, project_id: str) -> List[Dict[str, Any]]:
 
 
 async def test_run_interview_rows(session) -> List[Dict[str, Any]]:
-    """Interviews of every test-kind project (ADR-0030 'Test runs' bucket),
+    """Interviews of every test-kind project (ADR-0034 'Test runs' bucket),
     tagged with suite; ordered by suite, then created_at.
 
     graphq: purpose=ui scope=domain-broad audience=[api]
@@ -403,7 +403,7 @@ Add below `list_interviews`:
 ```python
 @router.get("/test-runs/interviews")
 async def list_test_run_interviews():
-    """All interviews from test-kind projects (ADR-0030 'Test runs' bucket)."""
+    """All interviews from test-kind projects (ADR-0034 'Test runs' bucket)."""
     async with await Neo4jConnectionManager.get_session() as session:
         rows = await reader.test_run_interview_rows(session)
     return {"interviews": rows}
@@ -456,7 +456,7 @@ ADR-0003 (projection service is the sole Neo4j writer) is not violated in spirit
 - [ ] **Step 1: Write the failing test**
 
 ```python
-"""tools.dev.purge: read-model cleanup of test-kind projects (ADR-0030)."""
+"""tools.dev.purge: read-model cleanup of test-kind projects (ADR-0034)."""
 
 import pytest
 
@@ -518,7 +518,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'tools.dev'`
 - [ ] **Step 3: Implement `tools/dev/purge.py`**
 
 ```python
-"""Dev-only read-model cleanup of test-run projects (ADR-0030).
+"""Dev-only read-model cleanup of test-run projects (ADR-0034).
 
 Deletes a project's Neo4j subgraph: the Project, its Interviews, their
 Fragments/Speakers/Utterances, and every node carrying one of those
@@ -630,7 +630,7 @@ dev-purge-test-data: ## Delete test-run projects from dev Neo4j (read model only
 @pytest.fixture
 async def isolated_project_id():
     """Factory: mint a unique test project id under `prefix` and purge its
-    read-model subgraph after the test (ADR-0030 — tests must not leak).
+    read-model subgraph after the test (ADR-0034 — tests must not leak).
     `prefix` must be one of src.ui.project_kind.TEST_PREFIXES sans the dash.
 
     Async so teardown runs on the test's own loop (pytest.ini:
@@ -706,7 +706,7 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-// ADR-0030 / spec §E: colors come from semantic tokens only, so both themes
+// ADR-0034 / spec §E: colors come from semantic tokens only, so both themes
 // stay readable. Raw palette classes are how dark mode broke before.
 const RAW_PALETTE =
   /\b(?:text|bg|border|divide|ring|from|to|via)-(?:neutral|gray|zinc|slate|stone|red|green|amber|yellow|blue|emerald|sky|indigo)-\d{2,3}\b|\b(?:text|bg)-(?:white|black)\b/g;
@@ -940,7 +940,7 @@ Expected: FAIL — cannot resolve `@/lib/routes`
 
 `frontend/src/lib/routes.ts`:
 ```ts
-/** Every in-app URL (ADR-0030: the project is the top-level nav scope).
+/** Every in-app URL (ADR-0034: the project is the top-level nav scope).
  * Components link via these builders only — never hand-built strings. */
 const e = encodeURIComponent;
 
@@ -1401,7 +1401,7 @@ import { displayProjectName } from "@/lib/projectName";
 import { routes, TEST_RUNS_ID } from "@/lib/routes";
 
 /** Header project dropdown. The URL is the only source of truth for the
- * current project (ADR-0030) — no component state, so Back always agrees. */
+ * current project (ADR-0034) — no component state, so Back always agrees. */
 export function ProjectSwitcher() {
   const router = useRouter();
   const pathname = usePathname() ?? "";
@@ -1748,7 +1748,7 @@ import { StateGate } from "@/components/StateGate";
 import { InterviewRow } from "@/components/InterviewRow";
 import { routes } from "@/lib/routes";
 
-/** ADR-0030 bucket: every test-run interview, grouped by suite. */
+/** ADR-0034 bucket: every test-run interview, grouped by suite. */
 export default function TestRunsPage() {
   const { data, isLoading, isError, error } = useTestRunInterviews();
   const bySuite = new Map<string, NonNullable<typeof data>>();
@@ -2267,7 +2267,7 @@ git commit -m "feat(ui): insight-first interview page with highlight and URL-hel
 - Create: `frontend/e2e/screenshots.spec.ts`
 - Modify: `Makefile` (`ui-screenshots` target)
 - Regenerate: `docs/api/`, `docs/cli/index.md`, `docs/code/index.md`, `docs/tests/index.md`, `docs/graph/{index,graph}.md`, ADR index
-- Modify: `docs/adr/0030-…md` only if `adr-check` asks for markers; add `# governed-by: ADR-0030` comment to `frontend/src/lib/routes.ts` header
+- Modify: `docs/adr/0034-…md` only if `adr-check` asks for markers; add `# governed-by: ADR-0034` comment to `frontend/src/lib/routes.ts` header
 
 **Interfaces:**
 - Consumes: everything above; dev stack; `.env`.
@@ -2368,7 +2368,7 @@ Expected: all green (pre-existing live-LLM quota failures excepted — report th
 
 - [ ] **Step 6: Knowledge-graph upkeep**
 
-Add `// governed-by: ADR-0030` to the top comment of `frontend/src/lib/routes.ts`. Then:
+Add `// governed-by: ADR-0034` to the top comment of `frontend/src/lib/routes.ts`. Then:
 
 ```bash
 make adr-index && make adr-check
@@ -2387,4 +2387,4 @@ git commit -m "test(ui): e2e + light/dark screenshots for new nav; load samples 
 
 ## Knowledge-graph check
 
-Surfaces touched: `/ui` API shape (Task 2), new module `src/ui/project_kind.py` and `tools/dev/` (Tasks 1, 3), new make targets `dev-purge-test-data` and `ui-screenshots` (Tasks 3, 9), new tests, frontend routes. Task 9 Step 6 regenerates `docs/api/`, `docs/cli/index.md`, `docs/code/index.md`, `docs/tests/index.md`, `docs/graph/`, and runs `make adr-check` + `make knowledge-check`. New reader query `test_run_interview_rows` carries its `graphq:` tag. ADR-0030 records the decision (committed with the spec).
+Surfaces touched: `/ui` API shape (Task 2), new module `src/ui/project_kind.py` and `tools/dev/` (Tasks 1, 3), new make targets `dev-purge-test-data` and `ui-screenshots` (Tasks 3, 9), new tests, frontend routes. Task 9 Step 6 regenerates `docs/api/`, `docs/cli/index.md`, `docs/code/index.md`, `docs/tests/index.md`, `docs/graph/`, and runs `make adr-check` + `make knowledge-check`. New reader query `test_run_interview_rows` carries its `graphq:` tag. ADR-0034 records the decision (committed with the spec).

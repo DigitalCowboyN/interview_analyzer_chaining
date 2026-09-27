@@ -89,7 +89,7 @@ async def persona_exists(session, project_id: str, person_id: str) -> bool:
 
 
 async def project_rows(session) -> List[Dict[str, Any]]:
-    """Every project with its interview count and derived kind (ADR-0030).
+    """Every project with its interview count and derived kind (ADR-0034).
     Real projects first, then test runs; each group ordered by project_id.
 
     graphq: purpose=ui scope=domain-broad audience=[api]
@@ -151,7 +151,7 @@ async def interview_rows(session, project_id: str) -> List[Dict[str, Any]]:
 
 
 async def test_run_interview_rows(session) -> List[Dict[str, Any]]:
-    """Interviews of every test-kind project (ADR-0030 'Test runs' bucket),
+    """Interviews of every test-kind project (ADR-0034 'Test runs' bucket),
     tagged with suite; ordered by suite, then created_at.
 
     graphq: purpose=ui scope=domain-broad audience=[api]

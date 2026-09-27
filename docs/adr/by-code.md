@@ -2,7 +2,7 @@
 
 | code path | governed by |
 | --- | --- |
-| frontend/src/app/ | 0030 |
+| frontend/src/app/ | 0034 |
 | src/enrichment/ | 0005 |
 | src/events/ | 0004 |
 | src/export/ | 0005, 0013 |
@@ -11,11 +11,11 @@
 | src/persistence/ | 0001 |
 | src/projections/ | 0003 |
 | src/resolution/ | 0011 |
-| src/ui/project_kind.py | 0030 |
+| src/ui/project_kind.py | 0034 |
 | tools/code/ | 0026 |
 | tools/code/reader.py | 0027 |
 | tools/corpus/ | 0024 |
-| tools/dev/ | 0030 |
+| tools/dev/ | 0034 |
 | tools/graph/ | 0020 |
 | tools/graph/flow.py | 0028 |
 | tools/graph/neighbors.py | 0025, 0027 |

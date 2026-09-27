@@ -1,4 +1,4 @@
-"""project_kind (ADR-0030): read-time real/test classification of project ids."""
+"""project_kind (ADR-0034): read-time real/test classification of project ids."""
 
 import pytest
 

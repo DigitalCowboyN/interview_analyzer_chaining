@@ -1803,7 +1803,7 @@
           "ui"
         ],
         "summary": "List Test Run Interviews",
-        "description": "All interviews from test-kind projects (ADR-0030 'Test runs' bucket).",
+        "description": "All interviews from test-kind projects (ADR-0034 'Test runs' bucket).",
         "operationId": "list_test_run_interviews_ui_test_runs_interviews_get",
         "responses": {
           "200": {

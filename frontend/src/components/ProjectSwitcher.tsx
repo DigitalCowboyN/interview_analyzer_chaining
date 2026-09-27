@@ -18,7 +18,7 @@ function currentTab(pathname: string): (typeof TABS)[number] | undefined {
 }
 
 /** Header project dropdown. The URL is the only source of truth for the
- * current project (ADR-0030) — no component state, so Back always agrees. */
+ * current project (ADR-0034) — no component state, so Back always agrees. */
 export function ProjectSwitcher() {
   const router = useRouter();
   const pathname = usePathname() ?? "";

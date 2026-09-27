@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-// ADR-0030 / spec §E: colors come from semantic tokens only, so both themes
+// ADR-0034 / spec §E: colors come from semantic tokens only, so both themes
 // stay readable. Raw palette classes are how dark mode broke before.
 const RAW_PALETTE =
   /\b(?:text|bg|border|divide|ring|from|to|via)-(?:neutral|gray|zinc|slate|stone|red|green|amber|yellow|blue|emerald|sky|indigo)-\d{2,3}\b|\b(?:text|bg)-(?:white|black)\b/g;

@@ -31,4 +31,4 @@
 | 0027 | Lazy frontier-expanding traversal and symbol-grain code nodes | accepted |
 | 0028 | Event-and-label flow overlay is derived, not authored | accepted |
 | 0029 | Infra and deployment overlay is derived from docker-compose | accepted |
-| 0030 | UI is project-scoped; projects carry a derived kind | accepted |
+| 0034 | UI is project-scoped; projects carry a derived kind | accepted |

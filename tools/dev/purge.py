@@ -1,4 +1,4 @@
-"""Dev-only read-model cleanup of test-run projects (ADR-0030).
+"""Dev-only read-model cleanup of test-run projects (ADR-0034).
 
 Deletes a project's Neo4j subgraph: the Project, its Interviews, their
 Fragments (and their Analyses)/Speakers/Utterances, and every node
@@ -14,7 +14,7 @@ purged projects. Acceptable for dev.
     python -m tools.dev.purge --test-projects [--dry-run]
     python -m tools.dev.purge --project ledgerline-demo
 """
-# governed-by: ADR-0030
+# governed-by: ADR-0034
 
 import argparse
 import asyncio

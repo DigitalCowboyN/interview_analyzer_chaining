@@ -1,4 +1,4 @@
-"""tools.dev.purge: read-model cleanup of test-kind projects (ADR-0030)."""
+"""tools.dev.purge: read-model cleanup of test-kind projects (ADR-0034)."""
 # verifies: code:tools.dev.purge
 
 import types

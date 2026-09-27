@@ -591,7 +591,7 @@ export interface paths {
         };
         /**
          * List Test Run Interviews
-         * @description All interviews from test-kind projects (ADR-0030 'Test runs' bucket).
+         * @description All interviews from test-kind projects (ADR-0034 'Test runs' bucket).
          */
         get: operations["list_test_run_interviews_ui_test_runs_interviews_get"];
         put?: never;

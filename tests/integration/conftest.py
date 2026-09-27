@@ -538,7 +538,7 @@ def pytest_configure(config):
 @pytest.fixture
 async def isolated_project_id():
     """Factory: mint a unique test project id under `prefix` and purge its
-    read-model subgraph after the test (ADR-0030 — tests must not leak).
+    read-model subgraph after the test (ADR-0034 — tests must not leak).
     `prefix` must be one of src.ui.project_kind.TEST_PREFIXES sans the dash.
 
     Async so teardown runs on the test's own loop (pytest.ini:

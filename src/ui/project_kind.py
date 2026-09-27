@@ -1,4 +1,4 @@
-"""Read-time project classification (ADR-0030).
+"""Read-time project classification (ADR-0034).
 
 Projects carry no stored name or kind. Integration tests mint one project per
 run under a known id prefix, so kind is derived here from the id alone — one
@@ -9,7 +9,7 @@ added to TEST_PREFIXES or its runs will show up as real projects.
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-# governed-by: ADR-0030
+# governed-by: ADR-0034
 
 TEST_RUNS_ID = "test-runs"  # reserved: the UI's single bucket for all test runs
 

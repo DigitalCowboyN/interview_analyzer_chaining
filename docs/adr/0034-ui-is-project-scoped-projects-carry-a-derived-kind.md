@@ -1,6 +1,6 @@
 ---
 type: ADR
-id: 30
+id: 34
 title: UI is project-scoped; projects carry a derived kind
 status: accepted
 date: 2026-09-27

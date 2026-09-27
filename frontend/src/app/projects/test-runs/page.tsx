@@ -8,7 +8,7 @@ import { InterviewRow } from "@/components/InterviewRow";
 import { EmptyInterviewsToggle, splitEmpty } from "@/components/EmptyInterviewsToggle";
 import { routes } from "@/lib/routes";
 
-/** ADR-0030 bucket: every test-run interview, grouped by suite. */
+/** ADR-0034 bucket: every test-run interview, grouped by suite. */
 function TestRunsPageContent() {
   const { data, isLoading, isError, error } = useTestRunInterviews();
   const { showEmpty, toggleShowEmpty } = useShowEmptyParam();

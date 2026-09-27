@@ -164,7 +164,7 @@ test("one click into a project, one into an interview, Back returns to the proje
   await expect(page.getByRole("combobox", { name: "Project" })).toHaveValue("samples");
 
   // Header switcher: jumping to another project navigates via the URL, not
-  // component state (ADR-0030) -- proven by the URL assertion below.
+  // component state (ADR-0034) -- proven by the URL assertion below.
   await page
     .getByRole("combobox", { name: "Project" })
     .selectOption({ label: "Real Interviews" });

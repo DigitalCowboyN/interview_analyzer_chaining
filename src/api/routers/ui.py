@@ -101,7 +101,7 @@ async def list_interviews(project_id: str):
 
 @router.get("/test-runs/interviews")
 async def list_test_run_interviews():
-    """All interviews from test-kind projects (ADR-0030 'Test runs' bucket)."""
+    """All interviews from test-kind projects (ADR-0034 'Test runs' bucket)."""
     async with await Neo4jConnectionManager.get_session() as session:
         rows = await reader.test_run_interview_rows(session)
     return {"interviews": rows}
