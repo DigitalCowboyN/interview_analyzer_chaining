@@ -20,7 +20,7 @@ beforeEach(() => {
   vi.mocked(useRouter).mockReturnValue({ push } as never);
   vi.mocked(usePathname).mockReturnValue("/projects/samples");
   vi.mocked(useParams).mockReturnValue({ projectId: "samples" });
-  vi.mocked(useProjects).mockReturnValue({ data: projects, isLoading: false } as never);
+  vi.mocked(useProjects).mockReturnValue({ data: projects, isLoading: false, isError: false } as never);
 });
 
 describe("ProjectSwitcher", () => {
@@ -72,5 +72,47 @@ describe("ProjectSwitcher", () => {
     render(<ProjectSwitcher />);
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Project" }), "real-interviews");
     expect(push).toHaveBeenCalledWith("/projects/real-interviews");
+  });
+
+  it("groups real projects and Test runs under labeled optgroups, Projects before Test runs", () => {
+    const { container } = render(<ProjectSwitcher />);
+    const testRunsOption = screen.getByRole("option", { name: "Test runs" });
+    expect(testRunsOption.parentElement?.tagName).toBe("OPTGROUP");
+    expect((testRunsOption.parentElement as HTMLOptGroupElement).label).toBe("Test runs");
+    const groupLabels = Array.from(container.querySelectorAll("optgroup")).map(
+      (g) => (g as HTMLOptGroupElement).label,
+    );
+    expect(groupLabels).toEqual(["Projects", "Test runs"]);
+  });
+
+  it("shows a loading placeholder without the raw project id while projects are loading", () => {
+    vi.mocked(useParams).mockReturnValue({ projectId: "smoke-1" });
+    vi.mocked(useProjects).mockReturnValue({ data: undefined, isLoading: true, isError: false } as never);
+    render(<ProjectSwitcher />);
+    const select = screen.getByRole("combobox", { name: "Project" });
+    expect(select).toBeDisabled();
+    expect(screen.getByRole("option", { name: "Loading…" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "smoke-1" })).not.toBeInTheDocument();
+  });
+
+  it("shows an unavailable state and announces it to assistive tech when projects fail to load", () => {
+    vi.mocked(useProjects).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error("x"),
+    } as never);
+    render(<ProjectSwitcher />);
+    const select = screen.getByRole("combobox", { name: "Project" });
+    expect(select).toBeDisabled();
+    expect(screen.getByRole("option", { name: "Projects unavailable" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load projects");
+  });
+
+  it("falls back to the test-runs bucket when the route has no projectId param", () => {
+    vi.mocked(useParams).mockReturnValue({});
+    vi.mocked(usePathname).mockReturnValue("/projects/test-runs");
+    render(<ProjectSwitcher />);
+    expect(screen.getByRole("combobox", { name: "Project" })).toHaveValue("test-runs");
   });
 });

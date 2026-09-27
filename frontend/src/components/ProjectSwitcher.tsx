@@ -4,8 +4,11 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import { useProjects } from "@/hooks/useProjects";
 import { displayProjectName } from "@/lib/projectName";
 import { routes, TEST_RUNS_ID } from "@/lib/routes";
+import { StateGate } from "@/components/StateGate";
 
 const TABS = ["personas", "people", "review"] as const;
+
+const selectClassName = "rounded-md border border-border bg-surface px-2 py-1 text-sm text-fg";
 
 /** The tab segment right after `/projects/<id>/` in `pathname`, if it's one
  * we carry across projects (never an interview id — see lead ruling). */
@@ -20,7 +23,7 @@ export function ProjectSwitcher() {
   const router = useRouter();
   const pathname = usePathname() ?? "";
   const params = useParams<{ projectId?: string }>();
-  const { data: projects } = useProjects();
+  const { data: projects, isLoading, isError } = useProjects();
 
   const real = projects?.filter((p) => p.kind === "real") ?? [];
   const hasTests = projects?.some((p) => p.kind === "test") ?? false;
@@ -39,23 +42,50 @@ export function ProjectSwitcher() {
   }
 
   return (
-    <label className="flex items-center gap-2 text-sm text-fg-muted">
-      <span className="sr-only">Project</span>
-      <select
-        aria-label="Project"
-        value={current}
-        onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-fg"
+    <div className="flex items-center gap-2 text-sm text-fg-muted">
+      <StateGate
+        isLoading={isLoading}
+        isError={isError}
+        loadingFallback={
+          <select aria-label="Project" disabled className={selectClassName}>
+            <option value="">Loading…</option>
+          </select>
+        }
+        errorFallback={
+          <>
+            <select aria-label="Project" disabled className={selectClassName}>
+              <option value="">Projects unavailable</option>
+            </select>
+            <span role="alert" className="sr-only">
+              {"Couldn't load projects"}
+            </span>
+          </>
+        }
       >
-        <option value="">All projects</option>
-        {real.map((p) => (
-          <option key={p.project_id} value={p.project_id}>
-            {displayProjectName(p)}
-          </option>
-        ))}
-        {unlisted && <option value={current}>{current}</option>}
-        {(hasTests || current === TEST_RUNS_ID) && <option value={TEST_RUNS_ID}>Test runs</option>}
-      </select>
-    </label>
+        <select
+          aria-label="Project"
+          value={current}
+          onChange={(e) => onChange(e.target.value)}
+          className={selectClassName}
+        >
+          <option value="">All projects</option>
+          {(real.length > 0 || unlisted) && (
+            <optgroup label="Projects">
+              {real.map((p) => (
+                <option key={p.project_id} value={p.project_id}>
+                  {displayProjectName(p)}
+                </option>
+              ))}
+              {unlisted && <option value={current}>{current}</option>}
+            </optgroup>
+          )}
+          {(hasTests || current === TEST_RUNS_ID) && (
+            <optgroup label="Test runs">
+              <option value={TEST_RUNS_ID}>Test runs</option>
+            </optgroup>
+          )}
+        </select>
+      </StateGate>
+    </div>
   );
 }
