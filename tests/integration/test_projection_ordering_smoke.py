@@ -30,7 +30,6 @@ default suites.
 
 import asyncio
 import os
-import uuid as uuid_mod
 
 import pytest
 from neo4j import AsyncGraphDatabase
@@ -102,7 +101,9 @@ async def _poll_complete_projection(session, interview_id: str) -> list:
 
 
 @pytest.mark.asyncio
-async def test_projection_is_complete_and_reliable_across_repeated_interviews(tmp_path):
+async def test_projection_is_complete_and_reliable_across_repeated_interviews(
+    tmp_path, isolated_project_id
+):
     """Seed INTERVIEW_COUNT interviews; each must project every fragment with a
     non-null speaker. N consecutive complete projections proves the reorder
     buffer eliminated the flaky/lossy cross-lane race."""
@@ -113,7 +114,7 @@ async def test_projection_is_complete_and_reliable_across_repeated_interviews(tm
     try:
         async with driver.session() as session:
             for n in range(INTERVIEW_COUNT):
-                project_id = f"projection-smoke-{uuid_mod.uuid4()}"
+                project_id = isolated_project_id("projection-smoke")
                 input_file = tmp_path / f"projection_smoke_{n}.txt"
                 input_file.write_text(LABELED)
                 orchestrator = IngestionOrchestrator(
@@ -131,19 +132,10 @@ async def test_projection_is_complete_and_reliable_across_repeated_interviews(tm
 
             # All interviews projected completely, in sequence.
             assert len(seeded) == INTERVIEW_COUNT
-        # --- cleanup: remove the seeded graph (interview-scoped DETACH DELETE,
-        # mirrors test_deployed_projection_smoke.py's teardown) ---
-        async with driver.session() as session:
-            for _project_id, interview_id in seeded:
-                await session.run(
-                    """
-                    MATCH (i:Interview {interview_id: $iid})
-                    OPTIONAL MATCH (i)-[:HAS_SENTENCE]->(f:Fragment)
-                    OPTIONAL MATCH (i)-[:HAS_PARTICIPANT]->(sp:Speaker)
-                    OPTIONAL MATCH (f)-[:PART_OF_UTTERANCE]->(u:Utterance)
-                    DETACH DELETE i, f, sp, u
-                    """,
-                    iid=interview_id,
-                )
+        # Teardown (Project + Interviews + everything scoped to them) is
+        # handled by the isolated_project_id fixture, via tools.dev.purge --
+        # it purges the whole subgraph (this file's old manual DETACH DELETE
+        # only removed Interview/Fragment/Speaker/Utterance, never the
+        # Project node itself).
     finally:
         await driver.close()

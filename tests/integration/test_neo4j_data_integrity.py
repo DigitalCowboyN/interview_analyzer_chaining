@@ -41,7 +41,7 @@ pytestmark = [
 ]
 
 
-def create_interview_created_event(interview_id: str, project_id: str = "test-project") -> EventEnvelope:
+def create_interview_created_event(interview_id: str, project_id: str) -> EventEnvelope:
     """Helper to create InterviewCreated event."""
     return EventEnvelope(
         event_id=str(uuid.uuid4()),
@@ -133,9 +133,9 @@ class TestProjectionTransactionIntegrity:
     """Test transaction atomicity via projection handlers."""
 
     @pytest.mark.asyncio
-    async def test_projection_creates_complete_graph_structure(self, clean_test_database):
+    async def test_projection_creates_complete_graph_structure(self, clean_test_database, isolated_project_id):
         """Test that projection handlers create complete graph structure atomically."""
-        project_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         interview_id = str(uuid.uuid4())
         sentence_id = str(uuid.uuid4())
 
@@ -215,9 +215,9 @@ class TestProjectionTransactionIntegrity:
             assert record["domain_keyword_count"] == 2
 
     @pytest.mark.asyncio
-    async def test_projection_idempotency_same_event_twice(self, clean_test_database):
+    async def test_projection_idempotency_same_event_twice(self, clean_test_database, isolated_project_id):
         """Test that processing the same event twice doesn't create duplicates."""
-        project_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         interview_id = str(uuid.uuid4())
 
         # Create event
@@ -244,9 +244,9 @@ class TestProjectionRelationshipIntegrity:
     """Test relationship consistency via projection handlers."""
 
     @pytest.mark.asyncio
-    async def test_relationship_consistency_multiple_sentences(self, clean_test_database):
+    async def test_relationship_consistency_multiple_sentences(self, clean_test_database, isolated_project_id):
         """Test that relationships maintain integrity across multiple sentences."""
-        project_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         interview_id = str(uuid.uuid4())
 
         # Create interview
@@ -316,9 +316,9 @@ class TestProjectionRelationshipIntegrity:
             assert orphaned["orphaned_count"] == 0, "Orphaned Analysis nodes found"
 
     @pytest.mark.asyncio
-    async def test_shared_dimension_nodes_reused(self, clean_test_database):
+    async def test_shared_dimension_nodes_reused(self, clean_test_database, isolated_project_id):
         """Test that shared dimension nodes (keywords, topics) are reused, not duplicated."""
-        project_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         interview_id = str(uuid.uuid4())
 
         # Create interview
@@ -377,9 +377,9 @@ class TestProjectionDataConsistency:
     """Test data consistency via projection handlers."""
 
     @pytest.mark.asyncio
-    async def test_analysis_update_replaces_old_analysis(self, clean_test_database):
+    async def test_analysis_update_replaces_old_analysis(self, clean_test_database, isolated_project_id):
         """Test that a new AnalysisGenerated event replaces the old analysis."""
-        project_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         interview_id = str(uuid.uuid4())
         sentence_id = str(uuid.uuid4())
 
@@ -438,9 +438,9 @@ class TestProjectionDataConsistency:
             assert "modified" in record["keywords"], "Keywords not updated"
 
     @pytest.mark.asyncio
-    async def test_no_orphaned_nodes_after_projection(self, clean_test_database):
+    async def test_no_orphaned_nodes_after_projection(self, clean_test_database, isolated_project_id):
         """Test that projection handlers don't leave orphaned nodes."""
-        project_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         interview_id = str(uuid.uuid4())
         sentence_id = str(uuid.uuid4())
 
@@ -491,9 +491,9 @@ class TestProjectionDataValidation:
     """Test data type and constraint validation via projection handlers."""
 
     @pytest.mark.asyncio
-    async def test_data_types_preserved_through_projection(self, clean_test_database):
+    async def test_data_types_preserved_through_projection(self, clean_test_database, isolated_project_id):
         """Test that data types are correctly preserved through projection."""
-        project_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         interview_id = str(uuid.uuid4())
         sentence_id = str(uuid.uuid4())
 
@@ -538,9 +538,9 @@ class TestProjectionDataValidation:
             assert record["speaker"] == "test_speaker"
 
     @pytest.mark.asyncio
-    async def test_unique_sentence_ids_enforced(self, clean_test_database):
+    async def test_unique_sentence_ids_enforced(self, clean_test_database, isolated_project_id):
         """Test that unique sentence IDs are maintained."""
-        project_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         interview_id = str(uuid.uuid4())
 
         await InterviewCreatedHandler().handle(
