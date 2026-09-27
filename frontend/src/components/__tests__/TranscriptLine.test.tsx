@@ -75,4 +75,14 @@ describe("TranscriptLine", () => {
     await userEvent.click(screen.getByRole("button"));
     expect(onSelect).toHaveBeenCalledWith(line);
   });
+
+  it("anchors by fragment id and marks highlighted lines", () => {
+    const line = makeLine();
+    const { container } = render(
+      <TranscriptLine line={line} continuesUtterance={false} onSelect={() => {}} highlighted />,
+    );
+    const button = container.querySelector(`#line-${line.fragment_id}`)!;
+    expect(button).toHaveAttribute("data-highlighted", "true");
+    expect(button).toHaveClass("bg-highlight");
+  });
 });

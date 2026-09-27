@@ -1,37 +1,76 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo } from "react";
 import { useTranscript } from "@/hooks/useTranscript";
 import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { StateGate } from "@/components/StateGate";
 import { LiveIndicator } from "@/components/LiveIndicator";
-import { MetadataPanel } from "@/components/MetadataPanel";
 import { SegmentHeading } from "@/components/SegmentHeading";
 import { TranscriptLine } from "@/components/TranscriptLine";
 import { LineDetailPanel } from "@/components/LineDetailPanel";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { InterviewHeader } from "@/components/InterviewHeader";
+import { InsightsPanel } from "@/components/InsightsPanel";
+import { useInsights } from "@/hooks/useInsights";
+import { useInterviews } from "@/hooks/useInterviews";
+import { useProject } from "@/hooks/useProjects";
+import { displayProjectName } from "@/lib/projectName";
+import { formatDate } from "@/lib/formatDate";
+import { routes } from "@/lib/routes";
+import type { Insight } from "@/lib/insights";
 
-/** Transcript screen: the workbench's core, read-only display of an interview. */
-export default function TranscriptPage() {
-  const { projectId, interviewId } = useParams<{
-    projectId: string;
-    interviewId: string;
-  }>();
+function TranscriptPageContent() {
+  const { projectId, interviewId } = useParams<{ projectId: string; interviewId: string }>();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data: transcript, isLoading, isError, error } = useTranscript(interviewId);
+  const insightsQuery = useInsights(interviewId);
+  const { data: interviews } = useInterviews(projectId);
+  const { project } = useProject(projectId);
   const liveStatus = useLiveInvalidation({ interviewId, projectId });
-  const [selectedFragmentId, setSelectedFragmentId] = useState<string | null>(null);
-  // Derive the selected line from the latest transcript data each render,
-  // rather than caching the clicked line object — otherwise a refetch after
-  // a correction (text edit, speaker rename, ...) leaves the panel showing
-  // stale pre-correction content. If the line disappears from a refetch,
-  // this resolves to null and the panel closes naturally.
+
+  // URL is the state (reload/Back restore it); replace() so line clicks don't
+  // pile up history entries — Back leaves the interview.
+  function setParam(key: "line" | "insight", value: string | null) {
+    const next = new URLSearchParams(searchParams.toString());
+    if (value) next.set(key, value);
+    else next.delete(key);
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
   const selectedLine =
-    transcript?.lines.find((l) => l.fragment_id === selectedFragmentId) ?? null;
+    transcript?.lines.find((l) => l.fragment_id === searchParams.get("line")) ?? null;
+  const insights = insightsQuery.data ?? [];
+  const selectedInsight = insights.find((i) => i.item_id === searchParams.get("insight")) ?? null;
+  const highlighted = useMemo(
+    () => new Set(selectedInsight?.supporting_fragment_ids ?? []),
+    [selectedInsight],
+  );
+  const participants = useMemo(
+    () => [...new Set(transcript?.lines.map((l) => l.speaker?.display_name).filter(Boolean) as string[])],
+    [transcript],
+  );
+  const summary = interviews?.find((i) => i.interview_id === interviewId);
+
+  function onSelectInsight(insight: Insight) {
+    setParam("insight", insight.item_id);
+    const first = insight.supporting_fragment_ids[0];
+    if (first) document.getElementById(`line-${first}`)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  }
 
   return (
-    <div className="flex">
-      <div className="flex-1 p-6">
-        <div className="flex items-center justify-end">
+    <div className="mx-auto grid max-w-7xl gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="min-w-0">
+        <div className="flex items-center justify-between">
+          <Breadcrumbs
+            items={[
+              { label: project ? displayProjectName(project) : projectId, href: routes.project(projectId) },
+              { label: transcript?.title ?? "Interview" },
+            ]}
+          />
           <LiveIndicator status={liveStatus} />
         </div>
         <StateGate
@@ -47,7 +86,13 @@ export default function TranscriptPage() {
         >
           {transcript && (
             <>
-              <MetadataPanel title={transcript.title} metadata={transcript.metadata} />
+              <InterviewHeader
+                title={transcript.title}
+                participants={participants}
+                date={formatDate(summary?.created_at)}
+                lineCount={transcript.lines.length}
+                metadata={transcript.metadata}
+              />
               <div className="mt-4">
                 {transcript.lines.map((line, index) => {
                   const previous = transcript.lines[index - 1];
@@ -71,7 +116,8 @@ export default function TranscriptPage() {
                       <TranscriptLine
                         line={line}
                         continuesUtterance={continuesUtterance}
-                        onSelect={(l) => setSelectedFragmentId(l.fragment_id)}
+                        highlighted={highlighted.has(line.fragment_id)}
+                        onSelect={(l) => setParam("line", l.fragment_id)}
                       />
                     </div>
                   );
@@ -81,14 +127,33 @@ export default function TranscriptPage() {
           )}
         </StateGate>
       </div>
-      {selectedLine && (
-        <LineDetailPanel
-          projectId={projectId}
-          interviewId={interviewId}
-          line={selectedLine}
-          onClose={() => setSelectedFragmentId(null)}
-        />
-      )}
+      <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+        {selectedLine ? (
+          <LineDetailPanel
+            projectId={projectId}
+            interviewId={interviewId}
+            line={selectedLine}
+            onClose={() => setParam("line", null)}
+          />
+        ) : (
+          <div className="rounded-lg border border-border bg-surface p-4">
+            <h2 className="mb-3 font-semibold text-fg">Insights</h2>
+            {insightsQuery.isError ? (
+              <p className="text-sm text-danger">Couldn&rsquo;t load insights.</p>
+            ) : (
+              <InsightsPanel insights={insights} selectedId={selectedInsight?.item_id ?? null} onSelect={onSelectInsight} />
+            )}
+          </div>
+        )}
+      </aside>
     </div>
+  );
+}
+
+export default function TranscriptPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-fg-muted">Loading…</div>}>
+      <TranscriptPageContent />
+    </Suspense>
   );
 }

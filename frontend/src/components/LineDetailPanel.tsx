@@ -461,7 +461,7 @@ export function LineDetailPanel({
     <aside
       role="dialog"
       aria-label="Line detail"
-      className="w-96 shrink-0 border-l border-border p-4 bg-surface"
+      className="w-full rounded-lg border border-border p-4 bg-surface"
     >
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-fg">Line detail</h2>

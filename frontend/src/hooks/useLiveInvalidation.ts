@@ -69,13 +69,19 @@ export function keysForSurface(surface: string, scopes: LiveInvalidationScopes):
 
   switch (surface) {
     case "transcript":
-      if (interviewId) keys.push(queryKeys.transcript(interviewId));
+      if (interviewId) {
+        keys.push(queryKeys.transcript(interviewId));
+        keys.push(queryKeys.insights(interviewId));
+      }
       break;
     case "interviews":
       if (projectId) keys.push(queryKeys.interviews(projectId));
       break;
     case "project":
-      if (interviewId) keys.push(queryKeys.transcript(interviewId));
+      if (interviewId) {
+        keys.push(queryKeys.transcript(interviewId));
+        keys.push(queryKeys.insights(interviewId));
+      }
       if (projectId) {
         keys.push(queryKeys.persons(projectId));
         keys.push(queryKeys.personas(projectId));
@@ -87,7 +93,10 @@ export function keysForSurface(surface: string, scopes: LiveInvalidationScopes):
       }
       break;
     case "resync":
-      if (interviewId) keys.push(queryKeys.transcript(interviewId));
+      if (interviewId) {
+        keys.push(queryKeys.transcript(interviewId));
+        keys.push(queryKeys.insights(interviewId));
+      }
       if (projectId) {
         keys.push(queryKeys.interviews(projectId));
         keys.push(queryKeys.persons(projectId));

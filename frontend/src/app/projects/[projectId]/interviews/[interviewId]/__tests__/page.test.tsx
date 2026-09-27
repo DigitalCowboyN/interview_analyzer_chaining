@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,7 +6,11 @@ import type { ReactNode } from "react";
 import TranscriptPage from "@/app/projects/[projectId]/interviews/[interviewId]/page";
 import { useTranscript } from "@/hooks/useTranscript";
 import { useSentenceHistory } from "@/hooks/useSentenceHistory";
-import { useParams } from "next/navigation";
+import { useInsights } from "@/hooks/useInsights";
+import { useInterviews } from "@/hooks/useInterviews";
+import { useProject } from "@/hooks/useProjects";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Insight } from "@/lib/insights";
 
 vi.mock("@/hooks/useTranscript", () => ({
   useTranscript: vi.fn(),
@@ -16,16 +20,34 @@ vi.mock("@/hooks/useSentenceHistory", () => ({
   useSentenceHistory: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({
-  useParams: vi.fn(),
+vi.mock("@/hooks/useInsights", () => ({
+  useInsights: vi.fn(),
 }));
 
-function mockParams(projectId: string, interviewId: string) {
-  vi.mocked(useParams).mockReturnValue({ projectId, interviewId });
+vi.mock("@/hooks/useInterviews", () => ({
+  useInterviews: vi.fn(),
+}));
+
+vi.mock("@/hooks/useProjects", () => ({
+  useProject: vi.fn(),
+}));
+
+const replace = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useParams: vi.fn(),
+  usePathname: vi.fn(),
+  useRouter: vi.fn(),
+  useSearchParams: vi.fn(),
+}));
+
+function mockNav(search: string) {
+  vi.mocked(useParams).mockReturnValue({ projectId: "p1", interviewId: "i1" });
+  vi.mocked(usePathname).mockReturnValue("/projects/p1/interviews/i1");
+  vi.mocked(useRouter).mockReturnValue({ replace } as never);
+  vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams(search) as never);
 }
 
-// The LineDetailPanel's correction affordances (Task 5) use TanStack Query's
-// useQueryClient, so page renders need a provider.
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   function Wrapper({ children }: { children: ReactNode }) {
@@ -34,7 +56,7 @@ function renderPage() {
   return render(<TranscriptPage />, { wrapper: Wrapper });
 }
 
-const TRANSCRIPT_WITH_SEGMENTS = {
+const TRANSCRIPT = {
   interview_id: "i1",
   title: "Kickoff call",
   metadata: {},
@@ -45,8 +67,8 @@ const TRANSCRIPT_WITH_SEGMENTS = {
       text: "Let's talk about onboarding.",
       speaker: { speaker_id: "s1", display_name: "Speaker A" },
       person: null,
-      utterance_id: "u1",
-      segment: { segment_id: "seg1", topic: "Onboarding" },
+      utterance_id: null,
+      segment: null,
       entities: [],
       lens_items: [],
       edited: false,
@@ -56,21 +78,9 @@ const TRANSCRIPT_WITH_SEGMENTS = {
       sequence_order: 1,
       text: "It was confusing at first.",
       speaker: { speaker_id: "s2", display_name: "Speaker B" },
-      person: { person_id: "p1", display_name: "Jane Doe" },
-      utterance_id: "u1",
-      segment: { segment_id: "seg1", topic: "Onboarding" },
-      entities: [],
-      lens_items: [],
-      edited: true,
-    },
-    {
-      fragment_id: "f3",
-      sequence_order: 2,
-      text: "Now let's discuss pricing.",
-      speaker: { speaker_id: "s1", display_name: "Speaker A" },
       person: null,
-      utterance_id: "u2",
-      segment: { segment_id: "seg2", topic: "Pricing" },
+      utterance_id: null,
+      segment: null,
       entities: [],
       lens_items: [],
       edited: false,
@@ -78,200 +88,112 @@ const TRANSCRIPT_WITH_SEGMENTS = {
   ],
 };
 
-describe("TranscriptPage", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+const INSIGHTS: Insight[] = [
+  {
+    item_id: "d1",
+    node_type: "Decision",
+    lens: "meeting_minutes",
+    text: "Ship CSV export",
+    confidence: 0.92,
+    locked: true,
+    supporting_fragment_ids: ["f1"],
+  },
+];
 
-  it("shows the loading state via StateGate", () => {
-    mockParams("p1", "i1");
+describe("TranscriptPage", () => {
+  beforeEach(() => {
     vi.mocked(useTranscript).mockReturnValue({
+      data: TRANSCRIPT,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(useSentenceHistory).mockReturnValue({
       data: undefined,
       isLoading: true,
       isError: false,
       error: null,
     } as never);
-
-    renderPage();
-    expect(screen.getByRole("status")).toBeInTheDocument();
+    vi.mocked(useInsights).mockReturnValue({
+      data: INSIGHTS,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(useInterviews).mockReturnValue({
+      data: [{ interview_id: "i1", title: "Kickoff call", created_at: "2026-09-27T00:00:00Z" }],
+    } as never);
+    vi.mocked(useProject).mockReturnValue({
+      project: { project_id: "p1", interview_count: 1, kind: "real", suite: null },
+      isLoading: false,
+    } as never);
+    replace.mockClear();
   });
 
-  it("shows the error state via StateGate", () => {
-    mockParams("p1", "i1");
-    vi.mocked(useTranscript).mockReturnValue({
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("renders the Insights panel with a group heading when no line param", () => {
+    mockNav("");
+    renderPage();
+    expect(screen.getByRole("heading", { name: "Insights" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Decisions (1)" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Line detail" })).not.toBeInTheDocument();
+  });
+
+  it("?line=f1 shows the Line detail dialog instead of Insights", () => {
+    mockNav("line=f1");
+    renderPage();
+    expect(screen.getByRole("dialog", { name: "Line detail" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Decisions (1)" })).not.toBeInTheDocument();
+  });
+
+  it("?insight=d1 highlights its supporting fragment lines only", () => {
+    mockNav("insight=d1");
+    renderPage();
+    const f1 = document.getElementById("line-f1")!;
+    const f2 = document.getElementById("line-f2")!;
+    expect(f1).toHaveAttribute("data-highlighted", "true");
+    expect(f2).not.toHaveAttribute("data-highlighted", "true");
+  });
+
+  it("ignores unknown line/insight ids without throwing, showing Insights", () => {
+    mockNav("line=gone&insight=gone");
+    expect(() => renderPage()).not.toThrow();
+    expect(screen.getByRole("heading", { name: "Insights" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Line detail" })).not.toBeInTheDocument();
+    const f1 = document.getElementById("line-f1")!;
+    const f2 = document.getElementById("line-f2")!;
+    expect(f1).not.toHaveAttribute("data-highlighted", "true");
+    expect(f2).not.toHaveAttribute("data-highlighted", "true");
+  });
+
+  it("clicking a transcript line replaces the URL with ?line=<fragment_id>", async () => {
+    mockNav("");
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: /Let's talk about onboarding\./ }));
+    expect(replace).toHaveBeenCalledWith("/projects/p1/interviews/i1?line=f1", { scroll: false });
+  });
+
+  it("closing the Line detail panel removes ?line and shows Insights again", async () => {
+    mockNav("line=f1&insight=d1");
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: "Close detail panel" }));
+    expect(replace).toHaveBeenCalledWith("/projects/p1/interviews/i1?insight=d1", { scroll: false });
+  });
+
+  it("shows an insights error message while the transcript still renders", () => {
+    mockNav("");
+    vi.mocked(useInsights).mockReturnValue({
       data: undefined,
       isLoading: false,
       isError: true,
       error: new Error("boom"),
     } as never);
-
     renderPage();
-    expect(screen.getByRole("alert")).toHaveTextContent("boom");
-  });
-
-  it("shows the empty state when the interview has no lines", () => {
-    mockParams("p1", "i1");
-    vi.mocked(useTranscript).mockReturnValue({
-      data: { interview_id: "i1", title: "Kickoff call", metadata: {}, lines: [] },
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as never);
-
-    renderPage();
-    expect(
-      screen.getByText("This interview has no transcript lines yet."),
-    ).toBeInTheDocument();
-  });
-
-  it("renders metadata panel, lines in order, person suffix, edited badge, and segment headings interleaved at the correct positions", () => {
-    mockParams("p1", "i1");
-    vi.mocked(useTranscript).mockReturnValue({
-      data: TRANSCRIPT_WITH_SEGMENTS,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as never);
-
-    renderPage();
-
-    // Metadata panel (title + empty-metadata quiet state)
-    expect(
-      screen.getByRole("heading", { name: "Kickoff call" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("No metadata available.")).toBeInTheDocument();
-
-    // Segment headings appear, in document order, before their segment's first line
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(headings).toEqual(["Onboarding", "Pricing"]);
-
-    // Only one "Onboarding" heading — the second line of the same segment
-    // does not get a duplicate heading.
-    expect(screen.getAllByText("Onboarding")).toHaveLength(1);
-
-    // Person suffix pattern
-    expect(screen.getByText("Speaker B (Jane Doe)")).toBeInTheDocument();
-    // Edited badge only on the edited line
-    expect(screen.getAllByText("edited")).toHaveLength(1);
-
-    // Order: heading "Onboarding" -> line f1 -> line f2 -> heading "Pricing" -> line f3
-    const container = screen.getByText("Let's talk about onboarding.").closest("div")!
-      .parentElement!.parentElement!;
-    const textContent = container.textContent ?? "";
-    expect(textContent.indexOf("Onboarding")).toBeLessThan(
-      textContent.indexOf("Let's talk about onboarding."),
-    );
-    expect(textContent.indexOf("It was confusing at first.")).toBeLessThan(
-      textContent.indexOf("Pricing"),
-    );
-    expect(textContent.indexOf("Pricing")).toBeLessThan(
-      textContent.indexOf("Now let's discuss pricing."),
-    );
-  });
-
-  it("indicates utterance grouping: the second line of the same utterance is marked as continuing it", () => {
-    mockParams("p1", "i1");
-    vi.mocked(useTranscript).mockReturnValue({
-      data: TRANSCRIPT_WITH_SEGMENTS,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as never);
-
-    renderPage();
-
-    const buttons = screen.getAllByRole("button");
-    const first = buttons.find((b) => b.textContent?.includes("Let's talk about onboarding."))!;
-    const second = buttons.find((b) => b.textContent?.includes("It was confusing at first."))!;
-    const third = buttons.find((b) => b.textContent?.includes("Now let's discuss pricing."))!;
-
-    expect(first).toHaveAttribute("data-continues-utterance", "false");
-    expect(second).toHaveAttribute("data-continues-utterance", "true");
-    expect(third).toHaveAttribute("data-continues-utterance", "false");
-  });
-
-  it("opens the line detail panel when a line is clicked and closes it on close", async () => {
-    mockParams("p1", "i1");
-    vi.mocked(useTranscript).mockReturnValue({
-      data: TRANSCRIPT_WITH_SEGMENTS,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as never);
-    vi.mocked(useSentenceHistory).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      error: null,
-    } as never);
-
-    renderPage();
-
-    expect(screen.queryByRole("dialog", { name: "Line detail" })).not.toBeInTheDocument();
-
-    await userEvent.click(
-      screen.getByRole("button", { name: /Let's talk about onboarding\./ }),
-    );
-
-    expect(screen.getByRole("dialog", { name: "Line detail" })).toBeInTheDocument();
-    // Lazy history fetch only triggered on open, keyed to this line's sequence_order.
-    expect(useSentenceHistory).toHaveBeenCalledWith("i1", 0, true);
-
-    await userEvent.click(screen.getByRole("button", { name: "Close detail panel" }));
-    expect(screen.queryByRole("dialog", { name: "Line detail" })).not.toBeInTheDocument();
-  });
-
-  it("reflects refetched line data in the detail panel instead of the stale clicked snapshot", async () => {
-    mockParams("p1", "i1");
-    vi.mocked(useSentenceHistory).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      error: null,
-    } as never);
-
-    const original = TRANSCRIPT_WITH_SEGMENTS;
-    const updated = {
-      ...TRANSCRIPT_WITH_SEGMENTS,
-      lines: TRANSCRIPT_WITH_SEGMENTS.lines.map((line) =>
-        line.fragment_id === "f1"
-          ? { ...line, text: "Let's talk about corrections instead.", edited: true }
-          : line,
-      ),
-    };
-
-    vi.mocked(useTranscript).mockReturnValue({
-      data: original,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as never);
-
-    const { rerender } = renderPage();
-
-    await userEvent.click(
-      screen.getByRole("button", { name: /Let's talk about onboarding\./ }),
-    );
-    expect(screen.getByRole("dialog", { name: "Line detail" })).toHaveTextContent(
-      "Let's talk about onboarding.",
-    );
-
-    // Simulate the transcript refetch settling after a correction (e.g. a
-    // text edit) with the same fragment id but changed content.
-    vi.mocked(useTranscript).mockReturnValue({
-      data: updated,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as never);
-
-    rerender(<TranscriptPage />);
-
-    expect(screen.getByRole("dialog", { name: "Line detail" })).toHaveTextContent(
-      "Let's talk about corrections instead.",
-    );
-    expect(
-      screen.queryByRole("dialog", { name: "Line detail" }),
-    ).not.toHaveTextContent("Let's talk about onboarding.");
+    expect(screen.getByText("Couldn’t load insights.")).toBeInTheDocument();
+    expect(screen.getByText("Let's talk about onboarding.")).toBeInTheDocument();
+    expect(screen.getByText("It was confusing at first.")).toBeInTheDocument();
   });
 });

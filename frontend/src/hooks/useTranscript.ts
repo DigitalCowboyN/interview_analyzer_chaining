@@ -49,8 +49,8 @@ export interface TranscriptLineData {
  * Front-matter metadata for the interview. KNOWN BACKEND GAP (M5.0 Task 1):
  * the Interview node carries no metadata property yet, so this is always
  * `{}` until a projection handler starts writing front matter onto the
- * graph. The MetadataPanel shows a quiet "no metadata available" state
- * when this is empty rather than treating it as an error.
+ * graph. `InterviewHeader` shows metadata only when this is non-empty,
+ * rather than treating an empty object as an error.
  */
 export type TranscriptMetadata = Record<string, unknown>;
 

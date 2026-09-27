@@ -29,3 +29,29 @@ export function insightLabel(nodeType: string): string {
 export function insightChip(nodeType: string): string {
   return KNOWN.get(nodeType)?.chip ?? nodeType;
 }
+
+export interface Insight {
+  item_id: string;
+  node_type: string;
+  lens: string;
+  text: string;
+  confidence: number;
+  locked: boolean;
+  supporting_fragment_ids: string[];
+}
+
+export interface InsightGroup {
+  nodeType: string;
+  label: string;
+  items: Insight[];
+}
+
+export function groupInsights(items: Insight[]): InsightGroup[] {
+  const byType = new Map<string, Insight[]>();
+  for (const item of items) byType.set(item.node_type, [...(byType.get(item.node_type) ?? []), item]);
+  return orderNodeTypes(byType.keys()).map((nodeType) => ({
+    nodeType,
+    label: insightLabel(nodeType),
+    items: byType.get(nodeType)!,
+  }));
+}

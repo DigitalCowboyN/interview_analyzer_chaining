@@ -8,6 +8,7 @@ export const queryKeys = {
   projects: () => ["projects"] as const,
   interviews: (projectId: string) => ["projects", projectId, "interviews"] as const,
   transcript: (interviewId: string) => ["interviews", interviewId, "transcript"] as const,
+  insights: (interviewId: string) => ["interviews", interviewId, "insights"] as const,
   sentenceHistory: (interviewId: string, sequenceOrder: number) =>
     ["sentences", interviewId, sequenceOrder, "history"] as const,
   personas: (projectId: string) => ["projects", projectId, "personas"] as const,
