@@ -88,8 +88,9 @@ Header:  Interview Analyzer   [ Project ▾ ]                      [identity]
 Two columns (stacked below `lg`):
 
 - **Left — transcript**, as today (segments, utterance grouping, line click opens
-  `LineDetailPanel`), under a compact header: title, participants (from metadata),
-  date, line count, live indicator.
+  `LineDetailPanel`), under a compact header: title, participants (distinct
+  unmerged speaker display names — `Interview.metadata_json` is not populated
+  in the graph today), date, line count, live indicator.
 - **Right — Insights panel.** Fetches `GET /interviews/:id/lenses/{persona,meeting_minutes}/items`
   (existing endpoint; `limit=500`) and groups by `node_type` in a fixed order:
   Decisions, Action items, Objectives, Follow-ups, Goals, Pain points, Quotes.
@@ -107,7 +108,8 @@ Rows (not a bare list) with: title, formatted date (`Sep 27, 2026`),
 participants, line count, and per-type insight counts as small chips
 (e.g. "22 decisions · 18 actions"). Interviews with zero lines are hidden behind a
 "Show N empty" toggle. Backend: extend `interview_rows` (`src/ui/reader.py`) to
-return `participants` and `insight_counts: {node_type: n}` (one extra
+return `participants` (distinct unmerged `Speaker.display_name` via
+`HAS_PARTICIPANT`) and `insight_counts: {node_type: n}` (one extra
 `OPTIONAL MATCH` over `LensItem` by `interview_id`); the response gains fields,
 nothing is removed.
 
