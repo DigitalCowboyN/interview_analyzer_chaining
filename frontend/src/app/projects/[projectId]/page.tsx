@@ -2,21 +2,23 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense } from "react";
 import { useInterviews } from "@/hooks/useInterviews";
 import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
+import { useShowEmptyParam } from "@/hooks/useShowEmptyParam";
 import { StateGate } from "@/components/StateGate";
 import { LiveIndicator } from "@/components/LiveIndicator";
 import { InterviewRow } from "@/components/InterviewRow";
+import { EmptyInterviewsToggle, splitEmpty } from "@/components/EmptyInterviewsToggle";
 import { ApiError } from "@/api/client";
 import { routes } from "@/lib/routes";
 
 /** Project's interviews: title, created, participants, lines, insight chips; click-through to transcript. */
-export default function ProjectInterviewsPage() {
+function ProjectInterviewsPageContent() {
   const { projectId } = useParams<{ projectId: string }>();
   const { data: interviews, isLoading, isError, error } = useInterviews(projectId);
   const liveStatus = useLiveInvalidation({ projectId });
-  const [showEmpty, setShowEmpty] = useState(false);
+  const { showEmpty, toggleShowEmpty } = useShowEmptyParam();
 
   if (isError && error instanceof ApiError && error.status === 404) {
     return (
@@ -26,8 +28,8 @@ export default function ProjectInterviewsPage() {
     );
   }
 
-  const withLines = interviews?.filter((i) => i.fragment_count > 0) ?? [];
-  const empty = (interviews?.length ?? 0) - withLines.length;
+  const { withLines, emptyCount } = splitEmpty(interviews ?? []);
+  const allEmpty = (interviews?.length ?? 0) > 0 && withLines.length === 0;
   const visible = showEmpty ? interviews ?? [] : withLines;
 
   return (
@@ -48,24 +50,31 @@ export default function ProjectInterviewsPage() {
             </div>
           }
         >
-          <ul className="space-y-3">
-            {visible.map((i) => (
-              <li key={i.interview_id}>
-                <InterviewRow href={routes.interview(projectId, i.interview_id)} interview={i} />
-              </li>
-            ))}
-          </ul>
-          {empty > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowEmpty((v) => !v)}
-              className="mt-3 text-sm text-accent"
-            >
-              {showEmpty ? "Hide empty interviews" : `Show ${empty} empty`}
-            </button>
+          {allEmpty && !showEmpty ? null : (
+            <ul className="space-y-3">
+              {visible.map((i) => (
+                <li key={i.interview_id}>
+                  <InterviewRow href={routes.interview(projectId, i.interview_id)} interview={i} />
+                </li>
+              ))}
+            </ul>
           )}
+          <EmptyInterviewsToggle
+            emptyCount={emptyCount}
+            allEmpty={allEmpty}
+            showEmpty={showEmpty}
+            onToggle={toggleShowEmpty}
+          />
         </StateGate>
       </div>
     </div>
+  );
+}
+
+export default function ProjectInterviewsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-fg-muted">Loading…</div>}>
+      <ProjectInterviewsPageContent />
+    </Suspense>
   );
 }

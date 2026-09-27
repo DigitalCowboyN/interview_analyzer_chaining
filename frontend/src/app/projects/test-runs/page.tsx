@@ -1,15 +1,24 @@
 "use client";
 
+import { Suspense } from "react";
 import { useTestRunInterviews } from "@/hooks/useTestRunInterviews";
+import { useShowEmptyParam } from "@/hooks/useShowEmptyParam";
 import { StateGate } from "@/components/StateGate";
 import { InterviewRow } from "@/components/InterviewRow";
+import { EmptyInterviewsToggle, splitEmpty } from "@/components/EmptyInterviewsToggle";
 import { routes } from "@/lib/routes";
 
 /** ADR-0030 bucket: every test-run interview, grouped by suite. */
-export default function TestRunsPage() {
+function TestRunsPageContent() {
   const { data, isLoading, isError, error } = useTestRunInterviews();
+  const { showEmpty, toggleShowEmpty } = useShowEmptyParam();
+
+  const { withLines, emptyCount } = splitEmpty(data ?? []);
+  const allEmpty = (data?.length ?? 0) > 0 && withLines.length === 0;
+  const visible = showEmpty ? data ?? [] : withLines;
+
   const bySuite = new Map<string, NonNullable<typeof data>>();
-  for (const row of data ?? []) bySuite.set(row.suite, [...(bySuite.get(row.suite) ?? []), row]);
+  for (const row of visible) bySuite.set(row.suite, [...(bySuite.get(row.suite) ?? []), row]);
 
   return (
     <div className="mx-auto max-w-5xl p-6">
@@ -39,8 +48,23 @@ export default function TestRunsPage() {
               </ul>
             </details>
           ))}
+          <EmptyInterviewsToggle
+            emptyCount={emptyCount}
+            allEmpty={allEmpty}
+            showEmpty={showEmpty}
+            onToggle={toggleShowEmpty}
+            scope="test runs"
+          />
         </StateGate>
       </div>
     </div>
+  );
+}
+
+export default function TestRunsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-fg-muted">Loading…</div>}>
+      <TestRunsPageContent />
+    </Suspense>
   );
 }

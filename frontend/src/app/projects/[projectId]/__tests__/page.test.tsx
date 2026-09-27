@@ -5,19 +5,27 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import ProjectInterviewsPage from "@/app/projects/[projectId]/page";
 import { useInterviews } from "@/hooks/useInterviews";
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ApiError } from "@/api/client";
 
 vi.mock("@/hooks/useInterviews", () => ({
   useInterviews: vi.fn(),
 }));
 
+const replace = vi.fn();
+
 vi.mock("next/navigation", () => ({
   useParams: vi.fn(),
+  usePathname: vi.fn(),
+  useRouter: vi.fn(),
+  useSearchParams: vi.fn(),
 }));
 
-function mockProjectId(projectId: string) {
+function mockProjectId(projectId: string, search = "") {
   vi.mocked(useParams).mockReturnValue({ projectId });
+  vi.mocked(usePathname).mockReturnValue(`/projects/${projectId}`);
+  vi.mocked(useRouter).mockReturnValue({ replace } as never);
+  vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams(search) as never);
 }
 
 // useLiveInvalidation (Task 5) reaches for the real useQueryClient, so page
@@ -33,6 +41,7 @@ function renderPage() {
 describe("ProjectInterviewsPage (interviews)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    replace.mockClear();
   });
 
   it("shows the loading state via StateGate", () => {
@@ -98,35 +107,37 @@ describe("ProjectInterviewsPage (interviews)", () => {
     ).toHaveAttribute("href", "/projects/p1/interviews/i1");
   });
 
-  it("hides empty interviews by default and reveals them behind a toggle", async () => {
+  const MIXED_INTERVIEWS = [
+    {
+      interview_id: "i1",
+      title: "Kickoff call",
+      created_at: "2026-01-01T00:00:00Z",
+      fragment_count: 42,
+      participants: [],
+      insight_counts: {},
+    },
+    {
+      interview_id: "i2",
+      title: "Follow-up call",
+      created_at: "2026-01-02T00:00:00Z",
+      fragment_count: 10,
+      participants: [],
+      insight_counts: {},
+    },
+    {
+      interview_id: "i3",
+      title: "Empty upload",
+      created_at: "2026-01-03T00:00:00Z",
+      fragment_count: 0,
+      participants: [],
+      insight_counts: {},
+    },
+  ];
+
+  it("hides empty interviews by default; clicking the toggle replaces the URL with ?empty=1", async () => {
     mockProjectId("p1");
     vi.mocked(useInterviews).mockReturnValue({
-      data: [
-        {
-          interview_id: "i1",
-          title: "Kickoff call",
-          created_at: "2026-01-01T00:00:00Z",
-          fragment_count: 42,
-          participants: [],
-          insight_counts: {},
-        },
-        {
-          interview_id: "i2",
-          title: "Follow-up call",
-          created_at: "2026-01-02T00:00:00Z",
-          fragment_count: 10,
-          participants: [],
-          insight_counts: {},
-        },
-        {
-          interview_id: "i3",
-          title: "Empty upload",
-          created_at: "2026-01-03T00:00:00Z",
-          fragment_count: 0,
-          participants: [],
-          insight_counts: {},
-        },
-      ],
+      data: MIXED_INTERVIEWS,
       isLoading: false,
       isError: false,
       error: null,
@@ -139,7 +150,95 @@ describe("ProjectInterviewsPage (interviews)", () => {
     const user = userEvent.setup();
     await user.click(toggle);
 
+    expect(replace).toHaveBeenCalledWith("/projects/p1?empty=1", { scroll: false });
+  });
+
+  it("preserves an existing search param when the toggle sets ?empty=1", async () => {
+    mockProjectId("p1", "sort=recent");
+    vi.mocked(useInterviews).mockReturnValue({
+      data: MIXED_INTERVIEWS,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    const toggle = screen.getByRole("button", { name: "Show 1 empty" });
+    await userEvent.click(toggle);
+
+    expect(replace).toHaveBeenCalledWith("/projects/p1?sort=recent&empty=1", { scroll: false });
+  });
+
+  it("reads the toggle state from ?empty=1: shows empty rows and 'Hide empty interviews'", () => {
+    mockProjectId("p1", "empty=1");
+    vi.mocked(useInterviews).mockReturnValue({
+      data: MIXED_INTERVIEWS,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
     expect(screen.getAllByRole("link")).toHaveLength(3);
+    expect(screen.getByRole("button", { name: "Hide empty interviews" })).toBeInTheDocument();
+  });
+
+  it("shows an explanatory message instead of an empty list when every interview has no lines", () => {
+    mockProjectId("p1");
+    vi.mocked(useInterviews).mockReturnValue({
+      data: [
+        {
+          interview_id: "i1",
+          title: "Empty upload",
+          created_at: "2026-01-01T00:00:00Z",
+          fragment_count: 0,
+          participants: [],
+          insight_counts: {},
+        },
+        {
+          interview_id: "i2",
+          title: "Another empty upload",
+          created_at: "2026-01-02T00:00:00Z",
+          fragment_count: 0,
+          participants: [],
+          insight_counts: {},
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("All 2 interviews in this project have no transcript lines yet."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show 2 empty" })).toBeInTheDocument();
+  });
+
+  it("shows the singular all-empty message for a single empty interview", () => {
+    mockProjectId("p1");
+    vi.mocked(useInterviews).mockReturnValue({
+      data: [
+        {
+          interview_id: "i1",
+          title: "Empty upload",
+          created_at: "2026-01-01T00:00:00Z",
+          fragment_count: 0,
+          participants: [],
+          insight_counts: {},
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(
+      screen.getByText("All 1 interview in this project has no transcript lines yet."),
+    ).toBeInTheDocument();
   });
 
   it("shows a not-found message with a link back to all projects on a 404", () => {
