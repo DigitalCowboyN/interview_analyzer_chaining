@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import { useTranscript } from "@/hooks/useTranscript";
 import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { StateGate } from "@/components/StateGate";
@@ -55,10 +55,24 @@ function TranscriptPageContent() {
   );
   const summary = interviews?.find((i) => i.interview_id === interviewId);
 
+  // Scroll to the selected insight's first supporting line whenever the
+  // selection changes — whether from a click or restored from the URL
+  // (reload/Back). Guarded by a ref so it fires once per insight, not on
+  // every unrelated rerender (e.g. a transcript refetch).
+  const lastScrolledInsightId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedInsight || !transcript) return;
+    if (selectedInsight.item_id === lastScrolledInsightId.current) return;
+    const lineIds = new Set(transcript.lines.map((l) => l.fragment_id));
+    const id = selectedInsight.supporting_fragment_ids.find((fid) => lineIds.has(fid));
+    if (id) {
+      document.getElementById(`line-${id}`)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      lastScrolledInsightId.current = selectedInsight.item_id;
+    }
+  }, [selectedInsight, transcript]);
+
   function onSelectInsight(insight: Insight) {
     setParam("insight", insight.item_id);
-    const first = insight.supporting_fragment_ids[0];
-    if (first) document.getElementById(`line-${first}`)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
   }
 
   return (

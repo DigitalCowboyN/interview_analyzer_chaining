@@ -176,11 +176,68 @@ describe("TranscriptPage", () => {
     expect(replace).toHaveBeenCalledWith("/projects/p1/interviews/i1?line=f1", { scroll: false });
   });
 
-  it("closing the Line detail panel removes ?line and shows Insights again", async () => {
+  it("closing the Line detail panel replaces the URL without ?line, keeping ?insight", async () => {
     mockNav("line=f1&insight=d1");
     renderPage();
     await userEvent.click(screen.getByRole("button", { name: "Close detail panel" }));
     expect(replace).toHaveBeenCalledWith("/projects/p1/interviews/i1?insight=d1", { scroll: false });
+  });
+
+  describe("scrolling to the selected insight's first supporting line", () => {
+    let scrollIntoViewMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      scrollIntoViewMock = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoViewMock as unknown as typeof Element.prototype.scrollIntoView;
+    });
+
+    afterEach(() => {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    });
+
+    it("scrolls once to the first supporting id present in the transcript when ?insight= is restored from the URL, and not again on an unrelated rerender", () => {
+      mockNav("insight=d1");
+      vi.mocked(useInsights).mockReturnValue({
+        data: [{ ...INSIGHTS[0], supporting_fragment_ids: ["gone", "f2"] }],
+        isLoading: false,
+        isError: false,
+        error: null,
+      } as never);
+      const { rerender } = renderPage();
+
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ block: "center", behavior: "smooth" });
+      expect(scrollIntoViewMock.mock.contexts[0]).toBe(document.getElementById("line-f2"));
+
+      // Rerender with a NEW transcript object (same lines) and the same insight id —
+      // should not scroll again.
+      vi.mocked(useTranscript).mockReturnValue({
+        data: { ...TRANSCRIPT, lines: [...TRANSCRIPT.lines] },
+        isLoading: false,
+        isError: false,
+        error: null,
+      } as never);
+      rerender(<TranscriptPage />);
+
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("clicking an insight scrolls to its first supporting line exactly once, once the URL reflects the selection", async () => {
+      mockNav("");
+      const { rerender } = renderPage();
+
+      await userEvent.click(screen.getByRole("button", { name: /Ship CSV export/ }));
+      expect(replace).toHaveBeenCalledWith("/projects/p1/interviews/i1?insight=d1", { scroll: false });
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
+
+      // The mocked searchParams won't change by itself; simulate the URL update
+      // that router.replace would have produced, then rerender.
+      mockNav("insight=d1");
+      rerender(<TranscriptPage />);
+
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+      expect(scrollIntoViewMock.mock.contexts[0]).toBe(document.getElementById("line-f1"));
+    });
   });
 
   it("shows an insights error message while the transcript still renders", () => {
