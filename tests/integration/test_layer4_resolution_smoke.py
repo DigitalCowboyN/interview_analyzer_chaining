@@ -99,10 +99,10 @@ async def _emit_entities(interview_id, fragment_index, entities):
 
 
 @pytest.mark.asyncio
-async def test_resolution_engine_canonicalizes_entities_and_links_persons(tmp_path, monkeypatch):
+async def test_resolution_engine_canonicalizes_entities_and_links_persons(tmp_path, monkeypatch, isolated_project_id):
     from src.ingestion.orchestrator import IngestionOrchestrator
 
-    project_id = f"smoke-proj-{uuid_mod.uuid4()}"
+    project_id = isolated_project_id("smoke")
 
     file1 = tmp_path / "smoke_resolution_1.txt"
     file1.write_text(TRANSCRIPT_1)

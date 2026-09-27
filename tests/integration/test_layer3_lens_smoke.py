@@ -92,7 +92,7 @@ def persona_canned_outcome(spec, text):
 
 
 @pytest.mark.asyncio
-async def test_lens_projects_dual_label_nodes_with_links_and_grounding(tmp_path, monkeypatch):
+async def test_lens_projects_dual_label_nodes_with_links_and_grounding(tmp_path, monkeypatch, isolated_project_id):
     from unittest.mock import AsyncMock, MagicMock
 
     from src.ingestion.orchestrator import IngestionOrchestrator
@@ -100,7 +100,7 @@ async def test_lens_projects_dual_label_nodes_with_links_and_grounding(tmp_path,
     input_file = tmp_path / "smoke_lens.txt"
     input_file.write_text(LABELED)
 
-    project_id = f"smoke-{uuid_mod.uuid4()}"
+    project_id = isolated_project_id("smoke")
     ingest = IngestionOrchestrator(project_id=project_id, map_dir=tmp_path / "maps")
     ingest_result = await ingest.ingest_file(input_file)
     interview_id = ingest_result.interview_id
@@ -153,7 +153,7 @@ async def test_lens_projects_dual_label_nodes_with_links_and_grounding(tmp_path,
 
 @pytest.mark.asyncio
 async def test_persona_lens_projects_dual_label_nodes_with_links_and_grounding(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, isolated_project_id
 ):
     """Second lens, same generic engine/handlers: proves zero per-lens code.
 
@@ -170,7 +170,7 @@ async def test_persona_lens_projects_dual_label_nodes_with_links_and_grounding(
     input_file = tmp_path / "smoke_persona.txt"
     input_file.write_text(LABELED)
 
-    project_id = f"smoke-persona-{uuid_mod.uuid4()}"
+    project_id = isolated_project_id("smoke-persona")
     ingest = IngestionOrchestrator(project_id=project_id, map_dir=tmp_path / "maps")
     ingest_result = await ingest.ingest_file(input_file)
     interview_id = ingest_result.interview_id
