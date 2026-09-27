@@ -222,21 +222,64 @@ describe("TranscriptPage", () => {
       expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
     });
 
-    it("clicking an insight scrolls to its first supporting line exactly once, once the URL reflects the selection", async () => {
+    it("clicking an insight scrolls to its first supporting line exactly once, including after the URL catches up", async () => {
       mockNav("");
       const { rerender } = renderPage();
 
       await userEvent.click(screen.getByRole("button", { name: /Ship CSV export/ }));
       expect(replace).toHaveBeenCalledWith("/projects/p1/interviews/i1?insight=d1", { scroll: false });
-      expect(scrollIntoViewMock).not.toHaveBeenCalled();
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+      expect(scrollIntoViewMock.mock.contexts[0]).toBe(document.getElementById("line-f1"));
 
       // The mocked searchParams won't change by itself; simulate the URL update
-      // that router.replace would have produced, then rerender.
+      // that router.replace would have produced, then rerender. The
+      // URL-restore effect must not scroll again — the click already set
+      // the ref, so this is still exactly one scroll.
       mockNav("insight=d1");
       rerender(<TranscriptPage />);
 
       expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
-      expect(scrollIntoViewMock.mock.contexts[0]).toBe(document.getElementById("line-f1"));
+    });
+
+    it("clicking the already-selected insight always scrolls, even after scrolling away", async () => {
+      mockNav("insight=d1");
+      renderPage();
+
+      // Initial URL restore scrolls once.
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+
+      // Simulate having scrolled away by clearing the mock, then click the
+      // already-selected insight — it must scroll again, every time.
+      scrollIntoViewMock.mockClear();
+      await userEvent.click(screen.getByRole("button", { name: /Ship CSV export/ }));
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+
+      await userEvent.click(screen.getByRole("button", { name: /Ship CSV export/ }));
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not scroll or throw when no supporting id is present in the transcript, then scrolls once one appears", () => {
+      mockNav("insight=d1");
+      vi.mocked(useInsights).mockReturnValue({
+        data: [{ ...INSIGHTS[0], supporting_fragment_ids: ["gone"] }],
+        isLoading: false,
+        isError: false,
+        error: null,
+      } as never);
+      const { rerender } = renderPage();
+
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
+
+      vi.mocked(useTranscript).mockReturnValue({
+        data: { ...TRANSCRIPT, lines: [...TRANSCRIPT.lines, { ...TRANSCRIPT.lines[0], fragment_id: "gone" }] },
+        isLoading: false,
+        isError: false,
+        error: null,
+      } as never);
+      rerender(<TranscriptPage />);
+
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+      expect(scrollIntoViewMock.mock.contexts[0]).toBe(document.getElementById("line-gone"));
     });
   });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranscript } from "@/hooks/useTranscript";
 import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
 import { StateGate } from "@/components/StateGate";
@@ -55,23 +55,41 @@ function TranscriptPageContent() {
   );
   const summary = interviews?.find((i) => i.interview_id === interviewId);
 
-  // Scroll to the selected insight's first supporting line whenever the
-  // selection changes — whether from a click or restored from the URL
-  // (reload/Back). Guarded by a ref so it fires once per insight, not on
-  // every unrelated rerender (e.g. a transcript refetch).
+  // Scroll to the first supporting line of an insight that's present in the
+  // transcript. Returns whether it found one and scrolled.
+  const scrollToFirstPresentLine = useCallback(
+    (insight: Insight): boolean => {
+      if (!transcript) return false;
+      const lineIds = new Set(transcript.lines.map((l) => l.fragment_id));
+      const id = insight.supporting_fragment_ids.find((fid) => lineIds.has(fid));
+      if (!id) return false;
+      document.getElementById(`line-${id}`)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      return true;
+    },
+    [transcript],
+  );
+
+  // URL-restore scroll: when ?insight= arrives from a reload/Back rather
+  // than a click, there's no click handler to scroll for it, so this effect
+  // does it. Guarded by a ref so it fires once per insight, not on every
+  // unrelated rerender (e.g. a transcript refetch) — clicks set this ref
+  // themselves (see onSelectInsight) so this effect doesn't double-scroll
+  // once the URL catches up.
   const lastScrolledInsightId = useRef<string | null>(null);
   useEffect(() => {
-    if (!selectedInsight || !transcript) return;
+    if (!selectedInsight) {
+      lastScrolledInsightId.current = null;
+      return;
+    }
     if (selectedInsight.item_id === lastScrolledInsightId.current) return;
-    const lineIds = new Set(transcript.lines.map((l) => l.fragment_id));
-    const id = selectedInsight.supporting_fragment_ids.find((fid) => lineIds.has(fid));
-    if (id) {
-      document.getElementById(`line-${id}`)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    if (scrollToFirstPresentLine(selectedInsight)) {
       lastScrolledInsightId.current = selectedInsight.item_id;
     }
-  }, [selectedInsight, transcript]);
+  }, [selectedInsight, scrollToFirstPresentLine]);
 
   function onSelectInsight(insight: Insight) {
+    scrollToFirstPresentLine(insight);
+    lastScrolledInsightId.current = insight.item_id;
     setParam("insight", insight.item_id);
   }
 
