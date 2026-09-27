@@ -9,6 +9,8 @@ export interface InterviewSummary {
   title: string;
   created_at: string;
   fragment_count: number;
+  participants: string[];
+  insight_counts: Record<string, number>;
 }
 
 interface InterviewsResponse {

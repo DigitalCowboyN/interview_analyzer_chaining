@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import ProjectInterviewsPage from "@/app/projects/[projectId]/page";
@@ -82,6 +83,8 @@ describe("ProjectInterviewsPage (interviews)", () => {
           title: "Kickoff call",
           created_at: "2026-01-01T00:00:00Z",
           fragment_count: 42,
+          participants: [],
+          insight_counts: {},
         },
       ],
       isLoading: false,
@@ -93,6 +96,50 @@ describe("ProjectInterviewsPage (interviews)", () => {
     expect(
       screen.getByRole("link", { name: /Kickoff call/ }),
     ).toHaveAttribute("href", "/projects/p1/interviews/i1");
+  });
+
+  it("hides empty interviews by default and reveals them behind a toggle", async () => {
+    mockProjectId("p1");
+    vi.mocked(useInterviews).mockReturnValue({
+      data: [
+        {
+          interview_id: "i1",
+          title: "Kickoff call",
+          created_at: "2026-01-01T00:00:00Z",
+          fragment_count: 42,
+          participants: [],
+          insight_counts: {},
+        },
+        {
+          interview_id: "i2",
+          title: "Follow-up call",
+          created_at: "2026-01-02T00:00:00Z",
+          fragment_count: 10,
+          participants: [],
+          insight_counts: {},
+        },
+        {
+          interview_id: "i3",
+          title: "Empty upload",
+          created_at: "2026-01-03T00:00:00Z",
+          fragment_count: 0,
+          participants: [],
+          insight_counts: {},
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+    const toggle = screen.getByRole("button", { name: "Show 1 empty" });
+
+    const user = userEvent.setup();
+    await user.click(toggle);
+
+    expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 
   it("shows a not-found message with a link back to all projects on a 404", () => {
