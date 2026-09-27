@@ -28,7 +28,7 @@ function DimensionItemRow({ item }: { item: PersonaDimensionItem }) {
 
 /**
  * Persona CORE view (not a card): dimension-grouped items with per-interview
- * provenance chips. Distinct route `gallery/personas/[projectId]/[personId]`
+ * provenance chips. Distinct route `projects/[projectId]/personas/[personId]`
  * — Persona is its own entity type, never embedded in the person core view.
  */
 export function PersonaCoreView({ dimensions }: { dimensions: PersonaDimensions }) {

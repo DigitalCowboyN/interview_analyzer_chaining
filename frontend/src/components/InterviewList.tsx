@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { routes } from "@/lib/routes";
 import type { InterviewSummary } from "@/hooks/useInterviews";
 
 /** Renders interview rows (title, created, fragment count); each navigates to its transcript. */
@@ -14,9 +15,7 @@ export function InterviewList({
       {interviews.map((interview) => (
         <li key={interview.interview_id}>
           <Link
-            href={`/workbench/${encodeURIComponent(projectId)}/${encodeURIComponent(
-              interview.interview_id,
-            )}`}
+            href={routes.interview(projectId, interview.interview_id)}
             className="flex items-center justify-between py-3 hover:bg-surface-raised"
           >
             <span className="font-medium text-fg">

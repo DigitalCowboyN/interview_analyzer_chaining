@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { routes } from "@/lib/routes";
 import type { PersonLink } from "@/hooks/usePersonDetail";
 
 /**
@@ -50,9 +51,7 @@ export function PersonCoreView({
         <h2 className="text-sm font-semibold uppercase text-fg-muted">Persona profile</h2>
         {contributesToPersona ? (
           <Link
-            href={`/gallery/personas/${encodeURIComponent(projectId)}/${encodeURIComponent(
-              personId,
-            )}`}
+            href={routes.persona(projectId, personId)}
             className="mt-2 inline-block text-sm text-accent hover:underline"
           >
             View persona profile →

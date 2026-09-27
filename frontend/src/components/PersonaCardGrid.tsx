@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { routes } from "@/lib/routes";
 import type { PersonaCardData } from "@/hooks/usePersonaCards";
 
 /**
@@ -18,9 +19,7 @@ export function PersonaCardGrid({
       {personas.map((persona) => (
         <li key={persona.person_id}>
           <Link
-            href={`/gallery/personas/${encodeURIComponent(projectId)}/${encodeURIComponent(
-              persona.person_id,
-            )}`}
+            href={routes.persona(projectId, persona.person_id)}
             className="block rounded border border-border p-4 hover:bg-surface-raised"
           >
             <h3 className="font-medium text-fg">{persona.display_name}</h3>

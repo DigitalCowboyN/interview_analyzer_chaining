@@ -26,10 +26,10 @@ describe("PersonaCardGrid", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText(/I just want it to work\./)).toBeInTheDocument();
 
-    // Separate-route-tree assertion: persona cards navigate under /gallery/personas/...
+    // Separate-route-tree assertion: persona cards navigate under /projects/:projectId/personas/...
     expect(screen.getByRole("link", { name: /Jane Doe/ })).toHaveAttribute(
       "href",
-      "/gallery/personas/proj1/p1",
+      "/projects/proj1/personas/p1",
     );
   });
 

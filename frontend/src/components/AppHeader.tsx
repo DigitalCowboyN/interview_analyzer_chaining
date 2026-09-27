@@ -1,39 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { IdentitySwitcher } from "@/identity/IdentitySwitcher";
+import { routes } from "@/lib/routes";
 
-const NAV_LINKS = [
-  { href: "/workbench", label: "Workbench" },
-  { href: "/gallery", label: "Gallery" },
-] as const;
-
+// Interim: Workbench/Gallery nav is gone now that routes are project-scoped
+// (ADR-0030); a later task rewrites this header with a project switcher.
 export function AppHeader() {
-  const pathname = usePathname();
-
   return (
     <header className="flex items-center justify-between border-b border-border px-6 py-3 bg-surface">
       <div className="flex items-center gap-8">
-        <span className="font-semibold">Interview Analyzer</span>
-        <nav className="flex items-center gap-4 text-sm">
-          {NAV_LINKS.map((link) => {
-            const isActive = pathname?.startsWith(link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={
-                  isActive
-                    ? "font-medium text-fg"
-                    : "text-fg-muted hover:text-fg"
-                }
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <Link href={routes.home()} className="font-semibold text-fg">
+          Interview Analyzer
+        </Link>
       </div>
       <IdentitySwitcher />
     </header>

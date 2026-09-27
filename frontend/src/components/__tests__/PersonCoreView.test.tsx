@@ -32,7 +32,7 @@ describe("PersonCoreView", () => {
 
     expect(screen.getByRole("link", { name: /View persona profile/ })).toHaveAttribute(
       "href",
-      "/gallery/personas/proj1/p1",
+      "/projects/proj1/personas/p1",
     );
   });
 

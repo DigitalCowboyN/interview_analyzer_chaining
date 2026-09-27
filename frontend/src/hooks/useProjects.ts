@@ -6,13 +6,15 @@ import { queryKeys } from "@/hooks/queryKeys";
 export interface ProjectSummary {
   project_id: string;
   interview_count: number;
+  kind: "real" | "test";
+  suite: string | null;
 }
 
 interface ProjectsResponse {
   projects: ProjectSummary[];
 }
 
-/** Projects list for the workbench nav root. */
+/** Projects list for the landing page and project switcher. */
 export function useProjects() {
   return useQuery({
     queryKey: queryKeys.projects(),
@@ -21,4 +23,10 @@ export function useProjects() {
       return data.projects;
     },
   });
+}
+
+/** One project's summary from the cached projects list (undefined if unlisted). */
+export function useProject(projectId: string) {
+  const { data, isLoading } = useProjects();
+  return { project: data?.find((p) => p.project_id === projectId), isLoading };
 }

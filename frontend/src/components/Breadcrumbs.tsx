@@ -6,7 +6,7 @@ export interface BreadcrumbItem {
   href?: string;
 }
 
-/** Shared breadcrumb trail: `Workbench / {project} / {interview}`. */
+/** Shared breadcrumb trail: an ordered list of labels, each linked except the last. */
 export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
   return (
     <nav aria-label="Breadcrumb" className="mb-4 text-sm text-fg-muted">

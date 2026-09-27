@@ -6,6 +6,7 @@ import {
   type FlowIntentPollOptions,
 } from "@/hooks/mutations";
 import { NoticeText } from "@/components/NoticeText";
+import { routes } from "@/lib/routes";
 import type {
   WorklistData,
   WorklistLensItem,
@@ -23,10 +24,6 @@ export interface WorklistRowsProps {
 }
 
 const DEGRADED_MESSAGE = "suggestions degraded — embedding provider unavailable";
-
-function workbenchHref(projectId: string, interviewId: string): string {
-  return `/workbench/${encodeURIComponent(projectId)}/${encodeURIComponent(interviewId)}`;
-}
 
 function DegradationBanner({ flags }: { flags: string[] }) {
   if (!flags.includes("embedding_unavailable")) return null;
@@ -55,7 +52,7 @@ function LensItemsSection({
         {items.map((item) => (
           <li key={item.item_id} className="rounded border border-border p-3 text-sm bg-surface">
             <Link
-              href={workbenchHref(projectId, item.interview_id)}
+              href={routes.interview(projectId, item.interview_id)}
               className="font-medium text-accent hover:underline"
             >
               {item.lens} · {item.node_type}
@@ -86,7 +83,7 @@ function ClaimsSection({
         {claims.map((claim) => (
           <li key={claim.claim_id} className="rounded border border-border p-3 text-sm bg-surface">
             <Link
-              href={workbenchHref(projectId, claim.interview_id)}
+              href={routes.interview(projectId, claim.interview_id)}
               className="font-medium text-accent hover:underline"
             >
               {claim.text}
@@ -254,7 +251,7 @@ function PersonLinkSuggestionsSection({
 
 /**
  * The worklist's review rows (M5.0 Task 8): low-confidence lens items and
- * claims (link into the workbench transcript for manual review), plus
+ * claims (link into the interview transcript for manual review), plus
  * entity-merge and person-link suggestions with one-click accept affordances
  * built on the Task 5 intent pattern. Each accept row hides itself once its
  * own intent settles (the confirm-refetch has already confirmed the

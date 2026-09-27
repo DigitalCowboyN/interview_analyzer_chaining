@@ -24,7 +24,7 @@ describe("InterviewList", () => {
 
     expect(screen.getByRole("link", { name: /Kickoff call/ })).toHaveAttribute(
       "href",
-      "/workbench/p1/i1",
+      "/projects/p1/interviews/i1",
     );
   });
 });

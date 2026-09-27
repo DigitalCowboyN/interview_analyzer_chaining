@@ -1,0 +1,157 @@
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import ReviewPage from "@/app/projects/[projectId]/review/page";
+import { useWorklist } from "@/hooks/useWorklist";
+import { useLiveInvalidation } from "@/hooks/useLiveInvalidation";
+import { useParams } from "next/navigation";
+
+vi.mock("@/hooks/useWorklist", () => ({
+  useWorklist: vi.fn(),
+}));
+
+// Mocked so the page test doesn't open a real EventSource; the real
+// LiveIndicator still renders off its status.
+vi.mock("@/hooks/useLiveInvalidation", () => ({
+  useLiveInvalidation: vi.fn(() => "idle"),
+}));
+
+vi.mock("next/navigation", () => ({
+  useParams: vi.fn(),
+}));
+
+function mockProjectId(projectId: string) {
+  vi.mocked(useParams).mockReturnValue({ projectId });
+}
+
+function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  }
+  return render(<ReviewPage />, { wrapper: Wrapper });
+}
+
+const EMPTY_DATA = {
+  lens_items: [],
+  claims: [],
+  entity_merge_suggestions: [],
+  person_link_suggestions: [],
+  flags: [],
+};
+
+describe("ReviewPage", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows the loading state via StateGate", () => {
+    mockProjectId("proj1");
+    vi.mocked(useWorklist).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+  });
+
+  it("shows the error state via StateGate", () => {
+    mockProjectId("proj1");
+    vi.mocked(useWorklist).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error("boom"),
+    } as never);
+
+    renderPage();
+    expect(screen.getByRole("alert")).toHaveTextContent("boom");
+  });
+
+  it('shows "Nothing to review" when all four row arrays are empty and there are no flags', () => {
+    mockProjectId("proj1");
+    vi.mocked(useWorklist).mockReturnValue({
+      data: EMPTY_DATA,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(screen.getByText("Nothing to review.")).toBeInTheDocument();
+  });
+
+  it("renders worklist rows when the project has review items", () => {
+    mockProjectId("proj1");
+    vi.mocked(useWorklist).mockReturnValue({
+      data: {
+        ...EMPTY_DATA,
+        claims: [
+          {
+            interview_id: "i1",
+            claim_id: "c1",
+            text: "We ship weekly.",
+            kind: "assertion",
+            confidence: 0.5,
+            reason: "low_confidence",
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(screen.getByText("We ship weekly.")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing to review.")).not.toBeInTheDocument();
+  });
+
+  it("does not treat a degraded-but-otherwise-empty worklist as the empty state (banner still renders)", () => {
+    mockProjectId("proj1");
+    vi.mocked(useWorklist).mockReturnValue({
+      data: { ...EMPTY_DATA, flags: ["embedding_unavailable"] },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(
+      screen.getByText("suggestions degraded — embedding provider unavailable"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Nothing to review.")).not.toBeInTheDocument();
+  });
+
+  it("renders the Review heading", () => {
+    mockProjectId("proj1");
+    vi.mocked(useWorklist).mockReturnValue({
+      data: EMPTY_DATA,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(screen.getByRole("heading", { name: "Review" })).toBeInTheDocument();
+  });
+
+  it("wires the live-updates indicator with the project scope", () => {
+    mockProjectId("proj1");
+    vi.mocked(useLiveInvalidation).mockReturnValue("live");
+    vi.mocked(useWorklist).mockReturnValue({
+      data: EMPTY_DATA,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    renderPage();
+    expect(screen.getByText(/Live updates/i)).toBeInTheDocument();
+    expect(useLiveInvalidation).toHaveBeenCalledWith({ projectId: "proj1" });
+  });
+});
