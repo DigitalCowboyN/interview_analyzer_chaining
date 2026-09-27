@@ -5,11 +5,15 @@ export function InsightsPanel({
   insights,
   selectedId,
   onSelect,
+  isLoading,
 }: {
   insights: Insight[];
   selectedId: string | null;
   onSelect: (insight: Insight) => void;
+  isLoading?: boolean;
 }) {
+  if (isLoading) return <p className="p-4 text-sm text-fg-muted">Loading insights…</p>;
+
   const groups = groupInsights(insights);
   if (groups.length === 0) return <p className="p-4 text-sm text-fg-muted">No insights yet.</p>;
 

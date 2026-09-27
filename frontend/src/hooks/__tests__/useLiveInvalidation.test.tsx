@@ -103,18 +103,26 @@ describe("useLiveInvalidation", () => {
       ]);
     });
 
-    it("keysForSurface maps project -> transcript+insights(interviewId) + persons/personas/worklist(projectId) when interviewId scope present", () => {
+    it("keysForSurface maps project -> transcript+insights(interviewId) + interviews/persons/personas/worklist(projectId) when interviewId scope present", () => {
       expect(keysForSurface("project", { interviewId: "i1", projectId: "p1" })).toEqual([
         queryKeys.transcript("i1"),
         queryKeys.insights("i1"),
+        queryKeys.interviews("p1"),
         queryKeys.persons("p1"),
         queryKeys.personas("p1"),
         queryKeys.worklist("p1"),
       ]);
     });
 
-    it("keysForSurface maps project -> only persons/personas/worklist(projectId) when no interviewId scope", () => {
+    it("keysForSurface's project surface includes interviews(projectId), so a lens run refreshes stale insight chips on the interview list", () => {
+      expect(keysForSurface("project", { interviewId: "i1", projectId: "p1" })).toContainEqual(
+        queryKeys.interviews("p1"),
+      );
+    });
+
+    it("keysForSurface maps project -> interviews/persons/personas/worklist(projectId) when no interviewId scope", () => {
       expect(keysForSurface("project", { projectId: "p1" })).toEqual([
+        queryKeys.interviews("p1"),
         queryKeys.persons("p1"),
         queryKeys.personas("p1"),
         queryKeys.worklist("p1"),
@@ -275,12 +283,13 @@ describe("useLiveInvalidation", () => {
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.interviews("p1"), exact: true });
     });
 
-    it("project surface invalidates transcript(interviewId) and persons/personas/worklist(projectId) when an interviewId scope is present", () => {
+    it("project surface invalidates transcript(interviewId) and interviews/persons/personas/worklist(projectId) when an interviewId scope is present", () => {
       const { spy } = setup();
       send("project", { project_id: "p1" });
-      expect(spy).toHaveBeenCalledTimes(5);
+      expect(spy).toHaveBeenCalledTimes(6);
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.transcript("i1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.insights("i1"), exact: true });
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.interviews("p1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.persons("p1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.personas("p1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.worklist("p1"), exact: true });
@@ -299,13 +308,14 @@ describe("useLiveInvalidation", () => {
     });
   });
 
-  it("project surface invalidates persons/personas/worklist(projectId) on the interview-list page scope (no interviewId)", () => {
+  it("project surface invalidates interviews/persons/personas/worklist(projectId) on the interview-list page scope (no interviewId)", () => {
     const { client, Wrapper } = makeWrapper();
     const spy = vi.spyOn(client, "invalidateQueries");
     renderHook(() => useLiveInvalidation({ projectId: "p1" }), { wrapper: Wrapper });
 
     send("project", { project_id: "p1" });
-    expect(spy).toHaveBeenCalledTimes(3);
+    expect(spy).toHaveBeenCalledTimes(4);
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.interviews("p1"), exact: true });
     expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.persons("p1"), exact: true });
     expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.personas("p1"), exact: true });
     expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.worklist("p1"), exact: true });

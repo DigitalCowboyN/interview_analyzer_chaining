@@ -30,4 +30,10 @@ describe("InsightsPanel", () => {
     render(<InsightsPanel insights={[]} selectedId={null} onSelect={() => {}} />);
     expect(screen.getByText("No insights yet.")).toBeInTheDocument();
   });
+
+  it("shows a muted loading state instead of the empty state while loading", () => {
+    render(<InsightsPanel insights={[]} selectedId={null} onSelect={() => {}} isLoading />);
+    expect(screen.getByText("Loading insights…")).toBeInTheDocument();
+    expect(screen.queryByText("No insights yet.")).not.toBeInTheDocument();
+  });
 });

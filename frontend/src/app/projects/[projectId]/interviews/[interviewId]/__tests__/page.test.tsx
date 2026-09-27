@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -310,6 +310,22 @@ describe("TranscriptPage", () => {
       expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
       expect(scrollIntoViewMock.mock.contexts[0]).toBe(document.getElementById("line-gone"));
     });
+  });
+
+  it("shows Test runs / <project> / <title> breadcrumbs for a test-kind project, with Test runs linking to /projects/test-runs", () => {
+    mockNav("");
+    vi.mocked(useProject).mockReturnValue({
+      project: { project_id: "p1", interview_count: 1, kind: "test", suite: null },
+      isLoading: false,
+    } as never);
+    renderPage();
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    const links = within(nav).getAllByRole("link");
+    expect(links[0]).toHaveTextContent("Test runs");
+    expect(links[0]).toHaveAttribute("href", "/projects/test-runs");
+    expect(links[1]).toHaveTextContent("p1");
+    expect(links[1]).toHaveAttribute("href", "/projects/p1");
+    expect(within(nav).getByText("Kickoff call")).toBeInTheDocument();
   });
 
   it("shows an insights error message while the transcript still renders", () => {

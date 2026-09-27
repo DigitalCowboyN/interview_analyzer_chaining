@@ -56,7 +56,9 @@ export function buildStreamUrl(scopes: LiveInvalidationScopes): string {
  *   interviews -> interviews(projectId)
  *   project    -> transcript(interviewId) IF an interviewId scope is present
  *                 (person links affect the open transcript), AND
- *                 persons(projectId), personas(projectId), worklist(projectId);
+ *                 interviews(projectId), persons(projectId), personas(projectId),
+ *                 worklist(projectId) — interviews(projectId) so a lens run
+ *                 refreshes stale insight chips on the interview list;
  *                 PLUS persona(projectId, personId) and person(projectId, personId)
  *                 IF a personId scope is present (M5.1b gallery liveness)
  *   resync     -> every key this hook watches (union of the above, given the
@@ -83,6 +85,7 @@ export function keysForSurface(surface: string, scopes: LiveInvalidationScopes):
         keys.push(queryKeys.insights(interviewId));
       }
       if (projectId) {
+        keys.push(queryKeys.interviews(projectId));
         keys.push(queryKeys.persons(projectId));
         keys.push(queryKeys.personas(projectId));
         keys.push(queryKeys.worklist(projectId));

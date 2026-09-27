@@ -97,10 +97,18 @@ function TranscriptPageContent() {
       <div className="min-w-0">
         <div className="flex items-center justify-between">
           <Breadcrumbs
-            items={[
-              { label: project ? displayProjectName(project) : projectId, href: routes.project(projectId) },
-              { label: transcript?.title ?? "Interview" },
-            ]}
+            items={
+              project?.kind === "test"
+                ? [
+                    { label: "Test runs", href: routes.testRuns() },
+                    { label: displayProjectName(project), href: routes.project(projectId) },
+                    { label: transcript?.title ?? "Interview" },
+                  ]
+                : [
+                    { label: project ? displayProjectName(project) : projectId, href: routes.project(projectId) },
+                    { label: transcript?.title ?? "Interview" },
+                  ]
+            }
           />
           <LiveIndicator status={liveStatus} />
         </div>
@@ -172,7 +180,12 @@ function TranscriptPageContent() {
             {insightsQuery.isError ? (
               <p className="text-sm text-danger">Couldn&rsquo;t load insights.</p>
             ) : (
-              <InsightsPanel insights={insights} selectedId={selectedInsight?.item_id ?? null} onSelect={onSelectInsight} />
+              <InsightsPanel
+                insights={insights}
+                selectedId={selectedInsight?.item_id ?? null}
+                onSelect={onSelectInsight}
+                isLoading={insightsQuery.isLoading}
+              />
             )}
           </div>
         )}
