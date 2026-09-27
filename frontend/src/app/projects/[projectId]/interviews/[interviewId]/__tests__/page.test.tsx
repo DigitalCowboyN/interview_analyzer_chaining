@@ -241,6 +241,35 @@ describe("TranscriptPage", () => {
       expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
     });
 
+    it("clicking an insight whose line isn't loaded yet doesn't mark it scrolled, so the URL-restore effect retries once the line appears", async () => {
+      mockNav("");
+      vi.mocked(useInsights).mockReturnValue({
+        data: [{ ...INSIGHTS[0], supporting_fragment_ids: ["f3"] }],
+        isLoading: false,
+        isError: false,
+        error: null,
+      } as never);
+      const { rerender } = renderPage();
+
+      await userEvent.click(screen.getByRole("button", { name: /Ship CSV export/ }));
+      expect(replace).toHaveBeenCalledWith("/projects/p1/interviews/i1?insight=d1", { scroll: false });
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
+
+      // The URL catches up, and the transcript now includes the supporting
+      // line — the URL-restore effect must retry since the click never
+      // marked the insight as scrolled.
+      mockNav("insight=d1");
+      vi.mocked(useTranscript).mockReturnValue({
+        data: { ...TRANSCRIPT, lines: [...TRANSCRIPT.lines, { ...TRANSCRIPT.lines[0], fragment_id: "f3" }] },
+        isLoading: false,
+        isError: false,
+        error: null,
+      } as never);
+      rerender(<TranscriptPage />);
+
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+    });
+
     it("clicking the already-selected insight always scrolls, even after scrolling away", async () => {
       mockNav("insight=d1");
       renderPage();

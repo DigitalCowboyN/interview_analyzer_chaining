@@ -88,8 +88,7 @@ function TranscriptPageContent() {
   }, [selectedInsight, scrollToFirstPresentLine]);
 
   function onSelectInsight(insight: Insight) {
-    scrollToFirstPresentLine(insight);
-    lastScrolledInsightId.current = insight.item_id;
+    if (scrollToFirstPresentLine(insight)) lastScrolledInsightId.current = insight.item_id;
     setParam("insight", insight.item_id);
   }
 
