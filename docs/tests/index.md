@@ -32,7 +32,7 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `api.test_resolution_router` (18) → api  ·  verifies: —
 - `api.test_segments_router` (9) → api  ·  verifies: —
 - `api.test_speakers_router` (11) → api  ·  verifies: —
-- `api.test_ui_router` (24) → api  ·  verifies: —
+- `api.test_ui_router` (26) → api  ·  verifies: —
 - `api_surface.test_check` (4) → tools.api  ·  verifies: —
 - `api_surface.test_cli` (1) → tools.api  ·  verifies: —
 - `api_surface.test_reader` (3) → tools.api  ·  verifies: —
@@ -198,8 +198,10 @@ The test suite as a graph node set, and what it verifies (`../code/`, `../capabi
 - `testmap.test_reader` (2) → tools.testmap  ·  verifies: —
 - `testmap.test_render` (2) → tools.testmap  ·  verifies: —
 - `testmap.test_verification` (3) → tools.testmap  ·  verifies: —
+- `tools.test_dev_purge` (5) → —  ·  verifies: code:tools.dev.purge
 - `ui.test_notifications` (31) → ui  ·  verifies: —
-- `ui.test_reader` (18) → ui  ·  verifies: —
+- `ui.test_project_kind` (4) → ui  ·  verifies: —
+- `ui.test_reader` (19) → ui  ·  verifies: —
 - `usecase.test_check` (5) → tools.usecase  ·  verifies: —
 - `usecase.test_cli` (2) → tools.usecase  ·  verifies: —
 - `usecase.test_coverage` (2) → tools.usecase  ·  verifies: —

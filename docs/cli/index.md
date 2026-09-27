@@ -26,6 +26,7 @@
 | db-test-down | internal | Stop and remove test Neo4j |
 | db-test-up | internal | Start test Neo4j (no wait) |
 | deployed-smoke | everyday | Prove the dockerized projection path end-to-end |
+| dev-purge-test-data | everyday | Delete test-run projects from dev Neo4j (read model only; ESDB replay restores them) |
 | es-down | internal | Stop the event sourcing system |
 | es-logs | internal | Tail event sourcing logs |
 | es-status | internal | Show event sourcing system status |
@@ -85,6 +86,7 @@
 | testmap-index | everyday | Regenerate docs/tests/index.md (test suite nodes + verification rollup) |
 | ui-build | everyday | Production build of the frontend |
 | ui-dev | everyday | Run the frontend dev server |
+| ui-screenshots | everyday | Playwright light/dark screenshots of landing, project, interview (needs `samples` loaded) |
 | ui-smoke | everyday | Playwright smoke: seeded interview to transcript text-edit settle |
 | ui-test | everyday | Frontend gates: lint + typecheck + vitest |
 | ui-typegen | everyday | Regenerate OpenAPI types from the backend app object |

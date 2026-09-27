@@ -14,6 +14,7 @@ purged projects. Acceptable for dev.
     python -m tools.dev.purge --test-projects [--dry-run]
     python -m tools.dev.purge --project ledgerline-demo
 """
+# governed-by: ADR-0030
 
 import argparse
 import asyncio

@@ -272,6 +272,10 @@ ui-smoke: ## Playwright smoke: seeded interview to transcript text-edit settle
 	docker compose ps
 	cd frontend && UI_SMOKE=1 npx playwright test
 
+.PHONY: ui-screenshots
+ui-screenshots: ## Playwright light/dark screenshots of landing, project, interview (needs `samples` loaded)
+	cd frontend && UI_SMOKE=1 npx playwright test screenshots.spec.ts
+
 .PHONY: dev-purge-test-data
 dev-purge-test-data: ## Delete test-run projects from dev Neo4j (read model only; ESDB replay restores them)
 	$(PYTHON) -m tools.dev.purge --test-projects

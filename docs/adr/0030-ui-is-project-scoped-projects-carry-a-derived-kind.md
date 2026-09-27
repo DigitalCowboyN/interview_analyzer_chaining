@@ -9,6 +9,7 @@ superseded_by: []
 governs:
   - frontend/src/app/
   - src/ui/project_kind.py
+  - tools/dev/
 tags: [adr, ui, frontend, navigation, projects, testing]
 source: docs/superpowers/specs/2026-09-27-ui-nav-theme-organization-design.md
 ---

@@ -3,12 +3,14 @@ import path from "node:path";
 import os from "node:os";
 
 /**
- * Playwright config for the M5.0 UI smoke (frontend/e2e/smoke.spec.ts) —
- * see that file's header for the full required-services list and how to run
- * it (`make ui-smoke`). Env-gated behind UI_SMOKE=1, mirroring the backend's
- * DEPLOYED_SMOKE=1 pytest gate (tests/integration/test_deployed_projection_smoke.py):
- * this config MUST NOT start real servers or run anything when UI_SMOKE isn't
- * set, so a bare `npx playwright test` never surprises anyone.
+ * Playwright config for the M5.0 UI smoke (frontend/e2e/smoke.spec.ts) and
+ * the light/dark screenshot spec (frontend/e2e/screenshots.spec.ts) — see
+ * smoke.spec.ts's header for the full required-services list and how to run
+ * them (`make ui-smoke`, `make ui-screenshots`). Env-gated behind UI_SMOKE=1,
+ * mirroring the backend's DEPLOYED_SMOKE=1 pytest gate
+ * (tests/integration/test_deployed_projection_smoke.py): this config MUST
+ * NOT start real servers or run anything when UI_SMOKE isn't set, so a bare
+ * `npx playwright test` never surprises anyone.
  */
 const UI_SMOKE = process.env.UI_SMOKE === "1";
 
@@ -33,7 +35,7 @@ const BACKEND_COMMAND = [
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "smoke.spec.ts",
+  testMatch: ["smoke.spec.ts", "screenshots.spec.ts"],
   // Belt-and-suspenders alongside the spec's own test.skip: if UI_SMOKE isn't
   // set, ignore the whole e2e dir so an accidental bare `npx playwright test`
   // never attempts test discovery (and therefore never starts webServer)
