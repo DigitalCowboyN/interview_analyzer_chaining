@@ -19,6 +19,7 @@
   --success: #067647;
   --success-subtle: #e3f6ec;
   --highlight: #fff4c2;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,6 +40,7 @@
     --success: #5fd4a0;
     --success-subtle: #0f2e22;
     --highlight: #3d3514;
+    color-scheme: dark;
   }
 }
 
@@ -61,6 +63,16 @@
   --color-highlight: var(--highlight);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+@layer base {
+  input,
+  select,
+  textarea {
+    background-color: var(--surface);
+    color: var(--fg);
+    border-color: var(--border);
+  }
 }
 
 body {
