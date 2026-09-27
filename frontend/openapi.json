@@ -1723,12 +1723,34 @@
         ],
         "summary": "List Projects",
         "operationId": "list_projects_ui_projects_get",
+        "parameters": [
+          {
+            "name": "include_empty",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Empty"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -1769,6 +1791,26 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/test-runs/interviews": {
+      "get": {
+        "tags": [
+          "ui"
+        ],
+        "summary": "List Test Run Interviews",
+        "description": "All interviews from test-kind projects (ADR-0030 'Test runs' bucket).",
+        "operationId": "list_test_run_interviews_ui_test_runs_interviews_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }

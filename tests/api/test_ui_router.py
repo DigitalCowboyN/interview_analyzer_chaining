@@ -73,11 +73,22 @@ class _MultiPatch:
 
 # --- GET /ui/projects ---
 
-def test_list_projects(client):
-    rows = [{"project_id": PID, "interview_count": 2}]
+def test_list_projects_excludes_empty_by_default(client):
+    rows = [
+        {"project_id": "samples", "interview_count": 2, "kind": "real", "suite": None},
+        {"project_id": "projection-smoke-1", "interview_count": 0, "kind": "test",
+         "suite": "projection-smoke"},
+    ]
     with patch_session(), _MultiPatch(patch_reader(project_rows=rows)):
         resp = client.get("/ui/projects")
     assert resp.status_code == 200
+    assert resp.json() == {"projects": [rows[0]]}
+
+
+def test_list_projects_include_empty(client):
+    rows = [{"project_id": "p0", "interview_count": 0, "kind": "real", "suite": None}]
+    with patch_session(), _MultiPatch(patch_reader(project_rows=rows)):
+        resp = client.get("/ui/projects", params={"include_empty": "true"})
     assert resp.json() == {"projects": rows}
 
 
@@ -97,6 +108,16 @@ def test_list_interviews_404_unknown_project(client):
     with patch_session(), _MultiPatch(patch_reader(project_exists=False)):
         resp = client.get(f"/ui/projects/{PID}/interviews")
     assert resp.status_code == 404
+
+
+def test_list_test_run_interviews(client):
+    rows = [{"project_id": "smoke-1", "interview_id": IID, "title": "T",
+             "created_at": "2026-01-01", "fragment_count": 2, "participants": [],
+             "insight_counts": {}, "suite": "smoke"}]
+    with patch_session(), _MultiPatch(patch_reader(test_run_interview_rows=rows)):
+        resp = client.get("/ui/test-runs/interviews")
+    assert resp.status_code == 200
+    assert resp.json() == {"interviews": rows}
 
 
 # --- GET /ui/interviews/{interview_id}/transcript ---

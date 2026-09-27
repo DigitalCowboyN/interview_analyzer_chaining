@@ -83,9 +83,11 @@ def _shape_dimension_item(row: dict) -> dict:
 
 
 @router.get("/projects")
-async def list_projects():
+async def list_projects(include_empty: bool = False):
     async with await Neo4jConnectionManager.get_session() as session:
         rows = await reader.project_rows(session)
+    if not include_empty:
+        rows = [row for row in rows if row["interview_count"] > 0]
     return {"projects": rows}
 
 
@@ -94,6 +96,14 @@ async def list_interviews(project_id: str):
     async with await Neo4jConnectionManager.get_session() as session:
         await _require_project(session, project_id)
         rows = await reader.interview_rows(session, project_id)
+    return {"interviews": rows}
+
+
+@router.get("/test-runs/interviews")
+async def list_test_run_interviews():
+    """All interviews from test-kind projects (ADR-0030 'Test runs' bucket)."""
+    async with await Neo4jConnectionManager.get_session() as session:
+        rows = await reader.test_run_interview_rows(session)
     return {"interviews": rows}
 
 
