@@ -42,17 +42,16 @@ DETACH DELETE p
 """
 
 
-async def purge_project(session, project_id: str) -> None:
-    """Delete one project's read-model subgraph."""
-    await session.run(_PURGE_QUERY, project_id=project_id)
+async def purge_project(session, project_id: str) -> bool:
+    """Delete one project's read-model subgraph; True iff the Project existed."""
+    result = await session.run(_PURGE_QUERY, project_id=project_id)
+    summary = await result.consume()
+    return summary.counters.nodes_deleted > 0
 
 
 async def purge_projects(session, project_ids: Iterable[str]) -> int:
-    count = 0
-    for project_id in project_ids:
-        await purge_project(session, project_id)
-        count += 1
-    return count
+    """Purge each id; return how many Projects were actually deleted."""
+    return sum([await purge_project(session, project_id) for project_id in project_ids])
 
 
 async def test_project_ids(session) -> List[str]:
@@ -73,11 +72,29 @@ async def _main(args) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--test-projects", action="store_true")
-    group.add_argument("--project")
-    parser.add_argument("--dry-run", action="store_true")
+    group.add_argument(
+        "--test-projects",
+        action="store_true",
+        help="purge every project classified as a test run (src.ui.project_kind)",
+    )
+    group.add_argument(
+        "--project",
+        metavar="ID",
+        help=(
+            "purge the project with this ID -- ANY project, including real ones, "
+            "with no confirmation. Read model (Neo4j) only; an ESDB projection "
+            "replay restores it."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="list the ids that would be purged and exit without deleting",
+    )
     asyncio.run(_main(parser.parse_args()))
 
 
