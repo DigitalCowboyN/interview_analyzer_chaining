@@ -24,10 +24,10 @@ const LABEL: Record<LiveStatus, string> = {
 export function LiveIndicator({ status }: LiveIndicatorProps) {
   const isLive = status === "live";
   return (
-    <span aria-live="polite" className="inline-flex items-center gap-1.5 text-xs text-neutral-500">
+    <span aria-live="polite" className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
       <span
         aria-hidden="true"
-        className={`h-2 w-2 rounded-full ${isLive ? "bg-emerald-500" : "bg-neutral-300"}`}
+        className={`h-2 w-2 rounded-full ${isLive ? "bg-success" : "bg-fg-muted"}`}
       />
       <span>{LABEL[status]}</span>
     </span>

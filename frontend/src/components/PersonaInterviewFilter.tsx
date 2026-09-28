@@ -28,7 +28,7 @@ export function PersonaInterviewFilter({
     <div>
       <label
         htmlFor="persona-interview-filter"
-        className="text-xs font-semibold uppercase text-neutral-500"
+        className="text-xs font-semibold uppercase text-fg-muted"
       >
         Filter by interview
       </label>
@@ -36,7 +36,7 @@ export function PersonaInterviewFilter({
         id="persona-interview-filter"
         value={selectedInterviewId}
         onChange={(e) => onSelectInterview(e.target.value)}
-        className="mt-1 block rounded border border-neutral-300 p-1 text-sm"
+        className="mt-1 block rounded border border-border p-1 text-sm"
       >
         <option value="">All interviews</option>
         {interviews.map((interview) => (
@@ -48,7 +48,7 @@ export function PersonaInterviewFilter({
 
       <div className="mt-4">
         {filtered.length === 0 ? (
-          <p className="text-sm text-neutral-400">
+          <p className="text-sm text-fg-muted">
             No persona profiles for this interview.
           </p>
         ) : (

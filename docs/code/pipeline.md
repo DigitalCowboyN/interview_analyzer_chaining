@@ -276,6 +276,8 @@ graph LR
     tools.corpus.check --> tools.corpus.reader
     tools.corpus.reader --> ingestion.front_matter
     tools.corpus.reader --> tools.corpus.model
+    tools.dev.purge --> ui.project_kind
+    tools.dev.purge --> utils.neo4j_driver
     tools.glossary.__main__ --> tools.glossary.check
     tools.glossary.__main__ --> tools.glossary.model
     tools.glossary.__main__ --> tools.glossary.render
@@ -385,6 +387,7 @@ graph LR
     tools.usecase.render --> tools.usecase.coverage
     tools.usecase.render --> tools.usecase.reader
     ui.notifications --> events.store
+    ui.reader --> ui.project_kind
     utils.logger --> config
     utils.neo4j_driver --> config
     utils.neo4j_driver --> utils.environment

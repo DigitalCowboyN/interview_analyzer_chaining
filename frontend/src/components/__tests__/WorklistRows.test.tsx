@@ -97,22 +97,22 @@ describe("WorklistRows", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders a low-confidence lens item row linking into the workbench transcript", () => {
+  it("renders a low-confidence lens item row linking into the interview transcript", () => {
     renderRows(BASE_DATA);
     expect(screen.getByText(/values/)).toBeInTheDocument();
     expect(screen.getAllByText(/low confidence/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /values/ })).toHaveAttribute(
       "href",
-      "/workbench/proj1/i1",
+      "/projects/proj1/interviews/i1",
     );
   });
 
-  it("renders a claim row linking into the workbench transcript at that interview", () => {
+  it("renders a claim row linking into the interview transcript at that interview", () => {
     renderRows(BASE_DATA);
     expect(screen.getByText("We ship weekly.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /We ship weekly\./ })).toHaveAttribute(
       "href",
-      "/workbench/proj1/i2",
+      "/projects/proj1/interviews/i2",
     );
   });
 

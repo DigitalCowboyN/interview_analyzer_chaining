@@ -25,12 +25,12 @@ Alice: Let's get started.
 
 
 @pytest.mark.asyncio
-async def test_ingested_interview_projects_speaker_utterance_subgraph(tmp_path):
+async def test_ingested_interview_projects_speaker_utterance_subgraph(tmp_path, isolated_project_id):
     input_file = tmp_path / "smoke_meeting.txt"
     input_file.write_text(LABELED)
 
     orchestrator = IngestionOrchestrator(
-        project_id=f"smoke-{uuid_mod.uuid4()}", map_dir=tmp_path / "maps"
+        project_id=isolated_project_id("smoke"), map_dir=tmp_path / "maps"
     )
     result = await orchestrator.ingest_file(input_file)
     assert result.speaker_count == 2

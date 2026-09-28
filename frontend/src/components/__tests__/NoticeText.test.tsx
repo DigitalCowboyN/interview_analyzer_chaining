@@ -19,21 +19,21 @@ describe("NoticeText", () => {
     render(<NoticeText notice={{ kind: "timeout", message: "Still processing — check back later." }} />);
     const el = screen.getByRole("status");
     expect(el).toHaveTextContent("Still processing — check back later.");
-    expect(el.className).toContain("text-neutral-500");
-    expect(el.className).not.toContain("text-red-600");
+    expect(el.className).toContain("text-fg-muted");
+    expect(el.className).not.toContain("text-danger");
   });
 
   it("renders a conflict notice with role=alert and the red tone", () => {
     render(<NoticeText notice={{ kind: "conflict", message: "Speaker was already renamed." }} />);
     const el = screen.getByRole("alert");
     expect(el).toHaveTextContent("Speaker was already renamed.");
-    expect(el.className).toContain("text-red-600");
+    expect(el.className).toContain("text-danger");
   });
 
   it("renders a network notice with role=alert and the red tone", () => {
     render(<NoticeText notice={{ kind: "network", message: "Could not reach the server." }} />);
     const el = screen.getByRole("alert");
-    expect(el.className).toContain("text-red-600");
+    expect(el.className).toContain("text-danger");
   });
 
   it("defaults to mt-1 and accepts a className override for the mt-2 call sites", () => {

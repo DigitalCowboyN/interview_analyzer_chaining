@@ -71,32 +71,49 @@ async def test_interview_exists_counts_interview_node():
 
 
 @pytest.mark.asyncio
-async def test_project_rows_counts_interviews_per_project():
-    session = FakeSession(
-        rows=[{"project_id": PID, "interview_count": 3}]
-    )
+async def test_project_rows_adds_kind_and_suite():
+    session = FakeSession(rows=[
+        {"project_id": "smoke-abc", "interview_count": 1},
+        {"project_id": "samples", "interview_count": 4},
+    ])
     rows = await reader.project_rows(session)
-    assert rows[0]["interview_count"] == 3
-    q = session.last_query
-    assert "(:Project)-[:CONTAINS_INTERVIEW]->" in q or "MATCH (p:Project)" in q
-    assert "CONTAINS_INTERVIEW" in q
+    assert rows == [
+        {"project_id": "samples", "interview_count": 4, "kind": "real", "suite": None},
+        {"project_id": "smoke-abc", "interview_count": 1, "kind": "test", "suite": "smoke"},
+    ]
+    assert "CONTAINS_INTERVIEW" in session.last_query
 
 
 @pytest.mark.asyncio
-async def test_interview_rows_scopes_to_project_and_counts_fragments():
-    session = FakeSession(
-        rows=[{
-            "interview_id": IID, "title": "T", "created_at": "2026-01-01T00:00:00",
-            "fragment_count": 5,
-        }]
-    )
+async def test_interview_rows_returns_participants_and_insight_counts():
+    session = FakeSession(rows=[{
+        "interview_id": IID, "title": "T", "created_at": "2026-01-01T00:00:00",
+        "fragment_count": 5, "participants": ["Bob", "Alice"],
+        "insight_pairs": [{"node_type": "Decision", "n": 2}, {"node_type": None, "n": 0}],
+    }])
     rows = await reader.interview_rows(session, PID)
-    assert rows[0]["fragment_count"] == 5
+    assert rows[0]["participants"] == ["Alice", "Bob"]
+    assert rows[0]["insight_counts"] == {"Decision": 2}
+    assert "insight_pairs" not in rows[0]
     q = session.last_query
-    assert "(:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->" in q
-    assert "HAS_SENTENCE" in q
-    assert session.last_params["project_id"] == PID
+    assert "(p:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->" in q
+    assert "HAS_PARTICIPANT" in q and "merged_into IS NULL" in q
+    assert "LensItem" in q
     assert "ORDER BY created_at" in q
+
+
+@pytest.mark.asyncio
+async def test_test_run_interview_rows_filters_to_test_projects_and_tags_suite():
+    session = FakeSession(rows=[
+        {"project_id": "samples", "interview_id": "a", "title": "Real", "created_at": "2026-01-02",
+         "fragment_count": 3, "participants": [], "insight_pairs": []},
+        {"project_id": "ui-smoke-1", "interview_id": "b", "title": "S", "created_at": "2026-01-01",
+         "fragment_count": 2, "participants": ["Alice"], "insight_pairs": []},
+    ])
+    rows = await reader.test_run_interview_rows(session)
+    assert [r["interview_id"] for r in rows] == ["b"]
+    assert rows[0]["suite"] == "ui-smoke"
+    assert rows[0]["project_id"] == "ui-smoke-1"
 
 
 @pytest.mark.asyncio

@@ -47,7 +47,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | interview_exists | ui | task | ui |  | Interview |  | found |
 | interview_header_row | ui | task | api | api | Interview |  | interview_id, title, metadata_json |
-| interview_rows | ui | domain-broad | api | api | Fragment, Interview, Project | CONTAINS_INTERVIEW, HAS_SENTENCE | interview_id, title, created_at, fragment_count |
+| interview_rows | ui | domain-broad | api | api | Interview, Project | CONTAINS_INTERVIEW |  |
 | person_card_rows | ui | domain-broad | api | api | Fragment, Interview, Person, Project, Speaker | CONTAINS_INTERVIEW, HAS_SENTENCE, IDENTIFIED_AS, SPOKEN_BY | person_id, display_name, speaker_count, interview_count |
 | person_contributes_to_persona | ui | task | api | api | Fragment, Interview, LensItem, Person, Project, Speaker | CONTAINS_INTERVIEW, HAS_SENTENCE, IDENTIFIED_AS, SUPPORTED_BY | found |
 | person_detail_rows | ui | domain-broad | api | api | Fragment, Interview, Person, Project, Speaker | CONTAINS_INTERVIEW, HAS_SENTENCE, IDENTIFIED_AS, SPOKEN_BY | interview_id, interview_title, speaker_id, speaker_display_name |
@@ -58,4 +58,5 @@
 | persona_exists | ui | task | api | api | Fragment, Interview, LensItem, Person, Project, Speaker | CONTAINS_INTERVIEW, HAS_SENTENCE, IDENTIFIED_AS, SUPPORTED_BY | found |
 | project_exists | ui | task | api, ask | api, ask | Project |  | found |
 | project_rows | ui | domain-broad | api | api | Interview, Project | CONTAINS_INTERVIEW | project_id, interview_count |
+| test_run_interview_rows | ui | domain-broad | api | api | Interview, Project | CONTAINS_INTERVIEW |  |
 | transcript_line_rows | ui | domain-broad | api | api | Entity, Fragment, Interview, LensItem, Person, Segment, Speaker, Utterance | CONTAINS, HAS_SENTENCE, IDENTIFIED_AS, MENTIONS, PART_OF_UTTERANCE, SPOKEN_BY, SUPPORTED_BY | fragment_id, sequence_order, text, edited, speaker_id, speaker_display_name, person_id, person_display_name, utterance_id, segment_id, segment_topic |

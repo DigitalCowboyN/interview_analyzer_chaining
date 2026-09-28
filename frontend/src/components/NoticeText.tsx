@@ -15,7 +15,7 @@ export interface NoticeTextProps {
  */
 export function NoticeText({ notice, className = "mt-1" }: NoticeTextProps) {
   if (!notice) return null;
-  const tone = notice.kind === "timeout" ? "text-neutral-500" : "text-red-600";
+  const tone = notice.kind === "timeout" ? "text-fg-muted" : "text-danger";
   return (
     <p role={notice.kind === "timeout" ? "status" : "alert"} className={`${className} text-xs ${tone}`}>
       {notice.message}

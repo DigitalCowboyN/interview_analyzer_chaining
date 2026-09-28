@@ -61,7 +61,7 @@ def canned_outcome(spec, text):
 
 
 @pytest.mark.asyncio
-async def test_front_matter_ingest_through_okf_bundle(tmp_path, monkeypatch):
+async def test_front_matter_ingest_through_okf_bundle(tmp_path, monkeypatch, isolated_project_id):
     from unittest.mock import AsyncMock, MagicMock
 
     from src.ingestion.orchestrator import IngestionOrchestrator
@@ -69,7 +69,7 @@ async def test_front_matter_ingest_through_okf_bundle(tmp_path, monkeypatch):
     input_file = tmp_path / "smoke_export.txt"
     input_file.write_text(LABELED)
 
-    project_id = f"smoke-{uuid_mod.uuid4()}"
+    project_id = isolated_project_id("smoke")
     ingest = IngestionOrchestrator(project_id=project_id, map_dir=tmp_path / "maps")
     ingest_result = await ingest.ingest_file(input_file)
     interview_id = ingest_result.interview_id

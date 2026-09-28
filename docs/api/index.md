@@ -66,6 +66,7 @@
 - `GET /ui/projects/{project_id}/personas` — list_personas
 - `GET /ui/projects/{project_id}/persons` — list_persons
 - `GET /ui/streams/events` — stream_events
+- `GET /ui/test-runs/interviews` — list_test_run_interviews
 
 ## src.main
 

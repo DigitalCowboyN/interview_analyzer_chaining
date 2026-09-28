@@ -533,3 +533,31 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "slow: marks tests as slow running")
     config.addinivalue_line("markers", "performance: marks tests as performance benchmarks")
     config.addinivalue_line("markers", "eventstore: marks tests as requiring EventStoreDB")
+
+
+@pytest.fixture
+async def isolated_project_id():
+    """Factory: mint a unique test project id under `prefix` and purge its
+    read-model subgraph after the test (ADR-0034 — tests must not leak).
+    `prefix` must be one of src.ui.project_kind.TEST_PREFIXES sans the dash.
+
+    Async so teardown runs on the test's own loop (pytest.ini:
+    asyncio_mode=auto, function loop scope) — the Neo4j async driver is
+    loop-bound, so a sync fixture calling asyncio.run() would break."""
+    import uuid
+
+    from src.utils.neo4j_driver import Neo4jConnectionManager
+    from tools.dev.purge import purge_projects
+
+    minted = []
+
+    def _mint(prefix: str = "smoke") -> str:
+        project_id = f"{prefix}-{uuid.uuid4()}"
+        minted.append(project_id)
+        return project_id
+
+    yield _mint
+
+    if minted:
+        async with await Neo4jConnectionManager.get_session() as session:
+            await purge_projects(session, minted)

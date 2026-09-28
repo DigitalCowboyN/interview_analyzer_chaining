@@ -6,6 +6,7 @@ import {
   type FlowIntentPollOptions,
 } from "@/hooks/mutations";
 import { NoticeText } from "@/components/NoticeText";
+import { routes } from "@/lib/routes";
 import type {
   WorklistData,
   WorklistLensItem,
@@ -24,16 +25,12 @@ export interface WorklistRowsProps {
 
 const DEGRADED_MESSAGE = "suggestions degraded — embedding provider unavailable";
 
-function workbenchHref(projectId: string, interviewId: string): string {
-  return `/workbench/${encodeURIComponent(projectId)}/${encodeURIComponent(interviewId)}`;
-}
-
 function DegradationBanner({ flags }: { flags: string[] }) {
   if (!flags.includes("embedding_unavailable")) return null;
   return (
     <div
       role="status"
-      className="mb-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800"
+      className="mb-4 rounded border border-warning bg-warning-subtle p-3 text-sm text-warning"
     >
       {DEGRADED_MESSAGE}
     </div>
@@ -50,17 +47,17 @@ function LensItemsSection({
   if (items.length === 0) return null;
   return (
     <section className="mt-6">
-      <h2 className="text-xs font-semibold uppercase text-neutral-500">Lens items</h2>
+      <h2 className="text-xs font-semibold uppercase text-fg-muted">Lens items</h2>
       <ul className="mt-2 space-y-2">
         {items.map((item) => (
-          <li key={item.item_id} className="rounded border border-neutral-200 p-3 text-sm">
+          <li key={item.item_id} className="rounded border border-border p-3 text-sm bg-surface">
             <Link
-              href={workbenchHref(projectId, item.interview_id)}
-              className="font-medium text-blue-700 hover:underline"
+              href={routes.interview(projectId, item.interview_id)}
+              className="font-medium text-accent hover:underline"
             >
               {item.lens} · {item.node_type}
             </Link>
-            <div className="mt-1 text-xs text-neutral-500">
+            <div className="mt-1 text-xs text-fg-muted">
               {(item.confidence * 100).toFixed(0)}% confidence ·{" "}
               {item.reason.replace(/_/g, " ")}
             </div>
@@ -81,17 +78,17 @@ function ClaimsSection({
   if (claims.length === 0) return null;
   return (
     <section className="mt-6">
-      <h2 className="text-xs font-semibold uppercase text-neutral-500">Claims</h2>
+      <h2 className="text-xs font-semibold uppercase text-fg-muted">Claims</h2>
       <ul className="mt-2 space-y-2">
         {claims.map((claim) => (
-          <li key={claim.claim_id} className="rounded border border-neutral-200 p-3 text-sm">
+          <li key={claim.claim_id} className="rounded border border-border p-3 text-sm bg-surface">
             <Link
-              href={workbenchHref(projectId, claim.interview_id)}
-              className="font-medium text-blue-700 hover:underline"
+              href={routes.interview(projectId, claim.interview_id)}
+              className="font-medium text-accent hover:underline"
             >
               {claim.text}
             </Link>
-            <div className="mt-1 text-xs text-neutral-500">
+            <div className="mt-1 text-xs text-fg-muted">
               {claim.kind} · {(claim.confidence * 100).toFixed(0)}% confidence ·{" "}
               {claim.reason.replace(/_/g, " ")}
             </div>
@@ -120,29 +117,29 @@ function EntityMergeSuggestionRow({
   if (status === "settled") return null;
 
   return (
-    <li className="rounded border border-neutral-200 p-3 text-sm">
+    <li className="rounded border border-border p-3 text-sm bg-surface">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <span className="font-medium text-neutral-900">
+          <span className="font-medium text-fg">
             {suggestion.surfaces_a.join(", ")}
           </span>
-          <span className="mx-1 text-neutral-400">↔</span>
-          <span className="font-medium text-neutral-900">
+          <span className="mx-1 text-fg-muted">↔</span>
+          <span className="font-medium text-fg">
             {suggestion.surfaces_b.join(", ")}
           </span>
         </div>
-        <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-600">
+        <span className="rounded bg-surface-raised px-1.5 py-0.5 text-xs text-fg-muted">
           {suggestion.band}
         </span>
       </div>
-      <div className="mt-1 text-xs text-neutral-500">score {suggestion.score.toFixed(2)}</div>
+      <div className="mt-1 text-xs text-fg-muted">score {suggestion.score.toFixed(2)}</div>
       <button
         type="button"
         disabled={isPending}
         onClick={() =>
           acceptMerge(suggestion.surviving_canonical_id, suggestion.merged_canonical_id)
         }
-        className="mt-2 rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+        className="mt-2 rounded bg-accent px-2 py-1 text-xs text-accent-fg disabled:opacity-50"
       >
         {isPending ? "Accepting…" : "Accept merge"}
       </button>
@@ -163,7 +160,7 @@ function EntityMergeSuggestionsSection({
   if (suggestions.length === 0) return null;
   return (
     <section className="mt-6">
-      <h2 className="text-xs font-semibold uppercase text-neutral-500">
+      <h2 className="text-xs font-semibold uppercase text-fg-muted">
         Entity merge suggestions
       </h2>
       <ul className="mt-2 space-y-2">
@@ -198,9 +195,9 @@ function PersonLinkSuggestionRow({
   if (status === "settled") return null;
 
   return (
-    <li className="rounded border border-neutral-200 p-3 text-sm">
-      <div className="font-medium text-neutral-900">{suggestion.display_name}</div>
-      <div className="mt-1 text-xs text-neutral-500">
+    <li className="rounded border border-border p-3 text-sm bg-surface">
+      <div className="font-medium text-fg">{suggestion.display_name}</div>
+      <div className="mt-1 text-xs text-fg-muted">
         {suggestion.speaker_display_name} · {suggestion.interview_id} · {suggestion.reason}
       </div>
       <button
@@ -214,7 +211,7 @@ function PersonLinkSuggestionRow({
             suggestion.display_name,
           )
         }
-        className="mt-2 rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+        className="mt-2 rounded bg-accent px-2 py-1 text-xs text-accent-fg disabled:opacity-50"
       >
         {isPending ? "Linking…" : "Accept link"}
       </button>
@@ -235,7 +232,7 @@ function PersonLinkSuggestionsSection({
   if (suggestions.length === 0) return null;
   return (
     <section className="mt-6">
-      <h2 className="text-xs font-semibold uppercase text-neutral-500">
+      <h2 className="text-xs font-semibold uppercase text-fg-muted">
         Person link suggestions
       </h2>
       <ul className="mt-2 space-y-2">
@@ -254,7 +251,7 @@ function PersonLinkSuggestionsSection({
 
 /**
  * The worklist's review rows (M5.0 Task 8): low-confidence lens items and
- * claims (link into the workbench transcript for manual review), plus
+ * claims (link into the interview transcript for manual review), plus
  * entity-merge and person-link suggestions with one-click accept affordances
  * built on the Task 5 intent pattern. Each accept row hides itself once its
  * own intent settles (the confirm-refetch has already confirmed the

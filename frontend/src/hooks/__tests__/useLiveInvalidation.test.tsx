@@ -90,9 +90,10 @@ describe("useLiveInvalidation", () => {
       );
     });
 
-    it("keysForSurface maps transcript -> transcript(interviewId)", () => {
+    it("keysForSurface maps transcript -> transcript(interviewId) + insights(interviewId)", () => {
       expect(keysForSurface("transcript", { interviewId: "i1", projectId: "p1" })).toEqual([
         queryKeys.transcript("i1"),
+        queryKeys.insights("i1"),
       ]);
     });
 
@@ -102,17 +103,26 @@ describe("useLiveInvalidation", () => {
       ]);
     });
 
-    it("keysForSurface maps project -> transcript(interviewId) + persons/personas/worklist(projectId) when interviewId scope present", () => {
+    it("keysForSurface maps project -> transcript+insights(interviewId) + interviews/persons/personas/worklist(projectId) when interviewId scope present", () => {
       expect(keysForSurface("project", { interviewId: "i1", projectId: "p1" })).toEqual([
         queryKeys.transcript("i1"),
+        queryKeys.insights("i1"),
+        queryKeys.interviews("p1"),
         queryKeys.persons("p1"),
         queryKeys.personas("p1"),
         queryKeys.worklist("p1"),
       ]);
     });
 
-    it("keysForSurface maps project -> only persons/personas/worklist(projectId) when no interviewId scope", () => {
+    it("keysForSurface's project surface includes interviews(projectId), so a lens run refreshes stale insight chips on the interview list", () => {
+      expect(keysForSurface("project", { interviewId: "i1", projectId: "p1" })).toContainEqual(
+        queryKeys.interviews("p1"),
+      );
+    });
+
+    it("keysForSurface maps project -> interviews/persons/personas/worklist(projectId) when no interviewId scope", () => {
       expect(keysForSurface("project", { projectId: "p1" })).toEqual([
+        queryKeys.interviews("p1"),
         queryKeys.persons("p1"),
         queryKeys.personas("p1"),
         queryKeys.worklist("p1"),
@@ -122,6 +132,7 @@ describe("useLiveInvalidation", () => {
     it("keysForSurface maps resync -> all keys this hook watches", () => {
       expect(keysForSurface("resync", { interviewId: "i1", projectId: "p1" })).toEqual([
         queryKeys.transcript("i1"),
+        queryKeys.insights("i1"),
         queryKeys.interviews("p1"),
         queryKeys.persons("p1"),
         queryKeys.personas("p1"),
@@ -142,22 +153,25 @@ describe("useLiveInvalidation", () => {
     const spy = vi.spyOn(client, "invalidateQueries");
     renderHook(() => useLiveInvalidation({ interviewId: "i1" }), { wrapper: Wrapper });
 
+    // Two keys are watched for a "transcript" notification (transcript +
+    // insights), each debounced independently, so one notification yields
+    // one immediate invalidate PER key.
     send("transcript");
-    expect(spy).toHaveBeenCalledTimes(1); // immediate
+    expect(spy).toHaveBeenCalledTimes(2); // immediate, one per watched key
 
     // A second notification just under the default 500ms coalesce window
-    // must be coalesced (no second immediate invalidate).
+    // must be coalesced (no second immediate invalidate) for either key.
     vi.advanceTimersByTime(499);
     send("transcript");
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledTimes(2);
 
     // The trailing refetch fires 2000ms after the MOST RECENT notification,
     // not the first — so advancing only 2000ms from the first notification
     // must not yet fire it (only 1501ms have passed since the 2nd notify).
     vi.advanceTimersByTime(1999);
-    expect(spy).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(1);
     expect(spy).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(1);
+    expect(spy).toHaveBeenCalledTimes(4); // trailing fires for both keys
   });
 
   it("no scopes -> idle status, no EventSource constructed", () => {
@@ -254,11 +268,12 @@ describe("useLiveInvalidation", () => {
       return { spy };
     }
 
-    it("transcript surface invalidates transcript(interviewId) only", () => {
+    it("transcript surface invalidates transcript(interviewId) and insights(interviewId)", () => {
       const { spy } = setup();
       send("transcript", { interview_id: "i1" });
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledTimes(2);
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.transcript("i1"), exact: true });
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.insights("i1"), exact: true });
     });
 
     it("interviews surface invalidates interviews(projectId) only", () => {
@@ -268,11 +283,13 @@ describe("useLiveInvalidation", () => {
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.interviews("p1"), exact: true });
     });
 
-    it("project surface invalidates transcript(interviewId) and persons/personas/worklist(projectId) when an interviewId scope is present", () => {
+    it("project surface invalidates transcript(interviewId) and interviews/persons/personas/worklist(projectId) when an interviewId scope is present", () => {
       const { spy } = setup();
       send("project", { project_id: "p1" });
-      expect(spy).toHaveBeenCalledTimes(4);
+      expect(spy).toHaveBeenCalledTimes(6);
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.transcript("i1"), exact: true });
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.insights("i1"), exact: true });
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.interviews("p1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.persons("p1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.personas("p1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.worklist("p1"), exact: true });
@@ -281,8 +298,9 @@ describe("useLiveInvalidation", () => {
     it("resync surface invalidates every key this hook watches", () => {
       const { spy } = setup();
       send("resync");
-      expect(spy).toHaveBeenCalledTimes(5);
+      expect(spy).toHaveBeenCalledTimes(6);
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.transcript("i1"), exact: true });
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.insights("i1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.interviews("p1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.persons("p1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.personas("p1"), exact: true });
@@ -290,13 +308,14 @@ describe("useLiveInvalidation", () => {
     });
   });
 
-  it("project surface invalidates persons/personas/worklist(projectId) on the interview-list page scope (no interviewId)", () => {
+  it("project surface invalidates interviews/persons/personas/worklist(projectId) on the interview-list page scope (no interviewId)", () => {
     const { client, Wrapper } = makeWrapper();
     const spy = vi.spyOn(client, "invalidateQueries");
     renderHook(() => useLiveInvalidation({ projectId: "p1" }), { wrapper: Wrapper });
 
     send("project", { project_id: "p1" });
-    expect(spy).toHaveBeenCalledTimes(3);
+    expect(spy).toHaveBeenCalledTimes(4);
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.interviews("p1"), exact: true });
     expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.persons("p1"), exact: true });
     expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.personas("p1"), exact: true });
     expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.worklist("p1"), exact: true });
@@ -343,6 +362,7 @@ describe("useLiveInvalidation", () => {
       expect(keys).toEqual(
         expect.arrayContaining([
           queryKeys.transcript("i1"),
+          queryKeys.insights("i1"),
           queryKeys.interviews("p1"),
           queryKeys.persons("p1"),
           queryKeys.personas("p1"),
@@ -364,31 +384,30 @@ describe("useLiveInvalidation", () => {
       );
 
       // 5 notifications, 100ms apart — all within the 500ms coalesce window
-      // of the first, so only the first is an immediate invalidate.
+      // of the first, so only the first is an immediate invalidate (once
+      // per watched key: transcript + insights).
       send("transcript");
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledTimes(2);
       for (let i = 0; i < 4; i += 1) {
         vi.advanceTimersByTime(100);
         send("transcript");
       }
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledTimes(2);
 
       // Trailing timer resets on every notification — advancing only up to
       // just before 2000ms since the LAST (5th) notification must not fire
       // it yet.
       vi.advanceTimersByTime(1999);
-      expect(spy).toHaveBeenCalledTimes(1);
-      vi.advanceTimersByTime(1);
       expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy).toHaveBeenNthCalledWith(2, {
-        queryKey: queryKeys.transcript("i1"),
-        exact: true,
-      });
+      vi.advanceTimersByTime(1);
+      expect(spy).toHaveBeenCalledTimes(4);
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.transcript("i1"), exact: true });
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.insights("i1"), exact: true });
 
       // No further invalidation happens after the trailing fire (no leaked
       // timers still pending).
       vi.advanceTimersByTime(10_000);
-      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy).toHaveBeenCalledTimes(4);
     });
 
     it("a notification after the coalesce window has elapsed triggers a new immediate invalidate", () => {
@@ -400,11 +419,11 @@ describe("useLiveInvalidation", () => {
       );
 
       send("transcript");
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledTimes(2);
 
       vi.advanceTimersByTime(501);
       send("transcript");
-      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy).toHaveBeenCalledTimes(4);
     });
 
     it("debounce is scoped per query key — a burst touching two different keys immediately-invalidates each independently", () => {
@@ -421,8 +440,9 @@ describe("useLiveInvalidation", () => {
 
       send("transcript");
       send("interviews");
-      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy).toHaveBeenCalledTimes(3);
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.transcript("i1"), exact: true });
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.insights("i1"), exact: true });
       expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.interviews("p1"), exact: true });
     });
   });

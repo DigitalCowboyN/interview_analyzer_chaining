@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { routes } from "@/lib/routes";
 import type { PersonSummary } from "@/hooks/usePersons";
 
 /**
@@ -18,20 +19,18 @@ export function PersonCardGrid({
       {persons.map((person) => (
         <li key={person.person_id}>
           <Link
-            href={`/gallery/persons/${encodeURIComponent(projectId)}/${encodeURIComponent(
-              person.person_id,
-            )}`}
-            className="block rounded border border-neutral-200 p-4 hover:bg-neutral-50"
+            href={routes.person(projectId, person.person_id)}
+            className="block rounded border border-border p-4 hover:bg-surface-raised"
           >
-            <h3 className="font-medium text-neutral-900">{person.display_name}</h3>
-            <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
+            <h3 className="font-medium text-fg">{person.display_name}</h3>
+            <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted">
               <div className="flex items-center gap-1">
                 <dt>Speakers</dt>
-                <dd className="font-medium text-neutral-700">{person.speaker_count}</dd>
+                <dd className="font-medium text-fg">{person.speaker_count}</dd>
               </div>
               <div className="flex items-center gap-1">
                 <dt>Interviews</dt>
-                <dd className="font-medium text-neutral-700">{person.interview_count}</dd>
+                <dd className="font-medium text-fg">{person.interview_count}</dd>
               </div>
             </dl>
           </Link>

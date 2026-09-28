@@ -3,8 +3,22 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { PersonaInterviewFilter } from "@/components/PersonaInterviewFilter";
 
 const INTERVIEWS = [
-  { interview_id: "i1", title: "Kickoff call", created_at: "2026-01-01", fragment_count: 10 },
-  { interview_id: "i2", title: "Follow-up", created_at: "2026-01-02", fragment_count: 5 },
+  {
+    interview_id: "i1",
+    title: "Kickoff call",
+    created_at: "2026-01-01",
+    fragment_count: 10,
+    participants: [],
+    insight_counts: {},
+  },
+  {
+    interview_id: "i2",
+    title: "Follow-up",
+    created_at: "2026-01-02",
+    fragment_count: 5,
+    participants: [],
+    insight_counts: {},
+  },
 ];
 
 const PERSONAS = [

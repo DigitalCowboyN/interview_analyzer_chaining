@@ -160,8 +160,8 @@ async def _ingest_and_enrich(tmp_path, monkeypatch, project_id, filename, text, 
 
 
 @pytest.mark.asyncio
-async def test_ask_engine_hybrid_retrieval_and_verbatim_citations(tmp_path, monkeypatch):
-    project_id = f"smoke-ask-{uuid_mod.uuid4()}"
+async def test_ask_engine_hybrid_retrieval_and_verbatim_citations(tmp_path, monkeypatch, isolated_project_id):
+    project_id = isolated_project_id("smoke")
 
     # --- 1/2. Ingest two transcripts, canned enrichment (fake embedder) -----
     result1 = await _ingest_and_enrich(

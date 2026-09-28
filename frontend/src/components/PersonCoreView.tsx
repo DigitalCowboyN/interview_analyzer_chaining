@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { routes } from "@/lib/routes";
 import type { PersonLink } from "@/hooks/usePersonDetail";
 
 /**
@@ -22,22 +23,22 @@ export function PersonCoreView({
   return (
     <div className="space-y-6">
       <section>
-        <h2 className="text-sm font-semibold uppercase text-neutral-500">
+        <h2 className="text-sm font-semibold uppercase text-fg-muted">
           Linked speakers ({links.length})
         </h2>
         {links.length === 0 ? (
-          <p className="mt-2 text-sm text-neutral-400">No linked speakers.</p>
+          <p className="mt-2 text-sm text-fg-muted">No linked speakers.</p>
         ) : (
           <ul className="mt-2 space-y-2">
             {links.map((link) => (
               <li
                 key={`${link.interview_id}-${link.speaker_id}`}
-                className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-200 p-3"
+                className="flex flex-wrap items-center justify-between gap-2 rounded border border-border p-3 bg-surface"
               >
-                <span className="text-sm text-neutral-900">
+                <span className="text-sm text-fg">
                   {link.speaker_display_name}
                 </span>
-                <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700">
+                <span className="rounded bg-accent-subtle px-1.5 py-0.5 text-xs text-accent">
                   {link.interview_title}
                 </span>
               </li>
@@ -47,18 +48,16 @@ export function PersonCoreView({
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold uppercase text-neutral-500">Persona profile</h2>
+        <h2 className="text-sm font-semibold uppercase text-fg-muted">Persona profile</h2>
         {contributesToPersona ? (
           <Link
-            href={`/gallery/personas/${encodeURIComponent(projectId)}/${encodeURIComponent(
-              personId,
-            )}`}
-            className="mt-2 inline-block text-sm text-blue-700 hover:underline"
+            href={routes.persona(projectId, personId)}
+            className="mt-2 inline-block text-sm text-accent hover:underline"
           >
             View persona profile →
           </Link>
         ) : (
-          <p className="mt-2 text-sm text-neutral-400">
+          <p className="mt-2 text-sm text-fg-muted">
             No persona profile yet for this person.
           </p>
         )}

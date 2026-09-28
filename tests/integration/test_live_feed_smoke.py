@@ -131,12 +131,14 @@ class _FixedFirstUUID4:
 
 
 @pytest.mark.asyncio
-async def test_live_feed_delivers_transcript_notification_on_ingest(tmp_path, monkeypatch):
+async def test_live_feed_delivers_transcript_notification_on_ingest(
+    tmp_path, monkeypatch, isolated_project_id
+):
     from src.api.routers.ui import stream_events
 
     fresh_interview_uuid = uuid_mod.uuid4()
     fresh_interview_id = str(fresh_interview_uuid)
-    project_id = f"live-feed-smoke-{uuid_mod.uuid4()}"
+    project_id = isolated_project_id("live-feed-smoke")
 
     monkeypatch.setattr(uuid_mod, "uuid4", _FixedFirstUUID4(fresh_interview_uuid))
     monkeypatch.setattr("src.api.routers.ui.HEARTBEAT_SECONDS", HEARTBEAT_TEST_SECONDS)
@@ -201,7 +203,7 @@ async def test_live_feed_delivers_transcript_notification_on_ingest(tmp_path, mo
 
 @pytest.mark.asyncio
 async def test_live_feed_delivers_project_notifications_for_resolution_and_lens(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, isolated_project_id
 ):
     """Gallery liveness (M5.1b): a project-scoped SSE subscriber receives a
     `project` notification for (a) a Project-stream resolution event and
@@ -222,7 +224,7 @@ async def test_live_feed_delivers_project_notifications_for_resolution_and_lens(
     from src.events.repository import get_project_repository
     from src.lens.engine import LensEngine
 
-    project_id = f"live-gallery-smoke-{uuid_mod.uuid4()}"
+    project_id = isolated_project_id("live-gallery-smoke")
 
     monkeypatch.setattr("src.api.routers.ui.HEARTBEAT_SECONDS", HEARTBEAT_TEST_SECONDS)
     monkeypatch.setattr(

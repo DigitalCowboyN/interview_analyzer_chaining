@@ -36,6 +36,7 @@ class TestIdempotency:
     async def test_replay_same_event_multiple_times(
         self,
         clean_test_database,
+        isolated_project_id,
     ):
         """
         Test that replaying the same event multiple times doesn't change state.
@@ -48,7 +49,7 @@ class TestIdempotency:
         """
         # Generate test IDs
         interview_id = str(uuid.uuid4())
-        project_id = "idempotency-test"
+        project_id = isolated_project_id("smoke")
         system_actor = Actor(actor_type=ActorType.SYSTEM, user_id="pipeline")
 
         # Create event
@@ -111,6 +112,7 @@ class TestIdempotency:
     async def test_version_guard_prevents_old_events(
         self,
         clean_test_database,
+        isolated_project_id,
     ):
         """
         Test that version guards prevent processing old events.
@@ -123,6 +125,7 @@ class TestIdempotency:
         """
         # Generate test IDs
         interview_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         sentence_index = 0
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
         system_actor = Actor(actor_type=ActorType.SYSTEM, user_id="pipeline")
@@ -159,7 +162,7 @@ class TestIdempotency:
             source="test.txt",
             language="en",
             actor=system_actor,
-            project_id="test-project",
+            project_id=project_id,
             correlation_id=correlation_id,
         )
         await interview_handler.handle(interview_event)
@@ -206,6 +209,7 @@ class TestIdempotency:
     async def test_multiple_event_types_idempotency(
         self,
         clean_test_database,
+        isolated_project_id,
     ):
         """
         Test idempotency across different event types.
@@ -217,6 +221,7 @@ class TestIdempotency:
         """
         # Generate test IDs
         interview_id = str(uuid.uuid4())
+        project_id = isolated_project_id("smoke")
         sentence_index = 0
         sentence_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{interview_id}:{sentence_index}"))
         system_actor = Actor(actor_type=ActorType.SYSTEM, user_id="pipeline")
@@ -263,7 +268,7 @@ class TestIdempotency:
             source="test.txt",
             language="en",
             actor=system_actor,
-            project_id="test-project",
+            project_id=project_id,
             correlation_id=correlation_id,
         )
         await interview_handler.handle(interview_event)

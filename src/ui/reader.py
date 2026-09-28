@@ -11,6 +11,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
+from src.ui.project_kind import classify
+
 logger = logging.getLogger(__name__)
 
 PERSONA_LENS = "persona"
@@ -87,7 +89,8 @@ async def persona_exists(session, project_id: str, person_id: str) -> bool:
 
 
 async def project_rows(session) -> List[Dict[str, Any]]:
-    """Every project with its interview count (nav landing).
+    """Every project with its interview count and derived kind (ADR-0034).
+    Real projects first, then test runs; each group ordered by project_id.
 
     graphq: purpose=ui scope=domain-broad audience=[api]
     """
@@ -98,23 +101,74 @@ async def project_rows(session) -> List[Dict[str, Any]]:
     ORDER BY p.project_id
     """
     result = await session.run(query)
-    return [dict(r) async for r in result]
+    rows = []
+    async for r in result:
+        kind = classify(r["project_id"])
+        rows.append({**dict(r), "kind": kind.kind, "suite": kind.suite})
+    rows.sort(key=lambda row: (row["kind"] != "real", row["project_id"]))
+    return rows
+
+
+_INTERVIEW_ROW_TAIL = """
+    OPTIONAL MATCH (i)-[:HAS_SENTENCE]->(f:Fragment)
+    WITH p, i, count(DISTINCT f) AS fragment_count
+    OPTIONAL MATCH (i)-[:HAS_PARTICIPANT]->(sp:Speaker)
+    WHERE sp.merged_into IS NULL
+    WITH p, i, fragment_count, collect(DISTINCT sp.display_name) AS participants
+    OPTIONAL MATCH (n:LensItem {interview_id: i.interview_id})
+    WITH p, i, fragment_count, participants, n.node_type AS node_type, count(n) AS cnt
+    WITH p, i, fragment_count, participants,
+         collect({node_type: node_type, n: cnt}) AS insight_pairs
+    RETURN p.project_id AS project_id, i.interview_id AS interview_id, i.title AS title,
+           toString(i.created_at) AS created_at, fragment_count, participants, insight_pairs
+"""
+
+
+def _shape_interview_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Fold insight_pairs into {node_type: count}; sort participants."""
+    shaped = {k: v for k, v in row.items() if k != "insight_pairs"}
+    shaped["participants"] = sorted(p for p in (row.get("participants") or []) if p)
+    shaped["insight_counts"] = {
+        pair["node_type"]: pair["n"]
+        for pair in (row.get("insight_pairs") or [])
+        if pair["node_type"] is not None and pair["n"]
+    }
+    return shaped
 
 
 async def interview_rows(session, project_id: str) -> List[Dict[str, Any]]:
-    """Project's interviews with fragment counts.
+    """Project's interviews with fragment counts, participants, insight counts.
 
     graphq: purpose=ui scope=domain-broad audience=[api]
     """
-    query = """
-    MATCH (:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->(i:Interview)
-    OPTIONAL MATCH (i)-[:HAS_SENTENCE]->(f:Fragment)
-    RETURN i.interview_id AS interview_id, i.title AS title,
-           toString(i.created_at) AS created_at, count(f) AS fragment_count
-    ORDER BY created_at
-    """
+    query = (
+        "MATCH (p:Project {project_id: $project_id})-[:CONTAINS_INTERVIEW]->(i:Interview)"
+        + _INTERVIEW_ROW_TAIL
+        + "ORDER BY created_at"
+    )
     result = await session.run(query, project_id=project_id)
-    return [dict(r) async for r in result]
+    return [_shape_interview_row(dict(r)) async for r in result]
+
+
+async def test_run_interview_rows(session) -> List[Dict[str, Any]]:
+    """Interviews of every test-kind project (ADR-0034 'Test runs' bucket),
+    tagged with suite; ordered by suite, then created_at.
+
+    graphq: purpose=ui scope=domain-broad audience=[api]
+    """
+    query = (
+        "MATCH (p:Project)-[:CONTAINS_INTERVIEW]->(i:Interview)"
+        + _INTERVIEW_ROW_TAIL
+        + "ORDER BY created_at"
+    )
+    result = await session.run(query)
+    rows = []
+    async for r in result:
+        kind = classify(r["project_id"])
+        if kind.kind == "test":
+            rows.append({**_shape_interview_row(dict(r)), "suite": kind.suite})
+    rows.sort(key=lambda row: (row["suite"], row["created_at"] or ""))
+    return rows
 
 
 async def interview_header_row(session, interview_id: str) -> Optional[Dict[str, Any]]:

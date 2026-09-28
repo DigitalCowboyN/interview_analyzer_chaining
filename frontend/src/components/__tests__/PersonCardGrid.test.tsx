@@ -17,10 +17,10 @@ describe("PersonCardGrid", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
 
-    // Separate-route-tree assertion: person cards navigate under /gallery/persons/...
+    // Separate-route-tree assertion: person cards navigate under /projects/:projectId/people/...
     expect(screen.getByRole("link", { name: /Jane Doe/ })).toHaveAttribute(
       "href",
-      "/gallery/persons/proj1/p1",
+      "/projects/proj1/people/p1",
     );
   });
 });

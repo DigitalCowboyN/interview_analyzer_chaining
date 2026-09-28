@@ -27,6 +27,7 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | tools.cli | operations | deterministic |  |
 | tools.code | operations | deterministic |  |
 | tools.corpus | operations | deterministic |  |
+| tools.dev |  | deterministic |  |
 | tools.glossary | operations | deterministic |  |
 | tools.graph | operations | deterministic |  |
 | tools.graphq | operations | deterministic |  |
@@ -166,6 +167,7 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | tools.corpus.check |  | deterministic | ingestion.front_matter, tools.corpus.model, tools.corpus.reader |
 | tools.corpus.model |  | deterministic |  |
 | tools.corpus.reader |  | deterministic | ingestion.front_matter, tools.corpus.model |
+| tools.dev.purge |  | deterministic | ui.project_kind, utils.neo4j_driver |
 | tools.glossary.__main__ |  | deterministic | tools.glossary.check, tools.glossary.model, tools.glossary.render, tools.glossary.scaffold |
 | tools.glossary.check |  | deterministic | tools.glossary.model, tools.glossary.reader, tools.glossary.render |
 | tools.glossary.model |  | deterministic | ingestion.front_matter |
@@ -207,7 +209,8 @@ Derived from `src/` and `tools/`. See `pipeline.md` for the dependency graph.
 | tools.usecase.reader |  | deterministic | ingestion.front_matter |
 | tools.usecase.render |  | deterministic | tools.capability.reader, tools.usecase.coverage, tools.usecase.reader |
 | ui.notifications |  | deterministic | events.store |
-| ui.reader | product | deterministic |  |
+| ui.project_kind |  | deterministic |  |
+| ui.reader | product | deterministic | ui.project_kind |
 | utils.environment |  | deterministic |  |
 | utils.helpers |  | deterministic |  |
 | utils.logger |  | deterministic | config |

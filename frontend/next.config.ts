@@ -14,6 +14,38 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  async redirects() {
+    return [
+      { source: "/workbench", destination: "/", permanent: false },
+      { source: "/gallery", destination: "/", permanent: false },
+      { source: "/workbench/:projectId", destination: "/projects/:projectId", permanent: false },
+      {
+        source: "/workbench/:projectId/:interviewId",
+        destination: "/projects/:projectId/interviews/:interviewId",
+        permanent: false,
+      },
+      { source: "/gallery/personas/:projectId", destination: "/projects/:projectId/personas", permanent: false },
+      {
+        source: "/gallery/personas/:projectId/:personId",
+        destination: "/projects/:projectId/personas/:personId",
+        permanent: false,
+      },
+      { source: "/gallery/persons/:projectId", destination: "/projects/:projectId/people", permanent: false },
+      {
+        source: "/gallery/persons/:projectId/:personId",
+        destination: "/projects/:projectId/people/:personId",
+        permanent: false,
+      },
+      {
+        source: "/gallery/worklist",
+        has: [{ type: "query", key: "project", value: "(?<project>.+)" }],
+        destination: "/projects/:project/review",
+        permanent: false,
+      },
+      { source: "/gallery/worklist", destination: "/", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -9,8 +9,8 @@ import { expect, test } from "@playwright/test";
  * the UI actually round-trips through the real event-sourced write path
  * (command -> ESDB -> dockerized projection-service -> Neo4j -> refetch).
  *
- * Journey: workbench nav (projects -> interviews -> transcript) -> transcript
- * renders the seeded lines -> edit one line's text through the UI -> the
+ * Journey: project/interview routes (/projects/:id -> /projects/:id/interviews/:id)
+ * -> transcript renders the seeded lines -> edit one line's text through the UI -> the
  * "edited" badge settles (proves the projection consumer delivered the
  * SentenceEdited event, not just that the POST returned 202).
  *
@@ -108,17 +108,15 @@ test.afterAll(() => {
   );
 });
 
-test("workbench nav renders seeded transcript, and a text edit settles", async ({ page }) => {
+test("nav renders seeded transcript, and a text edit settles", async ({ page }) => {
   const data = seeded!;
 
-  // Workbench nav: projects -> this project -> its one interview.
-  await page.goto("/workbench");
-  await page.getByRole("link", { name: data.project_id }).click();
-  await expect(page).toHaveURL(new RegExp(`/workbench/${encodeURIComponent(data.project_id)}$`));
-
-  await page.getByRole("link", { name: data.title }).click();
+  // Nav: this project's own URL (it's a test project, reached via its own
+  // URL or the Test runs bucket, not a landing card) -> its one interview.
+  await page.goto(`/projects/${encodeURIComponent(data.project_id)}`);
+  await page.getByRole("link", { name: new RegExp(data.title) }).click();
   await expect(page).toHaveURL(
-    new RegExp(`/workbench/${encodeURIComponent(data.project_id)}/${data.interview_id}$`),
+    new RegExp(`/projects/${encodeURIComponent(data.project_id)}/interviews/${data.interview_id}$`),
   );
 
   // Transcript renders the seeded line.
@@ -155,12 +153,30 @@ test("workbench nav renders seeded transcript, and a text edit settles", async (
   await expect(lineButton.getByText("edited", { exact: true })).toBeVisible({ timeout: 40_000 });
 });
 
+test("one click into a project, one into an interview, Back returns to the project", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: /Samples/ }).click();
+  await expect(page).toHaveURL(/\/projects\/samples$/);
+  await page.getByRole("link", { name: /Weekly Planning Sync/ }).click();
+  await expect(page.getByRole("heading", { name: /Decisions \(\d+\)/ })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/projects\/samples$/);
+  await expect(page.getByRole("combobox", { name: "Project" })).toHaveValue("samples");
+
+  // Header switcher: jumping to another project navigates via the URL, not
+  // component state (ADR-0034) -- proven by the URL assertion below.
+  await page
+    .getByRole("combobox", { name: "Project" })
+    .selectOption({ label: "Real Interviews" });
+  await expect(page).toHaveURL(/\/projects\/real-interviews$/);
+});
+
 test("a server-side line append appears live on an open transcript page with no user action", async ({
   page,
 }) => {
   const data = seeded!;
 
-  await page.goto(`/workbench/${encodeURIComponent(data.project_id)}/${data.interview_id}`);
+  await page.goto(`/projects/${encodeURIComponent(data.project_id)}/interviews/${data.interview_id}`);
 
   // Baseline: the seeded lines are up, and the live indicator has connected
   // (its EventSource onopen fired) -- both must be true before the append,
